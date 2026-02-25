@@ -20,13 +20,22 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 RUN apt-get update && apt-get install -y build-essential gfortran
 
 ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
-RUN tar xzf NPB3.3.1.tar.gz
+# Fix permissions for cross-build with QEMU emulation
+RUN tar xzf NPB3.3.1.tar.gz && chmod -R a+rX NPB3.3.1
 
 WORKDIR ./NPB3.3.1/NPB3.3-OMP
 
+# Add missing shebangs to shell scripts - required for cross-build with QEMU emulation
+# Without shebangs, dash (default /bin/sh on Debian) fails to execute these scripts via make
+RUN sed -i '1i#!/bin/sh' sys/print_header sys/print_instructions
+
 # Create build config based on the architecture and build the workload.
-RUN if [ $(arch) != "x86_64" ]; then \
-    sed s/-mcmodel=medium//g config/NAS.samples/make.def.gcc_x86 > config/make.def; \
+# arm64 requires special flags to avoid relocation overflow with large binaries:
+#   -mcmodel=large: use large code model for address space beyond default limits
+#   -fno-PIE: disable position-independent executable (incompatible with large model)
+#   -mno-outline-atomics: inline atomics to avoid linker issues
+RUN if [ $(arch) = "aarch64" ]; then \
+    sed 's/-mcmodel=medium/-mcmodel=large -fno-PIE -mno-outline-atomics/g' config/NAS.samples/make.def.gcc_x86 > config/make.def; \
 else \
     cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
 fi

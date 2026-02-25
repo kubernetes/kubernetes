@@ -18,6 +18,7 @@ package ipallocator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -73,7 +74,7 @@ type Allocator struct {
 var _ Interface = &Allocator{}
 
 // NewIPAllocator returns an IP allocator associated to a network range
-// that use the IPAddress objectto track the assigned IP addresses,
+// that use the IPAddress object to track the assigned IP addresses,
 // using an informer cache as storage.
 func NewIPAllocator(
 	cidr *net.IPNet,
@@ -253,7 +254,11 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 	var offset uint64
 	switch {
 	case rangeSize >= math.MaxInt64:
-		offset = rand.Uint64()
+		offset = a.rand.Uint64()
+		// a.offsetAddress + offset should not overflow a 64 bit CIDR.
+		if math.MaxUint64-offset < uint64(a.rangeOffset) {
+			offset -= uint64(a.rangeOffset)
+		}
 	case rangeSize == 0:
 		return net.IP{}, ErrFull
 	default:
@@ -265,8 +270,8 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 		a.metrics.setLatency(a.metricLabel, time.Since(start))
 		return ip, nil
 	}
-	// check the lower range
-	if a.rangeOffset != 0 {
+	// if the upper range is full, try to allocate from the lower range
+	if errors.Is(err, ErrFull) && a.rangeOffset != 0 {
 		offset = uint64(a.rand.Intn(a.rangeOffset))
 		iterator = ipIterator(a.firstAddress, a.offsetAddress.Prev(), offset)
 		ip, err = a.allocateFromRange(iterator, svc)
@@ -275,9 +280,13 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 			return ip, nil
 		}
 	}
-	// update metrics
+	// no IP available
+	if err == nil {
+		klog.Info("[SHOULD NOT HAPPEN] - No IP Allocated and no error")
+		err = ErrFull
+	}
 	a.metrics.incrementAllocationErrors(a.metricLabel, "dynamic")
-	return net.IP{}, ErrFull
+	return net.IP{}, err
 }
 
 // IP iterator allows to iterate over all the IP addresses
@@ -339,11 +348,17 @@ func (a *Allocator) allocateFromRange(iterator func() netip.Addr, svc *api.Servi
 		}
 		// address is not present on the cache, try to allocate it
 		err = a.createIPAddress(name, svc, "dynamic")
-		// an error can happen if there is a race and our informer was not updated
-		// swallow the error and try with the next IP address
+		// an error can happen if there is a TOCTOU race and the IP address
+		// was allocated by another instance, in that case, swallow the error
+		// and try with the next IP address, but abort on other errors.
+		// Ref: https://issues.k8s.io/135333
 		if err != nil {
+			if errors.Is(err, ErrAllocated) {
+				klog.Infof("mid-air collision trying to allocate IP %s that already exists, retrying ...", name)
+				continue
+			}
 			klog.Infof("can not create IPAddress %s: %v", name, err)
-			continue
+			return nil, err
 		}
 		return ip.AsSlice(), nil
 	}
@@ -420,12 +435,44 @@ func (a *Allocator) Used() int {
 	if err != nil {
 		return 0
 	}
-	return len(ips)
+
+	// Count only IPs that belong to this allocator's CIDR
+	count := 0
+	for _, ipAddress := range ips {
+		// Parse the IP address string to netip.Addr type
+		ip, err := netip.ParseAddr(ipAddress.Name)
+		if err != nil {
+			continue
+		}
+		// Only count valid IPs that fall within this allocator's CIDR range
+		if a.prefix.Contains(ip) {
+			count++
+		}
+	}
+	return count
 }
 
 // for testing, it assumes this is the allocator is unique for the ipFamily
 func (a *Allocator) Free() int {
-	return int(a.size) - a.Used()
+	used := a.Used()
+
+	// Prevent integer overflow: if a.size exceeds int max value, use MaxInt
+	if a.size > math.MaxInt {
+		// In this case, used is definitely less than MaxInt, so no negative values
+		return math.MaxInt - used
+	}
+
+	size := int(a.size)
+
+	// Prevent negative return values due to data inconsistency
+	if used > size {
+		// This usually indicates data inconsistency, log a warning and return 0
+		klog.Warningf("IP allocator inconsistency detected: used (%d) > size (%d) for CIDR %s",
+			used, size, a.cidr.String())
+		return 0
+	}
+
+	return size - used
 }
 
 // Destroy
@@ -493,7 +540,7 @@ func (dry dryRunAllocator) EnableMetrics() {
 func addOffsetAddress(address netip.Addr, offset uint64) (netip.Addr, error) {
 	addressBytes := address.AsSlice()
 	addressBig := big.NewInt(0).SetBytes(addressBytes)
-	r := big.NewInt(0).Add(addressBig, big.NewInt(int64(offset))).Bytes()
+	r := big.NewInt(0).Add(addressBig, big.NewInt(0).SetUint64(offset)).Bytes()
 	// r must be 4 or 16 bytes depending of the ip family
 	// bigInt conversion to bytes will not take this into consideration
 	// and drop the leading zeros, so we have to take this into account.

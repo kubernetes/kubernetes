@@ -161,7 +161,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 			return false, nil
 		}
 		return res.ResourceVersion == se.ResourceVersion, nil
-	}); err == nil || err != wait.ErrWaitTimeout {
+	}); err == nil || !wait.Interrupted(err) {
 		t.Errorf("Events watchcache unexpected synced: %v", err)
 	}
 }
@@ -180,7 +180,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	wg := sync.WaitGroup{}
 
 	errCh := make(chan error, namespaces)
-	for i := 0; i < namespaces; i++ {
+	for i := range namespaces {
 		wg.Add(1)
 		index := i
 		go func() {
@@ -195,7 +195,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 				return
 			}
 
-			for j := 0; j < secretsPerNamespace; j++ {
+			for j := range secretsPerNamespace {
 				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("secret-%d", j),

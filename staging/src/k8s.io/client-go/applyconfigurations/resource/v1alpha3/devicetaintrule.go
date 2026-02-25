@@ -29,10 +29,20 @@ import (
 
 // DeviceTaintRuleApplyConfiguration represents a declarative configuration of the DeviceTaintRule type for use
 // with apply.
+//
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
 type DeviceTaintRuleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec specifies the selector and one taint.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status provides information about what was requested in the spec.
+	Status *DeviceTaintRuleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // DeviceTaintRule constructs a declarative configuration of the DeviceTaintRule type for use with
@@ -45,29 +55,14 @@ func DeviceTaintRule(name string) *DeviceTaintRuleApplyConfiguration {
 	return b
 }
 
-// ExtractDeviceTaintRule extracts the applied configuration owned by fieldManager from
-// deviceTaintRule. If no managedFields are found in deviceTaintRule for fieldManager, a
-// DeviceTaintRuleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractDeviceTaintRuleFrom extracts the applied configuration owned by fieldManager from
+// deviceTaintRule for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // deviceTaintRule must be a unmodified DeviceTaintRule API object that was retrieved from the Kubernetes API.
-// ExtractDeviceTaintRule provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractDeviceTaintRuleFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
-	return extractDeviceTaintRule(deviceTaintRule, fieldManager, "")
-}
-
-// ExtractDeviceTaintRuleStatus is the same as ExtractDeviceTaintRule except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDeviceTaintRuleStatus(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
-	return extractDeviceTaintRule(deviceTaintRule, fieldManager, "status")
-}
-
-func extractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string, subresource string) (*DeviceTaintRuleApplyConfiguration, error) {
+func ExtractDeviceTaintRuleFrom(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string, subresource string) (*DeviceTaintRuleApplyConfiguration, error) {
 	b := &DeviceTaintRuleApplyConfiguration{}
 	err := managedfields.ExtractInto(deviceTaintRule, internal.Parser().Type("io.k8s.api.resource.v1alpha3.DeviceTaintRule"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +74,27 @@ func extractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, f
 	b.WithAPIVersion("resource.k8s.io/v1alpha3")
 	return b, nil
 }
+
+// ExtractDeviceTaintRule extracts the applied configuration owned by fieldManager from
+// deviceTaintRule. If no managedFields are found in deviceTaintRule for fieldManager, a
+// DeviceTaintRuleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// deviceTaintRule must be a unmodified DeviceTaintRule API object that was retrieved from the Kubernetes API.
+// ExtractDeviceTaintRule provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
+	return ExtractDeviceTaintRuleFrom(deviceTaintRule, fieldManager, "")
+}
+
+// ExtractDeviceTaintRuleStatus extracts the applied configuration owned by fieldManager from
+// deviceTaintRule for the status subresource.
+func ExtractDeviceTaintRuleStatus(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
+	return ExtractDeviceTaintRuleFrom(deviceTaintRule, fieldManager, "status")
+}
+
 func (b DeviceTaintRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
@@ -244,6 +260,14 @@ func (b *DeviceTaintRuleApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 // If called multiple times, the Spec field is set to the value of the last call.
 func (b *DeviceTaintRuleApplyConfiguration) WithSpec(value *DeviceTaintRuleSpecApplyConfiguration) *DeviceTaintRuleApplyConfiguration {
 	b.Spec = value
+	return b
+}
+
+// WithStatus sets the Status field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Status field is set to the value of the last call.
+func (b *DeviceTaintRuleApplyConfiguration) WithStatus(value *DeviceTaintRuleStatusApplyConfiguration) *DeviceTaintRuleApplyConfiguration {
+	b.Status = value
 	return b
 }
 

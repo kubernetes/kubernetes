@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -304,8 +303,8 @@ func checkPodPullingOverlap(podStartTime map[string]metav1.Time, podEndTime map[
 
 func prepareAndCleanup(ctx context.Context, f *framework.Framework) (testpods []*v1.Pod) {
 	// cuda images are > 2Gi and it will reduce the flaky rate
-	image1 := imageutils.GetE2EImage(imageutils.Httpd)
-	image2 := imageutils.GetE2EImage(imageutils.HttpdNew)
+	image1 := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+	image2 := imageutils.GetE2EImage(imageutils.Agnhost)
 	node := getNodeName(ctx, f)
 
 	testpod := &v1.Pod{

@@ -66,8 +66,8 @@ func (et *ValueType) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (e ValueType) String() string {
-	switch e {
+func (et ValueType) String() string {
+	switch et {
 	case ValNone:
 		return "<ValNone>"
 	case ValScalar:

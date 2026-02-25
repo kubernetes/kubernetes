@@ -31,6 +31,9 @@
             "description": "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -569,16 +572,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "DeleteOptions",
             "version": "v1"
@@ -726,6 +719,11 @@
           {
             "group": "resource.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1alpha3"
           },
           {
@@ -771,7 +769,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
@@ -1034,8 +1032,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails"
               }
             ],
-            "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
-            "x-kubernetes-list-type": "atomic"
+            "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
           },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -1258,16 +1255,6 @@
             "version": "v2"
           },
           {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
             "group": "batch",
             "kind": "WatchEvent",
             "version": "v1"
@@ -1415,6 +1402,11 @@
           {
             "group": "resource.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1alpha3"
           },
           {
@@ -1460,7 +1452,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },

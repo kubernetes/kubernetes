@@ -19,12 +19,15 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -41,6 +44,7 @@ const defaultClientCallTimeout = 45 * time.Second
 // All API versions supported by this wrapper.
 // Sorted by most recent first, oldest last.
 var servicesSupportedByKubelet = []string{
+	drapbv1.DRAPluginService,
 	drapbv1beta1.DRAPluginService,
 }
 
@@ -51,8 +55,14 @@ type DRAPlugin struct {
 	driverName        string
 	conn              *grpc.ClientConn
 	endpoint          string
-	chosenService     string // e.g. drapbv1beta1.DRAPluginService
+	chosenService     string // e.g. drapbv1.DRAPluginService
 	clientCallTimeout time.Duration
+
+	mutex         sync.Mutex
+	backgroundCtx context.Context
+
+	healthStreamCtx    context.Context
+	healthStreamCancel context.CancelFunc
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -61,10 +71,10 @@ func (p *DRAPlugin) DriverName() string {
 
 func (p *DRAPlugin) NodePrepareResources(
 	ctx context.Context,
-	req *drapbv1beta1.NodePrepareResourcesRequest,
+	req *drapbv1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
-) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
+) (*drapbv1.NodePrepareResourcesResponse, error) {
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
@@ -73,11 +83,14 @@ func (p *DRAPlugin) NodePrepareResources(
 	defer cancel()
 
 	var err error
-	var response *drapbv1beta1.NodePrepareResourcesResponse
+	var response *drapbv1.NodePrepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = nodeClient.NodePrepareResources(ctx, req)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
+	case drapbv1.DRAPluginService:
+		client := drapbv1.NewDRAPluginClient(p.conn)
+		response, err = client.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -89,23 +102,27 @@ func (p *DRAPlugin) NodePrepareResources(
 
 func (p *DRAPlugin) NodeUnprepareResources(
 	ctx context.Context,
-	req *drapbv1beta1.NodeUnprepareResourcesRequest,
+	req *drapbv1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
-) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
+) (*drapbv1.NodeUnprepareResourcesResponse, error) {
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
+
+	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
 	var err error
-	var response *drapbv1beta1.NodeUnprepareResourcesResponse
+	var response *drapbv1.NodeUnprepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = nodeClient.NodeUnprepareResources(ctx, req)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
+	case drapbv1.DRAPluginService:
+		client := drapbv1.NewDRAPluginClient(p.conn)
+		response, err = client.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -122,4 +139,36 @@ func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
+}
+
+// SetHealthStream stores the context and cancel function for the active health stream.
+func (p *DRAPlugin) SetHealthStream(ctx context.Context, cancel context.CancelFunc) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.healthStreamCtx = ctx
+	p.healthStreamCancel = cancel
+}
+
+// HealthStreamCancel returns the cancel function for the current health stream, if any.
+func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.healthStreamCancel
+}
+
+// NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
+func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
+	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
+	healthClient := drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+
+	logger.V(4).Info("Starting WatchResources stream")
+	stream, err := healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
+	if err != nil {
+		logger.Error(err, "NodeWatchResources RPC call failed")
+		return nil, err
+	}
+
+	logger.V(4).Info("NodeWatchResources stream initiated successfully")
+	return stream, nil
 }

@@ -24,9 +24,20 @@ import (
 
 // DaemonSetUpdateStrategyApplyConfiguration represents a declarative configuration of the DaemonSetUpdateStrategy type for use
 // with apply.
+//
+// DaemonSetUpdateStrategy indicates the strategy that the DaemonSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
 type DaemonSetUpdateStrategyApplyConfiguration struct {
-	Type          *extensionsv1beta1.DaemonSetUpdateStrategyType `json:"type,omitempty"`
-	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration      `json:"rollingUpdate,omitempty"`
+	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// Default is OnDelete.
+	Type *extensionsv1beta1.DaemonSetUpdateStrategyType `json:"type,omitempty"`
+	// Rolling update config params. Present only if type = "RollingUpdate".
+	// ---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be. Same as Deployment `strategy.rollingUpdate`.
+	// See https://github.com/kubernetes/kubernetes/issues/35345
+	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
 // DaemonSetUpdateStrategyApplyConfiguration constructs a declarative configuration of the DaemonSetUpdateStrategy type for use with

@@ -24,20 +24,52 @@ import (
 
 // NodeStatusApplyConfiguration represents a declarative configuration of the NodeStatus type for use
 // with apply.
+//
+// NodeStatus is information about the current status of a node.
 type NodeStatusApplyConfiguration struct {
-	Capacity        *corev1.ResourceList                   `json:"capacity,omitempty"`
-	Allocatable     *corev1.ResourceList                   `json:"allocatable,omitempty"`
-	Phase           *corev1.NodePhase                      `json:"phase,omitempty"`
-	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty"`
-	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty"`
+	// Capacity represents the total resources of a node.
+	// More info: https://kubernetes.io/docs/reference/node/node-status/#capacity
+	Capacity *corev1.ResourceList `json:"capacity,omitempty"`
+	// Allocatable represents the resources of a node that are available for scheduling.
+	// Defaults to Capacity.
+	Allocatable *corev1.ResourceList `json:"allocatable,omitempty"`
+	// NodePhase is the recently observed lifecycle phase of the node.
+	// More info: https://kubernetes.io/docs/concepts/nodes/node/#phase
+	// The field is never populated, and now is deprecated.
+	Phase *corev1.NodePhase `json:"phase,omitempty"`
+	// Conditions is an array of current observed node conditions.
+	// More info: https://kubernetes.io/docs/reference/node/node-status/#condition
+	Conditions []NodeConditionApplyConfiguration `json:"conditions,omitempty"`
+	// List of addresses reachable to the node.
+	// Queried from cloud provider, if available.
+	// More info: https://kubernetes.io/docs/reference/node/node-status/#addresses
+	// Note: This field is declared as mergeable, but the merge key is not sufficiently
+	// unique, which can cause data corruption when it is merged. Callers should instead
+	// use a full-replacement patch. See https://pr.k8s.io/79391 for an example.
+	// Consumers should assume that addresses can change during the
+	// lifetime of a Node. However, there are some exceptions where this may not
+	// be possible, such as Pods that inherit a Node's address in its own status or
+	// consumers of the downward API (status.hostIP).
+	Addresses []NodeAddressApplyConfiguration `json:"addresses,omitempty"`
+	// Endpoints of daemons running on the Node.
 	DaemonEndpoints *NodeDaemonEndpointsApplyConfiguration `json:"daemonEndpoints,omitempty"`
-	NodeInfo        *NodeSystemInfoApplyConfiguration      `json:"nodeInfo,omitempty"`
-	Images          []ContainerImageApplyConfiguration     `json:"images,omitempty"`
-	VolumesInUse    []corev1.UniqueVolumeName              `json:"volumesInUse,omitempty"`
-	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty"`
-	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty"`
+	// Set of ids/uuids to uniquely identify the node.
+	// More info: https://kubernetes.io/docs/reference/node/node-status/#info
+	NodeInfo *NodeSystemInfoApplyConfiguration `json:"nodeInfo,omitempty"`
+	// List of container images on this node
+	Images []ContainerImageApplyConfiguration `json:"images,omitempty"`
+	// List of attachable volumes in use (mounted) by the node.
+	VolumesInUse []corev1.UniqueVolumeName `json:"volumesInUse,omitempty"`
+	// List of volumes that are attached to the node.
+	VolumesAttached []AttachedVolumeApplyConfiguration `json:"volumesAttached,omitempty"`
+	// Status of the config assigned to the node via the dynamic Kubelet config feature.
+	Config *NodeConfigStatusApplyConfiguration `json:"config,omitempty"`
+	// The available runtime handlers.
 	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
-	Features        *NodeFeaturesApplyConfiguration        `json:"features,omitempty"`
+	// Features describes the set of features implemented by the CRI implementation.
+	Features *NodeFeaturesApplyConfiguration `json:"features,omitempty"`
+	// DeclaredFeatures represents the features related to feature gates that are declared by the node.
+	DeclaredFeatures []string `json:"declaredFeatures,omitempty"`
 }
 
 // NodeStatusApplyConfiguration constructs a declarative configuration of the NodeStatus type for use with
@@ -174,5 +206,15 @@ func (b *NodeStatusApplyConfiguration) WithRuntimeHandlers(values ...*NodeRuntim
 // If called multiple times, the Features field is set to the value of the last call.
 func (b *NodeStatusApplyConfiguration) WithFeatures(value *NodeFeaturesApplyConfiguration) *NodeStatusApplyConfiguration {
 	b.Features = value
+	return b
+}
+
+// WithDeclaredFeatures adds the given value to the DeclaredFeatures field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the DeclaredFeatures field.
+func (b *NodeStatusApplyConfiguration) WithDeclaredFeatures(values ...string) *NodeStatusApplyConfiguration {
+	for i := range values {
+		b.DeclaredFeatures = append(b.DeclaredFeatures, values[i])
+	}
 	return b
 }

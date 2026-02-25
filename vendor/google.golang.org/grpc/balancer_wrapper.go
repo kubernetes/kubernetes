@@ -450,13 +450,14 @@ func (acbw *acBalancerWrapper) healthListenerRegFn() func(context.Context, func(
 	if acbw.ccb.cc.dopts.disableHealthCheck {
 		return noOpRegisterHealthListenerFn
 	}
+	cfg := acbw.ac.cc.healthCheckConfig()
+	if cfg == nil {
+		return noOpRegisterHealthListenerFn
+	}
 	regHealthLisFn := internal.RegisterClientHealthCheckListener
 	if regHealthLisFn == nil {
 		// The health package is not imported.
-		return noOpRegisterHealthListenerFn
-	}
-	cfg := acbw.ac.cc.healthCheckConfig()
-	if cfg == nil {
+		channelz.Error(logger, acbw.ac.channelz, "Health check is requested but health package is not imported.")
 		return noOpRegisterHealthListenerFn
 	}
 	return func(ctx context.Context, listener func(balancer.SubConnState)) func() {

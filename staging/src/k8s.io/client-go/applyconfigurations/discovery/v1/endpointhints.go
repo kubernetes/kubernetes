@@ -20,8 +20,14 @@ package v1
 
 // EndpointHintsApplyConfiguration represents a declarative configuration of the EndpointHints type for use
 // with apply.
+//
+// EndpointHints provides hints describing how an endpoint should be consumed.
 type EndpointHintsApplyConfiguration struct {
+	// forZones indicates the zone(s) this endpoint should be consumed by when
+	// using topology aware routing. May contain a maximum of 8 entries.
 	ForZones []ForZoneApplyConfiguration `json:"forZones,omitempty"`
+	// forNodes indicates the node(s) this endpoint should be consumed by when
+	// using topology aware routing. May contain a maximum of 8 entries.
 	ForNodes []ForNodeApplyConfiguration `json:"forNodes,omitempty"`
 }
 

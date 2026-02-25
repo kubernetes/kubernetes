@@ -20,9 +20,11 @@ package dlopen
 // #include <stdlib.h>
 // #include <dlfcn.h>
 import "C"
+
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"unsafe"
 )
 
@@ -56,6 +58,10 @@ func GetHandle(libs []string) (*LibHandle, error) {
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
 func (l *LibHandle) GetSymbolPointer(symbol string) (unsafe.Pointer, error) {
+	// Locking the thread is critical here as the dlerror() is thread local so
+	// go should not reschedule this onto another thread.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	sym := C.CString(symbol)
 	defer C.free(unsafe.Pointer(sym))
 
@@ -63,7 +69,7 @@ func (l *LibHandle) GetSymbolPointer(symbol string) (unsafe.Pointer, error) {
 	p := C.dlsym(l.Handle, sym)
 	e := C.dlerror()
 	if e != nil {
-		return nil, fmt.Errorf("error resolving symbol %q: %v", symbol, errors.New(C.GoString(e)))
+		return nil, fmt.Errorf("error resolving symbol %q: %s", symbol, C.GoString(e))
 	}
 
 	return p, nil
@@ -71,11 +77,15 @@ func (l *LibHandle) GetSymbolPointer(symbol string) (unsafe.Pointer, error) {
 
 // Close closes a LibHandle.
 func (l *LibHandle) Close() error {
+	// Locking the thread is critical here as the dlerror() is thread local so
+	// go should not reschedule this onto another thread.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	C.dlerror()
 	C.dlclose(l.Handle)
 	e := C.dlerror()
 	if e != nil {
-		return fmt.Errorf("error closing %v: %v", l.Libname, errors.New(C.GoString(e)))
+		return fmt.Errorf("error closing %v: %s", l.Libname, C.GoString(e))
 	}
 
 	return nil

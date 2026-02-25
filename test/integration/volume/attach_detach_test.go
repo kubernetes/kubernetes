@@ -614,7 +614,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 
 	// pods with pvc not bound
 	pvcs := []*v1.PersistentVolumeClaim{}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
 		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod : %v", err)

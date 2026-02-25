@@ -93,7 +93,7 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 	resv1 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(resv2))
 	for i, cond := range resv2 {
 		resv1[i] = autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.HorizontalPodAutoscalerConditionType(cond.Type),
+			Type:   cond.Type,
 			Status: cond.Status,
 			Reason: cond.Reason,
 		}
@@ -146,6 +146,7 @@ type testCase struct {
 	expectedReportedReconciliationErrorLabel      monitor.ErrorLabel
 	expectedReportedMetricComputationActionLabels map[autoscalingv2.MetricSourceType]monitor.ActionLabel
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
+	checkDesiredReplicaMetric                     bool
 
 	// Target resource information.
 	resource *fakeResource
@@ -186,6 +187,7 @@ func init() {
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
+	logger, _ := ktesting.NewTestContext(t)
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -510,7 +512,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, obj, nil
 	})
 
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeMetricsClient := &metricsfake.Clientset{}
@@ -727,6 +729,14 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 		}
 		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
+
+	// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
+	if tc.checkDesiredReplicaMetric {
+		currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
+		assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
+			"the desired replicas should be recorded in monitor expectedly")
+	}
+
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -816,9 +826,14 @@ func coolCPUCreationTime() metav1.Time {
 
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		hpaController.Run(ctx, 5)
+	})
+	defer wg.Wait()
+	defer cancel()
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
@@ -861,12 +876,15 @@ type mockMonitor struct {
 
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+	metricObjectsCount            int
+	desiredReplicasValues         map[string]int32 // key is "namespace/name"
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		desiredReplicasValues:         make(map[string]int32),
 	}
 }
 
@@ -899,6 +917,39 @@ func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
 	}
 }
 
+func (m *mockMonitor) ObserveHPAAddition() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount++
+}
+
+func (m *mockMonitor) ObserveHPADeletion() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount--
+}
+
+func (m *mockMonitor) GetObjectsCount() int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.metricObjectsCount
+}
+
+func (m *mockMonitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
+	fmt.Printf("putting %s/%s with %v", namespace, hpaName, desiredReplicas)
+	m.Lock()
+	defer m.Unlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	m.desiredReplicasValues[key] = desiredReplicas
+}
+
+func (m *mockMonitor) GetDesiredReplicasValue(namespace, hpaName string) int32 {
+	m.RLock()
+	defer m.RUnlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	return m.desiredReplicasValues[key]
+}
+
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -919,6 +970,7 @@ func TestScaleUp(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
+		checkDesiredReplicaMetric: true,
 	}
 	tc.runTest(t)
 }
@@ -4003,7 +4055,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: ptr.To(int32(stabilizationWindow)),
+		StabilizationWindowSeconds: ptr.To(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {
@@ -5150,6 +5202,11 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
 	testMetricsClient := &metricsfake.Clientset{}
+	hpaWatcher := watch.NewFake()
+	podWatcher := watch.NewFake()
+
+	testClient.AddWatchReactor("horizontalpodautoscalers", core.DefaultWatchReactor(hpaWatcher, nil))
+	testClient.AddWatchReactor("pods", core.DefaultWatchReactor(podWatcher, nil))
 
 	hpaList := [hpaCount]autoscalingv2.HorizontalPodAutoscaler{}
 	scaleUpEventsMap := map[string][]timestampedScaleEvent{}
@@ -5389,6 +5446,7 @@ func TestMultipleHPAs(t *testing.T) {
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
+	hpaController.monitor = newMockMonitor()
 
 	informerFactory.Start(tCtx.Done())
 	go hpaController.Run(tCtx, 5)
@@ -5406,6 +5464,15 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
+	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
+
+	// Simulate the watch event for deletion
+	hpaWatcher.Delete(&hpaList[0])
+
+	// Give the controller time to process the deletion and update the monitor
+	assert.Eventually(t, func() bool {
+		return hpaController.monitor.(*mockMonitor).GetObjectsCount() == hpaCount-1
+	}, 5*time.Second, 100*time.Millisecond, "Expected objects count to be hpaCount-1 after an HPA was deleted")
 }
 
 func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {

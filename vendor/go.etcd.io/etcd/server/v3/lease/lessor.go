@@ -428,6 +428,8 @@ func (le *lessor) Renew(id LeaseID) (int64, error) {
 		}
 	}
 
+	// gofail: var beforeCheckpointInLeaseRenew struct{}
+
 	// Clear remaining TTL when we renew if it is set
 	// By applying a RAFT entry only when the remainingTTL is already set, we limit the number
 	// of RAFT entries written per lease to a max of 2 per checkpoint interval.
@@ -438,6 +440,12 @@ func (le *lessor) Renew(id LeaseID) (int64, error) {
 	}
 
 	le.mu.Lock()
+	// Re-check in case the lease was revoked immediately after the previous check
+	l = le.leaseMap[id]
+	if l == nil {
+		le.mu.Unlock()
+		return -1, ErrLeaseNotFound
+	}
 	l.refresh(0)
 	item := &LeaseWithTime{id: l.ID, time: l.expiry}
 	le.leaseExpiredNotifier.RegisterOrUpdate(item)

@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -20,15 +19,18 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestVerifyRunAsNonRoot(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -50,6 +52,9 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 
 	rootUser := int64(0)
 	anyUser := int64(1000)
+	invalidUser := int64(2147483648)
+	negativeUser := int64(-1000)
+	maxInt32User := int64(math.MaxInt32)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
 	for _, test := range []struct {
@@ -138,9 +143,33 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			},
 			fail: false,
 		},
+		{
+			desc: "Fail if image's user is invalid and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &invalidUser,
+			fail: true,
+		},
+		{
+			desc: "Fail if image's user is negative and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &negativeUser,
+			fail: true,
+		},
+		{
+			desc: "Pass if image's user is math.MaxInt32 and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &maxInt32User,
+			fail: false,
+		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
-		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username)
+		err := verifyRunAsNonRoot(tCtx, pod, &pod.Spec.Containers[0], test.uid, test.username)
 		if test.fail {
 			assert.Error(t, err, test.desc)
 		} else {

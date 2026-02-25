@@ -35,6 +35,15 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// LastStoreSyncResourceVersion is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) LastStoreSyncResourceVersion() string {
+	return ""
+}
+
+// Bookmark is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) Bookmark(rv string) {
+}
+
 // ListKeys returns a list of all the keys of the objects currently
 // in the FIFO.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
@@ -65,6 +74,21 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 	defer f.lock.RUnlock()
 	item, exists = f.items[key]
 	return item, exists, nil
+}
+
+// Pop is helper function for popping from Queue.
+// WARNING: Do NOT use this function in non-test code to avoid races
+// unless you really really really really know what you are doing.
+//
+// NOTE: This function is deprecated and may be removed in the future without
+// additional warning.
+func Pop(queue Queue) interface{} {
+	var result interface{}
+	queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		result = obj
+		return nil
+	})
+	return result
 }
 
 func testFifoObjectKeyFunc(obj interface{}) (string, error) {

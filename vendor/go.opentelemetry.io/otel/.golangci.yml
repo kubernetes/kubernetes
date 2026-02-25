@@ -1,252 +1,267 @@
-# See https://github.com/golangci/golangci-lint#config-file
+version: "2"
 run:
-  issues-exit-code: 1 #Default
-  tests: true #Default
-
+  issues-exit-code: 1
+  tests: true
 linters:
-  # Disable everything by default so upgrades to not include new "default
-  # enabled" linters.
-  disable-all: true
-  # Specifically enable linters we want to use.
+  default: none
   enable:
     - asasalint
     - bodyclose
     - depguard
     - errcheck
     - errorlint
+    - gocritic
     - godot
-    - gofumpt
-    - goimports
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
+    - modernize
     - perfsprint
     - revive
     - staticcheck
     - testifylint
-    - typecheck
     - unconvert
-    - unused
     - unparam
+    - unused
     - usestdlibvars
     - usetesting
-
+  settings:
+    depguard:
+      rules:
+        auto/sdk:
+          files:
+            - '!internal/global/trace.go'
+            - ~internal/global/trace_test.go
+          deny:
+            - pkg: go.opentelemetry.io/auto/sdk
+              desc: Do not use SDK from automatic instrumentation.
+        non-tests:
+          files:
+            - '!$test'
+            - '!**/*test/*.go'
+            - '!**/internal/matchers/*.go'
+          deny:
+            - pkg: testing
+            - pkg: github.com/stretchr/testify
+            - pkg: crypto/md5
+            - pkg: crypto/sha1
+            - pkg: crypto/**/pkix
+        otel-internal:
+          files:
+            - '**/sdk/*.go'
+            - '**/sdk/**/*.go'
+            - '**/exporters/*.go'
+            - '**/exporters/**/*.go'
+            - '**/schema/*.go'
+            - '**/schema/**/*.go'
+            - '**/metric/*.go'
+            - '**/metric/**/*.go'
+            - '**/bridge/*.go'
+            - '**/bridge/**/*.go'
+            - '**/trace/*.go'
+            - '**/trace/**/*.go'
+            - '**/log/*.go'
+            - '**/log/**/*.go'
+          deny:
+            - pkg: go.opentelemetry.io/otel/internal$
+              desc: Do not use cross-module internal packages.
+            - pkg: go.opentelemetry.io/otel/internal/internaltest
+              desc: Do not use cross-module internal packages.
+        otlp-internal:
+          files:
+            - '!**/exporters/otlp/internal/**/*.go'
+          deny:
+            - pkg: go.opentelemetry.io/otel/exporters/otlp/internal
+              desc: Do not use cross-module internal packages.
+        otlpmetric-internal:
+          files:
+            - '!**/exporters/otlp/otlpmetric/internal/*.go'
+            - '!**/exporters/otlp/otlpmetric/internal/**/*.go'
+          deny:
+            - pkg: go.opentelemetry.io/otel/exporters/otlp/otlpmetric/internal
+              desc: Do not use cross-module internal packages.
+        otlptrace-internal:
+          files:
+            - '!**/exporters/otlp/otlptrace/*.go'
+            - '!**/exporters/otlp/otlptrace/internal/**.go'
+          deny:
+            - pkg: go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal
+              desc: Do not use cross-module internal packages.
+    gocritic:
+      disabled-checks:
+        - appendAssign
+        - commentedOutCode
+        - dupArg
+        - hugeParam
+        - importShadow
+        - preferDecodeRune
+        - rangeValCopy
+        - unnamedResult
+        - whyNoLint
+      enable-all: true
+    godot:
+      exclude:
+        # Exclude links.
+        - '^ *\[[^]]+\]:'
+        # Exclude sentence fragments for lists.
+        - ^[ ]*[-•]
+        # Exclude sentences prefixing a list.
+        - :$
+    misspell:
+      locale: US
+      ignore-rules:
+        - cancelled
+    modernize:
+      disable:
+        - omitzero
+    perfsprint:
+      int-conversion: true
+      err-error: true
+      errorf: true
+      sprintf1: true
+      strconcat: true
+    revive:
+      confidence: 0.01
+      rules:
+        - name: blank-imports
+        - name: bool-literal-in-expr
+        - name: constant-logical-expr
+        - name: context-as-argument
+          arguments:
+            - allowTypesBefore: '*testing.T'
+          disabled: true
+        - name: context-keys-type
+        - name: deep-exit
+        - name: defer
+          arguments:
+            - - call-chain
+              - loop
+        - name: dot-imports
+        - name: duplicated-imports
+        - name: early-return
+          arguments:
+            - preserveScope
+        - name: empty-block
+        - name: empty-lines
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          arguments:
+            - sayRepetitiveInsteadOfStutters
+        - name: flag-parameter
+        - name: identical-branches
+        - name: if-return
+        - name: import-shadowing
+        - name: increment-decrement
+        - name: indent-error-flow
+          arguments:
+            - preserveScope
+        - name: package-comments
+        - name: range
+        - name: range-val-in-closure
+        - name: range-val-address
+        - name: redefines-builtin-id
+        - name: string-format
+          arguments:
+            - - panic
+              - /^[^\n]*$/
+              - must not contain line breaks
+        - name: struct-tag
+        - name: superfluous-else
+          arguments:
+            - preserveScope
+        - name: time-equal
+        - name: unconditional-recursion
+        - name: unexported-return
+        - name: unhandled-error
+          arguments:
+            - fmt.Fprint
+            - fmt.Fprintf
+            - fmt.Fprintln
+            - fmt.Print
+            - fmt.Printf
+            - fmt.Println
+        - name: unused-parameter
+        - name: unused-receiver
+        - name: unnecessary-stmt
+        - name: use-any
+        - name: useless-break
+        - name: var-declaration
+        - name: var-naming
+          arguments:
+            - ["ID"] # AllowList
+            - ["Otel", "Aws", "Gcp"] # DenyList
+        - name: waitgroup-by-value
+    testifylint:
+      enable-all: true
+      disable:
+        - float-compare
+        - go-require
+        - require-error
+    usetesting:
+      context-background: true
+      context-todo: true
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - revive
+        path: schema/v.*/types/.*
+        text: avoid meaningless package names
+      # TODO: Having appropriate comments for exported objects helps development,
+      # even for objects in internal packages. Appropriate comments for all
+      # exported objects should be added and this exclusion removed.
+      - linters:
+          - revive
+        path: .*internal/.*
+        text: exported (method|function|type|const) (.+) should have comment or be unexported
+      # Yes, they are, but it's okay in a test.
+      - linters:
+          - revive
+        path: _test\.go
+        text: exported func.*returns unexported type.*which can be annoying to use
+      # Example test functions should be treated like main.
+      - linters:
+          - revive
+        path: example.*_test\.go
+        text: calls to (.+) only in main[(][)] or init[(][)] functions
+      # It's okay to not run gosec and perfsprint in a test.
+      - linters:
+          - gosec
+          - perfsprint
+        path: _test\.go
+      # Ignoring gosec G404: Use of weak random number generator (math/rand instead of crypto/rand)
+      # as we commonly use it in tests and examples.
+      - linters:
+          - gosec
+        text: 'G404:'
+      # Ignoring gosec G402: TLS MinVersion too low
+      # as the https://pkg.go.dev/crypto/tls#Config handles MinVersion default well.
+      - linters:
+          - gosec
+        text: 'G402: TLS MinVersion too low.'
 issues:
-  # Maximum issues count per one linter.
-  # Set to 0 to disable.
-  # Default: 50
-  # Setting to unlimited so the linter only is run once to debug all issues.
   max-issues-per-linter: 0
-  # Maximum count of issues with the same text.
-  # Set to 0 to disable.
-  # Default: 3
-  # Setting to unlimited so the linter only is run once to debug all issues.
   max-same-issues: 0
-  # Excluding configuration per-path, per-linter, per-text and per-source.
-  exclude-rules:
-    # TODO: Having appropriate comments for exported objects helps development,
-    # even for objects in internal packages. Appropriate comments for all
-    # exported objects should be added and this exclusion removed.
-    - path: '.*internal/.*'
-      text: "exported (method|function|type|const) (.+) should have comment or be unexported"
-      linters:
-        - revive
-    # Yes, they are, but it's okay in a test.
-    - path: _test\.go
-      text: "exported func.*returns unexported type.*which can be annoying to use"
-      linters:
-        - revive
-    # Example test functions should be treated like main.
-    - path: example.*_test\.go
-      text: "calls to (.+) only in main[(][)] or init[(][)] functions"
-      linters:
-        - revive
-    # It's okay to not run gosec and perfsprint in a test.
-    - path: _test\.go
-      linters:
-        - gosec
-        - perfsprint
-    # Ignoring gosec G404: Use of weak random number generator (math/rand instead of crypto/rand)
-    # as we commonly use it in tests and examples.
-    - text: "G404:"
-      linters:
-        - gosec
-    # Ignoring gosec G402: TLS MinVersion too low
-    # as the https://pkg.go.dev/crypto/tls#Config handles MinVersion default well.
-    - text: "G402: TLS MinVersion too low."
-      linters:
-        - gosec
-  include:
-    # revive exported should have comment or be unexported.
-    - EXC0012
-    # revive package comment should be of the form ...
-    - EXC0013
-
-linters-settings:
-  depguard:
-    rules:
-      non-tests:
-        files:
-          - "!$test"
-          - "!**/*test/*.go"
-          - "!**/internal/matchers/*.go"
-        deny:
-          - pkg: "testing"
-          - pkg: "github.com/stretchr/testify"
-          - pkg: "crypto/md5"
-          - pkg: "crypto/sha1"
-          - pkg: "crypto/**/pkix"
-      auto/sdk:
-        files:
-          - "!internal/global/trace.go"
-          - "~internal/global/trace_test.go"
-        deny:
-          - pkg: "go.opentelemetry.io/auto/sdk"
-            desc: Do not use SDK from automatic instrumentation.
-      otlp-internal:
-        files:
-          - "!**/exporters/otlp/internal/**/*.go"
-        deny:
-          - pkg: "go.opentelemetry.io/otel/exporters/otlp/internal"
-            desc: Do not use cross-module internal packages.
-      otlptrace-internal:
-        files:
-          - "!**/exporters/otlp/otlptrace/*.go"
-          - "!**/exporters/otlp/otlptrace/internal/**.go"
-        deny:
-          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal"
-            desc: Do not use cross-module internal packages.
-      otlpmetric-internal:
-        files:
-          - "!**/exporters/otlp/otlpmetric/internal/*.go"
-          - "!**/exporters/otlp/otlpmetric/internal/**/*.go"
-        deny:
-          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/internal"
-            desc: Do not use cross-module internal packages.
-      otel-internal:
-        files:
-          - "**/sdk/*.go"
-          - "**/sdk/**/*.go"
-          - "**/exporters/*.go"
-          - "**/exporters/**/*.go"
-          - "**/schema/*.go"
-          - "**/schema/**/*.go"
-          - "**/metric/*.go"
-          - "**/metric/**/*.go"
-          - "**/bridge/*.go"
-          - "**/bridge/**/*.go"
-          - "**/trace/*.go"
-          - "**/trace/**/*.go"
-          - "**/log/*.go"
-          - "**/log/**/*.go"
-        deny:
-          - pkg: "go.opentelemetry.io/otel/internal$"
-            desc: Do not use cross-module internal packages.
-          - pkg: "go.opentelemetry.io/otel/internal/attribute"
-            desc: Do not use cross-module internal packages.
-          - pkg: "go.opentelemetry.io/otel/internal/internaltest"
-            desc: Do not use cross-module internal packages.
-          - pkg: "go.opentelemetry.io/otel/internal/matchers"
-            desc: Do not use cross-module internal packages.
-  godot:
-    exclude:
-      # Exclude links.
-      - '^ *\[[^]]+\]:'
-      # Exclude sentence fragments for lists.
-      - '^[ ]*[-•]'
-      # Exclude sentences prefixing a list.
-      - ':$'
-  goimports:
-    local-prefixes: go.opentelemetry.io
-  misspell:
-    locale: US
-    ignore-words:
-      - cancelled
-  perfsprint:
-    err-error: true
-    errorf: true
-    int-conversion: true
-    sprintf1: true
-    strconcat: true
-  revive:
-    # Sets the default failure confidence.
-    # This means that linting errors with less than 0.8 confidence will be ignored.
-    # Default: 0.8
-    confidence: 0.01
-    # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
-    rules:
-      - name: blank-imports
-      - name: bool-literal-in-expr
-      - name: constant-logical-expr
-      - name: context-as-argument
-        disabled: true
-        arguments:
-          - allowTypesBefore: "*testing.T"
-      - name: context-keys-type
-      - name: deep-exit
-      - name: defer
-        arguments:
-          - ["call-chain", "loop"]
-      - name: dot-imports
-      - name: duplicated-imports
-      - name: early-return
-        arguments:
-          - "preserveScope"
-      - name: empty-block
-      - name: empty-lines
-      - name: error-naming
-      - name: error-return
-      - name: error-strings
-      - name: errorf
-      - name: exported
-        arguments:
-          - "sayRepetitiveInsteadOfStutters"
-      - name: flag-parameter
-      - name: identical-branches
-      - name: if-return
-      - name: import-shadowing
-      - name: increment-decrement
-      - name: indent-error-flow
-        arguments:
-          - "preserveScope"
-      - name: package-comments
-      - name: range
-      - name: range-val-in-closure
-      - name: range-val-address
-      - name: redefines-builtin-id
-      - name: string-format
-        arguments:
-          - - panic
-            - '/^[^\n]*$/'
-            - must not contain line breaks
-      - name: struct-tag
-      - name: superfluous-else
-        arguments:
-          - "preserveScope"
-      - name: time-equal
-      - name: unconditional-recursion
-      - name: unexported-return
-      - name: unhandled-error
-        arguments:
-          - "fmt.Fprint"
-          - "fmt.Fprintf"
-          - "fmt.Fprintln"
-          - "fmt.Print"
-          - "fmt.Printf"
-          - "fmt.Println"
-      - name: unnecessary-stmt
-      - name: useless-break
-      - name: var-declaration
-      - name: var-naming
-        arguments:
-          - ["ID"] # AllowList
-          - ["Otel", "Aws", "Gcp"] # DenyList
-      - name: waitgroup-by-value
-  testifylint:
-    enable-all: true
-    disable:
-      - float-compare
-      - go-require
-      - require-error
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - go.opentelemetry.io/otel
+    golines:
+      max-len: 120
+  exclusions:
+    generated: lax

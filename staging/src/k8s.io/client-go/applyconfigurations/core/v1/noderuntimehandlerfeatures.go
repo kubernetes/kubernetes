@@ -20,9 +20,13 @@ package v1
 
 // NodeRuntimeHandlerFeaturesApplyConfiguration represents a declarative configuration of the NodeRuntimeHandlerFeatures type for use
 // with apply.
+//
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 type NodeRuntimeHandlerFeaturesApplyConfiguration struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty"`
-	UserNamespaces          *bool `json:"userNamespaces,omitempty"`
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+	UserNamespaces *bool `json:"userNamespaces,omitempty"`
 }
 
 // NodeRuntimeHandlerFeaturesApplyConfiguration constructs a declarative configuration of the NodeRuntimeHandlerFeatures type for use with

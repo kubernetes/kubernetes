@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -31,42 +33,46 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.InfoS("Start()")
+func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Start()")
 	return nil
 }
 
-func (m *fakeManager) Policy() Policy {
-	klog.InfoS("Policy()")
-	return NewPolicyNone()
+func (m *fakeManager) Policy(logger klog.Logger) Policy {
+	logger.Info("Policy()")
+	return NewPolicyNone(logger)
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.TODO()
+	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	klog.InfoS("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
+func (m *fakeManager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
+	logger.Info("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
-	klog.InfoS("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *fakeManager) GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, container *v1.Container) sets.Set[int] {
+	logger.Info("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.InfoS("RemoveContainer", "containerID", containerID)
+func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) error {
+	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.TODO()
+	logger.Info("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Pod Topology Hints", "pod", klog.KObj(pod))
+	logger := klog.TODO()
+	logger.Info("Get Pod Topology Hints", "pod", klog.KObj(pod))
 	return map[string][]topologymanager.TopologyHint{}
 }
 
@@ -76,19 +82,22 @@ func (m *fakeManager) State() state.Reader {
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (m *fakeManager) GetAllocatableMemory() []state.Block {
-	klog.InfoS("Get Allocatable Memory")
+	logger := klog.TODO()
+	logger.Info("Get Allocatable Memory")
 	return []state.Block{}
 }
 
 // GetMemory returns the memory allocated by a container from NUMA nodes
 func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
-	klog.InfoS("Get Memory", "podUID", podUID, "containerName", containerName)
+	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID, "containerName", containerName)
+	logger.Info("Get Memory")
 	return []state.Block{}
 }
 
 // NewFakeManager creates empty/fake memory manager
-func NewFakeManager() Manager {
+func NewFakeManager(logger klog.Logger) Manager {
+	logger = klog.LoggerWithName(logger, "memory-mgr.fake")
 	return &fakeManager{
-		state: state.NewMemoryState(),
+		state: state.NewMemoryState(logger),
 	}
 }

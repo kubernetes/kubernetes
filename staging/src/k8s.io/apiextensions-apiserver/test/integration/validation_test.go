@@ -106,7 +106,7 @@ func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
 			"beta": {
 				Description: "Minimum value of beta is 10",
 				Type:        "number",
-				Minimum:     float64Ptr(10),
+				Minimum:     ptr.To[float64](10),
 			},
 			"gamma": {
 				Description: "Gamma is restricted to foo, bar and baz",
@@ -1610,10 +1610,6 @@ func toValidationJSON(yml string) string {
 		panic(err)
 	}
 	return fmt.Sprintf("{\"openAPIV3Schema\": %s}", string(bs))
-}
-
-func float64Ptr(f float64) *float64 {
-	return &f
 }
 
 func TestNonStructuralSchemaConditionForCRDV1(t *testing.T) {

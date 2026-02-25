@@ -131,9 +131,6 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 // Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
 	defer utilruntime.HandleCrash()
-	defer gc.attemptToDelete.ShutDown()
-	defer gc.attemptToOrphan.ShutDown()
-	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	// Start events processing pipeline.
 	gc.eventBroadcaster.StartStructuredLogging(3)
@@ -142,11 +139,26 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "controller", "garbagecollector")
-	defer logger.Info("Shutting down controller", "controller", "garbagecollector")
 
-	go gc.dependencyGraphBuilder.Run(ctx)
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "controller", "garbagecollector")
+		gc.dependencyGraphBuilder.graphChanges.ShutDown()
+		gc.attemptToOrphan.ShutDown()
+		gc.attemptToDelete.ShutDown()
+		wg.Wait()
+	}()
 
-	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
+	// Start dependency graph builder.
+	wg.Go(func() {
+		gc.dependencyGraphBuilder.Run(ctx)
+	})
+
+	// Create a new context that is cancelled after the initialSyncTimeout.
+	syncCtx, cancel := context.WithTimeout(ctx, initialSyncTimeout)
+	defer cancel()
+
+	if !cache.WaitForNamedCacheSyncWithContext(syncCtx, func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)
 	}) {
 		logger.Info("Garbage collector: not all resource monitors could be synced, proceeding anyways")
@@ -158,10 +170,13 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 
 	// gc workers
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
-		go wait.Until(func() { gc.runAttemptToOrphanWorker(logger) }, 1*time.Second, ctx.Done())
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
+		})
+		wg.Go(func() {
+			wait.Until(func() { gc.runAttemptToOrphanWorker(logger) }, 1*time.Second, ctx.Done())
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -227,8 +242,11 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		}
 		logger.V(4).Info("resynced monitors")
 
+		syncCtx, cancel := context.WithTimeout(ctx, period)
+		defer cancel()
+
 		// gc worker no longer waits for cache to be synced, but we will keep the periodical check to provide logs & metrics
-		cacheSynced := cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), period), func() bool {
+		cacheSynced := cache.WaitForNamedCacheSyncWithContext(syncCtx, func() bool {
 			return gc.dependencyGraphBuilder.IsSynced(logger)
 		})
 		if cacheSynced {
@@ -260,19 +278,6 @@ func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct
 		}
 	}
 	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
-}
-
-// waitForStopOrTimeout returns a stop channel that closes when the provided stop channel closes or when the specified timeout is reached
-func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan struct{} {
-	stopChWithTimeout := make(chan struct{})
-	go func() {
-		select {
-		case <-stopCh:
-		case <-time.After(timeout):
-		}
-		close(stopChWithTimeout)
-	}()
-	return stopChWithTimeout
 }
 
 // IsSynced returns true if dependencyGraphBuilder is synced.
@@ -354,8 +359,8 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			// 2. The reference is to an invalid group/version. We don't currently
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
-			// For now, record the error and retry.
-			logger.V(5).Error(err, "error syncing item", "item", n.identity)
+			// For now, log the error and retry.
+			logger.V(5).Info("error syncing item", "item", n.identity, "err", err)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -620,7 +625,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
 		policy := metav1.DeletePropagationForeground
-		return gc.deleteObject(item.identity, &policy)
+		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
@@ -641,7 +646,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 			"item", item.identity,
 			"propagationPolicy", policy,
 		)
-		return gc.deleteObject(item.identity, &policy)
+		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
 	}
 }
 

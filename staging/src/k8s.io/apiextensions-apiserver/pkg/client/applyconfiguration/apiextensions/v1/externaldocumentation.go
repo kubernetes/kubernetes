@@ -20,6 +20,8 @@ package v1
 
 // ExternalDocumentationApplyConfiguration represents a declarative configuration of the ExternalDocumentation type for use
 // with apply.
+//
+// ExternalDocumentation allows referencing an external resource for extended documentation.
 type ExternalDocumentationApplyConfiguration struct {
 	Description *string `json:"description,omitempty"`
 	URL         *string `json:"url,omitempty"`

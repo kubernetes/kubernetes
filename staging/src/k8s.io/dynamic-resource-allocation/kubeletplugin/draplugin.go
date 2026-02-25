@@ -29,15 +29,17 @@ import (
 	"k8s.io/klog/v2"
 
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -56,8 +58,8 @@ type DRAPlugin interface {
 	// for the given ResourceClaims. This is used to implement
 	// the gRPC NodePrepareResources call.
 	//
-	// It gets called with the complete list of claims that are needed
-	// by some pod. In contrast to the gRPC call, the helper has
+	// It gets called with the complete list of claims handled by this DRA driver
+	// that are needed by some pod. In contrast to the gRPC call, the helper has
 	// already retrieved the actual ResourceClaim objects.
 	//
 	// In addition to that, the helper also:
@@ -119,19 +121,42 @@ type DRAPlugin interface {
 	// must have an entry in the response, even if that entry is nil.
 	UnprepareResourceClaims(ctx context.Context, claims []NamespacedObject) (result map[types.UID]error, err error)
 
-	// ErrorHandler gets called for each error encountered while publishing
-	// ResourceSlices. See [resourceslice.Options.ErrorHandler] for details.
+	// HandleError gets called for errors encountered in the background,
+	// for example while publishing ResourceSlices.
+	// See [resourceslice.Options.ErrorHandler] for details on that.
 	//
-	// A simple implementation is to only log with k8s.io/apimachinery/pkg/util/runtime.HandleErrorWithContext:
-	//    runtime.HandleErrorWithContext(ctx, err, msg)
+	// The recommended implementation is to log with
+	// runtime.HandleErrorWithContext(ctx, err, msg) (from
+	// k8s.io/apimachinery/pkg/util/runtime.HandleErrorWithContext)
+	// and then to exit the process if the error is fatal.
+	// Ideally the process should shut down gracefully, which can be
+	// achieved by canceling the main context of the DRA driver.
+	//
+	// Fatal errors can be distinguished from recoverable errors via
+	//    errors.Is(err, kubeletplugin.ErrRecoverable)
 	//
 	// This is a mandatory method because drivers should check for errors
 	// which won't get resolved by retrying and then fail or change the
 	// slices that they are trying to publish:
 	// - dropped fields (see [resourceslice.DroppedFieldsError])
 	// - validation errors (see [apierrors.IsInvalid])
-	ErrorHandler(ctx context.Context, err error, msg string)
+	HandleError(ctx context.Context, err error, msg string)
 }
+
+// ErrRecoverable distinguishes recoverable errors from those errors which are fatal
+// and should cause the process to exit. Use with:
+//
+//	errors.Is(err, ErrRecoverable)
+var ErrRecoverable = errors.New("recoverable error")
+
+type recoverableError struct {
+	error
+}
+
+var _ error = recoverableError{}
+
+func (err recoverableError) Is(other error) bool { return other == ErrRecoverable }
+func (err recoverableError) Unwrap() error       { return err.error }
 
 // PrepareResult contains the result of preparing one particular ResourceClaim.
 type PrepareResult struct {
@@ -174,13 +199,18 @@ type Device struct {
 	// Each ID must be of the form "<vendor ID>/<class>=<unique name>".
 	// May be empty.
 	CDIDeviceIDs []string
+
+	// ShareID identifes the device share.
+	// May be empty.
+	ShareID *types.UID
 }
 
 // Option implements the functional options pattern for Start.
 type Option func(o *options) error
 
 // DriverName defines the driver name for the dynamic resource allocation driver.
-// Must be set.
+// Must be set. Must be a DNS subdomain and should end with a DNS domain
+// owned by the vendor of the driver. It should use only lower case characters.
 func DriverName(driverName string) Option {
 	return func(o *options) error {
 		o.driverName = driverName
@@ -275,7 +305,7 @@ func PluginSocket(name string) Option {
 	}
 }
 
-// PluginListener configures how to create the registrar socket.
+// PluginListener configures how to create the DRA service socket.
 // The default is to remove the file if it exists and to then
 // create a socket.
 //
@@ -352,6 +382,18 @@ func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 func NodeV1beta1(enabled bool) Option {
 	return func(o *options) error {
 		o.nodeV1beta1 = enabled
+		return nil
+	}
+}
+
+// NodeV1 explicitly chooses whether the DRA gRPC API v1
+// gets enabled. True by default.
+//
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+func NodeV1(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1 = enabled
 		return nil
 	}
 }
@@ -448,8 +490,10 @@ type options struct {
 	serialize                  bool
 	flockDirectoryPath         string
 	nodeV1beta1                bool
+	nodeV1                     bool
 	registrationService        bool
 	draService                 bool
+	healthService              *bool
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -467,7 +511,7 @@ type Helper struct {
 	nodeName         string
 	nodeUID          types.UID
 	kubeClient       kubernetes.Interface
-	resourceClient   cgoresource.ResourceV1beta2Interface
+	resourceClient   cgoresource.ResourceV1Interface
 	serialize        bool
 	grpcMutex        sync.Mutex
 	grpcLockFilePath string
@@ -497,6 +541,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
 		serialize:     true,
 		nodeV1beta1:   true,
+		nodeV1:        true,
 		pluginRegistrationEndpoint: endpoint{
 			dir: KubeletRegistryDir,
 		},
@@ -574,9 +619,17 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}()
 
 	var supportedServices []string
+	if o.nodeV1 {
+		supportedServices = append(supportedServices, drapbv1.DRAPluginService)
+	}
 	if o.nodeV1beta1 {
-		logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-		supportedServices = append(supportedServices, drapb.DRAPluginService)
+		supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
+	}
+	// Check if the plugin implements the DRAResourceHealth service.
+	if _, ok := plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
+		// If it does, add it to the list of services this plugin supports.
+		logger.V(5).Info("detected v1alpha1.DRAResourceHealth gRPC service")
+		supportedServices = append(supportedServices, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName)
 	}
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
@@ -589,12 +642,34 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.draService {
 		// Run the node plugin gRPC server first to ensure that it is ready.
-		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
-			if o.nodeV1beta1 {
-				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
-			}
-		})
+		pluginServer, err := startGRPCServer(
+			klog.LoggerWithName(logger, "dra"),
+			o.grpcVerbosity,
+			o.unaryInterceptors,
+			o.streamInterceptors,
+			draEndpoint,
+			func(ctx context.Context, err error) { // This error handler is REQUIRED
+				plugin.HandleError(ctx, err, "DRA gRPC server failed")
+			},
+			func(grpcServer *grpc.Server) {
+				if o.nodeV1 {
+					logger.V(5).Info("registering v1.DRAPlugin gRPC service")
+					drapbv1.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+				}
+
+				if o.nodeV1beta1 {
+					logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+					drapbv1beta1.RegisterDRAPluginServer(grpcServer, drapbv1beta1.V1ServerWrapper{DRAPluginServer: &nodePluginImplementation{Helper: d}})
+				}
+
+				if heatlhServer, ok := d.plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
+					if o.healthService == nil || *o.healthService {
+						logger.V(5).Info("registering v1alpha1.DRAResourceHealth gRPC service")
+						drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, heatlhServer)
+					}
+				}
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("start DRA service: %w", err)
 		}
@@ -603,7 +678,19 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.registrationService {
 		// Now make it available to kubelet.
-		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+		registrar, err := startRegistrar(
+			klog.LoggerWithName(logger, "registrar"),
+			o.grpcVerbosity,
+			o.unaryInterceptors,
+			o.streamInterceptors,
+			o.driverName,
+			supportedServices,
+			draEndpoint.path(),
+			o.pluginRegistrationEndpoint,
+			func(ctx context.Context, err error) {
+				plugin.HandleError(ctx, err, "registrar gRPC server failed")
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("start registrar: %w", err)
 		}
@@ -690,11 +777,17 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 		var err error
 		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx,
 			resourceslice.Options{
-				DriverName:   d.driverName,
-				KubeClient:   d.kubeClient,
-				Owner:        &owner,
-				Resources:    driverResources,
-				ErrorHandler: d.plugin.ErrorHandler,
+				DriverName: d.driverName,
+				KubeClient: d.kubeClient,
+				Owner:      &owner,
+				Resources:  driverResources,
+				ErrorHandler: func(ctx context.Context, err error, msg string) {
+					// ResourceSlice publishing errors like dropped fields or
+					// invalid spec are not going to get resolved by retrying,
+					// but neither is restarting the process going to help
+					// -> all errors are recoverable.
+					d.plugin.HandleError(ctx, recoverableError{error: err}, msg)
+				},
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}
@@ -720,6 +813,13 @@ func (d *Helper) RegistrationStatus() *registerapi.RegistrationStatus {
 // To restore normal behavior, call SetGetInfoError(nil).
 func (d *Helper) SetGetInfoError(err error) {
 	d.registrar.setGetInfoError(err)
+}
+
+// SetNotifyRegistrationStatusError configures the registration server
+// to make NotifyRegistrationStatus calls return the specified error.
+// To restore normal behavior, call SetNotifyRegistrationStatusError(nil).
+func (d *Helper) SetNotifyRegistrationStatusError(err error) {
+	d.registrar.setNotifyRegistrationStatusError(err)
 }
 
 // serializeGRPCIfEnabled locks a mutex if serialization is enabled.
@@ -750,10 +850,11 @@ func (d *Helper) serializeGRPCIfEnabled() (func(), error) {
 // It prevents polluting the public API with these implementation details.
 type nodePluginImplementation struct {
 	*Helper
+	drapbv1.UnsafeDRAPluginServer
 }
 
-// NodePrepareResources implements [drapb.NodePrepareResources].
-func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+// NodePrepareResources implements [drapbv1.NodePrepareResources].
+func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
 	// Do slow API calls before serializing.
 	claims, err := d.getResourceClaims(ctx, req.Claims)
 	if err != nil {
@@ -771,19 +872,20 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 		return nil, fmt.Errorf("prepare resource claims: %w", err)
 	}
 
-	resp := &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{}}
+	resp := &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{}}
 	for uid, claimResult := range result {
-		var devices []*drapb.Device
+		var devices []*drapbv1.Device
 		for _, result := range claimResult.Devices {
-			device := &drapb.Device{
+			device := &drapbv1.Device{
 				RequestNames: stripSubrequestNames(result.Requests),
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
-				CDIDeviceIDs: result.CDIDeviceIDs,
+				CdiDeviceIds: result.CDIDeviceIDs,
+				ShareId:      (*string)(result.ShareID),
 			}
 			devices = append(devices, device)
 		}
-		resp.Claims[string(uid)] = &drapb.NodePrepareResourceResponse{
+		resp.Claims[string(uid)] = &drapbv1.NodePrepareResourceResponse{
 			Error:   errorString(claimResult.Err),
 			Devices: devices,
 		}
@@ -806,7 +908,7 @@ func stripSubrequestNames(names []string) []string {
 	return stripped
 }
 
-func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims []*drapb.Claim) ([]*resourceapi.ResourceClaim, error) {
+func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims []*drapbv1.Claim) ([]*resourceapi.ResourceClaim, error) {
 	var resourceClaims []*resourceapi.ResourceClaim
 	for _, claimReq := range claims {
 		claim, err := d.resourceClient.ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
@@ -816,7 +918,7 @@ func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims
 		if claim.Status.Allocation == nil {
 			return resourceClaims, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
 		}
-		if claim.UID != types.UID(claimReq.UID) {
+		if claim.UID != types.UID(claimReq.Uid) {
 			return resourceClaims, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
 		}
 		resourceClaims = append(resourceClaims, claim)
@@ -825,7 +927,7 @@ func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims
 }
 
 // NodeUnprepareResources implements [draapi.NodeUnprepareResources].
-func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, req *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 	unlock, err := d.serializeGRPCIfEnabled()
 	if err != nil {
 		return nil, fmt.Errorf("serialize gRPC: %w", err)
@@ -834,16 +936,16 @@ func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, r
 
 	claims := make([]NamespacedObject, 0, len(req.Claims))
 	for _, claim := range req.Claims {
-		claims = append(claims, NamespacedObject{UID: types.UID(claim.UID), NamespacedName: types.NamespacedName{Name: claim.Name, Namespace: claim.Namespace}})
+		claims = append(claims, NamespacedObject{UID: types.UID(claim.Uid), NamespacedName: types.NamespacedName{Name: claim.Name, Namespace: claim.Namespace}})
 	}
 	result, err := d.plugin.UnprepareResourceClaims(ctx, claims)
 	if err != nil {
 		return nil, fmt.Errorf("unprepare resource claims: %w", err)
 	}
 
-	resp := &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}}
+	resp := &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{}}
 	for uid, err := range result {
-		resp.Claims[string(uid)] = &drapb.NodeUnprepareResourceResponse{
+		resp.Claims[string(uid)] = &drapbv1.NodeUnprepareResourceResponse{
 			Error: errorString(err),
 		}
 	}

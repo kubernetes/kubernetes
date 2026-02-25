@@ -20,7 +20,11 @@ package v1
 
 // NodeConfigSourceApplyConfiguration represents a declarative configuration of the NodeConfigSource type for use
 // with apply.
+//
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+// This API is deprecated since 1.22
 type NodeConfigSourceApplyConfiguration struct {
+	// ConfigMap is a reference to a Node's ConfigMap
 	ConfigMap *ConfigMapNodeConfigSourceApplyConfiguration `json:"configMap,omitempty"`
 }
 

@@ -31,8 +31,3 @@ func FileVersion(info *types.Info, file *ast.File) string {
 	// This would act as a max version on what a tool can support.
 	return Future
 }
-
-// InitFileVersions initializes info to record Go versions for Go files.
-func InitFileVersions(info *types.Info) {
-	info.FileVersions = make(map[*ast.File]string)
-}

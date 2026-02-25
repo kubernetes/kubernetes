@@ -105,7 +105,9 @@ type Int64ObservableUpDownCounterConfig struct {
 
 // NewInt64ObservableUpDownCounterConfig returns a new
 // [Int64ObservableUpDownCounterConfig] with all opts applied.
-func NewInt64ObservableUpDownCounterConfig(opts ...Int64ObservableUpDownCounterOption) Int64ObservableUpDownCounterConfig {
+func NewInt64ObservableUpDownCounterConfig(
+	opts ...Int64ObservableUpDownCounterOption,
+) Int64ObservableUpDownCounterConfig {
 	var config Int64ObservableUpDownCounterConfig
 	for _, o := range opts {
 		config = o.applyInt64ObservableUpDownCounter(config)
@@ -223,7 +225,11 @@ type Int64Observer interface {
 // attributes as another Int64Callbacks also registered for the same
 // instrument.
 //
-// The function needs to be concurrent safe.
+// The function needs to be reentrant and concurrent safe.
+//
+// Note that Go's mutexes are not reentrant, and locking a mutex takes
+// an indefinite amount of time. It is therefore advised to avoid
+// using mutexes inside callbacks.
 type Int64Callback func(context.Context, Int64Observer) error
 
 // Int64ObservableOption applies options to int64 Observer instruments.
@@ -242,7 +248,9 @@ func (o int64CallbackOpt) applyInt64ObservableCounter(cfg Int64ObservableCounter
 	return cfg
 }
 
-func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(cfg Int64ObservableUpDownCounterConfig) Int64ObservableUpDownCounterConfig {
+func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(
+	cfg Int64ObservableUpDownCounterConfig,
+) Int64ObservableUpDownCounterConfig {
 	cfg.callbacks = append(cfg.callbacks, o.cback)
 	return cfg
 }

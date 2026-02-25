@@ -20,6 +20,7 @@ if (( KUBE_VERBOSE > 4 )); then
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+cd "${KUBE_ROOT}"
 
 # This script builds and runs a local kubernetes cluster. You may need to run
 # this as root to allow kubelet to open containerd's socket, and to write the test
@@ -58,7 +59,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.7.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.9.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -94,6 +95,7 @@ KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
 TOPOLOGY_MANAGER_POLICY=${TOPOLOGY_MANAGER_POLICY:-""}
+MEMORY_MANAGER_POLICY=${MEMORY_MANAGER_POLICY:-""}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
@@ -180,6 +182,15 @@ function usage {
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
+            echo "Example 5: PATH=\"\${PATH}:/usr/local/go/src/k8s.io/kubernetes/third_party/etcd\" \\"
+            echo "           FEATURE_GATES=CPUManagerPolicyOptions=true,MemoryManager=true,InPlacePodVerticalScalingExclusiveCPUs=true \\"
+            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
+            echo "           MEMORY_MANAGER_POLICY=\"Static\" \\"
+            echo "           CPUMANAGER_POLICY=\"static\" \\"
+            echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
+            echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
+            echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=4Gi --system-reserved=cpu=1,memory=1Gi --reserved-memory 0:memory=3Gi;1:memory=2148Mi --resolv-conf=/run/systemd/resolve/resolv.conf\" \\"
+            echo "           hack/local-up-cluster.sh ( run with Topology, CPU, Memory Management policies alongside InPlacePodVerticalScaling, extra flags for etcd and coredns)"
             echo ""
             echo "-d         dry-run: prepare for running commands, then show their command lines instead of running them"
 }
@@ -423,6 +434,13 @@ function detect_binary {
 cleanup()
 {
   echo "Cleaning up..."
+
+  # Capture CoreDNS logs before shutting down (useful for debugging DNS issues)
+  if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
+    echo "Capturing CoreDNS logs..."
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" logs -n kube-system -l k8s-app=kube-dns --all-containers > "${LOG_DIR}/coredns.log" 2>&1 || true
+  fi
+
   # delete running images
   # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
@@ -669,6 +687,7 @@ EOF
       --egress-selector-config-file="${EGRESS_SELECTOR_CONFIG_FILE:-}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
+      --kubelet-certificate-authority="${CLUSTER_SIGNING_CERT_FILE}" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
       --kubelet-port="${KUBELET_PORT}" \
       --kubelet-read-only-port="${KUBELET_READ_ONLY_PORT}" \
@@ -793,6 +812,20 @@ function start_cloud_controller_manager {
     export CLOUD_CTLRMGR_PID=$!
 }
 
+function wait_node_csr() {
+  local interval_time=2
+  local csr_approved_time=300
+  local newline='"\n"'
+  local unapproved_csr_names="--field-selector='spec.signerName=kubernetes.io/kubelet-serving' -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
+  local csr_approved="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get csr ${unapproved_csr_names}' | xargs --no-run-if-empty ${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' certificate approve | grep csr"
+  kube::util::wait_for_success "$csr_approved_time" "$interval_time" "$csr_approved"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for CSR approval"
+    exit 1
+  fi
+  echo "kubelet CSR approved"
+}
+
 function wait_node_ready(){
   if [[ -n "${DRY_RUN}" ]]; then
     return
@@ -823,27 +856,6 @@ function wait_node_ready(){
 function wait_coredns_available(){
   if [[ -n "${DRY_RUN}" ]]; then
     return
-  fi
-
-  local interval_time=2
-  local coredns_wait_time=300
-
-  # kick the coredns pods to be recreated
-  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-system delete pods -l k8s-app=kube-dns
-  sleep 30
-
-  local coredns_pods_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s pods -l k8s-app=kube-dns -n kube-system"
-  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_pods_ready"
-  if [ $? == "1" ]; then
-    echo "time out on waiting for coredns pods"
-    exit 1
-  fi
-
-  local coredns_available="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Available --timeout=60s deployments coredns -n kube-system"
-  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_available"
-  if [ $? == "1" ]; then
-    echo "time out on waiting for coredns deployment"
-    exit 1
   fi
 
   if [[ "${ENABLE_DAEMON}" = false ]]; then
@@ -922,6 +934,7 @@ readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 healthzPort: ${KUBELET_HEALTHZ_PORT}
 healthzBindAddress: ${KUBELET_HOST}
 rotateCertificates: true
+serverTLSBootstrap: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
@@ -997,6 +1010,11 @@ EOF
       # topology maanager policy
       if [[ -n ${TOPOLOGY_MANAGER_POLICY} ]]; then
         echo "topologyManagerPolicy: \"${TOPOLOGY_MANAGER_POLICY}\""
+      fi
+
+      # memorymanager policy
+      if [[ -n ${MEMORY_MANAGER_POLICY} ]]; then
+        echo "memoryManagerPolicy: \"${MEMORY_MANAGER_POLICY}\""
       fi
 
       # cpumanager policy
@@ -1295,14 +1313,19 @@ function install_cni {
     rm -rf "${cni_plugin_tarball}" &&
     sudo find /opt/cni/bin -type f -not \( \
         -iname host-local \
-        -o -iname bridge \
+        -o -iname ptp \
         -o -iname portmap \
         -o -iname loopback \
         \) \
         -delete
 
-  # containerd in kubekins supports CNI version 0.4.0
-  echo "Configuring cni"
+  # Configure CNI using ptp (point-to-point) plugin instead of bridge.
+  # ptp creates direct veth pairs between pods and host namespace, which
+  # avoids the need for br_netfilter and bridge-nf-call-iptables settings
+  # that are unreliable in docker-in-docker environments.
+  # This approach is proven to work reliably by KIND (Kubernetes IN Docker):
+  # https://github.com/kubernetes-sigs/kind/blob/main/images/kindnetd/cmd/kindnetd/cni.go#L83-L121
+  echo "Configuring cni (ptp mode)"
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
@@ -1310,11 +1333,8 @@ function install_cni {
  "name": "containerd-net",
  "plugins": [
    {
-     "type": "bridge",
-     "bridge": "cni0",
-     "isGateway": true,
+     "type": "ptp",
      "ipMasq": true,
-     "promiscMode": true,
      "ipam": {
        "type": "host-local",
        "ranges": [
@@ -1370,6 +1390,26 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
 
+  # Configure kernel network parameters for container networking.
+  # These settings are required for ptp CNI and iptables-based kube-proxy
+  # to work correctly in docker-in-docker environments.
+  # See KIND's network configuration for reference.
+  echo "Configuring kernel network parameters for DIND..."
+
+  # Enable route_localnet - allows routing to localhost addresses after NAT.
+  # Required for proper DNS resolution in containers.
+  echo 1 > /proc/sys/net/ipv4/conf/all/route_localnet
+
+  # Set arp_ignore=0 - required for ptp CNI which uses /32 addresses.
+  # Ensures ARP replies are sent for all local addresses.
+  echo 0 > /proc/sys/net/ipv4/conf/all/arp_ignore
+
+  # Ensure IP forwarding is enabled for pod-to-pod traffic
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+  echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || true
+
+  echo "Kernel network parameters configured"
+
   # to use containerd as kubelet container runtime we need to install cni
   install_cni 
 
@@ -1387,8 +1427,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # configure and start containerd
   echo "configuring containerd"
   containerd config default > /etc/containerd/config.toml
-  sed -ie 's|root = "/var/lib/containerd"|root = "/docker-graph/containerd/daemon"|' /etc/containerd/config.toml
-  sed -ie 's|state = "/run/containerd"|state = "/var/run/docker/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|root = ./var/lib/containerd.|root = "/docker-graph/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|state = ./run/containerd.|state = "/var/run/docker/containerd/daemon"|' /etc/containerd/config.toml
   sed -ie 's|enable_cdi = false|enable_cdi = true|' /etc/containerd/config.toml
 
   echo "starting containerd"
@@ -1450,12 +1490,13 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kubelet is not currently supported in darwin, kubelet aborted."
+        print_color "kubelet is not supported on macOS. Please use https://sigs.k8s.io/kind"
         KUBELET_LOG=""
         ;;
       Linux)
         install_cni_if_needed
         start_kubelet
+        wait_node_csr
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
@@ -1469,7 +1510,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
+        print_color "kube-proxy is not supported on macOS. Please use https://sigs.k8s.io/kind."
         ;;
       Linux)
         start_kubeproxy

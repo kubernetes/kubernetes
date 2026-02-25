@@ -68,8 +68,7 @@ func (volumeAttributesClassStrategy) PrepareForUpdate(ctx context.Context, obj, 
 }
 
 func (volumeAttributesClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateVolumeAttributesClass(obj.(*storage.VolumeAttributesClass))
-	return append(errorList, validation.ValidateVolumeAttributesClassUpdate(obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))...)
+	return validation.ValidateVolumeAttributesClassUpdate(obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -44,7 +44,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers", framework.WithSerial(), framework.WithDisruptive(), framework.WithSlow(), skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] RebootHost containers", framework.WithSerial(), framework.WithDisruptive(), framework.WithSlow(), skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -53,6 +53,7 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a reboot process on the host/node", func(ctx context.Context) {
+		e2eskipper.Skipf("skipping test until graceful shutdown feature enabled")
 
 		ginkgo.By("selecting a Windows node")
 		nodes, err := findWindowsNodes(ctx, f)

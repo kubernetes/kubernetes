@@ -19,6 +19,7 @@ package enum
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -27,10 +28,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero vals
-	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field": {"Unsupported value: \"\"$"},
-		"enum1Field": {"Unsupported value: \"\": supported values: \"e1v1\""},
-		"enum2Field": {"Unsupported value: \"\": supported values: \"e2v1\", \"e2v2\""},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.NotSupported(field.NewPath("enum0Field"), Enum0(""), []Enum0{}),
+		field.NotSupported(field.NewPath("enum1Field"), Enum1(""), []Enum1{E1V1}),
+		field.NotSupported(field.NewPath("enum2Field"), Enum2(""), []Enum2{E2V1, E2V2}),
 	})
 
 	st.Value(&Struct{
@@ -42,9 +43,9 @@ func Test(t *testing.T) {
 		Enum2PtrField:   ptr.To(E2V1),
 		NotEnumField:    "x",
 		NotEnumPtrField: ptr.To(NotEnum("x")),
-	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field":    {"Unsupported value: \"\"$"},
-		"enum0PtrField": {"Unsupported value: \"\"$"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.NotSupported(field.NewPath("enum0Field"), Enum0(""), []Enum0{}),
+		field.NotSupported(field.NewPath("enum0PtrField"), Enum0(""), []Enum0{}),
 	})
 
 	st.Value(&Struct{
@@ -56,12 +57,12 @@ func Test(t *testing.T) {
 		Enum2PtrField:   ptr.To(Enum2("x")),
 		NotEnumField:    "x",
 		NotEnumPtrField: ptr.To(NotEnum("x")),
-	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field":    {"Unsupported value: \"x\"$"},
-		"enum0PtrField": {"Unsupported value: \"x\"$"},
-		"enum1Field":    {"Unsupported value: \"x\": supported values: \"e1v1\""},
-		"enum1PtrField": {"Unsupported value: \"x\": supported values: \"e1v1\""},
-		"enum2Field":    {"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
-		"enum2PtrField": {"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.NotSupported(field.NewPath("enum0Field"), Enum0("x"), []Enum0{}),
+		field.NotSupported(field.NewPath("enum0PtrField"), Enum0("x"), []Enum0{}),
+		field.NotSupported(field.NewPath("enum1Field"), Enum1("x"), []Enum1{E1V1}),
+		field.NotSupported(field.NewPath("enum1PtrField"), Enum1("x"), []Enum1{E1V1}),
+		field.NotSupported(field.NewPath("enum2Field"), Enum2("x"), []Enum2{E2V1, E2V2}),
+		field.NotSupported(field.NewPath("enum2PtrField"), Enum2("x"), []Enum2{E2V1, E2V2}),
 	})
 }

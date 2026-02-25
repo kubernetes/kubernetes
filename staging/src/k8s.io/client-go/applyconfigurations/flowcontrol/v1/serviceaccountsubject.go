@@ -20,9 +20,15 @@ package v1
 
 // ServiceAccountSubjectApplyConfiguration represents a declarative configuration of the ServiceAccountSubject type for use
 // with apply.
+//
+// ServiceAccountSubject holds detailed information for service-account-kind subject.
 type ServiceAccountSubjectApplyConfiguration struct {
+	// `namespace` is the namespace of matching ServiceAccount objects.
+	// Required.
 	Namespace *string `json:"namespace,omitempty"`
-	Name      *string `json:"name,omitempty"`
+	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
+	// Required.
+	Name *string `json:"name,omitempty"`
 }
 
 // ServiceAccountSubjectApplyConfiguration constructs a declarative configuration of the ServiceAccountSubject type for use with

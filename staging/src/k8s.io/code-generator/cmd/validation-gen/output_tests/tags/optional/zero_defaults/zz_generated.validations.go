@@ -37,6 +37,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -47,80 +48,91 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.StringField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			return
-		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }))...)
+		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }), oldObj != nil)...)
 
 	// field Struct.StringPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
+		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }), oldObj != nil)...)
 
 	// field Struct.IntField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			return
-		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntField }))...)
+		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntField }), oldObj != nil)...)
 
 	// field Struct.IntPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *Struct) *int { return oldObj.IntPtrField }))...)
+		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *Struct) *int { return oldObj.IntPtrField }), oldObj != nil)...)
 
 	// field Struct.BoolField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			return
-		}(fldPath.Child("boolField"), &obj.BoolField, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.BoolField }))...)
+		}(fldPath.Child("boolField"), &obj.BoolField, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.BoolField }), oldObj != nil)...)
 
 	// field Struct.BoolPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("boolPtrField"), obj.BoolPtrField, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.BoolPtrField }))...)
+		}(fldPath.Child("boolPtrField"), obj.BoolPtrField, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.BoolPtrField }), oldObj != nil)...)
 
 	return errs
 }

@@ -124,7 +124,8 @@ type serviceInfo struct {
 
 // Server is a gRPC server to serve RPC requests.
 type Server struct {
-	opts serverOptions
+	opts         serverOptions
+	statsHandler stats.Handler
 
 	mu  sync.Mutex // guards following
 	lis map[net.Listener]bool
@@ -179,6 +180,7 @@ type serverOptions struct {
 	numServerWorkers      uint32
 	bufferPool            mem.BufferPool
 	waitForHandlers       bool
+	staticWindowSize      bool
 }
 
 var defaultServerOptions = serverOptions{
@@ -279,6 +281,7 @@ func ReadBufferSize(s int) ServerOption {
 func InitialWindowSize(s int32) ServerOption {
 	return newFuncServerOption(func(o *serverOptions) {
 		o.initialWindowSize = s
+		o.staticWindowSize = true
 	})
 }
 
@@ -287,6 +290,29 @@ func InitialWindowSize(s int32) ServerOption {
 func InitialConnWindowSize(s int32) ServerOption {
 	return newFuncServerOption(func(o *serverOptions) {
 		o.initialConnWindowSize = s
+		o.staticWindowSize = true
+	})
+}
+
+// StaticStreamWindowSize returns a ServerOption to set the initial stream
+// window size to the value provided and disables dynamic flow control.
+// The lower bound for window size is 64K and any value smaller than that
+// will be ignored.
+func StaticStreamWindowSize(s int32) ServerOption {
+	return newFuncServerOption(func(o *serverOptions) {
+		o.initialWindowSize = s
+		o.staticWindowSize = true
+	})
+}
+
+// StaticConnWindowSize returns a ServerOption to set the initial connection
+// window size to the value provided and disables dynamic flow control.
+// The lower bound for window size is 64K and any value smaller than that
+// will be ignored.
+func StaticConnWindowSize(s int32) ServerOption {
+	return newFuncServerOption(func(o *serverOptions) {
+		o.initialConnWindowSize = s
+		o.staticWindowSize = true
 	})
 }
 
@@ -667,13 +693,14 @@ func NewServer(opt ...ServerOption) *Server {
 		o.apply(&opts)
 	}
 	s := &Server{
-		lis:      make(map[net.Listener]bool),
-		opts:     opts,
-		conns:    make(map[string]map[transport.ServerTransport]bool),
-		services: make(map[string]*serviceInfo),
-		quit:     grpcsync.NewEvent(),
-		done:     grpcsync.NewEvent(),
-		channelz: channelz.RegisterServer(""),
+		lis:          make(map[net.Listener]bool),
+		opts:         opts,
+		statsHandler: istats.NewCombinedHandler(opts.statsHandlers...),
+		conns:        make(map[string]map[transport.ServerTransport]bool),
+		services:     make(map[string]*serviceInfo),
+		quit:         grpcsync.NewEvent(),
+		done:         grpcsync.NewEvent(),
+		channelz:     channelz.RegisterServer(""),
 	}
 	chainUnaryServerInterceptors(s)
 	chainStreamServerInterceptors(s)
@@ -974,7 +1001,7 @@ func (s *Server) newHTTP2Transport(c net.Conn) transport.ServerTransport {
 		ConnectionTimeout:     s.opts.connectionTimeout,
 		Credentials:           s.opts.creds,
 		InTapHandle:           s.opts.inTapHandle,
-		StatsHandlers:         s.opts.statsHandlers,
+		StatsHandler:          s.statsHandler,
 		KeepaliveParams:       s.opts.keepaliveParams,
 		KeepalivePolicy:       s.opts.keepalivePolicy,
 		InitialWindowSize:     s.opts.initialWindowSize,
@@ -986,6 +1013,7 @@ func (s *Server) newHTTP2Transport(c net.Conn) transport.ServerTransport {
 		MaxHeaderListSize:     s.opts.maxHeaderListSize,
 		HeaderTableSize:       s.opts.headerTableSize,
 		BufferPool:            s.opts.bufferPool,
+		StaticWindowSize:      s.opts.staticWindowSize,
 	}
 	st, err := transport.NewServerTransport(c, config)
 	if err != nil {
@@ -1010,18 +1038,18 @@ func (s *Server) newHTTP2Transport(c net.Conn) transport.ServerTransport {
 func (s *Server) serveStreams(ctx context.Context, st transport.ServerTransport, rawConn net.Conn) {
 	ctx = transport.SetConnection(ctx, rawConn)
 	ctx = peer.NewContext(ctx, st.Peer())
-	for _, sh := range s.opts.statsHandlers {
-		ctx = sh.TagConn(ctx, &stats.ConnTagInfo{
+	if s.statsHandler != nil {
+		ctx = s.statsHandler.TagConn(ctx, &stats.ConnTagInfo{
 			RemoteAddr: st.Peer().Addr,
 			LocalAddr:  st.Peer().LocalAddr,
 		})
-		sh.HandleConn(ctx, &stats.ConnBegin{})
+		s.statsHandler.HandleConn(ctx, &stats.ConnBegin{})
 	}
 
 	defer func() {
 		st.Close(errors.New("finished serving streams for the server transport"))
-		for _, sh := range s.opts.statsHandlers {
-			sh.HandleConn(ctx, &stats.ConnEnd{})
+		if s.statsHandler != nil {
+			s.statsHandler.HandleConn(ctx, &stats.ConnEnd{})
 		}
 	}()
 
@@ -1078,7 +1106,7 @@ var _ http.Handler = (*Server)(nil)
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a
 // later release.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	st, err := transport.NewServerHandlerTransport(w, r, s.opts.statsHandlers, s.opts.bufferPool)
+	st, err := transport.NewServerHandlerTransport(w, r, s.statsHandler, s.opts.bufferPool)
 	if err != nil {
 		// Errors returned from transport.NewServerHandlerTransport have
 		// already been written to w.
@@ -1172,12 +1200,8 @@ func (s *Server) sendResponse(ctx context.Context, stream *transport.ServerStrea
 		return status.Errorf(codes.ResourceExhausted, "grpc: trying to send message larger than max (%d vs. %d)", payloadLen, s.opts.maxSendMessageSize)
 	}
 	err = stream.Write(hdr, payload, opts)
-	if err == nil {
-		if len(s.opts.statsHandlers) != 0 {
-			for _, sh := range s.opts.statsHandlers {
-				sh.HandleRPC(ctx, outPayload(false, msg, dataLen, payloadLen, time.Now()))
-			}
-		}
+	if err == nil && s.statsHandler != nil {
+		s.statsHandler.HandleRPC(ctx, outPayload(false, msg, dataLen, payloadLen, time.Now()))
 	}
 	return err
 }
@@ -1219,16 +1243,15 @@ func getChainUnaryHandler(interceptors []UnaryServerInterceptor, curr int, info 
 }
 
 func (s *Server) processUnaryRPC(ctx context.Context, stream *transport.ServerStream, info *serviceInfo, md *MethodDesc, trInfo *traceInfo) (err error) {
-	shs := s.opts.statsHandlers
-	if len(shs) != 0 || trInfo != nil || channelz.IsOn() {
+	sh := s.statsHandler
+	if sh != nil || trInfo != nil || channelz.IsOn() {
 		if channelz.IsOn() {
 			s.incrCallsStarted()
 		}
 		var statsBegin *stats.Begin
-		for _, sh := range shs {
-			beginTime := time.Now()
+		if sh != nil {
 			statsBegin = &stats.Begin{
-				BeginTime:      beginTime,
+				BeginTime:      time.Now(),
 				IsClientStream: false,
 				IsServerStream: false,
 			}
@@ -1256,7 +1279,7 @@ func (s *Server) processUnaryRPC(ctx context.Context, stream *transport.ServerSt
 				trInfo.tr.Finish()
 			}
 
-			for _, sh := range shs {
+			if sh != nil {
 				end := &stats.End{
 					BeginTime: statsBegin.BeginTime,
 					EndTime:   time.Now(),
@@ -1353,7 +1376,7 @@ func (s *Server) processUnaryRPC(ctx context.Context, stream *transport.ServerSt
 	}
 
 	var payInfo *payloadInfo
-	if len(shs) != 0 || len(binlogs) != 0 {
+	if sh != nil || len(binlogs) != 0 {
 		payInfo = &payloadInfo{}
 		defer payInfo.free()
 	}
@@ -1379,7 +1402,7 @@ func (s *Server) processUnaryRPC(ctx context.Context, stream *transport.ServerSt
 			return status.Errorf(codes.Internal, "grpc: error unmarshalling request: %v", err)
 		}
 
-		for _, sh := range shs {
+		if sh != nil {
 			sh.HandleRPC(ctx, &stats.InPayload{
 				RecvTime:         time.Now(),
 				Payload:          v,
@@ -1553,32 +1576,30 @@ func (s *Server) processStreamingRPC(ctx context.Context, stream *transport.Serv
 	if channelz.IsOn() {
 		s.incrCallsStarted()
 	}
-	shs := s.opts.statsHandlers
+	sh := s.statsHandler
 	var statsBegin *stats.Begin
-	if len(shs) != 0 {
-		beginTime := time.Now()
+	if sh != nil {
 		statsBegin = &stats.Begin{
-			BeginTime:      beginTime,
+			BeginTime:      time.Now(),
 			IsClientStream: sd.ClientStreams,
 			IsServerStream: sd.ServerStreams,
 		}
-		for _, sh := range shs {
-			sh.HandleRPC(ctx, statsBegin)
-		}
+		sh.HandleRPC(ctx, statsBegin)
 	}
 	ctx = NewContextWithServerTransportStream(ctx, stream)
 	ss := &serverStream{
 		ctx:                   ctx,
 		s:                     stream,
-		p:                     &parser{r: stream, bufferPool: s.opts.bufferPool},
+		p:                     parser{r: stream, bufferPool: s.opts.bufferPool},
 		codec:                 s.getCodec(stream.ContentSubtype()),
+		desc:                  sd,
 		maxReceiveMessageSize: s.opts.maxReceiveMessageSize,
 		maxSendMessageSize:    s.opts.maxSendMessageSize,
 		trInfo:                trInfo,
-		statsHandler:          shs,
+		statsHandler:          sh,
 	}
 
-	if len(shs) != 0 || trInfo != nil || channelz.IsOn() {
+	if sh != nil || trInfo != nil || channelz.IsOn() {
 		// See comment in processUnaryRPC on defers.
 		defer func() {
 			if trInfo != nil {
@@ -1592,7 +1613,7 @@ func (s *Server) processStreamingRPC(ctx context.Context, stream *transport.Serv
 				ss.mu.Unlock()
 			}
 
-			if len(shs) != 0 {
+			if sh != nil {
 				end := &stats.End{
 					BeginTime: statsBegin.BeginTime,
 					EndTime:   time.Now(),
@@ -1600,9 +1621,7 @@ func (s *Server) processStreamingRPC(ctx context.Context, stream *transport.Serv
 				if err != nil && err != io.EOF {
 					end.Error = toRPCErr(err)
 				}
-				for _, sh := range shs {
-					sh.HandleRPC(ctx, end)
-				}
+				sh.HandleRPC(ctx, end)
 			}
 
 			if channelz.IsOn() {
@@ -1791,19 +1810,17 @@ func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Ser
 	method := sm[pos+1:]
 
 	// FromIncomingContext is expensive: skip if there are no statsHandlers
-	if len(s.opts.statsHandlers) > 0 {
+	if s.statsHandler != nil {
 		md, _ := metadata.FromIncomingContext(ctx)
-		for _, sh := range s.opts.statsHandlers {
-			ctx = sh.TagRPC(ctx, &stats.RPCTagInfo{FullMethodName: stream.Method()})
-			sh.HandleRPC(ctx, &stats.InHeader{
-				FullMethod:  stream.Method(),
-				RemoteAddr:  t.Peer().Addr,
-				LocalAddr:   t.Peer().LocalAddr,
-				Compression: stream.RecvCompress(),
-				WireLength:  stream.HeaderWireLength(),
-				Header:      md,
-			})
-		}
+		ctx = s.statsHandler.TagRPC(ctx, &stats.RPCTagInfo{FullMethodName: stream.Method()})
+		s.statsHandler.HandleRPC(ctx, &stats.InHeader{
+			FullMethod:  stream.Method(),
+			RemoteAddr:  t.Peer().Addr,
+			LocalAddr:   t.Peer().LocalAddr,
+			Compression: stream.RecvCompress(),
+			WireLength:  stream.HeaderWireLength(),
+			Header:      md,
+		})
 	}
 	// To have calls in stream callouts work. Will delete once all stats handler
 	// calls come from the gRPC layer.

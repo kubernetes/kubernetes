@@ -28,8 +28,6 @@ set -o errexit -o nounset -o xtrace
 # parallel testing is enabled. Using LABEL_FILTER instead of combining SKIP and
 # FOCUS is recommended (more expressive, easier to read than regexp).
 #
-# GA_ONLY: true  - limit to GA APIs/features as much as possible
-#          false - (default) APIs and features left at defaults
 # FEATURE_GATES:
 #          JSON or YAML encoding of a string/bool map: {"FeatureGateA": true, "FeatureGateB": false}
 #          Enables or disables feature gates in the entire cluster.
@@ -84,73 +82,15 @@ build() {
   export PATH="${PWD}/_output/bin:$PATH"
 }
 
-check_structured_log_support() {
-	case "${KUBE_VERSION}" in
-		v1.1[0-8].*)
-			echo "$1 is only supported on versions >= v1.19, got ${KUBE_VERSION}"
-			exit 1
-			;;
-	esac
-}
-
 # up a cluster with kind
 create_cluster() {
-  # Grab the version of the cluster we're about to start
-  KUBE_VERSION="$(docker run --rm --entrypoint=cat "kindest/node:latest" /kind/version)"
-
   # Default Log level for all components in test clusters
   KIND_CLUSTER_LOG_LEVEL=${KIND_CLUSTER_LOG_LEVEL:-4}
-
-  # potentially enable --logging-format
-  CLUSTER_LOG_FORMAT=${CLUSTER_LOG_FORMAT:-}
-  scheduler_extra_args="      \"v\": \"${KIND_CLUSTER_LOG_LEVEL}\""
-  controllerManager_extra_args="      \"v\": \"${KIND_CLUSTER_LOG_LEVEL}\""
-  apiServer_extra_args="      \"v\": \"${KIND_CLUSTER_LOG_LEVEL}\""
-  if [ -n "$CLUSTER_LOG_FORMAT" ]; then
-      check_structured_log_support "CLUSTER_LOG_FORMAT"
-      scheduler_extra_args="${scheduler_extra_args}
-      \"logging-format\": \"${CLUSTER_LOG_FORMAT}\""
-      controllerManager_extra_args="${controllerManager_extra_args}
-      \"logging-format\": \"${CLUSTER_LOG_FORMAT}\""
-      apiServer_extra_args="${apiServer_extra_args}
-      \"logging-format\": \"${CLUSTER_LOG_FORMAT}\""
-  fi
-  kubelet_extra_args="      \"v\": \"${KIND_CLUSTER_LOG_LEVEL}\""
-  KUBELET_LOG_FORMAT=${KUBELET_LOG_FORMAT:-$CLUSTER_LOG_FORMAT}
-  if [ -n "$KUBELET_LOG_FORMAT" ]; then
-      check_structured_log_support "KUBECTL_LOG_FORMAT"
-      kubelet_extra_args="${kubelet_extra_args}
-      \"logging-format\": \"${KUBELET_LOG_FORMAT}\""
-  fi
 
   # JSON or YAML map injected into featureGates config
   feature_gates="${FEATURE_GATES:-{\}}"
   # --runtime-config argument value passed to the API server, again as a map
   runtime_config="${RUNTIME_CONFIG:-{\}}"
-
-  case "${GA_ONLY:-false}" in
-  false)
-    :
-    ;;
-  true)
-    if [ "${feature_gates}" != "{}" ]; then
-      echo "GA_ONLY=true and FEATURE_GATES=${feature_gates} are mutually exclusive."
-      exit 1
-    fi
-    if [ "${runtime_config}" != "{}" ]; then
-      echo "GA_ONLY=true and RUNTIME_CONFIG=${runtime_config} are mutually exclusive."
-      exit 1
-    fi
-
-    echo "Limiting to GA APIs and features for ${KUBE_VERSION}"
-    feature_gates='{"AllAlpha":false,"AllBeta":false}'
-    runtime_config='{"api/alpha":"false", "api/beta":"false"}'
-    ;;
-  *)
-    echo "\$GA_ONLY set to '${GA_ONLY}'; supported values are true and false (default)"
-    exit 1
-    ;;
-  esac
 
   # create the config file
   cat <<EOF > "${ARTIFACTS}/kind-config.yaml"
@@ -170,29 +110,67 @@ nodes:
 featureGates: ${feature_gates}
 runtimeConfig: ${runtime_config}
 kubeadmConfigPatches:
+# v1beta4 for the future (v1.35.0+ ?)
+# https://github.com/kubernetes-sigs/kind/issues/3847
+# TODO: drop v1beta3 when kind makes the switch
 - |
   kind: ClusterConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta4
   metadata:
     name: config
   apiServer:
     extraArgs:
-${apiServer_extra_args}
+      - name: "v"
+        value: "${KIND_CLUSTER_LOG_LEVEL}"
   controllerManager:
     extraArgs:
-${controllerManager_extra_args}
+      - name: "v"
+        value: "${KIND_CLUSTER_LOG_LEVEL}"
   scheduler:
     extraArgs:
-${scheduler_extra_args}
+      - name: "v"
+        value: "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: InitConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta4
   nodeRegistration:
     kubeletExtraArgs:
-${kubelet_extra_args}
+      - name: "v"
+        value: "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: JoinConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta4
   nodeRegistration:
     kubeletExtraArgs:
-${kubelet_extra_args}
+      - name: "v"
+        value: "${KIND_CLUSTER_LOG_LEVEL}"
+# v1beta3 for v1.23.0 ... ?
+- |
+  kind: ClusterConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta3
+  metadata:
+    name: config
+  apiServer:
+    extraArgs:
+      "v": "${KIND_CLUSTER_LOG_LEVEL}"
+  controllerManager:
+    extraArgs:
+      "v": "${KIND_CLUSTER_LOG_LEVEL}"
+  scheduler:
+    extraArgs:
+      "v": "${KIND_CLUSTER_LOG_LEVEL}"
+  ---
+  kind: InitConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta3
+  nodeRegistration:
+    kubeletExtraArgs:
+     "v": "${KIND_CLUSTER_LOG_LEVEL}"
+  ---
+  kind: JoinConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta3
+  nodeRegistration:
+    kubeletExtraArgs:
+      "v": "${KIND_CLUSTER_LOG_LEVEL}"
 EOF
   # NOTE: must match the number of workers above
   NUM_NODES=2
@@ -266,11 +244,12 @@ run_tests() {
   export KUBE_CONTAINER_RUNTIME=remote
   export KUBE_CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
   export KUBE_CONTAINER_RUNTIME_NAME=containerd
-  # ginkgo can take forever to exit, so we run it in the background and save the
-  # PID, bash will not run traps while waiting on a process, but it will while
-  # running a builtin like `wait`, saving the PID also allows us to forward the
-  # interrupt
-  
+  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.4.0}"
+  echo "SNAPSHOTTER_VERSION is $SNAPSHOTTER_VERSION"
+
+  # Enable VolumeGroupSnapshot tests in csi-driver-hostpath
+  export CSI_PROW_ENABLE_GROUP_SNAPSHOT=true
+
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml || exit 1
@@ -278,13 +257,17 @@ run_tests() {
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshotcontents.yaml || exit 1
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml || exit 1
 
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
-  curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/"${SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
+  curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/"${SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
 awk '/--leader-election=true/ {print; print "            - \"--feature-gates=CSIVolumeGroupSnapshot=true\""; next}1' |  \
-sed 's|image: registry.k8s.io/sig-storage/snapshot-controller:v8.0.1|image: registry.k8s.io/sig-storage/snapshot-controller:v8.2.0|' | \
+sed "s|image: registry.k8s.io/sig-storage/snapshot-controller:.*|image: registry.k8s.io/sig-storage/snapshot-controller:${SNAPSHOTTER_VERSION}|" | \
  kubectl apply -f - || exit 1
 
 
+  # ginkgo can take forever to exit, so we run it in the background and save the
+  # PID, bash will not run traps while waiting on a process, but it will while
+  # running a builtin like `wait`, saving the PID also allows us to forward the
+  # interrupt
   ./hack/ginkgo-e2e.sh \
     '--provider=skeleton' "--num-nodes=${NUM_NODES}" \
     "--ginkgo.focus=${FOCUS}" "--ginkgo.skip=${SKIP}" "--ginkgo.label-filter=${LABEL_FILTER}" \

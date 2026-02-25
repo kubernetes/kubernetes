@@ -60,7 +60,7 @@ func TestSimpleQueue(t *testing.T) {
 
 		return false, nil
 	})
-	if err != wait.ErrWaitTimeout {
+	if !wait.Interrupted(err) {
 		t.Errorf("expected timeout, got: %v", err)
 	}
 

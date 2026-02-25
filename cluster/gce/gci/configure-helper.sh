@@ -1963,10 +1963,14 @@ def resolve(host):
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+
+  etcd_creds_and_extra_args="${etcd_creds} ${etcd_apiserver_creds} ${etcd_extra_args}"
+  etcd_creds_and_extra_args=$(echo "$etcd_creds_and_extra_args" | awk '{for (i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"") }')
+  etcdctl_certs=$(echo "$etcdctl_certs" | awk '{for (i=1; i<=NF; i++) printf "\"%s\",", $i }')
+
+  sed -i -e "s@{{ *etcd_creds_and_extra_args *}}@$etcd_creds_and_extra_args@g" "${temp_file}"
+
   sed -i -e "s@{{ *etcdctl_certs *}}@$etcdctl_certs@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1980,6 +1984,7 @@ def resolve(host):
     container_security_context="\"securityContext\": {\"runAsUser\": ${ETCD_RUNASUSER}, \"runAsGroup\": ${ETCD_RUNASGROUP}, \"allowPrivilegeEscalation\": false, \"capabilities\": {\"drop\": [\"all\"]}},"
   fi
   sed -i -e "s@{{security_context}}@${container_security_context}@g" "${temp_file}"
+
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
@@ -2165,7 +2170,6 @@ function update-legacy-addon-node-labels() {
     sleep 5
   done
   update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
-  update-node-label "beta.kubernetes.io/kube-proxy-ds-ready=true,node.kubernetes.io/kube-proxy-ds-ready!=true" "node.kubernetes.io/kube-proxy-ds-ready=true"
   update-node-label "beta.kubernetes.io/masq-agent-ds-ready=true,node.kubernetes.io/masq-agent-ds-ready!=true" "node.kubernetes.io/masq-agent-ds-ready=true"
 }
 
@@ -2888,17 +2892,6 @@ function start-kube-addons {
   fi
 
   # Set up manifests of other addons.
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-    if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
-      # Replace with custom GKE kube proxy.
-      cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
-$CUSTOM_KUBE_PROXY_YAML
-EOF
-      update-daemon-set-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
-    fi
-    prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
-    setup-addon-manifests "addons" "kube-proxy"
-  fi
   if [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]]; then
@@ -3200,7 +3193,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.4
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.6
     command:
     - /bin/sh
     args:
@@ -3621,9 +3614,7 @@ function main() {
   else
     log-wrap 'CreateNodePKI' create-node-pki
     log-wrap 'CreateKubeletKubeconfig' create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
-    fi
+    log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
         log-wrap 'CreateNodeProblemDetectorKubeconfig' create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
@@ -3687,9 +3678,7 @@ function main() {
     log-wrap 'StartLBController' start-lb-controller
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
   else
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      log-wrap 'StartKubeProxy' start-kube-proxy
-    fi
+    log-wrap 'StartKubeProxy' start-kube-proxy
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       log-wrap 'StartNodeProblemDetector' start-node-problem-detector
     fi

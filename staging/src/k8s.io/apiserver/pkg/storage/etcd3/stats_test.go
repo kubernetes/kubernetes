@@ -27,7 +27,7 @@ import (
 
 func TestStatsCache(t *testing.T) {
 	ctx := t.Context()
-	store := newStatsCache("/prefix", func(ctx context.Context) ([]string, error) { return []string{}, nil })
+	store := newResourceSizeEstimator("/prefix", func(ctx context.Context) ([]string, error) { return []string{}, nil })
 	defer store.Close()
 
 	stats, err := store.Stats(ctx)

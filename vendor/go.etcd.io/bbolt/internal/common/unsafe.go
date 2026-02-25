@@ -23,5 +23,5 @@ func UnsafeByteSlice(base unsafe.Pointer, offset uintptr, i, j int) []byte {
 	// index 0.  However, the wiki never says that the address must be to
 	// the beginning of a C allocation (or even that malloc was used at
 	// all), so this is believed to be correct.
-	return (*[pageMaxAllocSize]byte)(UnsafeAdd(base, offset))[i:j:j]
+	return (*[MaxAllocSize]byte)(UnsafeAdd(base, offset))[i:j:j]
 }

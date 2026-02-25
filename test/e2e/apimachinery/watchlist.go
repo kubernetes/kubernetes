@@ -33,28 +33,25 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/watchlist"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), framework.WithSerial(), func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested by informers when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 
@@ -98,8 +95,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 	})
 	ginkgo.It("should be requested by metadatainformer when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		metadataClient, err := metadata.NewForConfig(f.ClientConfig())
 		framework.ExpectNoError(err)
 		secretMetaInformer := metadatainformer.NewFilteredMetadataInformer(
@@ -141,8 +136,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
 	})
 	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
@@ -162,8 +155,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByKubeClient))
 	})
 	ginkgo.It("should NOT be requested by dynamic client's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
 		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
 
@@ -185,8 +176,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 	})
 	ginkgo.It("should NOT be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		metaClient, err := metadata.NewForConfig(f.ClientConfig())
 		framework.ExpectNoError(err)
 		expectedMetaSecrets := []metav1.PartialObjectMetadata{}
@@ -214,8 +203,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	})
 
 	ginkgo.It("server supports sending resources in Table format", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
 		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
 		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
@@ -225,56 +212,77 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 		dynamicClient := dynamic.New(restClient)
 
-		opts, hasPreparedOptions, err := watchlist.PrepareWatchListOptionsFromListOptions(metav1.ListOptions{})
+		opts, hasPreparedOptions, err := watchlist.PrepareWatchListOptionsFromListOptions(metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 		gomega.Expect(hasPreparedOptions).To(gomega.BeTrueBecause("it should be possible to prepare watchlist opts from an empty ListOptions"))
 
-		w, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace("default").Watch(ctx, opts)
+		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+		wellKnownSecrets := addWellKnownUnstructuredSecrets(ctx, f)
+
+		ginkgo.By(fmt.Sprintf("Retrieving the secrets from %s namespace in table format", f.Namespace.Name))
+		expectedSecrets := []*unstructured.Unstructured{}
+		for i, wellKnownSecret := range wellKnownSecrets {
+			actualSecret, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Get(ctx, wellKnownSecret.GetName(), metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			if i != 0 {
+				// only the first obj has
+				// the column definition
+				actualSecret = removeColumnDefinitionsFromTable(actualSecret)
+			}
+			expectedSecrets = append(expectedSecrets, actualSecret)
+		}
+
+		ginkgo.By("Verifying if the secrets can be streamed in table format")
+		w, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(ctx, opts)
 		framework.ExpectNoError(err)
 		defer w.Stop()
+
+		var ageColIndex int
+		for i, expectedSecret := range expectedSecrets {
+			actualSecret := retrieveObjFromEventOfType(w, watch.Added)
+			// clean the Age column value because it's dynamic
+			// and causes flakes in equality checks.
+			if i == 0 {
+				ageColIndex = getAgeColumnIndex(expectedSecret)
+			}
+			cleanedExpectedSecret := removeAgeColumnValueAtIndex(expectedSecret, ageColIndex)
+			cleanedActualSecret := removeAgeColumnValueAtIndex(actualSecret, ageColIndex)
+			gomega.Expect(cmp.Equal(cleanedExpectedSecret, cleanedActualSecret)).To(gomega.BeTrueBecause("received object must match expected (ignoring dynamic 'Age' column)"))
+		}
+		rawBookmark := retrieveObjFromEventOfType(w, watch.Bookmark)
+		if !hasTableObjectInitialEventsAnnotationInBookmarkObj(rawBookmark) {
+			framework.Failf("expected the bookmark object to contain the required annotation, obj: %v", rawBookmark)
+		}
 	})
 
 	ginkgo.It("reflector doesn't support receiving resources as Tables", func(ctx context.Context) {
-		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
-
-		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
-		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
-			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
-		}, ",")
-		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
-		restClient, err := rest.RESTClientFor(modifiedClientConfig)
-		framework.ExpectNoError(err)
-		dynamicClient := dynamic.New(restClient)
-
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-
-		secretInformer := cache.NewSharedIndexInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return nil, fmt.Errorf("unexpected list call")
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					options.LabelSelector = "watchlist=true"
-					return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(context.TODO(), options)
-				},
+		dynamicClient := setupDynamicTableClient(f)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return nil, fmt.Errorf("unexpected list call")
 			},
-			&unstructured.Unstructured{},
-			time.Duration(0),
-			nil,
-		)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = "watchlist=true"
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(ctx, options)
+			},
+		}
+		verifyReflectorRejectsTableResources(ctx, f, lw)
+	})
 
-		_ = addWellKnownUnstructuredSecrets(ctx, f)
-
-		ginkgo.By("Starting the secret informer")
-		go secretInformer.Run(stopCh)
-
-		ginkgo.By("Checking if the secret informer hasn't been synced")
-		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(context.Context) (done bool, err error) {
-			return secretInformer.HasSynced(), nil
-		})
-		gomega.Expect(err).To(gomega.HaveOccurred())
-		gomega.Expect(secretInformer.GetStore().List()).To(gomega.BeEmpty(), "unsupported resources should not have been added to the store")
+	ginkgo.It("reflector using standard List doesn't support receiving resources as Tables", func(ctx context.Context) {
+		dynamicClient := setupDynamicTableClient(f)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = "watchlist=true"
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// a dummy error triggers the fallback logic
+				// which uses a standard LIST call
+				return nil, fmt.Errorf("dummy error")
+			},
+		}
+		verifyReflectorRejectsTableResources(ctx, f, lw)
 	})
 })
 
@@ -304,6 +312,41 @@ func clientConfigWithRoundTripper(f *framework.Framework) (*roundTripper, *rest.
 	clientConfig.Wrap(rt.Wrap)
 
 	return rt, clientConfig
+}
+
+func setupDynamicTableClient(f *framework.Framework) dynamic.Interface {
+	modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
+	modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
+		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
+	}, ",")
+	modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
+	restClient, err := rest.RESTClientFor(modifiedClientConfig)
+	framework.ExpectNoError(err)
+	return dynamic.New(restClient)
+}
+
+func verifyReflectorRejectsTableResources(ctx context.Context, f *framework.Framework, lw *cache.ListWatch) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	secretInformer := cache.NewSharedIndexInformer(
+		lw,
+		&unstructured.Unstructured{},
+		time.Duration(0),
+		nil,
+	)
+
+	_ = addWellKnownUnstructuredSecrets(ctx, f)
+
+	ginkgo.By("Starting the secret informer")
+	go secretInformer.Run(stopCh)
+
+	ginkgo.By("Checking if the secret informer hasn't been synced")
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(context.Context) (done bool, err error) {
+		return secretInformer.HasSynced(), nil
+	})
+	gomega.Expect(err).To(gomega.HaveOccurred())
+	gomega.Expect(secretInformer.GetStore().List()).To(gomega.BeEmpty(), "unsupported resources should not have been added to the store")
 }
 
 func verifyStoreFor(ctx context.Context, verifier func() bool) {
@@ -423,4 +466,119 @@ func toPartialObjectMetadata(rawItems []interface{}) ([]*metav1.PartialObjectMet
 		ret = append(ret, meta)
 	}
 	return ret, nil
+}
+
+func retrieveObjFromEventOfType(watch watch.Interface, expectedType watch.EventType) runtime.Object {
+	select {
+	case event, ok := <-watch.ResultChan():
+		if !ok {
+			framework.Failf("watch closed unexpectedly")
+		}
+		framework.Logf("Got : %v %v", event.Type, event.Object)
+		if event.Type != expectedType {
+			framework.Failf("unexpected watch event type: %v, expected: %v", event.Type, expectedType)
+		}
+		return event.Object
+	case <-time.After(wait.ForeverTestTimeout):
+		framework.Failf("timed out waiting for watch event")
+	}
+	return nil
+}
+
+func hasTableObjectInitialEventsAnnotationInBookmarkObj(rawObject runtime.Object) bool {
+	table, err := decodeIntoTable(rawObject)
+	framework.ExpectNoError(err)
+	if len(table.Rows) == 0 {
+		framework.Failf("table has no rows")
+	}
+	if len(table.Rows) != 1 {
+		framework.Failf("expected 1 row in the Table, got %d", len(table.Rows))
+	}
+
+	internalObjMeta, err := extractMetadataFromTableRowObject(table.Rows[0])
+	framework.ExpectNoError(err)
+	return internalObjMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true"
+}
+
+var (
+	supportedTableVersions = map[schema.GroupVersionKind]bool{
+		metav1beta1.SchemeGroupVersion.WithKind("Table"): true,
+		metav1.SchemeGroupVersion.WithKind("Table"):      true,
+	}
+
+	_ metav1.Table      = metav1beta1.Table{}
+	_ metav1beta1.Table = metav1.Table{}
+)
+
+// extractMetadataFromTableRowObject retrieves the metav1.Object
+// from a single TableRow. It handles two scenarios:
+//  1. If row.Object.Object is already populated, it simply returns its metadata.
+//  2. Otherwise, it decodes row.Object.Raw into a runtime.Object and then returns its metadata.
+func extractMetadataFromTableRowObject(row metav1.TableRow) (metav1.Object, error) {
+	if row.Object.Raw == nil && row.Object.Object == nil {
+		return nil, fmt.Errorf("no object was found in the table")
+	}
+	if row.Object.Object != nil {
+		return meta.Accessor(row.Object.Object)
+	}
+
+	internalObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+	framework.ExpectNoError(err)
+	return meta.Accessor(internalObj)
+}
+
+// decodeIntoTable converts a runtime.Object into a *metav1.Table.
+func decodeIntoTable(rawObject runtime.Object) (*metav1.Table, error) {
+	unstructuredObj, ok := rawObject.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured got %T", rawObject)
+	}
+	if !supportedTableVersions[rawObject.GetObjectKind().GroupVersionKind()] {
+		return nil, fmt.Errorf("unsupported Table GVK: %v", rawObject.GetObjectKind().GroupVersionKind())
+	}
+
+	var table metav1.Table
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, &table)
+	framework.ExpectNoError(err)
+	return &table, nil
+}
+
+func removeColumnDefinitionsFromTable(rawObject *unstructured.Unstructured) *unstructured.Unstructured {
+	table, err := decodeIntoTable(rawObject)
+	framework.ExpectNoError(err)
+	table.ColumnDefinitions = nil
+
+	rawTable, err := runtime.DefaultUnstructuredConverter.ToUnstructured(table)
+	framework.ExpectNoError(err)
+	return &unstructured.Unstructured{Object: rawTable}
+}
+
+func getAgeColumnIndex(rawObj runtime.Object) int {
+	table, err := decodeIntoTable(rawObj)
+	framework.ExpectNoError(err)
+
+	for i, col := range table.ColumnDefinitions {
+		if col.Name == "Age" {
+			return i
+		}
+	}
+	return -1
+}
+
+func removeAgeColumnValueAtIndex(rawObj runtime.Object, ageColIndex int) runtime.Object {
+	if ageColIndex == -1 {
+		return rawObj
+	}
+
+	table, err := decodeIntoTable(rawObj)
+	framework.ExpectNoError(err)
+
+	for i := range table.Rows {
+		cells := table.Rows[i].Cells
+		if ageColIndex < len(cells) {
+			cells[ageColIndex] = ""
+		}
+	}
+
+	return table
 }

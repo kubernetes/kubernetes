@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Scale
 	scheme.AddValidationFunc((*appsv1beta1.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/scale":
@@ -48,32 +49,43 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_Scale validates an instance of Scale according
+// to declarative validation rules in the API schema.
 func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.Scale) (errs field.ErrorList) {
 	// field appsv1beta1.Scale.TypeMeta has no validation
 	// field appsv1beta1.Scale.ObjectMeta has no validation
 
 	// field appsv1beta1.Scale.Spec
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *appsv1beta1.ScaleSpec) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *appsv1beta1.ScaleSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
 			errs = append(errs, Validate_ScaleSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *appsv1beta1.Scale) *appsv1beta1.ScaleSpec { return &oldObj.Spec }))...)
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *appsv1beta1.Scale) *appsv1beta1.ScaleSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field appsv1beta1.Scale.Status has no validation
 	return errs
 }
 
+// Validate_ScaleSpec validates an instance of ScaleSpec according
+// to declarative validation rules in the API schema.
 func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.ScaleSpec) (errs field.ErrorList) {
 	// field appsv1beta1.ScaleSpec.Replicas
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *appsv1beta1.ScaleSpec) *int32 { return &oldObj.Replicas }))...)
+		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *appsv1beta1.ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
 
 	return errs
 }

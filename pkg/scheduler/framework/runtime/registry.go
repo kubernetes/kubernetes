@@ -22,21 +22,21 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"sigs.k8s.io/yaml"
 )
 
 // PluginFactory is a function that builds a plugin.
-type PluginFactory = func(ctx context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error)
+type PluginFactory = func(ctx context.Context, configuration runtime.Object, f fwk.Handle) (fwk.Plugin, error)
 
 // PluginFactoryWithFts is a function that builds a plugin with certain feature gates.
-type PluginFactoryWithFts[T framework.Plugin] func(context.Context, runtime.Object, framework.Handle, plfeature.Features) (T, error)
+type PluginFactoryWithFts[T fwk.Plugin] func(context.Context, runtime.Object, fwk.Handle, plfeature.Features) (T, error)
 
 // FactoryAdapter can be used to inject feature gates for a plugin that needs
 // them when the caller expects the older PluginFactory method.
-func FactoryAdapter[T framework.Plugin](fts plfeature.Features, withFts PluginFactoryWithFts[T]) PluginFactory {
-	return func(ctx context.Context, plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func FactoryAdapter[T fwk.Plugin](fts plfeature.Features, withFts PluginFactoryWithFts[T]) PluginFactory {
+	return func(ctx context.Context, plArgs runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return withFts(ctx, plArgs, fh, fts)
 	}
 }

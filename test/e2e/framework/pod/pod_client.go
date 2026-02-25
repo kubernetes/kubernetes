@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,6 +130,19 @@ func (c *PodClient) Create(ctx context.Context, pod *v1.Pod) *v1.Pod {
 	framework.ExpectNoError(err, "Error creating Pod")
 	return p
 
+}
+
+// TryCreate attempts to create a new pod according to the provided specification.
+// This function is designed to return an error to the caller if pod creation fails.
+func (c *PodClient) TryCreate(ctx context.Context, pod *v1.Pod) (*v1.Pod, error) {
+	ginkgo.GinkgoHelper()
+	c.mungeSpec(pod)
+	c.setOwnerAnnotation(pod)
+	p, err := c.PodInterface.Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error creating pod %s/%s: %w", pod.Namespace, pod.Name, err)
+	}
+	return p, nil
 }
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
@@ -258,18 +273,16 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	// during the test.
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		if c.ImagePullPolicy == v1.PullAlways {
-			// If the image pull policy is PullAlways, the image doesn't need to be in
-			// the allow list or pre-pulled, because the image is expected to be pulled
-			// in the test anyway.
-			continue
+		// If the image pull policy is PullNever, make sure it is in the pre-pull list.
+		// Note that we skip images from localhost registry here, because
+		// they are usually used for testing private registry pulling,
+		// and they are not supposed to be pre-pulled.
+		if c.ImagePullPolicy == v1.PullNever && !strings.Contains(c.Image, "localhost") {
+			gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
 		}
-		// If the image policy is not PullAlways, the image must be in the pre-pull list and
-		// pre-pulled.
-		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
-		// Do not pull images during the tests because the images in pre-pull list should have
-		// been prepulled.
-		c.ImagePullPolicy = v1.PullNever
+		// If the image pull policy is PullAlways or PullIfNotPresent, the image doesn't need
+		// to be in the allow list or pre-pulled, because the image is expected to be pulled
+		// in the test anyway.
 	}
 }
 
@@ -359,29 +372,10 @@ func (c *PodClient) PodIsReady(ctx context.Context, name string) bool {
 	return podutils.IsPodReady(pod)
 }
 
-// RemoveString returns a newly created []string that contains all items from slice
-// that are not equal to s.
-// This code is taken from k/k/pkg/util/slice/slice.go to remove
-// e2e/framework/pod -> k/k/pkg/util/slice dependency.
-func removeString(slice []string, s string) []string {
-	newSlice := make([]string, 0)
-	for _, item := range slice {
-		if item != s {
-			newSlice = append(newSlice, item)
-		}
-	}
-	if len(newSlice) == 0 {
-		// Sanitize for unit tests so we don't need to distinguish empty array
-		// and nil.
-		return nil
-	}
-	return newSlice
-}
-
 // RemoveFinalizer removes the pod's finalizer
 func (c *PodClient) RemoveFinalizer(ctx context.Context, podName string, finalizerName string) {
 	framework.Logf("Removing pod's %q finalizer: %q", podName, finalizerName)
 	c.Update(ctx, podName, func(pod *v1.Pod) {
-		pod.ObjectMeta.Finalizers = removeString(pod.ObjectMeta.Finalizers, finalizerName)
+		pod.ObjectMeta.Finalizers = slices.DeleteFunc(pod.ObjectMeta.Finalizers, func(actual string) bool { return actual == finalizerName })
 	})
 }

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -46,8 +45,11 @@ func (mc MemCheck) Check() (warnings, errorList []error) {
 }
 
 // addOSValidator adds a new OSValidator
-func addOSValidator(validators []system.Validator, reporter *system.StreamReporter) []system.Validator {
-	validators = append(validators, &system.OSValidator{Reporter: reporter}, &system.CgroupsValidator{Reporter: reporter})
+func addOSValidator(validators []system.Validator, reporter *system.StreamReporter, kubeletVersion string) []system.Validator {
+	validators = append(validators,
+		&system.OSValidator{Reporter: reporter},
+		&system.CgroupsValidator{Reporter: reporter, KubeletVersion: kubeletVersion},
+	)
 	return validators
 }
 

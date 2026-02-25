@@ -19,7 +19,6 @@ package scheduler
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -324,7 +324,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -332,7 +332,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx, nil)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}
@@ -358,8 +358,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			podIgnored := &v1.Pod{}
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			podInfoIgnored := queuedPodInfoForPod(&v1.Pod{})
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfoIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
@@ -500,7 +500,7 @@ func TestConvertToVictims(t *testing.T) {
 		nodeNameToMetaVictims map[string]*extenderv1.MetaVictims
 		nodeNames             []string
 		podsInNodeList        []*v1.Pod
-		nodeInfos             framework.NodeInfoLister
+		nodeInfos             fwk.NodeInfoLister
 		want                  map[string]*extenderv1.Victims
 		wantErr               bool
 	}{
@@ -552,7 +552,7 @@ func TestConvertToVictims(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// nodeInfos instantiations
-			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
+			nodeInfoList := make([]fwk.NodeInfo, 0, len(tt.nodeNames))
 			for i, nm := range tt.nodeNames {
 				nodeInfo := framework.NewNodeInfo()
 				node := createNode(nm)

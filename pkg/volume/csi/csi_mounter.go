@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -172,7 +173,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = pvSrc.NodePublishSecretRef
 		}
 
-		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+		// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 		if c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
@@ -233,12 +234,19 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, c.volumeLifecycleMode))
 	}
 
-	// Inject pod service account token into volume attributes
-	serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+	serviceAccountTokenAttrs, serviceAccountTokenInSecrets, err := c.podServiceAccountTokenAttrs()
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
 	}
-	volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+
+	// Inject service account token information into
+	// 1. volume_attributes (default behavior)
+	// 2. node_publish_secrets (if ServiceAccountTokenInSecrets is true in the CSIDriver spec)
+	if serviceAccountTokenInSecrets {
+		nodePublishSecrets = mergeMap(nodePublishSecrets, serviceAccountTokenAttrs)
+	} else {
+		volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+	}
 
 	driverSupportsCSIVolumeMountGroup := false
 	var nodePublishFSGroupArg *int64
@@ -307,7 +315,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(csiRPCError) {
+		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.ReconstructedVolume {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}
@@ -348,22 +356,22 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	return nil
 }
 
-func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
+func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, bool, error) {
 	if c.plugin.serviceAccountTokenGetter == nil {
-		return nil, errors.New("ServiceAccountTokenGetter is nil")
+		return nil, false, errors.New("ServiceAccountTokenGetter is nil")
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(5).Info(log("CSIDriver %q not found, not adding service account token information", c.driverName))
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, err
+		return nil, false, err
 	}
 
 	if len(csiDriver.Spec.TokenRequests) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	outputs := map[string]authenticationv1.TokenRequestStatus{}
@@ -386,17 +394,26 @@ func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		outputs[audience] = tr.Status
 	}
 
 	klog.V(4).Info(log("Fetched service account token attrs for CSIDriver %q", c.driverName))
-	tokens, _ := json.Marshal(outputs)
+	tokens, err := json.Marshal(outputs)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var serviceAccountTokenInSecrets bool
+	if csiDriver.Spec.ServiceAccountTokenInSecrets != nil && *csiDriver.Spec.ServiceAccountTokenInSecrets {
+		serviceAccountTokenInSecrets = true
+	}
+
 	return map[string]string{
 		"csi.storage.k8s.io/serviceAccount.tokens": string(tokens),
-	}, nil
+	}, serviceAccountTokenInSecrets, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
@@ -437,7 +454,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	// to the spec.
 	//
 	// Kubelet should only be responsible for removal of json data files it
-	// creates and parent directories.
+	// creates and their parent directories.
 	//
 	// However, some CSI plugins maybe buggy and don't adhere to the standard,
 	// so we still need to remove the target_path here if it's unmounted and
@@ -544,12 +561,7 @@ func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
 
 // containsVolumeMode checks whether the given volume mode is listed.
 func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check

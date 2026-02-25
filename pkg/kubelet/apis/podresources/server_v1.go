@@ -38,13 +38,15 @@ type v1PodResourcesServer struct {
 	memoryProvider           MemoryProvider
 	dynamicResourcesProvider DynamicResourcesProvider
 	useActivePods            bool
+	podresourcesv1.UnsafePodResourcesListerServer
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+func NewV1PodResourcesServer(ctx context.Context, providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+	logger := klog.FromContext(ctx)
 	useActivePods := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesListUseActivePods)
-	klog.InfoS("podresources", "method", "list", "useActivePods", useActivePods)
+	logger.Info("podresources", "method", "list", "useActivePods", useActivePods)
 	return &v1PodResourcesServer{
 		podsProvider:             providers.Pods,
 		devicesProvider:          providers.Devices,
@@ -62,9 +64,20 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 
 	var pods []*v1.Pod
 	if p.useActivePods {
+		// GetActivePods already filters out terminal pods, so no need for additional filtering.
 		pods = p.podsProvider.GetActivePods()
 	} else {
-		pods = p.podsProvider.GetPods()
+		// GetPods may include terminal pods, so we filter them out ourselves.
+		allPods := p.podsProvider.GetPods()
+		pods = make([]*v1.Pod, 0, len(allPods))
+		for _, pod := range allPods {
+			// Skip terminal pods (Failed or Succeeded).
+			// Terminal pods should not appear in podresources as they no longer consume resources.
+			if podutil.IsPodTerminal(pod) {
+				continue
+			}
+			pods = append(pods, pod)
+		}
 	}
 
 	podResources := make([]*podresourcesv1.PodResources, len(pods))

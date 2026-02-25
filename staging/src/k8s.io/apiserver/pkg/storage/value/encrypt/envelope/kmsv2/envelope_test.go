@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -35,9 +34,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"google.golang.org/protobuf/proto"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -247,11 +246,14 @@ func testStateFunc(ctx context.Context, envelopeService kmsservice.Service, cloc
 			return State{}, errGen
 		}
 		return State{
-			Transformer:         transformer,
-			EncryptedObject:     *encObject,
-			UID:                 "panda",
-			ExpirationTimestamp: clock.Now().Add(time.Hour),
-			CacheKey:            cacheKey,
+			Transformer:                           transformer,
+			EncryptedObjectKeyID:                  encObject.KeyID,
+			EncryptedObjectEncryptedDEKSource:     encObject.EncryptedDEKSource,
+			EncryptedObjectAnnotations:            encObject.Annotations,
+			EncryptedObjectEncryptedDEKSourceType: encObject.EncryptedDEKSourceType,
+			UID:                                   "panda",
+			ExpirationTimestamp:                   clock.Now().Add(time.Hour),
+			CacheKey:                              cacheKey,
 		}, nil
 	}
 }
@@ -338,11 +340,11 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 			}
 
 			// inject test data before performing a read
-			state.EncryptedObject.KeyID = tt.testKeyID
+			state.EncryptedObjectKeyID = tt.testKeyID
 			if tt.useSeedRead {
-				state.EncryptedObject.EncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+				state.EncryptedObjectEncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 			} else {
-				state.EncryptedObject.EncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
+				state.EncryptedObjectEncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
 			}
 			stateErr = tt.testErr
 
@@ -552,9 +554,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
-	// reset internal field modified by marshaling obj
-	obj.XXX_sizecache = 0
-	if !reflect.DeepEqual(got, obj) {
+	if !proto.Equal(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
 	}
 }
@@ -1103,7 +1103,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 
 	// this is to mimic a plugin that sets a static response for ciphertext
 	// but uses the annotation field to send the actual encrypted DEK source.
-	envelopeService.SetCiphertext(state.EncryptedObject.EncryptedDEKSource)
+	envelopeService.SetCiphertext(state.EncryptedObjectEncryptedDEKSource)
 	// for this plugin, it indicates a change in the remote key ID as the returned
 	// encrypted DEK source is different.
 	envelopeService.SetAnnotations(map[string][]byte{

@@ -16,7 +16,6 @@ SRCS = nnp
 OS ?= linux
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
-GOARM ?= 7
 GOLANG_VERSION ?= latest
 SRC_DIR = $(notdir $(shell pwd))
 export

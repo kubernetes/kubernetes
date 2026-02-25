@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
+	"k8s.io/utils/ptr"
 )
 
 type mockExpiryGauge struct {
@@ -33,10 +34,6 @@ type mockExpiryGauge struct {
 
 func (m *mockExpiryGauge) Set(t *time.Time) {
 	m.v = t
-}
-
-func ptr(t time.Time) *time.Time {
-	return &t
 }
 
 func TestCertificateExpirationTracker(t *testing.T) {
@@ -60,25 +57,25 @@ func TestCertificateExpirationTracker(t *testing.T) {
 			desc: "ttl for one authenticator",
 			auth: firstAuthenticator,
 			time: now.Add(time.Minute * 10),
-			want: ptr(now.Add(time.Minute * 10)),
+			want: ptr.To(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "second authenticator shorter ttl",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 5),
-			want: ptr(now.Add(time.Minute * 5)),
+			want: ptr.To(now.Add(time.Minute * 5)),
 		},
 		{
 			desc: "update shorter to be longer",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 15),
-			want: ptr(now.Add(time.Minute * 10)),
+			want: ptr.To(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "update shorter to be zero time",
 			auth: firstAuthenticator,
 			time: time.Time{},
-			want: ptr(now.Add(time.Minute * 15)),
+			want: ptr.To(now.Add(time.Minute * 15)),
 		},
 		{
 			desc: "update last to be zero time records nil",
@@ -194,8 +191,119 @@ func TestCallsMetric(t *testing.T) {
 	callsMetricComparer := cmp.Comparer(func(a, b mockCallsMetric) bool {
 		return a.exitCode == b.exitCode && a.errorType == b.errorType
 	})
-	actuallCallsMetrics := callsMetricCounter.calls
-	if diff := cmp.Diff(wantCallsMetrics, actuallCallsMetrics, callsMetricComparer); diff != "" {
+	actualCallsMetrics := callsMetricCounter.calls
+	if diff := cmp.Diff(wantCallsMetrics, actualCallsMetrics, callsMetricComparer); diff != "" {
+		t.Fatalf("got unexpected metrics calls; -want, +got:\n%s", diff)
+	}
+}
+
+type mockPolicyCallsMetric struct {
+	status string
+}
+
+type mockPolicyCallsMetricCounter struct {
+	policyCalls []mockPolicyCallsMetric
+}
+
+func (f *mockPolicyCallsMetricCounter) Increment(status string) {
+	f.policyCalls = append(f.policyCalls, mockPolicyCallsMetric{status: status})
+}
+
+func TestPolicyCallsMetric(t *testing.T) {
+	const (
+		goodOutput = `{
+			"kind": "ExecCredential",
+			"apiVersion": "client.authentication.k8s.io/v1beta1",
+			"status": {
+				"token": "foo-bar"
+			}
+		}`
+	)
+
+	policyCallsMetricCounter := &mockPolicyCallsMetricCounter{}
+	originalExecPluginPolicyCalls := metrics.ExecPluginPolicyCalls
+	t.Cleanup(func() { metrics.ExecPluginPolicyCalls = originalExecPluginPolicyCalls })
+	metrics.ExecPluginPolicyCalls = policyCallsMetricCounter
+
+	tests := []struct {
+		wantDenied bool
+		policy     api.PluginPolicy
+	}{
+		{
+			wantDenied: false,
+			policy:     api.PluginPolicy{PolicyType: api.PluginPolicyAllowAll},
+		},
+		{
+			wantDenied: true,
+			policy:     api.PluginPolicy{PolicyType: api.PluginPolicyDenyAll},
+		},
+		{
+			wantDenied: false,
+			policy: api.PluginPolicy{
+				PolicyType: api.PluginPolicyAllowlist,
+				Allowlist: []api.AllowlistEntry{
+					{
+						Name: "foobar",
+					},
+					{
+						Name: "testdata/test-plugin.sh",
+					},
+				},
+			},
+		},
+		{
+			wantDenied: true,
+			policy: api.PluginPolicy{
+				PolicyType: api.PluginPolicyAllowlist,
+				Allowlist: []api.AllowlistEntry{
+					{Name: "foobar"},
+					{Name: "baz"},
+				},
+			},
+		},
+	}
+
+	var wantPolicyCallsMetrics []mockPolicyCallsMetric
+	for _, test := range tests {
+		c := api.ExecConfig{
+			Command:    "./testdata/test-plugin.sh",
+			APIVersion: "client.authentication.k8s.io/v1beta1",
+			Env: []api.ExecEnvVar{
+				{Name: "TEST_EXIT_CODE", Value: fmt.Sprintf("%d", 0)},
+				{Name: "TEST_OUTPUT", Value: goodOutput},
+			},
+			InteractiveMode: api.IfAvailableExecInteractiveMode,
+			PluginPolicy:    test.policy,
+		}
+
+		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.stderr = io.Discard
+
+		err = a.refreshCredsLocked()
+		if err != nil && !test.wantDenied {
+			t.Fatalf("wanted no error, but got %q", err.Error())
+		}
+		if err == nil && test.wantDenied {
+			t.Fatal("wanted error, but got nil")
+		}
+
+		mockPolicyCallsMetric := mockPolicyCallsMetric{status: "allowed"}
+		if test.wantDenied {
+			mockPolicyCallsMetric.status = "denied"
+		}
+
+		wantPolicyCallsMetrics = append(wantPolicyCallsMetrics, mockPolicyCallsMetric)
+	}
+
+	policyCallsMetricComparer := cmp.Comparer(func(a, b mockPolicyCallsMetric) bool {
+		return a.status == b.status
+	})
+
+	actualPolicyCallsMetrics := policyCallsMetricCounter.policyCalls
+	if diff := cmp.Diff(wantPolicyCallsMetrics, actualPolicyCallsMetrics, policyCallsMetricComparer); diff != "" {
 		t.Fatalf("got unexpected metrics calls; -want, +got:\n%s", diff)
 	}
 }

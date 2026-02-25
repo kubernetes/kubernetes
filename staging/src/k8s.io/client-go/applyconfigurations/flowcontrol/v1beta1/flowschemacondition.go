@@ -25,12 +25,22 @@ import (
 
 // FlowSchemaConditionApplyConfiguration represents a declarative configuration of the FlowSchemaCondition type for use
 // with apply.
+//
+// FlowSchemaCondition describes conditions for a FlowSchema.
 type FlowSchemaConditionApplyConfiguration struct {
-	Type               *flowcontrolv1beta1.FlowSchemaConditionType `json:"type,omitempty"`
-	Status             *flowcontrolv1beta1.ConditionStatus         `json:"status,omitempty"`
-	LastTransitionTime *v1.Time                                    `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                     `json:"reason,omitempty"`
-	Message            *string                                     `json:"message,omitempty"`
+	// `type` is the type of the condition.
+	// Required.
+	Type *flowcontrolv1beta1.FlowSchemaConditionType `json:"type,omitempty"`
+	// `status` is the status of the condition.
+	// Can be True, False, Unknown.
+	// Required.
+	Status *flowcontrolv1beta1.ConditionStatus `json:"status,omitempty"`
+	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	LastTransitionTime *v1.Time `json:"lastTransitionTime,omitempty"`
+	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// `message` is a human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // FlowSchemaConditionApplyConfiguration constructs a declarative configuration of the FlowSchemaCondition type for use with

@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -20,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"os/user"
 
@@ -27,17 +27,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func checkPermissions() error {
-
+func checkPermissions(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	u, err := user.Current()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get current user")
+		logger.Error(err, "Unable to get current user")
 		return err
 	}
 
 	// For Windows user.UserName contains the login name and user.Name contains
 	// the user's display name - https://pkg.go.dev/os/user#User
-	klog.InfoS("Kubelet is running as", "login name", u.Username, "dispaly name", u.Name)
+	logger.Info("Kubelet is running as", "login name", u.Username, "display name", u.Name)
 
 	if !windows.GetCurrentProcessToken().IsElevated() {
 		return errors.New("kubelet needs to run with elevated permissions!")

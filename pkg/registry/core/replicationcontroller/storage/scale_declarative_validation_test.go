@@ -24,13 +24,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateScaleForDeclarative(t *testing.T) {
@@ -77,8 +78,13 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 					// We only need to test both gate enabled and disabled together, because
 					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
 					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+					if !gateVal {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+					}
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.DeclarativeValidation:         gateVal,
+						features.DeclarativeValidationTakeover: gateVal,
+					})
 
 					_, _, err := storage.Scale.Update(ctx, tc.input.Name, rest.DefaultUpdatedObjectInfo(&tc.input), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 					errs := errorListFromStatusError(t, err)
@@ -109,7 +115,7 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField()
 			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
 
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, apitesting.WithSubResources("scale"))
 		})
 	}
 }

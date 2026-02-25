@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 func TestConsistencyCheckerDigest(t *testing.T) {
@@ -40,16 +43,17 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 		cacherItems     []example.Pod
 		etcdItems       []example.Pod
 
-		expectListKey                  string
-		expectDigest                   storageDigest
-		expectErr                      bool
-		expectCompactedResourceVersion string
+		expectListKey    string
+		expectDigest     storageDigest
+		expectErr        bool
+		expectConsistent bool
 	}{
 		{
-			desc:            "not ready",
-			cacherReady:     false,
-			resourceVersion: "1",
-			expectErr:       true,
+			desc:             "not ready",
+			cacherReady:      false,
+			resourceVersion:  "1",
+			expectErr:        true,
+			expectConsistent: true,
 		},
 		{
 			desc:            "empty",
@@ -60,6 +64,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "cbf29ce484222325",
 				EtcdDigest:      "cbf29ce484222325",
 			},
+			expectConsistent: true,
 		},
 		{
 			desc:            "with one element equal",
@@ -76,6 +81,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "86bf3a5e80d1c5cb",
 				EtcdDigest:      "86bf3a5e80d1c5cb",
 			},
+			expectConsistent: true,
 		},
 		{
 			desc:            "namespace changes digest",
@@ -91,8 +97,13 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "4ae4e750bd825b17",
 				EtcdDigest:      "f940a60af965b03",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "kube-system", Name: "pod", RV: "2"},
+					EtcdItem:  &namespaceNameRV{Namespace: "kube-public", Name: "pod", RV: "2"},
+				},
 			},
-			expectCompactedResourceVersion: "2",
+			expectConsistent: false,
 		},
 		{
 			desc:            "name changes digest",
@@ -108,8 +119,13 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "c9120494e4c1897d",
 				EtcdDigest:      "c9156494e4c46274",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod2", RV: "2"},
+					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod3", RV: "2"},
+				},
 			},
-			expectCompactedResourceVersion: "2",
+			expectConsistent: false,
 		},
 		{
 			desc:            "resourceVersion changes digest",
@@ -125,8 +141,13 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "4",
 				CacheDigest:     "86bf3a5e80d1c5ca",
 				EtcdDigest:      "86bf3a5e80d1c5cd",
+				DiffDetail: &diffDetail{
+					Index:     0,
+					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod", RV: "3"},
+					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod", RV: "4"},
+				},
 			},
-			expectCompactedResourceVersion: "4",
+			expectConsistent: false,
 		},
 		{
 			desc:            "watch missed write event",
@@ -143,15 +164,43 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "3",
 				CacheDigest:     "1859bac707c2cb2b",
 				EtcdDigest:      "11d147fc800df0e0",
+				DiffDetail: &diffDetail{
+					Index:     1,
+					CacheItem: nil,
+					EtcdItem:  &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+				},
 			},
-			expectCompactedResourceVersion: "3",
+			expectConsistent: false,
+		},
+		{
+			desc:            "watch missed delete event",
+			resourceVersion: "3",
+			cacherReady:     true,
+			cacherItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "3"}},
+			},
+			etcdItems: []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "Default", Name: "pod", ResourceVersion: "2"}},
+			},
+			expectDigest: storageDigest{
+				ResourceVersion: "3",
+				CacheDigest:     "11d147fc800df0e0",
+				EtcdDigest:      "1859bac707c2cb2b",
+				DiffDetail: &diffDetail{
+					Index:     1,
+					CacheItem: &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+					EtcdItem:  nil,
+				},
+			},
+			expectConsistent: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			etcd := &dummyStorage{
-				getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+			etcd := &cachertesting.MockStorage{
+				GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 					if key != tc.expectListKey {
 						t.Fatalf("Expect GetList key %q, got %q", tc.expectListKey, key)
 					}
@@ -167,10 +216,11 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 					return nil
 				},
 			}
-			cacher := &dummyCacher{
-				ready: tc.cacherReady,
-				dummyStorage: dummyStorage{
-					getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+			cacher := &cachertesting.MockCacher{
+				IsReady:    tc.cacherReady,
+				Consistent: true,
+				MockStorage: cachertesting.MockStorage{
+					GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 						if key != tc.expectListKey {
 							t.Fatalf("Expect GetList key %q, got %q", tc.expectListKey, key)
 						}
@@ -195,13 +245,13 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if *digest != tc.expectDigest {
+			if !reflect.DeepEqual(*digest, tc.expectDigest) {
 				t.Errorf("Expect: %+v Got: %+v", &tc.expectDigest, *digest)
 			}
 
 			checker.check(context.Background())
-			if cacher.lastCompactedResourceVersion != tc.expectCompactedResourceVersion {
-				t.Errorf("Expect: %+v Got: %+v", tc.expectCompactedResourceVersion, cacher.lastCompactedResourceVersion)
+			if cacher.Consistent != tc.expectConsistent {
+				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.Consistent)
 			}
 		})
 	}
@@ -212,8 +262,8 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 
 	resourceVersion := "50"
 	etcdOpts := []storage.ListOptions{}
-	etcd := &dummyStorage{
-		getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	etcd := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 			etcdOpts = append(etcdOpts, opts)
 			podList := listObj.(*example.PodList)
 			podList.ResourceVersion = resourceVersion
@@ -221,10 +271,10 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 		},
 	}
 	cacherOpts := []storage.ListOptions{}
-	cacher := &dummyCacher{
-		ready: true,
-		dummyStorage: dummyStorage{
-			getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	cacher := &cachertesting.MockCacher{
+		IsReady: true,
+		MockStorage: cachertesting.MockStorage{
+			GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 				cacherOpts = append(cacherOpts, opts)
 				podList := listObj.(*example.PodList)
 				podList.ResourceVersion = resourceVersion
@@ -283,7 +333,7 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 
 	t.Log("Execute list to ensure cache is up to date")
 	outList := &example.PodList{}
-	err := store.cacher.GetList(ctx, "/pods", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
+	err := store.cacher.GetList(ctx, "/pods/", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +341,7 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 		t.Errorf("Expect to get %d pods, got %d", storageWatchListPageSize+1, len(outList.Items))
 	}
 
-	checker := newConsistencyChecker("/pods", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)
+	checker := newConsistencyChecker("/pods/", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)
 	digest, err := checker.calculateDigests(ctx)
 	if err != nil {
 		t.Fatal(err)

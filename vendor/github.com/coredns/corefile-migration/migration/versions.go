@@ -30,7 +30,55 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.14.1": {
+		priorVersion:   "1.14.0",
+		dockerImageSHA: "82b57287b29beb757c740dbbe68f2d4723da94715b563fffad5c13438b71b14a",
+		plugins:        plugins_1_14_0,
+	},
+	"1.14.0": {
+		nextVersion:    "1.14.1",
+		priorVersion:   "1.13.2",
+		dockerImageSHA: "4fbdd8fb53c5d1748aeb98f0799798fb073bb11128c13e8415aa254ad1ae0203",
+		plugins:        plugins_1_14_0,
+	},
+	"1.13.2": {
+		nextVersion:    "1.14.0",
+		priorVersion:   "1.13.1",
+		dockerImageSHA: "94caebb89dcfb9d2c4be45bfda34410a3e1092458fbbbc0284365c9e4c9a7818",
+		plugins:        plugins_1_13_0,
+	},
+	"1.13.1": {
+		nextVersion:    "1.13.2",
+		priorVersion:   "1.13.0",
+		dockerImageSHA: "9b9128672209474da07c91439bf15ed704ae05ad918dd6454e5b6ae14e35fee6",
+		plugins:        plugins_1_13_0,
+	},
+	"1.13.0": {
+		nextVersion:    "1.13.1",
+		priorVersion:   "1.12.4",
+		dockerImageSHA: "da282c1983a1a330240e6e84eaec9b6120b0de0e7e29e92c44a6acd25f9e0238",
+		plugins:        plugins_1_13_0,
+	},
+	"1.12.4": {
+		nextVersion:    "1.13.0",
+		priorVersion:   "1.12.3",
+		dockerImageSHA: "986f04c2e15e147d00bdd51e8c51bcef3644b13ff806be7d2ff1b261d6dfbae1",
+		plugins:        plugins_1_12_0,
+	},
+	"1.12.3": {
+		nextVersion:    "1.12.4",
+		priorVersion:   "1.12.2",
+		dockerImageSHA: "1391544c978029fcddc65068f6ad67f396e55585b664ecccd7fefba029b9b706",
+		plugins:        plugins_1_12_0,
+	},
+	"1.12.2": {
+		nextVersion:    "1.12.3",
+		priorVersion:   "1.12.1",
+		dockerImageSHA: "af8c8d35a5d184b386c4a6d1a012c8b218d40d1376474c7d071bb6c07201f47d",
+		plugins:        plugins_1_12_0,
+	},
 	"1.12.1": {
+		nextVersion:    "1.12.2",
 		priorVersion:   "1.12.0",
 		dockerImageSHA: "e8c262566636e6bc340ece6473b0eed193cad045384401529721ddbe6463d31c",
 		plugins:        plugins_1_12_0,
@@ -776,9 +824,47 @@ var Versions = map[string]release{
     }
     prometheus :9153
     proxy . *
-    cache 30
-    reload
+	cache 30
+	reload
 }`},
+}
+
+var plugins_1_14_0 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"],
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v2"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v5"],
+	"cache":        plugins["cache"]["v4"],
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v3"],
+	"transfer":     plugins["transfer"]["v1"],
+}
+
+var plugins_1_13_0 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"],
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v2"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v5"], // add failfast_all_unhealthy_upstreams option
+	"cache":        plugins["cache"]["v4"],
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v3"],
+	"transfer":     plugins["transfer"]["v1"],
 }
 
 var plugins_1_12_0 = map[string]plugin{

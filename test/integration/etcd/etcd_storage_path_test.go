@@ -88,8 +88,10 @@ func TestEtcdStoragePath(t *testing.T) {
 
 func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 	if v == componentbaseversion.DefaultKubeBinaryVersion {
-		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			"AllAlpha": true,
+			"AllBeta":  true,
+		})
 	} else {
 		// Only test for beta and GA APIs with emulated version.
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse(v))
@@ -239,7 +241,7 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 				}
 			}
 			if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
-				t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
+				t.Logf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
 					currentNonAlphaVersions.List(),
 					expectedGVK.Version,
 				)

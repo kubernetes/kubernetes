@@ -26,35 +26,31 @@ import (
 )
 
 var (
-	// TXTErrIgnore is set if TXT errors should be ignored ("GRPC_GO_IGNORE_TXT_ERRORS" is not "false").
+	// EnableTXTServiceConfig is set if the DNS resolver should perform TXT
+	// lookups for service config ("GRPC_ENABLE_TXT_SERVICE_CONFIG" is not
+	// "false").
+	EnableTXTServiceConfig = boolFromEnv("GRPC_ENABLE_TXT_SERVICE_CONFIG", true)
+
+	// TXTErrIgnore is set if TXT errors should be ignored
+	// ("GRPC_GO_IGNORE_TXT_ERRORS" is not "false").
 	TXTErrIgnore = boolFromEnv("GRPC_GO_IGNORE_TXT_ERRORS", true)
+
 	// RingHashCap indicates the maximum ring size which defaults to 4096
 	// entries but may be overridden by setting the environment variable
 	// "GRPC_RING_HASH_CAP".  This does not override the default bounds
 	// checking which NACKs configs specifying ring sizes > 8*1024*1024 (~8M).
 	RingHashCap = uint64FromEnv("GRPC_RING_HASH_CAP", 4096, 1, 8*1024*1024)
-	// LeastRequestLB is set if we should support the least_request_experimental
-	// LB policy, which can be enabled by setting the environment variable
-	// "GRPC_EXPERIMENTAL_ENABLE_LEAST_REQUEST" to "true".
-	LeastRequestLB = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_LEAST_REQUEST", false)
+
 	// ALTSMaxConcurrentHandshakes is the maximum number of concurrent ALTS
 	// handshakes that can be performed.
 	ALTSMaxConcurrentHandshakes = uint64FromEnv("GRPC_ALTS_MAX_CONCURRENT_HANDSHAKES", 100, 1, 100)
+
 	// EnforceALPNEnabled is set if TLS connections to servers with ALPN disabled
 	// should be rejected. The HTTP/2 protocol requires ALPN to be enabled, this
 	// option is present for backward compatibility. This option may be overridden
 	// by setting the environment variable "GRPC_ENFORCE_ALPN_ENABLED" to "true"
 	// or "false".
 	EnforceALPNEnabled = boolFromEnv("GRPC_ENFORCE_ALPN_ENABLED", true)
-	// XDSFallbackSupport is the env variable that controls whether support for
-	// xDS fallback is turned on. If this is unset or is false, only the first
-	// xDS server in the list of server configs will be used.
-	XDSFallbackSupport = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FALLBACK", true)
-	// NewPickFirstEnabled is set if the new pickfirst leaf policy is to be used
-	// instead of the exiting pickfirst implementation. This can be disabled by
-	// setting the environment variable "GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST"
-	// to "false".
-	NewPickFirstEnabled = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST", true)
 
 	// XDSEndpointHashKeyBackwardCompat controls the parsing of the endpoint hash
 	// key from EDS LbEndpoint metadata. Endpoint hash keys can be disabled by
@@ -69,6 +65,23 @@ var (
 	// to gRFC A76. It can be enabled by setting the environment variable
 	// "GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY" to "true".
 	RingHashSetRequestHashKey = boolFromEnv("GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY", false)
+
+	// ALTSHandshakerKeepaliveParams is set if we should add the
+	// KeepaliveParams when dial the ALTS handshaker service.
+	ALTSHandshakerKeepaliveParams = boolFromEnv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS", false)
+
+	// EnableDefaultPortForProxyTarget controls whether the resolver adds a default port 443
+	// to a target address that lacks one. This flag only has an effect when all of
+	// the following conditions are met:
+	//   - A connect proxy is being used.
+	//   - Target resolution is disabled.
+	//   - The DNS resolver is being used.
+	EnableDefaultPortForProxyTarget = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_DEFAULT_PORT_FOR_PROXY_TARGET", true)
+
+	// XDSAuthorityRewrite indicates whether xDS authority rewriting is enabled.
+	// This feature is defined in gRFC A81 and is enabled by setting the
+	// environment variable GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE to "true".
+	XDSAuthorityRewrite = boolFromEnv("GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

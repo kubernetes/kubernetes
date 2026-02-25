@@ -46,7 +46,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -210,15 +209,14 @@ type PodVolumeClaims struct {
 type volumeBinder struct {
 	kubeClient                  clientset.Interface
 	enableVolumeAttributesClass bool
-	enableCSIMigrationPortworx  bool
 
 	classLister   storagelisters.StorageClassLister
 	podLister     corelisters.PodLister
 	nodeLister    corelisters.NodeLister
 	csiNodeLister storagelisters.CSINodeLister
 
-	pvcCache *PVCAssumeCache
-	pvCache  *PVAssumeCache
+	pvcCache PVCAssumeCache
+	pvCache  PVAssumeCache
 
 	// Amount of time to wait for the bind operation to succeed
 	bindTimeout time.Duration
@@ -253,17 +251,22 @@ func NewVolumeBinder(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	capacityCheck CapacityCheck,
-	bindTimeout time.Duration) SchedulerVolumeBinder {
+	bindTimeout time.Duration) (SchedulerVolumeBinder, error) {
+
+	pvcCache, err1 := NewPVCAssumeCache(logger, pvcInformer.Informer())
+	pvCache, err2 := NewPVAssumeCache(logger, pvInformer.Informer())
+	if err := errors.Join(err1, err2); err != nil {
+		return nil, err
+	}
 	b := &volumeBinder{
 		kubeClient:                  kubeClient,
 		enableVolumeAttributesClass: fts.EnableVolumeAttributesClass,
-		enableCSIMigrationPortworx:  fts.EnableCSIMigrationPortworx,
 		podLister:                   podInformer.Lister(),
 		classLister:                 storageClassInformer.Lister(),
 		nodeLister:                  nodeInformer.Lister(),
 		csiNodeLister:               csiNodeInformer.Lister(),
-		pvcCache:                    NewPVCAssumeCache(logger, pvcInformer.Informer()),
-		pvCache:                     NewPVAssumeCache(logger, pvInformer.Informer()),
+		pvcCache:                    pvcCache,
+		pvCache:                     pvCache,
 		bindTimeout:                 bindTimeout,
 		translator:                  csitrans.New(),
 	}
@@ -271,7 +274,7 @@ func NewVolumeBinder(
 	b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
 	b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
 
-	return b
+	return b, nil
 }
 
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
@@ -620,12 +623,12 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 	}
 
 	for _, binding := range bindings {
-		pv, err := b.pvCache.GetAPIPV(binding.pv.Name)
+		pv, err := b.pvCache.GetAPIObj(binding.pv.Name)
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(binding.pvc))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(binding.pvc))
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
@@ -658,7 +661,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 	}
 
 	for _, claim := range claimsToProvision {
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(claim))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(claim))
 		if err != nil {
 			return false, fmt.Errorf("failed to check provisioning pvc: %w", err)
 		}
@@ -683,9 +686,9 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 
 		// If the PVC is bound to a PV, check its node affinity
 		if pvc.Spec.VolumeName != "" {
-			pv, err := b.pvCache.GetAPIPV(pvc.Spec.VolumeName)
+			pv, err := b.pvCache.GetAPIObj(pvc.Spec.VolumeName)
 			if err != nil {
-				if errors.Is(err, assumecache.ErrNotFound) {
+				if apierrors.IsNotFound(err) {
 					// We tolerate NotFound error here, because PV is possibly
 					// not found because of API delay, we can check next time.
 					// And if PV does not exist because it's deleted, PVC will
@@ -749,7 +752,7 @@ func (b *volumeBinder) isPVCBound(logger klog.Logger, namespace, pvcName string)
 		},
 	}
 	pvcKey := getPVCName(claim)
-	pvc, err := b.pvcCache.GetPVC(pvcKey)
+	pvc, err := b.pvcCache.Get(pvcKey)
 	if err != nil || pvc == nil {
 		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcKey, err)
 	}
@@ -822,7 +825,11 @@ func (b *volumeBinder) GetPodVolumeClaims(logger klog.Logger, pod *v1.Pod) (podV
 	for _, pvc := range podVolumeClaims.unboundClaimsDelayBinding {
 		// Get storage class name from each PVC
 		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
-		podVolumeClaims.unboundVolumesDelayBinding[storageClassName] = b.pvCache.ListPVs(storageClassName)
+		pvs, err := b.pvCache.ListPVs(storageClassName)
+		if err != nil {
+			return nil, err
+		}
+		podVolumeClaims.unboundVolumesDelayBinding[storageClassName] = pvs
 	}
 	return podVolumeClaims, nil
 }
@@ -836,9 +843,9 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 
 	for _, pvc := range claims {
 		pvName := pvc.Spec.VolumeName
-		pv, err := b.pvCache.GetPV(pvName)
+		pv, err := b.pvCache.Get(pvName)
 		if err != nil {
-			if errors.Is(err, assumecache.ErrNotFound) {
+			if apierrors.IsNotFound(err) {
 				err = nil
 			}
 			return true, false, err
@@ -954,13 +961,13 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 
 func (b *volumeBinder) revertAssumedPVs(bindings []*BindingInfo) {
 	for _, BindingInfo := range bindings {
-		b.pvCache.Restore(BindingInfo.pv.Name)
+		b.pvCache.Restore(BindingInfo.pv)
 	}
 }
 
 func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 	for _, claim := range claims {
-		b.pvcCache.Restore(getPVCName(claim))
+		b.pvcCache.Restore(claim)
 	}
 }
 
@@ -1057,7 +1064,7 @@ func (a byPVCSize) Less(i, j int) bool {
 }
 
 // isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string, enableCSIMigrationPortworx bool) bool {
+func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
 		return true
@@ -1068,7 +1075,7 @@ func isCSIMigrationOnForPlugin(pluginName string, enableCSIMigrationPortworx boo
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
-		return enableCSIMigrationPortworx
+		return true
 	}
 	return false
 }
@@ -1107,7 +1114,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.Persistent
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
 	}
 
-	if !isCSIMigrationOnForPlugin(pluginName, b.enableCSIMigrationPortworx) {
+	if !isCSIMigrationOnForPlugin(pluginName) {
 		return pv, nil
 	}
 

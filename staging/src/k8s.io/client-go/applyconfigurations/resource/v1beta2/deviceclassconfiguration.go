@@ -20,6 +20,8 @@ package v1beta2
 
 // DeviceClassConfigurationApplyConfiguration represents a declarative configuration of the DeviceClassConfiguration type for use
 // with apply.
+//
+// DeviceClassConfiguration is used in DeviceClass.
 type DeviceClassConfigurationApplyConfiguration struct {
 	DeviceConfigurationApplyConfiguration `json:",inline"`
 }

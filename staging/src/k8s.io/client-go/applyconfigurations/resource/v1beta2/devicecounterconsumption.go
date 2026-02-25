@@ -20,9 +20,17 @@ package v1beta2
 
 // DeviceCounterConsumptionApplyConfiguration represents a declarative configuration of the DeviceCounterConsumption type for use
 // with apply.
+//
+// DeviceCounterConsumption defines a set of counters that
+// a device will consume from a CounterSet.
 type DeviceCounterConsumptionApplyConfiguration struct {
-	CounterSet *string                              `json:"counterSet,omitempty"`
-	Counters   map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	// CounterSet is the name of the set from which the
+	// counters defined will be consumed.
+	CounterSet *string `json:"counterSet,omitempty"`
+	// Counters defines the counters that will be consumed by the device.
+	//
+	// The maximum number of counters is 32.
+	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
 }
 
 // DeviceCounterConsumptionApplyConfiguration constructs a declarative configuration of the DeviceCounterConsumption type for use with

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -20,6 +19,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -36,7 +36,10 @@ import (
 func GetBootTime() (time.Time, error) {
 	bootTime, err := getBootTimeWithProcStat()
 	if err != nil {
-		klog.InfoS("Failed to get boot time from /proc/uptime. Will retry with unix.Sysinfo.", "error", err)
+		// TODO: it needs to be replaced by a proper context in the future
+		ctx := context.TODO()
+		logger := klog.FromContext(ctx)
+		logger.Info("Failed to get boot time from /proc/uptime. Will retry with unix.Sysinfo.", "error", err)
 		return getBootTimeWithSysinfo()
 	}
 	return bootTime, nil

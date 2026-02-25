@@ -34,10 +34,10 @@ import (
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigapi "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -63,7 +63,7 @@ type KubeletFlags struct {
 	NodeIP string
 
 	// Container-runtime-specific options.
-	config.ContainerRuntimeOptions
+	kubeletconfig.ContainerRuntimeOptions
 
 	// certDirectory is the directory where the TLS certs are located.
 	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
@@ -86,8 +86,10 @@ type KubeletFlags struct {
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
 
-	// kubeletDropinConfigDirectory is a path to a directory to specify dropins allows the user to optionally specify
-	// additional configs to overwrite what is provided by default and in the KubeletConfigFile flag
+	// KubeletDropinConfigDirectory is the path to a directory containing drop-in configuration files that override settings from defaults and the --config file.
+	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// Drop-in files must have a '.conf' suffix and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored.
+	// All .conf files in the directory and its subdirectories are processed in lexical order.
 	KubeletDropinConfigDirectory string
 
 	// WindowsService should be set to true if kubelet is running as a service on Windows.
@@ -134,7 +136,7 @@ type KubeletFlags struct {
 // NewKubeletFlags will create a new KubeletFlags with default values
 func NewKubeletFlags() *KubeletFlags {
 	return &KubeletFlags{
-		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
+		ContainerRuntimeOptions: kubeletconfig.ContainerRuntimeOptions{},
 		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           filepath.Clean(defaultRootDir),
 		MaxContainerCount:       -1,
@@ -192,14 +194,14 @@ func getLabelNamespace(key string) string {
 }
 
 // NewKubeletConfiguration will create a new KubeletConfiguration with default values
-func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
+func NewKubeletConfiguration() (*kubeletconfigapi.KubeletConfiguration, error) {
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return nil, err
 	}
 	versioned := &v1beta1.KubeletConfiguration{}
 	scheme.Default(versioned)
-	config := &kubeletconfig.KubeletConfiguration{}
+	config := &kubeletconfigapi.KubeletConfiguration{}
 	if err := scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
@@ -210,13 +212,13 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 // applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
 // preserve the command line API. This is used to construct the baseline default KubeletConfiguration
 // before the first round of flag parsing.
-func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
+func applyLegacyDefaults(kc *kubeletconfigapi.KubeletConfiguration) {
 	// --anonymous-auth
 	kc.Authentication.Anonymous.Enabled = true
 	// --authentication-token-webhook
 	kc.Authentication.Webhook.Enabled = false
 	// --authorization-mode
-	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	kc.Authorization.Mode = kubeletconfigapi.KubeletAuthorizationModeAlwaysAllow
 	// --read-only-port
 	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
@@ -225,7 +227,7 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	KubeletFlags
-	kubeletconfig.KubeletConfiguration
+	kubeletconfigapi.KubeletConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -273,11 +275,11 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		mainfs.AddFlagSet(fs)
 	}()
 
-	f.ContainerRuntimeOptions.AddFlags(fs)
+	addContainerRuntimeFlags(fs, &f.ContainerRuntimeOptions)
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
-	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory to specify drop-ins, allows the user to optionally specify additional configs to overwrite what is provided by default and in the KubeletConfigFile flag. [default='']")
+	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory containing drop-in configuration files that override settings from defaults and the --config file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Drop-in files must have a '.conf' suffix (e.g., '99-kubelet-address.conf') and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored. All .conf files in the directory and its subdirectories are processed in lexical order. [default='']")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
@@ -317,8 +319,18 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
 }
 
+// addContainerRuntimeFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
+func addContainerRuntimeFlags(fs *pflag.FlagSet, o *kubeletconfig.ContainerRuntimeOptions) {
+	// General settings.
+	fs.StringVar(&o.RuntimeCgroups, "runtime-cgroups", o.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+
+	// Image credential provider settings.
+	fs.StringVar(&o.ImageCredentialProviderConfigPath, "image-credential-provider-config", o.ImageCredentialProviderConfigPath, "Path to a credential provider plugin config file (JSON/YAML/YML) or a directory of such files (merged in lexicographical order; non-recursive search).")
+	fs.StringVar(&o.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", o.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
+}
+
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
-func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
+func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletConfiguration) {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
 	defer func() {
 		// All KubeletConfiguration flags are now deprecated, and any new flags that point to
@@ -456,7 +468,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.RunOnce, "runonce", c.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 
 	fs.BoolVar(&c.CPUCFSQuota, "cpu-cfs-quota", c.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
-	fs.DurationVar(&c.CPUCFSQuotaPeriod.Duration, "cpu-cfs-quota-period", c.CPUCFSQuotaPeriod.Duration, "Sets CPU CFS quota period value, cpu.cfs_period_us, defaults to Linux Kernel default")
+	fs.DurationVar(&c.CPUCFSQuotaPeriod.Duration, "cpu-cfs-quota-period", c.CPUCFSQuotaPeriod.Duration, "Sets CPU CFS quota period value (cpu.cfs_period_us). Defaults to Linux Kernel default. "+"Requires the CustomCPUCFSQuotaPeriod feature gate to set non-default values.")
+
 	fs.BoolVar(&c.EnableControllerAttachDetach, "enable-controller-attach-detach", c.EnableControllerAttachDetach, "Enables the Attach/Detach controller to manage attachment/detachment of volumes scheduled to this node, and disables kubelet from executing any attach/detach operations")
 	fs.BoolVar(&c.MakeIPTablesUtilChains, "make-iptables-util-chains", c.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Beta feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated.")

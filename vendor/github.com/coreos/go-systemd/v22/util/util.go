@@ -19,15 +19,12 @@
 package util
 
 import (
-	"fmt"
-	"io/ioutil"
+	"errors"
 	"os"
 	"strings"
 )
 
-var (
-	ErrNoCGO = fmt.Errorf("go-systemd built with CGO disabled")
-)
+var ErrNoCGO = errors.New("go-systemd built with CGO disabled")
 
 // GetRunningSlice attempts to retrieve the name of the systemd slice in which
 // the current process is running.
@@ -82,9 +79,9 @@ func IsRunningSystemd() bool {
 // the contents of /etc/machine-id
 // http://www.freedesktop.org/software/systemd/man/sd_id128_get_machine.html
 func GetMachineID() (string, error) {
-	machineID, err := ioutil.ReadFile("/etc/machine-id")
+	machineID, err := os.ReadFile("/etc/machine-id")
 	if err != nil {
-		return "", fmt.Errorf("failed to read /etc/machine-id: %v", err)
+		return "", err
 	}
 	return strings.TrimSpace(string(machineID)), nil
 }

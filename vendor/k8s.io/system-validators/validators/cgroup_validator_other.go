@@ -23,9 +23,12 @@ package system
 
 var _ Validator = &CgroupsValidator{}
 
+const mountsFilePath = ""
+
 // CgroupsValidator validates cgroup configuration.
 type CgroupsValidator struct {
-	Reporter Reporter
+	Reporter       Reporter
+	KubeletVersion string
 }
 
 // Validate is part of the system.Validator interface.
@@ -36,4 +39,9 @@ func (c *CgroupsValidator) Validate(spec SysSpec) (warns, errs []error) {
 // Name is part of the system.Validator interface.
 func (c *CgroupsValidator) Name() string {
 	return "cgroups"
+}
+
+// getUnifiedMountpoint is a no-op for non-Linux OSes.
+func getUnifiedMountpoint(path string) (string, bool, error) {
+	return "", false, nil
 }

@@ -23,12 +23,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/opencontainers/selinux/go-selinux"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -60,9 +60,32 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		defaultSELinuxLevel = "s0:c1,c5"
 	)
 
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessFeatureGateEnabled(features.ImageVolume)
-	})
+	// TODO: remove when containerd 2.2 is available on all node e2e test platforms.
+	requireContainerdVersion := func(givenVersion string) {
+		runtime, _, err := getCRIClient()
+		framework.ExpectNoError(err, "Failed to get CRI client")
+
+		resp, err := runtime.Version(context.Background(), "")
+		framework.ExpectNoError(err, "Failed to get runtime version")
+
+		// Other runtimes like CRI-O do not need to enforce any version requirement.
+		if resp.GetRuntimeName() != "containerd" {
+			return
+		}
+
+		// Throw away any version suffix which just causes semver parsing issues.
+		version, _, _ := strings.Cut(resp.GetRuntimeVersion(), "-")
+
+		parsedVersion, err := semver.ParseTolerant(version)
+		framework.ExpectNoError(err, "Failed to parse CRI runtime version: "+version)
+
+		requiredVersion, err := semver.ParseTolerant(givenVersion)
+		framework.ExpectNoError(err, "Failed to parse required CRI runtime version")
+
+		if parsedVersion.LT(requiredVersion) {
+			e2eskipper.Skipf("runtime containerd is version %q, but test requires at least %q", resp.GetRuntimeVersion(), requiredVersion)
+		}
+	}
 
 	createPod := func(ctx context.Context, podName, nodeName string, volumes []v1.Volume, volumeMounts []v1.VolumeMount, selinuxOptions *v1.SELinuxOptions) {
 		pod := &v1.Pod{
@@ -101,6 +124,10 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePath, "etc", "os-release"))
 		gomega.Expect(secondFileContents).To(gomega.ContainSubstring("Alpine Linux"))
 	}
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		requireContainerdVersion("2.1")
+	})
 
 	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
 		var selinuxOptions *v1.SELinuxOptions
@@ -276,16 +303,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 
 	f.Context("subPath", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			runtime, _, err := getCRIClient()
-			framework.ExpectNoError(err, "Failed to get CRI client")
-
-			version, err := runtime.Version(context.Background(), "")
-			framework.ExpectNoError(err, "Failed to get runtime version")
-
-			// TODO: enable the subpath tests if containerd main branch has support for it.
-			if version.GetRuntimeName() != "cri-o" {
-				e2eskipper.Skip("runtime is not CRI-O")
-			}
+			requireContainerdVersion("2.2")
 		})
 
 		f.It("should succeed when using a valid subPath", func(ctx context.Context) {
@@ -312,8 +330,9 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
-			fileContent := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "os-release"))
-			gomega.Expect(fileContent).To(gomega.ContainSubstring("Alpine Linux"))
+			// Using this file is intentional because it's generally available on Linux and will not expose any secret information.
+			fileContent := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "passwd"))
+			gomega.Expect(fileContent).To(gomega.ContainSubstring("root:"))
 		})
 
 		f.It("should fail if subPath in volume is not existing", func(ctx context.Context) {

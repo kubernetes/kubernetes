@@ -21,10 +21,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/server/flagz"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -41,7 +43,6 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/zpages/flagz"
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -73,6 +74,8 @@ type KubeControllerManagerOptions struct {
 	CSRSigningController                      *CSRSigningControllerOptions
 	DaemonSetController                       *DaemonSetControllerOptions
 	DeploymentController                      *DeploymentControllerOptions
+	DeviceTaintEvictionController             *DeviceTaintEvictionControllerOptions
+	ResourceClaimController                   *ResourceClaimControllerOptions
 	StatefulSetController                     *StatefulSetControllerOptions
 	DeprecatedFlags                           *DeprecatedControllerOptions
 	EndpointController                        *EndpointControllerOptions
@@ -96,7 +99,7 @@ type KubeControllerManagerOptions struct {
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
-	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	SecureServing  *apiserveroptions.SecureServingOptions
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
@@ -104,6 +107,8 @@ type KubeControllerManagerOptions struct {
 
 	Master                      string
 	ShowHiddenMetricsForVersion string
+
+	ControllerShutdownTimeout time.Duration
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
@@ -144,6 +149,12 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeploymentController: &DeploymentControllerOptions{
 			&componentConfig.DeploymentController,
+		},
+		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
+			&componentConfig.DeviceTaintEvictionController,
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&componentConfig.ResourceClaimController,
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
 			&componentConfig.StatefulSetController,
@@ -211,7 +222,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
 			&componentConfig.ValidatingAdmissionPolicyStatusController,
 		},
-		SecureServing:            apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing:            apiserveroptions.NewSecureServingOptions(),
 		Authentication:           apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:            apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:                  metrics.NewOptions(),
@@ -235,6 +246,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
 	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
+	s.ControllerShutdownTimeout = 10 * time.Second
 	return &s, nil
 }
 
@@ -264,6 +277,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.AttachDetachController.AddFlags(fss.FlagSet(names.PersistentVolumeAttachDetachController))
 	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
 	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
+	s.DeviceTaintEvictionController.AddFlags(fss.FlagSet(names.DeviceTaintEvictionController))
+	s.ResourceClaimController.AddFlags(fss.FlagSet(names.ResourceClaimController))
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
 	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
@@ -295,6 +310,9 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 
+	fss.FlagSet("generic").DurationVar(&s.ControllerShutdownTimeout, "controller-shutdown-timeout",
+		s.ControllerShutdownTimeout, "Time to wait for the controllers to shut down before terminating the executable")
+
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 
 	return fss
@@ -321,6 +339,12 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeploymentController.ApplyTo(&c.ComponentConfig.DeploymentController); err != nil {
+		return err
+	}
+	if err := s.DeviceTaintEvictionController.ApplyTo(&c.ComponentConfig.DeviceTaintEvictionController); err != nil {
+		return err
+	}
+	if err := s.ResourceClaimController.ApplyTo(&c.ComponentConfig.ResourceClaimController); err != nil {
 		return err
 	}
 	if err := s.StatefulSetController.ApplyTo(&c.ComponentConfig.StatefulSetController); err != nil {
@@ -392,7 +416,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
 		return err
 	}
-	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if s.SecureServing.BindPort != 0 || s.SecureServing.Listener != nil {
@@ -403,6 +427,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 			return err
 		}
 	}
+	c.ControllerShutdownTimeout = s.ControllerShutdownTimeout
 	return nil
 }
 
@@ -421,6 +446,8 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.CSRSigningController.Validate()...)
 	errs = append(errs, s.DaemonSetController.Validate()...)
 	errs = append(errs, s.DeploymentController.Validate()...)
+	errs = append(errs, s.DeviceTaintEvictionController.Validate()...)
+	errs = append(errs, s.ResourceClaimController.Validate()...)
 	errs = append(errs, s.StatefulSetController.Validate()...)
 	errs = append(errs, s.DeprecatedFlags.Validate()...)
 	errs = append(errs, s.EndpointController.Validate()...)
@@ -492,11 +519,12 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:                   client,
-		Kubeconfig:               kubeconfig,
-		EventBroadcaster:         eventBroadcaster,
-		EventRecorder:            eventRecorder,
-		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
+		Client:                    client,
+		Kubeconfig:                kubeconfig,
+		EventBroadcaster:          eventBroadcaster,
+		EventRecorder:             eventRecorder,
+		ControllerShutdownTimeout: s.ControllerShutdownTimeout,
+		ComponentGlobalsRegistry:  s.ComponentGlobalsRegistry,
 	}
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err

@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -20,10 +19,13 @@ limitations under the License.
 package winstats
 
 import (
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"unsafe"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestGROUP_AFFINITY_Processors(t *testing.T) {
@@ -221,6 +223,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 }
 
 func Test_convertWinApiToCadvisorApi(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                 string
 		buffer               []byte
@@ -312,7 +315,7 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			numOfCores, numOfSockets, nodes, err := convertWinApiToCadvisorApi(tt.buffer)
+			numOfCores, numOfSockets, nodes, err := convertWinApiToCadvisorApi(logger, tt.buffer)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

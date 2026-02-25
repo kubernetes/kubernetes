@@ -32,7 +32,7 @@ const (
 	requiredTagName  = "k8s:required"
 	optionalTagName  = "k8s:optional"
 	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should evenually be +k8s:default
+	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {
@@ -309,10 +309,13 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 
 	switch rtv.mode {
 	case requirednessRequired:
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
+		doc.StabilityLevel = TagStabilityLevelAlpha
 		doc.Description = "Indicates that a field may not be specified."
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))

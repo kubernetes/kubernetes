@@ -1,3 +1,8 @@
+> ⚠️ **This is an automatically published [staged repository](https://git.k8s.io/kubernetes/staging#external-repository-staging-area) for Kubernetes**.   
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is read-only for importing, and not used for direct contributions.  
+> See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+
 # client-go
 
 Go clients for talking to a [kubernetes](http://kubernetes.io/) cluster.
@@ -75,14 +80,14 @@ We will backport bugfixes--but not new features--into older versions of
 
 #### Compatibility matrix
 
-|                               | Kubernetes 1.27 | Kubernetes 1.28 | Kubernetes 1.29 | Kubernetes 1.30 | Kubernetes 1.31 | Kubernetes 1.32 |
+|                               | Kubernetes 1.29 | Kubernetes 1.30 | Kubernetes 1.31 | Kubernetes 1.32 | Kubernetes 1.33 | Kubernetes 1.34 |
 | ----------------------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-| `kubernetes-1.27.0`/`v0.27.0` | ✓               | +-              | +-              | +-              | +-              | +-              |
-| `kubernetes-1.28.0`/`v0.28.0` | +-              | ✓               | +-              | +-              | +-              | +-              |
-| `kubernetes-1.29.0`/`v0.29.0` | +-              | +-              | ✓               | +-              | +-              | +-              |
-| `kubernetes-1.30.0`/`v0.30.0` | +-              | +-              | +-              | ✓               | +-              | +-              |
-| `kubernetes-1.31.0`/`v0.31.0` | +-              | +-              | +-              | +-              | ✓               | +-              |
-| `kubernetes-1.32.0`/`v0.32.0` | +-              | +-              | +-              | +-              | +-              | ✓               |
+| `kubernetes-1.29.0`/`v0.29.0` | ✓               | +-              | +-              | +-              | +-              | +-              |
+| `kubernetes-1.30.0`/`v0.30.0` | +-              | ✓               | +-              | +-              | +-              | +-              |
+| `kubernetes-1.31.0`/`v0.31.0` | +-              | +-              | ✓               | +-              | +-              | +-              |
+| `kubernetes-1.32.0`/`v0.32.0` | +-              | +-              | +-              | ✓               | +-              | +-              |
+| `kubernetes-1.33.0`/`v0.33.0` | +-              | +-              | +-              | +-              | ✓               | +-              |
+| `kubernetes-1.34.0`/`v0.34.0` | +-              | +-              | +-              | +-              | +-              | ✓               |
 | `HEAD`                        | +-              | +-              | +-              | +-              | +-              | +-              |
 
 Key:
@@ -104,16 +109,16 @@ between client-go versions.
 
 | Branch         | Canonical source code location      | Maintenance status |
 | -------------- | ----------------------------------- | ------------------ |
-| `release-1.23` | Kubernetes main repo, 1.23 branch   | =-                 |
-| `release-1.24` | Kubernetes main repo, 1.24 branch   | =-                 |
 | `release-1.25` | Kubernetes main repo, 1.25 branch   | =-                 |
 | `release-1.26` | Kubernetes main repo, 1.26 branch   | =-                 |
 | `release-1.27` | Kubernetes main repo, 1.27 branch   | =-                 |
 | `release-1.28` | Kubernetes main repo, 1.28 branch   | =-                 |
-| `release-1.29` | Kubernetes main repo, 1.29 branch   | ✓                  |
-| `release-1.30` | Kubernetes main repo, 1.30 branch   | ✓                  |
-| `release-1.31` | Kubernetes main repo, 1.31 branch   | ✓                  |
+| `release-1.29` | Kubernetes main repo, 1.29 branch   | =-                 |
+| `release-1.30` | Kubernetes main repo, 1.30 branch   | =-                 |
+| `release-1.31` | Kubernetes main repo, 1.31 branch   | =                  |
 | `release-1.32` | Kubernetes main repo, 1.32 branch   | ✓                  |
+| `release-1.33` | Kubernetes main repo, 1.33 branch   | ✓                  |
+| `release-1.34` | Kubernetes main repo, 1.34 branch   | ✓                  |
 | client-go HEAD | Kubernetes main repo, master branch | ✓                  |
 
 Key:

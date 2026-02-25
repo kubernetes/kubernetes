@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -126,6 +127,7 @@ func TestSyncConfigMap(t *testing.T) {
 			},
 		},
 	}
+	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(test.clientObjects...)
@@ -135,7 +137,7 @@ func TestSyncConfigMap(t *testing.T) {
 				controller.configMapCache.Add(test.existingConfigMap)
 			}
 
-			if err := controller.syncConfigMap(); err != nil {
+			if err := controller.syncConfigMap(ctx); err != nil {
 				t.Errorf("Failed to sync ConfigMap, err: %v", err)
 			}
 
@@ -145,7 +147,7 @@ func TestSyncConfigMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
 				})
 				controller.clock.(*testingclock.FakeClock).SetTime(createAt)
-				if err := controller.syncConfigMap(); err != nil {
+				if err := controller.syncConfigMap(ctx); err != nil {
 					t.Errorf("Failed to sync ConfigMap, err: %v", err)
 				}
 			}

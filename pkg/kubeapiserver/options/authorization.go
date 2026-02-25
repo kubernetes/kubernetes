@@ -22,8 +22,6 @@ import (
 	"time"
 
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/spf13/pflag"
 
@@ -108,17 +106,13 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 	//	- the config file can be loaded
 	//	- the config file represents a valid configuration
 	if o.AuthorizationConfigurationFile != "" {
-		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
-			return append(allErrors, fmt.Errorf("--%s cannot be used without enabling StructuredAuthorizationConfiguration feature flag", authorizationConfigFlag))
-		}
-
 		// error out if legacy flags are defined
 		if o.AreLegacyFlagsSet != nil && o.AreLegacyFlagsSet() {
 			return append(allErrors, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag))
 		}
 
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		_, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
+		_, _, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return append(allErrors, err)
 		}
@@ -193,7 +187,6 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.AuthorizationConfigurationFile, authorizationConfigFlag, o.AuthorizationConfigurationFile, ""+
 		"File with Authorization Configuration to configure the authorizer chain. "+
-		"Requires feature gate StructuredAuthorizationConfiguration. "+
 		"This flag is mutually exclusive with the other --authorization-mode and --authorization-webhook-* flags.")
 
 	// preserves compatibility with any method set during initialization
@@ -219,6 +212,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 
 	var authorizationConfiguration *authzconfig.AuthorizationConfiguration
 	var err error
+	var authorizationConfigData string
 
 	// if --authorization-config is set, check if
 	// 	- the feature flag is set
@@ -228,15 +222,12 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 	// else,
 	//	- build the AuthorizationConfig from the legacy flags
 	if o.AuthorizationConfigurationFile != "" {
-		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
-			return nil, fmt.Errorf("--%s cannot be used without enabling StructuredAuthorizationConfiguration feature flag", authorizationConfigFlag)
-		}
 		// error out if legacy flags are defined
 		if o.AreLegacyFlagsSet != nil && o.AreLegacyFlagsSet() {
 			return nil, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag)
 		}
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		authorizationConfiguration, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
+		authorizationConfiguration, authorizationConfigData, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -252,8 +243,9 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		VersionedInformerFactory: versionedInformerFactory,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
-		ReloadFile:                 o.AuthorizationConfigurationFile,
-		AuthorizationConfiguration: authorizationConfiguration,
+		ReloadFile:                            o.AuthorizationConfigurationFile,
+		AuthorizationConfiguration:            authorizationConfiguration,
+		InitialAuthorizationConfigurationData: authorizationConfigData,
 	}, nil
 }
 

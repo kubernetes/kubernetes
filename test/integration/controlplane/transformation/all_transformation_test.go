@@ -117,7 +117,6 @@ resources:
 		{"apiregistration.k8s.io", "v1", "APIService", "apiservices", "as2.foo.com", ""},
 		{"", "v1", "Pod", "pods", "pod1", testNamespace},
 	} {
-		tt := tt
 		t.Run(tt.resource, func(t *testing.T) {
 			t.Parallel()
 

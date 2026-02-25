@@ -47,12 +47,12 @@ const (
 	// Drop will not record the span and all attributes/events will be dropped.
 	Drop SamplingDecision = iota
 
-	// Record indicates the span's `IsRecording() == true`, but `Sampled` flag
-	// *must not* be set.
+	// RecordOnly indicates the span's IsRecording method returns true, but trace.FlagsSampled flag
+	// must not be set.
 	RecordOnly
 
-	// RecordAndSample has span's `IsRecording() == true` and `Sampled` flag
-	// *must* be set.
+	// RecordAndSample indicates the span's IsRecording method returns true and trace.FlagsSampled flag
+	// must be set.
 	RecordAndSample
 )
 
@@ -110,14 +110,14 @@ func TraceIDRatioBased(fraction float64) Sampler {
 
 type alwaysOnSampler struct{}
 
-func (as alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   RecordAndSample,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (as alwaysOnSampler) Description() string {
+func (alwaysOnSampler) Description() string {
 	return "AlwaysOnSampler"
 }
 
@@ -131,14 +131,14 @@ func AlwaysSample() Sampler {
 
 type alwaysOffSampler struct{}
 
-func (as alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   Drop,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (as alwaysOffSampler) Description() string {
+func (alwaysOffSampler) Description() string {
 	return "AlwaysOffSampler"
 }
 
@@ -279,4 +279,32 @@ func (pb parentBased) Description() string {
 		pb.config.localParentSampled.Description(),
 		pb.config.localParentNotSampled.Description(),
 	)
+}
+
+// AlwaysRecord returns a sampler decorator which ensures that every span
+// is passed to the SpanProcessor, even those that would be normally dropped.
+// It converts `Drop` decisions from the root sampler into `RecordOnly` decisions,
+// allowing processors to see all spans without sending them to exporters. This is
+// typically used to enable accurate span-to-metrics processing.
+func AlwaysRecord(root Sampler) Sampler {
+	return alwaysRecord{root}
+}
+
+type alwaysRecord struct {
+	root Sampler
+}
+
+func (ar alwaysRecord) ShouldSample(p SamplingParameters) SamplingResult {
+	rootSamplerSamplingResult := ar.root.ShouldSample(p)
+	if rootSamplerSamplingResult.Decision == Drop {
+		return SamplingResult{
+			Decision:   RecordOnly,
+			Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
+		}
+	}
+	return rootSamplerSamplingResult
+}
+
+func (ar alwaysRecord) Description() string {
+	return "AlwaysRecord{root:" + ar.root.Description() + "}"
 }

@@ -33,6 +33,7 @@ import (
 )
 
 func TestMetricCollection(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
@@ -59,7 +60,7 @@ func TestMetricCollection(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	// Add one volume to DesiredStateOfWorld
-	generatedVolumeName, err := dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxOptions */)
+	generatedVolumeName, err := dsw.AddPodToVolume(logger, podName, pod, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxOptions */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -76,21 +77,19 @@ func TestMetricCollection(t *testing.T) {
 
 	// Add one volume to ActualStateOfWorld
 	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
 	err = asw.MarkVolumeAsAttached(logger, "", volumeSpec, "", devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          generatedVolumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
-		VolumeMountState:    operationexecutor.VolumeMounted,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        generatedVolumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
+		VolumeMountState:  operationexecutor.VolumeMounted,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {

@@ -20,10 +20,16 @@ package v1alpha1
 
 // VolumeAttachmentSpecApplyConfiguration represents a declarative configuration of the VolumeAttachmentSpec type for use
 // with apply.
+//
+// VolumeAttachmentSpec is the specification of a VolumeAttachment request.
 type VolumeAttachmentSpecApplyConfiguration struct {
-	Attacher *string                                   `json:"attacher,omitempty"`
-	Source   *VolumeAttachmentSourceApplyConfiguration `json:"source,omitempty"`
-	NodeName *string                                   `json:"nodeName,omitempty"`
+	// attacher indicates the name of the volume driver that MUST handle this
+	// request. This is the name returned by GetPluginName().
+	Attacher *string `json:"attacher,omitempty"`
+	// source represents the volume that should be attached.
+	Source *VolumeAttachmentSourceApplyConfiguration `json:"source,omitempty"`
+	// nodeName represents the node that the volume should be attached to.
+	NodeName *string `json:"nodeName,omitempty"`
 }
 
 // VolumeAttachmentSpecApplyConfiguration constructs a declarative configuration of the VolumeAttachmentSpec type for use with

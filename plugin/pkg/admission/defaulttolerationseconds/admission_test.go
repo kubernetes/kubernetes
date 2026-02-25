@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -34,7 +35,11 @@ func TestForgivenessAdmission(t *testing.T) {
 		return &s
 	}
 
-	handler := admissiontesting.WithReinvocationTesting(t, NewDefaultTolerationSeconds())
+	plugin, err := newHandlerForTest()
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+	handler := admissiontesting.WithReinvocationTesting(t, plugin)
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
 		description  string
@@ -290,4 +295,12 @@ func TestHandles(t *testing.T) {
 			t.Errorf("Unexpected result for operation %s: %v\n", op, result)
 		}
 	}
+}
+
+// newHandlerForTest returns a handler configured for testing.
+func newHandlerForTest() (*Plugin, error) {
+	handler := NewDefaultTolerationSeconds()
+	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
+	pluginInitializer.Initialize(handler)
+	return handler, admission.ValidateInitialization(handler)
 }

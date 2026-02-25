@@ -29,6 +29,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -42,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -129,7 +131,7 @@ type FeatureGateFlag interface {
 
 func init() {
 	f := featuregate.NewFeatureGate()
-	runtime.Must(logsapi.AddFeatureGates(f))
+	utilruntime.Must(logsapi.AddFeatureGates(f))
 	LoggingFeatureGate = f
 
 	LoggingConfig = logsapi.NewLoggingConfiguration()
@@ -142,7 +144,7 @@ var (
 			"scheduler_framework_extension_point_duration_seconds": {
 				{
 					Label:  extensionPointsLabelName,
-					Values: metrics.ExtentionPoints,
+					Values: metrics.ExtensionPoints,
 				},
 			},
 			"scheduler_scheduling_attempt_duration_seconds": {
@@ -159,7 +161,7 @@ var (
 				},
 				{
 					Label:  extensionPointsLabelName,
-					Values: metrics.ExtentionPoints,
+					Values: metrics.ExtensionPoints,
 				},
 			},
 		},
@@ -276,8 +278,7 @@ type testCase struct {
 	// Optional
 	MetricsCollectorConfig *metricsCollectorConfig
 	// Template for sequence of ops that each workload must follow. Each op will
-	// be executed serially one after another. Each element of the list must be
-	// createNodesOp, createPodsOp, or barrierOp.
+	// be executed serially one after another.
 	WorkloadTemplate []op
 	// List of workloads to run under this testCase.
 	Workloads []*workload
@@ -292,7 +293,7 @@ type testCase struct {
 	Labels []string
 	// DefaultThresholdMetricSelector defines default metric used for threshold comparison.
 	// It is only populated to workloads without their ThresholdMetricSelector set.
-	// If nil, the default metric is set to "SchedulingThroughput".
+	// If nil, the default metric is set to "SchedulingThroughput" with "Average" data bucket.
 	// Optional
 	DefaultThresholdMetricSelector *thresholdMetricSelector
 }
@@ -331,8 +332,14 @@ type workload struct {
 	// The comparison is performed for op with CollectMetrics set to true.
 	// If the measured value is below the threshold, the workload's test case will fail.
 	// If set to zero, the threshold check is disabled.
+	//
+	// May contain a single value or map of topic name to value.
+	// The single value is used if there is no entry in the map for the topic name.
+	// Topic names are passed to RunBenchmarkPerfScheduling. This approach
+	// makes it possible to reuse the same test cases in different configurations.
+	//
 	// Optional
-	Threshold float64
+	Threshold thresholds
 	// ThresholdMetricSelector defines to what metric the Threshold should be compared.
 	// If nil, the metric is set to DefaultThresholdMetricSelector of the testCase.
 	// If DefaultThresholdMetricSelector is nil, the metric is set to "SchedulingThroughput".
@@ -345,8 +352,13 @@ type workload struct {
 }
 
 func (w *workload) isValid(mcc *metricsCollectorConfig) error {
-	if w.Threshold < 0 {
-		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold)
+	if w.Threshold.value < 0 {
+		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold.value)
+	}
+	for topicName, value := range w.Threshold.valuesByTopic {
+		if value < 0 {
+			return fmt.Errorf("invalid Threshold=%f for topic %q; should be non-negative", value, topicName)
+		}
 	}
 
 	return w.ThresholdMetricSelector.isValid(mcc)
@@ -360,10 +372,33 @@ func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricS
 		w.ThresholdMetricSelector = testCaseThresholdMetricSelector
 		return
 	}
-	// By defult, SchedulingThroughput should be compared with the threshold.
+	// By default, SchedulingThroughput Average should be compared with the threshold.
 	w.ThresholdMetricSelector = &thresholdMetricSelector{
-		Name: "SchedulingThroughput",
+		Name:       "SchedulingThroughput",
+		DataBucket: "Average",
 	}
+}
+
+type thresholds struct {
+	value         float64
+	valuesByTopic map[string]float64
+}
+
+func (t *thresholds) UnmarshalJSON(text []byte) error {
+	if errFloat64 := json.Unmarshal(text, &t.value); errFloat64 != nil {
+		// Not a plain number. Let's try as map.
+		if errMap := json.Unmarshal(text, &t.valuesByTopic); errMap != nil {
+			return fmt.Errorf("expected either float64 or topic name -> float64 map: %w, %w", errFloat64, errMap)
+		}
+	}
+	return nil
+}
+
+func (t *thresholds) Get(topicName string) float64 {
+	if value, ok := t.valuesByTopic[topicName]; ok {
+		return value
+	}
+	return t.value
 }
 
 // thresholdMetricSelector defines the name and labels of metric to compare with threshold.
@@ -372,6 +407,8 @@ type thresholdMetricSelector struct {
 	Name string
 	// Labels of the metric. All of them needs to match the metric's labels to assume equality.
 	Labels map[string]string
+	// DataBucket specifies which data bucket should be compared against the threshold.
+	DataBucket string
 	// ExpectLower defines whether the threshold should denote the maximum allowable value of the metric.
 	// If false, the threshold defines minimum allowable value.
 	// Optional
@@ -379,6 +416,9 @@ type thresholdMetricSelector struct {
 }
 
 func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
+	if ms.DataBucket == "" {
+		return fmt.Errorf("dataBucket should be set for metric %v", ms.Name)
+	}
 	if ms.Name == "SchedulingThroughput" {
 		return nil
 	}
@@ -438,7 +478,7 @@ func (p *params) UnmarshalJSON(b []byte) error {
 
 // get retrieves the parameter as an integer
 func (p params) get(key string) (int, error) {
-	// JSON unmarshals integer constants in an "any" field as float.
+	// JSON unmarshal integer constants in an "any" field as float.
 	f, err := getParam[float64](p, key)
 	if err != nil {
 		return 0, err
@@ -447,7 +487,7 @@ func (p params) get(key string) (int, error) {
 }
 
 // getParam retrieves the parameter as specific type. There is no conversion,
-// so in practice this means that only types that JSON unmarshaling uses
+// so in practice this means that only types that JSON unmarshalling uses
 // (float64, string, bool) work.
 func getParam[T float64 | string | bool](p params, key string) (T, error) {
 	p.isUsed[key] = true
@@ -542,7 +582,7 @@ type realOp interface {
 	patchParams(w *workload) (realOp, error)
 }
 
-// runnableOp is an interface implemented by some operations. It makes it posssible
+// runnableOp is an interface implemented by some operations. It makes it possible
 // to execute the operation without having to add separate code into runWorkload.
 type runnableOp interface {
 	realOp
@@ -672,11 +712,13 @@ type createPodsOp struct {
 	// the namespace, so use different namespaces for pods that
 	// are supposed to be kept running.
 	SteadyState bool
+	// Template parameter for SteadyState.
+	SteadyStateParam string
 	// How long to keep the cluster in a steady state.
 	Duration metav1.Duration
 	// Template parameter for Duration.
 	DurationParam string
-	// Whether or not to enable metrics collection for this createPodsOp.
+	// Whether to enable metrics collection for this createPodsOp.
 	// Optional. Both CollectMetrics and SkipWaitToCompletion cannot be true at
 	// the same time for a particular createPodsOp.
 	CollectMetrics bool
@@ -688,7 +730,7 @@ type createPodsOp struct {
 	// If nil, DefaultPodTemplatePath will be used.
 	// Optional
 	PodTemplatePath *string
-	// Whether or not to wait for all pods in this op to get scheduled.
+	// Whether to wait for all pods in this op to get scheduled.
 	// Defaults to false if not specified.
 	// Optional
 	SkipWaitToCompletion bool
@@ -710,6 +752,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	}
 	if cpo.SkipWaitToCompletion && cpo.SteadyState {
 		return errors.New("skipWaitToCompletion and steadyState cannot be true at the same time")
+	}
+	if cpo.SteadyState && !allowParameterization && cpo.Duration.Duration <= 0 {
+		return errors.New("when creating pods in a steady state, the test duration must be > 0")
 	}
 	return nil
 }
@@ -733,6 +778,13 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 		}
 		if cpo.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
 			return nil, fmt.Errorf("parsing duration parameter %s: %w", cpo.DurationParam, err)
+		}
+	}
+	if cpo.SteadyStateParam != "" {
+		var err error
+		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
@@ -787,7 +839,7 @@ type deletePodsOp struct {
 	// If empty, it will delete all Pods in the namespace.
 	// Optional.
 	LabelSelector map[string]string
-	// Whether or not to wait for all pods in this op to be deleted.
+	// Whether to wait for all pods in this op to be deleted.
 	// Defaults to false if not specified.
 	// Optional
 	SkipWaitToCompletion bool
@@ -1021,7 +1073,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -1054,6 +1106,11 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 			//
 			// This is a major issue because many Kubernetes goroutines get
 			// started without waiting for them to stop :-(
+			//
+			// In practice, klog's own flushing got called out by the race detector.
+			// As we know about that one, we can force it to stop explicitly to
+			// satisfy the race detector.
+			klog.StopFlushDaemon()
 			if err := logsapi.ResetForTest(LoggingFeatureGate); err != nil {
 				t.Errorf("Failed to reset the logging configuration: %v", err)
 			}
@@ -1097,14 +1154,17 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// Only emulate v1.33 when QueueingHints is explicitly disabled.
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	} else if _, found := featureGates[features.OpportunisticBatching]; !found {
+		if featureGates == nil {
+			featureGates = map[featuregate.Feature]bool{}
+		}
+		featureGates[features.OpportunisticBatching] = false
 	}
-	for feature, flag := range featureGates {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
-	}
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
-	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		registerQHintMetrics()
@@ -1117,13 +1177,9 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
-	if len(src) == 0 {
-		return maps.Clone(overrides)
-	}
-	result := maps.Clone(src)
-	for feature, enabled := range overrides {
-		result[feature] = enabled
-	}
+	result := make(map[featuregate.Feature]bool)
+	maps.Copy(result, src)
+	maps.Copy(result, overrides)
 	return result
 }
 
@@ -1201,11 +1257,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					fixJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
+					scheduler, informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
 
-					// TODO(#93795): make sure each workload within a test case has a unique
-					// name? The name is used to identify the stats in benchmark reports.
-					// TODO(#94404): check for unused template parameters? Probably a typo.
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						b.Fatalf("workload %s is not valid: %v", w.Name, err)
@@ -1218,7 +1271,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 						}
 					}
 
-					results, err := runWorkload(tCtx, tc, w, informerFactory)
+					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1285,7 +1338,15 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			}
 		})
 	}
-	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark_"+topicName); err != nil {
+	// Different top-level BenchmarkPerfScheduling* tests are supported as long as they use unique topic names.
+	// The final JSON file then is always called BenchmarkPerfScheduling_benchmark_<topic name>_<date+time>.json
+	// because that is what perf-dash is configured to read:
+	// https://github.com/kubernetes/perf-tests/blob/581139e45e79cf04b9c2777b82677957f1e7f90b/perfdash/config.go#L520-L525
+	namePrefix := b.Name()
+	namePrefix = regexp.MustCompile(`^BenchmarkPerfScheduling[^/]*`).ReplaceAllString(namePrefix, "BenchmarkPerfScheduling")
+	namePrefix = strings.ReplaceAll(namePrefix, "/", "_")
+	namePrefix += "_benchmark_" + topicName
+	if err := dataItems2JSONFile(dataItems, namePrefix); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
 }
@@ -1313,13 +1374,13 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
+					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
 					}
 
-					_, err = runWorkload(tCtx, tc, w, informerFactory)
+					_, err = runWorkload(tCtx, tc, w, "" /* topic name not relevant */, scheduler, informerFactory)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1379,7 +1440,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -1411,19 +1472,34 @@ func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
 	return value > threshold
 }
 
-func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+// applyThreshold adds the threshold to data item with metric specified via metricSelector and verifies that
+// this metrics value is within threshold.
+func applyThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
 	if threshold == 0 {
 		return nil
 	}
+	dataBucket := metricSelector.DataBucket
+	var errs []error
 	for _, item := range items {
-		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
+		if item.Labels["Metric"] != metricSelector.Name || !labelsMatch(item.Labels, metricSelector.Labels) {
+			continue
+		}
+		thresholdItemName := dataBucket + "Threshold"
+		item.Data[thresholdItemName] = threshold
+		dataItem, ok := item.Data[dataBucket]
+		if !ok {
+			errs = append(errs, fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket))
+			continue
+		}
+		if !valueWithinThreshold(dataItem, threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("%s: expected %s Average to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
+			} else {
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
 			}
-			return fmt.Errorf("%s: expected %s Average to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, item.Data["Average"], threshold)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func checkEmptyInFlightEvents() error {
@@ -1441,14 +1517,17 @@ func checkEmptyInFlightEvents() error {
 }
 
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
-	collectorCtx := ktesting.WithCancel(tCtx)
+	collectorCtx := tCtx.WithCancel()
 	workloadName := tCtx.Name()
+
+	// Clean up memory usage from the initial setup phase.
+	runtime.GC()
+
 	// The first part is the same for each workload, therefore we can strip it.
 	workloadName = workloadName[strings.Index(name, "/")+1:]
 	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)
 	for _, collector := range collectors {
 		// Need loop-local variable for function below.
-		collector := collector
 		err := collector.init()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to initialize data collector: %w", err)
@@ -1462,10 +1541,17 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 			collector.run(collectorCtx)
 		}()
 	}
+	if b, ok := tCtx.TB().(*testing.B); ok {
+		b.ResetTimer()
+	}
+	tCtx.Log("Started metrics collection")
 	return collectorCtx, collectors, nil
 }
 
 func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContext, collectorWG *sync.WaitGroup, threshold float64, tms thresholdMetricSelector, opIndex int, collectors []testDataCollector) ([]DataItem, error) {
+	if b, ok := tCtx.TB().(*testing.B); ok {
+		b.StopTimer()
+	}
 	if collectorCtx == nil {
 		return nil, fmt.Errorf("missing startCollectingMetrics operation before stopping")
 	}
@@ -1475,16 +1561,18 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 	for _, collector := range collectors {
 		items := collector.collect()
 		dataItems = append(dataItems, items...)
-		err := compareMetricWithThreshold(items, threshold, tms)
+		err := applyThreshold(items, threshold, tms)
 		if err != nil {
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
 	}
+	tCtx.Log("Stopped metrics collection")
 	return dataItems, nil
 }
 
 type WorkloadExecutor struct {
 	tCtx                         ktesting.TContext
+	scheduler                    *scheduler.Scheduler
 	wg                           sync.WaitGroup
 	collectorCtx                 ktesting.TContext
 	collectorWG                  sync.WaitGroup
@@ -1495,10 +1583,11 @@ type WorkloadExecutor struct {
 	throughputErrorMargin        float64
 	testCase                     *testCase
 	workload                     *workload
+	topicName                    string
 	nextNodeIndex                int
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1528,15 +1617,17 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	podInformer := informerFactory.Core().V1().Pods()
 
 	// Everything else started by this function gets stopped before it returns.
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
+		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,
+		topicName:                    topicName,
 	}
 
 	tCtx.TB().Cleanup(func() {
@@ -1592,6 +1683,9 @@ func (e *WorkloadExecutor) runOp(op realOp, opIndex int) error {
 		return e.runStartCollectingMetricsOp(opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
 		return e.runStopCollectingMetrics(opIndex)
+	case *createResourceDriverOp:
+		concreteOp.run(e.tCtx, e.scheduler.Profiles["default-scheduler"].SharedDRAManager())
+		return nil
 	default:
 		return e.runDefaultOp(opIndex, concreteOp)
 	}
@@ -1671,7 +1765,7 @@ func (e *WorkloadExecutor) runSleepOp(op *sleepOp) error {
 }
 
 func (e *WorkloadExecutor) runStopCollectingMetrics(opIndex int) error {
-	items, err := stopCollectingMetrics(e.tCtx, e.collectorCtx, &e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
+	items, err := stopCollectingMetrics(e.tCtx, e.collectorCtx, &e.collectorWG, e.workload.Threshold.Get(e.topicName), *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 	if err != nil {
 		return err
 	}
@@ -1725,7 +1819,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		// CollectMetrics and SkipWaitToCompletion can never be true at the
 		// same time, so if we're here, it means that all pods have been
 		// scheduled.
-		items, err := stopCollectingMetrics(e.tCtx, e.collectorCtx, &e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
+		items, err := stopCollectingMetrics(e.tCtx, e.collectorCtx, &e.collectorWG, e.workload.Threshold.Get(e.topicName), *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 		if err != nil {
 			return err
 		}
@@ -1748,7 +1842,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 			ticker := time.NewTicker(time.Second / time.Duration(op.DeletePodsPerSecond))
 			defer ticker.Stop()
 
-			for i := 0; i < len(podsToDelete); i++ {
+			for i := range podsToDelete {
 				select {
 				case <-ticker.C:
 					if err := e.tCtx.Client().CoreV1().Pods(op.Namespace).Delete(e.tCtx, podsToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
@@ -1894,17 +1988,17 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 }
 
 func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) error {
-	runable, ok := op.(runnableOp)
+	runnable, ok := op.(runnableOp)
 	if !ok {
 		return fmt.Errorf("invalid op %v", op)
 	}
-	for _, namespace := range runable.requiredNamespaces() {
+	for _, namespace := range runnable.requiredNamespaces() {
 		err := createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
 		if err != nil {
 			return err
 		}
 	}
-	runable.run(e.tCtx)
+	runnable.run(e.tCtx)
 	return nil
 }
 
@@ -1939,13 +2033,16 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+// var for mocking in tests.
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
 	return []testDataCollector{
 		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
+		newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond),
+		newSchedulingDurationCollector(map[string]string{"Name": name}),
 	}
 }
 
@@ -1999,7 +2096,7 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		return err
 	}
 	tCtx.Logf("creating pods in namespace %q for %s", namespace, cpo.Duration)
-	tCtx = ktesting.WithTimeout(tCtx, cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
+	tCtx = tCtx.WithTimeout(cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
 
 	// Start watching pods in the namespace. Any pod which is seen as being scheduled
 	// gets deleted.
@@ -2057,6 +2154,8 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 				return
 			}
 
+			mutex.Lock()
+			defer mutex.Unlock()
 			existingPods--
 			if pod.Spec.NodeName != "" {
 				runningPods--
@@ -2085,6 +2184,23 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		select {
 		case <-tCtx.Done():
 			tCtx.Logf("Completed after seeing %d scheduled pod: %v", countScheduledPods, context.Cause(tCtx))
+
+			// Sanity check: at least one pod should have been scheduled,
+			// giving us a non-zero average.
+			//
+			// This is important because otherwise "no pods scheduled because of constant
+			// failure" would not get detected in unit tests. For benchmarks
+			// it's less important, but indicates that the time period
+			// might have been too small.
+			//
+			// The collector logs "Failed to measure SchedulingThroughput ... Increase pods and/or nodes to make scheduling take longer"
+			// but that is hard to spot.
+			//
+			// The non-steady case blocks until all pods have been scheduled
+			// and doesn't need this check.
+			if countScheduledPods == 0 {
+				return errors.New("no pod at all got scheduled, either because of a problem or because the test interval was too small")
+			}
 			return nil
 		case <-scheduledPods:
 			countScheduledPods++
@@ -2174,7 +2290,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 }
 
 // waitUntilPodsAttemptedInNamespace blocks until all pods in the given
-// namespace at least once went through a schedyling cycle.
+// namespace at least once went through a scheduling cycle.
 // Times out after 10 minutes similarly to waitUntilPodsScheduledInNamespace.
 func waitUntilPodsAttemptedInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int) error {
 	var pendingPod *v1.Pod
@@ -2235,7 +2351,7 @@ func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.Po
 }
 
 // waitUntilPodsAttempted blocks until the all pods in the given namespaces are
-// attempted (at least once went through a schedyling cycle).
+// attempted (at least once went through a scheduling cycle).
 func waitUntilPodsAttempted(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
 	// If unspecified, default to all known namespaces.
 	if len(namespaces) == 0 {
@@ -2323,7 +2439,8 @@ func validateTestCases(testCases []*testCase) error {
 			return fmt.Errorf("%s: no ops defined", tc.Name)
 		}
 		// Make sure there's at least one CreatePods op with collectMetrics set to
-		// true in each workload. What's the point of running a performance
+		// true, or a startCollectingMetricsOp together with stopCollectingMetricsOp
+		// in each workload. What's the point of running a performance
 		// benchmark if no statistics are collected for reporting?
 		if !tc.collectsMetrics() {
 			return fmt.Errorf("%s: no op in the workload template collects metrics", tc.Name)

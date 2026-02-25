@@ -29,14 +29,14 @@ import (
 
 // SetNodeOwnerFunc helps construct a newLeasePostProcessFunc which sets
 // a node OwnerReference to the given lease object
-func SetNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
+func SetNodeOwnerFunc(ctx context.Context, c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
 	return func(lease *coordinationv1.Lease) error {
 		// Setting owner reference needs node's UID. Note that it is different from
 		// kubelet.nodeRef.UID. When lease is initially created, it is possible that
 		// the connection between master and node is not ready yet. So try to set
 		// owner reference every time when renewing the lease, until successful.
 		if len(lease.OwnerReferences) == 0 {
-			if node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{}); err == nil {
+			if node, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{}); err == nil {
 				lease.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
@@ -46,7 +46,8 @@ func SetNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordi
 					},
 				}
 			} else {
-				klog.ErrorS(err, "Failed to get node when trying to set owner ref to the node lease", "node", klog.KRef("", nodeName))
+				logger := klog.FromContext(ctx)
+				logger.Error(err, "Failed to get node when trying to set owner ref to the node lease", "node", klog.KRef("", nodeName))
 				return err
 			}
 		}

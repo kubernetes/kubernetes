@@ -86,13 +86,19 @@ func (Meter) Int64Gauge(string, ...metric.Int64GaugeOption) (metric.Int64Gauge, 
 
 // Int64ObservableCounter returns an ObservableCounter used to record int64
 // measurements that produces no telemetry.
-func (Meter) Int64ObservableCounter(string, ...metric.Int64ObservableCounterOption) (metric.Int64ObservableCounter, error) {
+func (Meter) Int64ObservableCounter(
+	string,
+	...metric.Int64ObservableCounterOption,
+) (metric.Int64ObservableCounter, error) {
 	return Int64ObservableCounter{}, nil
 }
 
 // Int64ObservableUpDownCounter returns an ObservableUpDownCounter used to
 // record int64 measurements that produces no telemetry.
-func (Meter) Int64ObservableUpDownCounter(string, ...metric.Int64ObservableUpDownCounterOption) (metric.Int64ObservableUpDownCounter, error) {
+func (Meter) Int64ObservableUpDownCounter(
+	string,
+	...metric.Int64ObservableUpDownCounterOption,
+) (metric.Int64ObservableUpDownCounter, error) {
 	return Int64ObservableUpDownCounter{}, nil
 }
 
@@ -128,19 +134,28 @@ func (Meter) Float64Gauge(string, ...metric.Float64GaugeOption) (metric.Float64G
 
 // Float64ObservableCounter returns an ObservableCounter used to record int64
 // measurements that produces no telemetry.
-func (Meter) Float64ObservableCounter(string, ...metric.Float64ObservableCounterOption) (metric.Float64ObservableCounter, error) {
+func (Meter) Float64ObservableCounter(
+	string,
+	...metric.Float64ObservableCounterOption,
+) (metric.Float64ObservableCounter, error) {
 	return Float64ObservableCounter{}, nil
 }
 
 // Float64ObservableUpDownCounter returns an ObservableUpDownCounter used to
 // record int64 measurements that produces no telemetry.
-func (Meter) Float64ObservableUpDownCounter(string, ...metric.Float64ObservableUpDownCounterOption) (metric.Float64ObservableUpDownCounter, error) {
+func (Meter) Float64ObservableUpDownCounter(
+	string,
+	...metric.Float64ObservableUpDownCounterOption,
+) (metric.Float64ObservableUpDownCounter, error) {
 	return Float64ObservableUpDownCounter{}, nil
 }
 
 // Float64ObservableGauge returns an ObservableGauge used to record int64
 // measurements that produces no telemetry.
-func (Meter) Float64ObservableGauge(string, ...metric.Float64ObservableGaugeOption) (metric.Float64ObservableGauge, error) {
+func (Meter) Float64ObservableGauge(
+	string,
+	...metric.Float64ObservableGaugeOption,
+) (metric.Float64ObservableGauge, error) {
 	return Float64ObservableGauge{}, nil
 }
 
@@ -176,12 +191,18 @@ type Int64Counter struct{ embedded.Int64Counter }
 // Add performs no operation.
 func (Int64Counter) Add(context.Context, int64, ...metric.AddOption) {}
 
+// Enabled performs no operation.
+func (Int64Counter) Enabled(context.Context) bool { return false }
+
 // Float64Counter is an OpenTelemetry Counter used to record float64
 // measurements. It produces no telemetry.
 type Float64Counter struct{ embedded.Float64Counter }
 
 // Add performs no operation.
 func (Float64Counter) Add(context.Context, float64, ...metric.AddOption) {}
+
+// Enabled performs no operation.
+func (Float64Counter) Enabled(context.Context) bool { return false }
 
 // Int64UpDownCounter is an OpenTelemetry UpDownCounter used to record int64
 // measurements. It produces no telemetry.
@@ -190,12 +211,18 @@ type Int64UpDownCounter struct{ embedded.Int64UpDownCounter }
 // Add performs no operation.
 func (Int64UpDownCounter) Add(context.Context, int64, ...metric.AddOption) {}
 
+// Enabled performs no operation.
+func (Int64UpDownCounter) Enabled(context.Context) bool { return false }
+
 // Float64UpDownCounter is an OpenTelemetry UpDownCounter used to record
 // float64 measurements. It produces no telemetry.
 type Float64UpDownCounter struct{ embedded.Float64UpDownCounter }
 
 // Add performs no operation.
 func (Float64UpDownCounter) Add(context.Context, float64, ...metric.AddOption) {}
+
+// Enabled performs no operation.
+func (Float64UpDownCounter) Enabled(context.Context) bool { return false }
 
 // Int64Histogram is an OpenTelemetry Histogram used to record int64
 // measurements. It produces no telemetry.
@@ -204,12 +231,18 @@ type Int64Histogram struct{ embedded.Int64Histogram }
 // Record performs no operation.
 func (Int64Histogram) Record(context.Context, int64, ...metric.RecordOption) {}
 
+// Enabled performs no operation.
+func (Int64Histogram) Enabled(context.Context) bool { return false }
+
 // Float64Histogram is an OpenTelemetry Histogram used to record float64
 // measurements. It produces no telemetry.
 type Float64Histogram struct{ embedded.Float64Histogram }
 
 // Record performs no operation.
 func (Float64Histogram) Record(context.Context, float64, ...metric.RecordOption) {}
+
+// Enabled performs no operation.
+func (Float64Histogram) Enabled(context.Context) bool { return false }
 
 // Int64Gauge is an OpenTelemetry Gauge used to record instantaneous int64
 // measurements. It produces no telemetry.
@@ -218,12 +251,18 @@ type Int64Gauge struct{ embedded.Int64Gauge }
 // Record performs no operation.
 func (Int64Gauge) Record(context.Context, int64, ...metric.RecordOption) {}
 
+// Enabled performs no operation.
+func (Int64Gauge) Enabled(context.Context) bool { return false }
+
 // Float64Gauge is an OpenTelemetry Gauge used to record instantaneous float64
 // measurements. It produces no telemetry.
 type Float64Gauge struct{ embedded.Float64Gauge }
 
 // Record performs no operation.
 func (Float64Gauge) Record(context.Context, float64, ...metric.RecordOption) {}
+
+// Enabled performs no operation.
+func (Float64Gauge) Enabled(context.Context) bool { return false }
 
 // Int64ObservableCounter is an OpenTelemetry ObservableCounter used to record
 // int64 measurements. It produces no telemetry.

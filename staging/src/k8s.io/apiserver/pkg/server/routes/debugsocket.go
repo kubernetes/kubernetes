@@ -17,12 +17,15 @@ limitations under the License.
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"path"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // DebugSocket installs profiling and debugflag as a Unix-Domain socket.
@@ -62,7 +65,14 @@ func (s *DebugSocket) InstallDebugFlag(flag string, handler func(http.ResponseWr
 }
 
 // Run starts the server and waits for stopCh to be closed to close the server.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (s *DebugSocket) Run(stopCh <-chan struct{}) error {
+	return s.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext starts the server and waits for the context to be cancelled to close the server.
+func (s *DebugSocket) RunWithContext(ctx context.Context) error {
 	if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove (%v): %v", s.path, err)
 	}
@@ -75,7 +85,7 @@ func (s *DebugSocket) Run(stopCh <-chan struct{}) error {
 
 	srv := http.Server{Handler: s.mux}
 	go func() {
-		<-stopCh
+		<-ctx.Done()
 		srv.Close()
 	}()
 	return srv.Serve(l)

@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1beta1
 
+type MutatingAdmissionPolicyExpansion interface{}
+
+type MutatingAdmissionPolicyBindingExpansion interface{}
+
 type MutatingWebhookConfigurationExpansion interface{}
 
 type ValidatingAdmissionPolicyExpansion interface{}

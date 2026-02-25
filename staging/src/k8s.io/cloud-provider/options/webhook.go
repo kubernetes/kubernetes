@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/cloud-provider/config"
+	cliflag "k8s.io/component-base/cli/flag"
 	netutils "k8s.io/utils/net"
 )
 
@@ -124,18 +125,45 @@ func (o *WebhookServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&o.BindPort, "webhook-secure-port", o.BindPort, "Secure port to serve cloud provider webhooks. If 0, don't serve webhooks at all.")
 
+	fs.BoolVar(&o.DisableHTTP2Serving, "webhook-disable-http2-serving", o.DisableHTTP2Serving,
+		"If true, HTTP2 serving will be disabled for the webhook server [default=false]")
+
 	fs.StringVar(&o.ServerCert.CertDirectory, "webhook-cert-dir", o.ServerCert.CertDirectory, ""+
 		"The directory where the TLS certs are located. "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
+		"If --webhook-tls-cert-file and --webhook-tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&o.ServerCert.CertKey.CertFile, "webhook-tls-cert-file", o.ServerCert.CertKey.CertFile, ""+
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
-		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
-		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to the directory specified by --cert-dir.")
+		"after server cert). If HTTPS serving is enabled, and --webhook-tls-cert-file and "+
+		"--webhook-tls-private-key-file are not provided, a self-signed certificate and key "+
+		"are generated for the public address and saved to the directory specified by --webhook-cert-dir.")
 
 	fs.StringVar(&o.ServerCert.CertKey.KeyFile, "webhook-tls-private-key-file", o.ServerCert.CertKey.KeyFile,
-		"File containing the default x509 private key matching --tls-cert-file.")
+		"File containing the default x509 private key matching --webhook-tls-cert-file.")
+
+	tlsCipherPreferredValues := cliflag.PreferredTLSCipherNames()
+	tlsCipherInsecureValues := cliflag.InsecureTLSCipherNames()
+	fs.StringSliceVar(&o.CipherSuites, "webhook-tls-cipher-suites", o.CipherSuites,
+		"Comma-separated list of cipher suites for the webhook server. "+
+			"If omitted, the default Go cipher suites will be used. \n"+
+			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
+			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
+
+	tlsPossibleVersions := cliflag.TLSPossibleVersions()
+	fs.StringVar(&o.MinTLSVersion, "webhook-tls-min-version", o.MinTLSVersion,
+		"Minimum TLS version supported for the webhook server. "+
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
+
+	fs.Var(cliflag.NewNamedCertKeyArray(&o.SNICertKeys), "webhook-tls-sni-cert-key", ""+
+		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
+		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
+		"segments. The domain patterns also allow IP addresses, but IPs should only be used if "+
+		"the webhook server has visibility to the IP address requested by a client. "+
+		"If no domain patterns are provided, the names of the certificate are "+
+		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
+		"trump over extracted names. For multiple key/certificate pairs, use the "+
+		"--webhook-tls-sni-cert-key multiple times. "+
+		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
 }
 
 func (o *WebhookServingOptions) Validate() []error {
@@ -176,19 +204,45 @@ func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo, webhookC
 	}
 
 	*cfg = &server.SecureServingInfo{
-		Listener: listener,
+		Listener:     listener,
+		DisableHTTP2: o.DisableHTTP2Serving,
 	}
+	c := *cfg
 
 	serverCertFile, serverKeyFile := o.ServerCert.CertKey.CertFile, o.ServerCert.CertKey.KeyFile
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		var err error
-		(*cfg).Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
+		c.Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load serving cert: %w", err)
 		}
 	} else if o.ServerCert.GeneratedCert != nil {
-		(*cfg).Cert = o.ServerCert.GeneratedCert
+		c.Cert = o.ServerCert.GeneratedCert
 	}
+
+	if len(o.CipherSuites) != 0 {
+		cipherSuites, err := cliflag.TLSCipherSuites(o.CipherSuites)
+		if err != nil {
+			return fmt.Errorf("failed to parse cipher suites: %w", err)
+		}
+		c.CipherSuites = cipherSuites
+	}
+
+	c.MinTLSVersion, err = cliflag.TLSVersion(o.MinTLSVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse TLS version: %w", err)
+	}
+
+	// load SNI certs
+	namedTLSCerts := make([]dynamiccertificates.SNICertKeyContentProvider, 0, len(o.SNICertKeys))
+	for _, nck := range o.SNICertKeys {
+		tlsCert, err := dynamiccertificates.NewDynamicSNIContentFromFiles("sni-serving-cert", nck.CertFile, nck.KeyFile, nck.Names...)
+		if err != nil {
+			return fmt.Errorf("failed to load SNI cert and key: %w", err)
+		}
+		namedTLSCerts = append(namedTLSCerts, tlsCert)
+	}
+	c.SNICerts = namedTLSCerts
 
 	return nil
 }

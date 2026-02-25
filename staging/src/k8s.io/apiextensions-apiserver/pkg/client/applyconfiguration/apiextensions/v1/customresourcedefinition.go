@@ -26,11 +26,18 @@ import (
 
 // CustomResourceDefinitionApplyConfiguration represents a declarative configuration of the CustomResourceDefinition type for use
 // with apply.
+//
+// CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
+// <.spec.name>.<.spec.group>.
 type CustomResourceDefinitionApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *CustomResourceDefinitionSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
+	// spec describes how the user wants the resources to appear
+	Spec *CustomResourceDefinitionSpecApplyConfiguration `json:"spec,omitempty"`
+	// status indicates the actual state of the CustomResourceDefinition
+	Status *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CustomResourceDefinition constructs a declarative configuration of the CustomResourceDefinition type for use with
@@ -42,6 +49,7 @@ func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfigu
 	b.WithAPIVersion("apiextensions.k8s.io/v1")
 	return b
 }
+
 func (b CustomResourceDefinitionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

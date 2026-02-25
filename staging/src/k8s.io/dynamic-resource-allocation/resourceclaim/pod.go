@@ -17,6 +17,8 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
@@ -45,4 +47,23 @@ func PodStatusEqual(statusA, statusB []corev1.PodResourceClaimStatus) bool {
 		}
 	}
 	return true
+}
+
+func PodExtendedStatusEqual(statusA, statusB *corev1.PodExtendedResourceClaimStatus) bool {
+	if statusA == nil && statusB == nil {
+		return true
+	}
+	if (statusA == nil) != (statusB == nil) {
+		return false
+	}
+	if statusA.ResourceClaimName != statusB.ResourceClaimName {
+		return false
+	}
+	if len(statusA.RequestMappings) != len(statusB.RequestMappings) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
 }

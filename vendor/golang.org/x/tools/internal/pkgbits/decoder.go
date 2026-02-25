@@ -259,7 +259,7 @@ func (r *Decoder) rawUvarint() uint64 {
 func readUvarint(r *strings.Reader) (uint64, error) {
 	var x uint64
 	var s uint
-	for i := 0; i < binary.MaxVarintLen64; i++ {
+	for i := range binary.MaxVarintLen64 {
 		b, err := r.ReadByte()
 		if err != nil {
 			if i > 0 && err == io.EOF {

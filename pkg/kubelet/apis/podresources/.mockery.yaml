@@ -1,16 +1,16 @@
 ---
 dir: testing
-filename: "{{.InterfaceName | snakecase}}.go"
-boilerplate-file: ../../../../hack/boilerplate/boilerplate.generatego.txt
-outpkg: testing
-with-expecter: true
+filename: mocks.go
+pkgname: testing
+template: testify
+template-data:
+  boilerplate-file: ../../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
 packages:
   k8s.io/kubernetes/pkg/kubelet/apis/podresources:
     interfaces:
-      CPUsProvider:
-        config:
-          filename: cpus_provider.go
-      DevicesProvider:
-      DynamicResourcesProvider:
-      MemoryProvider:
-      PodsProvider:
+      CPUsProvider: {}
+      DevicesProvider: {}
+      DynamicResourcesProvider: {}
+      MemoryProvider: {}
+      PodsProvider: {}

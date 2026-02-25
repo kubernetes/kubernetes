@@ -20,8 +20,12 @@ package v1
 
 // ContainerStateWaitingApplyConfiguration represents a declarative configuration of the ContainerStateWaiting type for use
 // with apply.
+//
+// ContainerStateWaiting is a waiting state of a container.
 type ContainerStateWaitingApplyConfiguration struct {
-	Reason  *string `json:"reason,omitempty"`
+	// (brief) reason the container is not yet running.
+	Reason *string `json:"reason,omitempty"`
+	// Message regarding why the container is not yet running.
 	Message *string `json:"message,omitempty"`
 }
 

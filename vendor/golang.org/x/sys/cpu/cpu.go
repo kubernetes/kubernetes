@@ -149,6 +149,18 @@ var ARM struct {
 	_           CacheLinePad
 }
 
+// The booleans in Loong64 contain the correspondingly named cpu feature bit.
+// The struct is padded to avoid false sharing.
+var Loong64 struct {
+	_         CacheLinePad
+	HasLSX    bool // support 128-bit vector extension
+	HasLASX   bool // support 256-bit vector extension
+	HasCRC32  bool // support CRC instruction
+	HasLAM_BH bool // support AM{SWAP/ADD}[_DB].{B/H} instruction
+	HasLAMCAS bool // support AMCAS[_DB].{B/H/W/D} instruction
+	_         CacheLinePad
+}
+
 // MIPS64X contains the supported CPU features of the current mips64/mips64le
 // platforms. If the current platform is not mips64/mips64le or the current
 // operating system is not Linux then all feature flags are false.
@@ -220,6 +232,17 @@ var RISCV64 struct {
 	HasZba            bool // Address generation instructions extension
 	HasZbb            bool // Basic bit-manipulation extension
 	HasZbs            bool // Single-bit instructions extension
+	HasZvbb           bool // Vector Basic Bit-manipulation
+	HasZvbc           bool // Vector Carryless Multiplication
+	HasZvkb           bool // Vector Cryptography Bit-manipulation
+	HasZvkt           bool // Vector Data-Independent Execution Latency
+	HasZvkg           bool // Vector GCM/GMAC
+	HasZvkn           bool // NIST Algorithm Suite (AES/SHA256/SHA512)
+	HasZvknc          bool // NIST Algorithm Suite with carryless multiply
+	HasZvkng          bool // NIST Algorithm Suite with GCM
+	HasZvks           bool // ShangMi Algorithm Suite
+	HasZvksc          bool // ShangMi Algorithm Suite with carryless multiplication
+	HasZvksg          bool // ShangMi Algorithm Suite with GCM
 	_                 CacheLinePad
 }
 

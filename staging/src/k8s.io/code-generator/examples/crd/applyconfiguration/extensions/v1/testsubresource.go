@@ -37,6 +37,7 @@ func TestSubresource() *TestSubresourceApplyConfiguration {
 	b.WithAPIVersion("extensions.test.crd.code-generator.k8s.io/v1")
 	return b
 }
+
 func (b TestSubresourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

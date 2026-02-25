@@ -159,10 +159,8 @@ func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, 
 		res[m.DescribedObject.Name] = PodMetric{
 			Timestamp: m.Timestamp.Time,
 			Window:    window,
-			Value:     int64(m.Value.MilliValue()),
+			Value:     m.Value.MilliValue(),
 		}
-
-		m.Value.MilliValue()
 	}
 
 	timestamp := metrics.Items[0].Timestamp.Time

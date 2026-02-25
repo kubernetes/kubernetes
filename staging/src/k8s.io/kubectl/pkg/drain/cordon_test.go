@@ -17,6 +17,8 @@ limitations under the License.
 package drain
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 type newCordonHelperFromRuntimeObjectTestCase struct {
@@ -141,6 +145,98 @@ func TestUpdateIfRequired(t *testing.T) {
 			}
 			if helper.desired != tt.desiredState {
 				t.Errorf("Expected desired state to be %v, got %v", tt.desiredState, helper.desired)
+			}
+		})
+	}
+}
+
+func TestCordonHelper_PatchOrReplaceWithContext(t *testing.T) {
+	tests := []struct {
+		name         string
+		node         *corev1.Node
+		clientset    *fake.Clientset
+		serverDryRun bool
+		shouldFail   bool
+	}{
+		{
+			name: "update success: local object should be updated",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-node",
+				},
+				Spec: corev1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			clientset: fake.NewClientset(&corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-node",
+				},
+				Spec: corev1.NodeSpec{
+					Unschedulable: false,
+				},
+			}),
+			serverDryRun: false,
+			shouldFail:   false,
+		},
+		{
+			name: "update faild: local object should not be updated",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-node",
+				},
+				Spec: corev1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			clientset: fake.NewClientset(&corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-node",
+				},
+				Spec: corev1.NodeSpec{
+					Unschedulable: false,
+				},
+			}),
+			serverDryRun: false,
+			shouldFail:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCordonHelper(tt.node)
+			c.desired = true
+			if tt.shouldFail {
+				tt.clientset.Fake.PrependReactor("update", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("fake update error")
+				})
+				tt.clientset.Fake.PrependReactor("patch", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, errors.New("fake update error")
+				})
+			}
+
+			err, _ := c.PatchOrReplaceWithContext(context.Background(), tt.clientset, tt.serverDryRun)
+			if tt.shouldFail {
+				if err == nil {
+					t.Errorf("PatchOrReplaceWithContext() failed: update should failed but no error returned")
+					return
+				}
+			} else {
+				if err != nil {
+					t.Errorf("PatchOrReplaceWithContext() failed: update should succeed but got error: %v", err)
+					return
+				}
+			}
+
+			if err != nil {
+				t.Logf("patch/update failed, error: %v, c.node.Spec.Unschedulable shouldn't be updated", err)
+				if c.node.Spec.Unschedulable == c.desired {
+					t.Errorf("PatchOrReplaceWithContext() failed: update failed but c.node's unschedulable was updated")
+				}
+			} else {
+				t.Log("patch/update successed, c.node.Spec.Unschedulable should be updated")
+				if c.node.Spec.Unschedulable != c.desired {
+					t.Errorf("PatchOrReplaceWithContext() failed: update succeeded but c.node's unschedulable was not updated")
+				}
 			}
 		})
 	}

@@ -24,8 +24,13 @@ import (
 
 // EventSeriesApplyConfiguration represents a declarative configuration of the EventSeries type for use
 // with apply.
+//
+// EventSeries contain information on series of events, i.e. thing that was/is happening
+// continuously for some time.
 type EventSeriesApplyConfiguration struct {
-	Count            *int32            `json:"count,omitempty"`
+	// Number of occurrences in this series up to the last heartbeat time
+	Count *int32 `json:"count,omitempty"`
+	// Time of the last occurrence observed
 	LastObservedTime *metav1.MicroTime `json:"lastObservedTime,omitempty"`
 }
 

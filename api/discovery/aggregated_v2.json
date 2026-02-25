@@ -705,6 +705,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "podcertificaterequests",
+              "responseKind": {
+                "group": "",
+                "kind": "PodCertificateRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podcertificaterequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodCertificateRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1beta1"
@@ -1222,6 +1257,29 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "volumeattributesclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "VolumeAttributesClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "vac"
+              ],
+              "singularResource": "volumeattributesclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1"
@@ -1254,35 +1312,6 @@
             }
           ],
           "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "volumeattributesclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "VolumeAttributesClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "shortNames": [
-                "vac"
-              ],
-              "singularResource": "volumeattributesclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -1294,6 +1323,52 @@
         {
           "freshness": "Current",
           "resources": [
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicies",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicy",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicybindings",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicyBinding",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicybinding",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
             {
               "categories": [
                 "api-extensions"
@@ -1454,6 +1529,58 @@
               ]
             }
           ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicies",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicy",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicybindings",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicyBinding",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicybinding",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1alpha1"
         }
       ]
@@ -1546,6 +1673,32 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "workloads",
+              "responseKind": {
+                "group": "",
+                "kind": "Workload",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "workload",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
@@ -1804,6 +1957,107 @@
               ]
             }
           ],
+          "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "deviceclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "deviceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaims",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaim",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaim",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourceClaim",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaimtemplates",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimTemplate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimtemplate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1beta2"
         },
         {
@@ -1919,6 +2173,21 @@
               },
               "scope": "Cluster",
               "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",
@@ -2110,7 +2379,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       ]
     }

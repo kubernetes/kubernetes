@@ -20,7 +20,10 @@ package v1
 
 // ClusterTestTypeStatusApplyConfiguration represents a declarative configuration of the ClusterTestTypeStatus type for use
 // with apply.
+//
+// Struct level comment
 type ClusterTestTypeStatusApplyConfiguration struct {
+	// Field level comment
 	Blah *string `json:"blah,omitempty"`
 }
 

@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
@@ -39,6 +38,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/dump"
 )
 
 // TestEventProcessorExit is expected to timeout if the event processor fails
@@ -387,7 +387,7 @@ func TestNewInformerWatcher(t *testing.T) {
 func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 	listCalls := 0
 	watchCalls := 0
-	lw := &cache.ListWatch{
+	lw := toListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			retval := &corev1.SecretList{}
 			if listCalls == 0 {
@@ -413,7 +413,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			watchCalls++
 			return w, nil
 		},
-	}
+	})
 	//nolint:logcheck // Intentionally uses the older API.
 	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
 	defer w.Stop()
@@ -462,5 +462,19 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 	}
 	if watchCalls < 1 {
 		t.Fatalf("expected at least 1 watch call, got %d", watchCalls)
+	}
+}
+
+type listWatchWithUnSupportedWatchListSemanticsWrapper struct {
+	*cache.ListWatch
+}
+
+func (lw listWatchWithUnSupportedWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
+func toListWatcherWithUnSupportedWatchListSemantics(lw *cache.ListWatch) cache.ListerWatcher {
+	return listWatchWithUnSupportedWatchListSemanticsWrapper{
+		lw,
 	}
 }

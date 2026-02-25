@@ -125,7 +125,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -158,7 +158,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -179,7 +179,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -191,7 +191,7 @@ func TestSingleflightProvide(t *testing.T) {
 	}
 }
 
-func Test_Provide(t *testing.T) {
+func Test_ProvideWithCoordinates(t *testing.T) {
 	klog.InitFlags(nil)
 	if err := flag.Set("v", "6"); err != nil {
 		t.Fatalf("failed to set log level: %v", err)
@@ -200,11 +200,12 @@ func Test_Provide(t *testing.T) {
 
 	tclock := clock.RealClock{}
 	testcases := []struct {
-		name           string
-		pluginProvider *perPodPluginProvider
-		image          string
-		dockerconfig   credentialprovider.DockerConfig
-		wantLog        string
+		name                   string
+		pluginProvider         *perPodPluginProvider
+		image                  string
+		dockerconfig           credentialprovider.DockerConfig
+		wantLog                string
+		expectedServiceAccount *credentialprovider.ServiceAccountCoordinates
 	}{
 		{
 			name: "exact image match, with Registry cache key",
@@ -372,6 +373,7 @@ func Test_Provide(t *testing.T) {
 			name: "[service account mode] sa name required but empty",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -379,15 +381,17 @@ func Test_Provide(t *testing.T) {
 				},
 				podName:      "pod-name",
 				podNamespace: "ns",
+				podUID:       "pod-uid",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Service account name is empty for pod ns/pod-name",
+			wantLog:      `Service account name is empty" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid"`,
 		},
 		{
 			name: "[service account mode] sa does not have required annotations",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -407,16 +411,18 @@ func Test_Provide(t *testing.T) {
 				},
 				podName:            "pod-name",
 				podNamespace:       "ns",
+				podUID:             "pod-uid",
 				serviceAccountName: "sa-name",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Failed to get service account data ns/sa-name: required annotation domain.io/identity-id not found",
+			wantLog:      `"Failed to get service account data" err="required annotation domain.io/identity-id not found" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] failed to get service account token",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -444,11 +450,63 @@ func Test_Provide(t *testing.T) {
 				},
 				podName:            "pod-name",
 				podNamespace:       "ns",
+				podUID:             "pod-uid",
 				serviceAccountName: "sa-name",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Error getting service account token ns/sa-name: failed to get token",
+			wantLog:      `"Failed to provide credentials for image" err="failed to get service account token: failed to get token" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
+		},
+		{
+			name: "[service account mode] cache type not token but service account echoed back",
+			pluginProvider: &perPodPluginProvider{
+				provider: &pluginProvider{
+					name:           "test-plugin",
+					clock:          tclock,
+					lastCachePurge: tclock.Now(),
+					matchImages:    []string{"test.registry.io"},
+					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+					plugin: &fakeExecPlugin{
+						cacheKeyType: credentialproviderapi.ImagePluginCacheKeyType,
+						auth: map[string]credentialproviderapi.AuthConfig{
+							"test.registry.io/foo/bar": {
+								Username: "user",
+								Password: "token", // this is the service account token being echoed back
+							},
+						},
+					},
+					serviceAccountProvider: &serviceAccountProvider{
+						requireServiceAccount: true,
+						requiredServiceAccountAnnotationKeys: []string{
+							"domain.io/identity-id",
+						},
+						optionalServiceAccountAnnotationKeys: []string{
+							"domain.io/identity-type",
+						},
+						getServiceAccountFunc: func(_, _ string) (*v1.ServiceAccount, error) {
+							return &v1.ServiceAccount{
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      "sa-name",
+									Namespace: "ns",
+									Annotations: map[string]string{
+										"domain.io/identity-id": "id",
+									},
+								},
+							}, nil
+						},
+						getServiceAccountTokenFunc: func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+							return &authenticationv1.TokenRequest{Status: authenticationv1.TokenRequestStatus{Token: "token"}}, nil
+						},
+					},
+				},
+				podName:            "pod-name",
+				podNamespace:       "ns",
+				podUID:             "pod-uid",
+				serviceAccountName: "sa-name",
+			},
+			image:        "test.registry.io/foo/bar",
+			dockerconfig: credentialprovider.DockerConfig{},
+			wantLog:      `"Failed to provide credentials for image" err="credential provider plugin returned the service account token as the password which is not allowed when service account cache type is not set to 'Token'" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] exact image match",
@@ -480,6 +538,7 @@ func Test_Provide(t *testing.T) {
 								ObjectMeta: metav1.ObjectMeta{
 									Name:      "sa-name",
 									Namespace: "ns",
+									UID:       "sa-uid",
 									Annotations: map[string]string{
 										"domain.io/identity-id":   "id",
 										"domain.io/identity-type": "type",
@@ -503,6 +562,11 @@ func Test_Provide(t *testing.T) {
 					Password: "password",
 				},
 			},
+			expectedServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+				Namespace: "ns",
+				Name:      "sa-name",
+				UID:       "sa-uid",
+			},
 		},
 	}
 
@@ -514,8 +578,17 @@ func Test_Provide(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			if got := testcase.pluginProvider.Provide(testcase.image); !reflect.DeepEqual(got, testcase.dockerconfig) {
-				t.Errorf("unexpected docker config: %v, expected: %v", got, testcase.dockerconfig)
+			gotConfig, gotCoordinates := testcase.pluginProvider.provideWithCoordinates(testcase.image)
+			if !reflect.DeepEqual(gotConfig, testcase.dockerconfig) {
+				t.Errorf("unexpected docker config from ProvideWithCoordinates: %v, expected: %v", gotConfig, testcase.dockerconfig)
+			}
+
+			if testcase.expectedServiceAccount != nil {
+				if !reflect.DeepEqual(gotCoordinates, testcase.expectedServiceAccount) {
+					t.Errorf("unexpected service account coordinates: %v, expected: %v", gotCoordinates, testcase.expectedServiceAccount)
+				}
+			} else if gotCoordinates != nil {
+				t.Errorf("expected nil service account coordinates but got: %v", gotCoordinates)
 			}
 
 			klog.Flush()
@@ -523,6 +596,7 @@ func Test_Provide(t *testing.T) {
 			capturedOutput := buf.String()
 
 			if len(testcase.wantLog) > 0 && !strings.Contains(capturedOutput, testcase.wantLog) {
+				t.Log("Captured output:", capturedOutput)
 				t.Errorf("expected log message %q not found in captured output: %q", testcase.wantLog, capturedOutput)
 			}
 		})
@@ -592,11 +666,9 @@ func Test_ProvideParallel(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				go func(w *sync.WaitGroup) {
 					image := fmt.Sprintf(testcase.registry+"/%s", rand.String(5))
-					dockerconfigResponse := pluginProvider.Provide(image)
+					dockerconfigResponse, _ := pluginProvider.provideWithCoordinates(image)
 					if !reflect.DeepEqual(dockerconfigResponse, dockerconfig) {
-						t.Logf("actual docker config: %v", dockerconfigResponse)
-						t.Logf("expected docker config: %v", dockerconfig)
-						t.Error("unexpected docker config")
+						t.Errorf("unexpected docker config for image %s: %v, expected: %v", image, dockerconfigResponse, dockerconfig)
 					}
 					w.Done()
 				}(&wg)
@@ -734,7 +806,18 @@ func Test_getCachedCredentials_pluginUsingServiceAccount(t *testing.T) {
 		},
 	}
 
-	serviceAccountCacheKey, err := generateServiceAccountCacheKey("namespace", "serviceAccountName", "service-account-uid", map[string]string{"prefix.io/annotation-1": "value1", "prefix.io/annotation-2": "value2"})
+	c := cacheKeyParams{
+		namespace:          "namespace",
+		serviceAccountName: "serviceAccountName",
+		serviceAccountUID:  "service-account-uid",
+		saAnnotations: map[string]string{
+			"prefix.io/annotation-1": "value1",
+			"prefix.io/annotation-2": "value2",
+		},
+		podName: "pod-name",
+		podUID:  "pod-uid",
+	}
+	serviceAccountCacheKey, err := generateServiceAccountCacheKey(c)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -1022,402 +1105,6 @@ func Test_decodeResponse(t *testing.T) {
 	}
 }
 
-func Test_RegistryCacheKeyType(t *testing.T) {
-	tclock := clock.RealClock{}
-
-	tests := []struct {
-		name              string
-		pluginProvider    *perPodPluginProvider
-		expectedCacheKeys func(p *pluginProvider) []string
-	}{
-		{
-			name: "plugin not using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				return []string{"\x00\x10test.registry.io\x00\x00"}
-			},
-		},
-		{
-			name: "plugin using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					serviceAccountProvider: &serviceAccountProvider{
-						audience:                             "audience",
-						requiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
-						getServiceAccountFunc: func(namespace, name string) (*v1.ServiceAccount, error) {
-							return &v1.ServiceAccount{
-								ObjectMeta: metav1.ObjectMeta{
-									Namespace: namespace,
-									Name:      name,
-									UID:       "service-account-uid",
-									Annotations: map[string]string{
-										"prefix.io/annotation-1": "value1",
-										"prefix.io/annotation-2": "value2",
-									},
-								},
-							}, nil
-						},
-						getServiceAccountTokenFunc: func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-							return &authenticationv1.TokenRequest{}, nil
-						},
-					},
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				serviceAccountCacheKey, err := generateServiceAccountCacheKey("namespace", "service-account-name", "service-account-uid", map[string]string{"prefix.io/annotation-1": "value1", "prefix.io/annotation-2": "value2"})
-				if err != nil {
-					t.Fatalf("Unexpected error %v", err)
-				}
-				cacheKey, err := generateCacheKey("test.registry.io", serviceAccountCacheKey)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return []string{cacheKey}
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			expectedDockerConfig := credentialprovider.DockerConfig{
-				"*.registry.io": credentialprovider.DockerConfigEntry{
-					Username: "user",
-					Password: "password",
-				},
-			}
-
-			dockerConfig := test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-
-			cacheKeys := test.pluginProvider.provider.cache.ListKeys()
-
-			expectedCacheKeys := test.expectedCacheKeys(test.pluginProvider.provider)
-			if !reflect.DeepEqual(cacheKeys, expectedCacheKeys) {
-				t.Logf("actual cache keys: %#v", cacheKeys)
-				t.Logf("expected cache keys: %v", expectedCacheKeys)
-				t.Error("unexpected cache keys")
-			}
-
-			// nil out the exec plugin, this will test whether credentialproviderapi are fetched
-			// from cache, otherwise Provider should panic
-			test.pluginProvider.provider.plugin = nil
-			dockerConfig = test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-		})
-	}
-}
-
-func Test_ImageCacheKeyType(t *testing.T) {
-	tclock := clock.RealClock{}
-
-	tests := []struct {
-		name              string
-		pluginProvider    *perPodPluginProvider
-		expectedCacheKeys func(p *pluginProvider) []string
-	}{
-		{
-			name: "plugin not using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.ImagePluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				return []string{"\x00\x18test.registry.io/foo/bar\x00\x00"}
-			},
-		},
-		{
-			name: "plugin using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.ImagePluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-					serviceAccountProvider: &serviceAccountProvider{
-						audience:                             "audience",
-						requiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
-						getServiceAccountFunc: func(namespace, name string) (*v1.ServiceAccount, error) {
-							return &v1.ServiceAccount{
-								ObjectMeta: metav1.ObjectMeta{
-									Namespace: namespace,
-									Name:      name,
-									UID:       "service-account-uid",
-									Annotations: map[string]string{
-										"prefix.io/annotation-1": "value1",
-										"prefix.io/annotation-2": "value2",
-									},
-								},
-							}, nil
-						},
-						getServiceAccountTokenFunc: func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-							return &authenticationv1.TokenRequest{}, nil
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				serviceAccountCacheKey, err := generateServiceAccountCacheKey("namespace", "service-account-name", "service-account-uid", map[string]string{"prefix.io/annotation-1": "value1", "prefix.io/annotation-2": "value2"})
-				if err != nil {
-					t.Fatalf("Unexpected error %v", err)
-				}
-				cacheKey, err := generateCacheKey("test.registry.io/foo/bar", serviceAccountCacheKey)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return []string{cacheKey}
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			expectedDockerConfig := credentialprovider.DockerConfig{
-				"*.registry.io": credentialprovider.DockerConfigEntry{
-					Username: "user",
-					Password: "password",
-				},
-			}
-
-			dockerConfig := test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-
-			cacheKeys := test.pluginProvider.provider.cache.ListKeys()
-
-			expectedCacheKeys := test.expectedCacheKeys(test.pluginProvider.provider)
-			if !reflect.DeepEqual(cacheKeys, expectedCacheKeys) {
-				t.Logf("actual cache keys: %#v", cacheKeys)
-				t.Logf("expected cache keys: %v", expectedCacheKeys)
-				t.Error("unexpected cache keys")
-			}
-
-			// nil out the exec plugin, this will test whether credentialproviderapi are fetched
-			// from cache, otherwise Provider should panic
-			test.pluginProvider.provider.plugin = nil
-			dockerConfig = test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-		})
-	}
-}
-
-func Test_GlobalCacheKeyType(t *testing.T) {
-	tclock := clock.RealClock{}
-
-	tests := []struct {
-		name              string
-		pluginProvider    *perPodPluginProvider
-		expectedCacheKeys func(p *pluginProvider) []string
-	}{
-		{
-			name: "plugin not using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				return []string{"\x00\x06global\x00\x00"}
-			},
-		},
-		{
-			name: "plugin using service account token",
-			pluginProvider: &perPodPluginProvider{
-				provider: &pluginProvider{
-					clock:          tclock,
-					lastCachePurge: tclock.Now(),
-					matchImages:    []string{"*.registry.io"},
-					cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
-					plugin: &fakeExecPlugin{
-						cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
-						cacheDuration: time.Hour,
-						auth: map[string]credentialproviderapi.AuthConfig{
-							"*.registry.io": {
-								Username: "user",
-								Password: "password",
-							},
-						},
-					},
-					serviceAccountProvider: &serviceAccountProvider{
-						audience:                             "audience",
-						requiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
-						getServiceAccountFunc: func(namespace, name string) (*v1.ServiceAccount, error) {
-							return &v1.ServiceAccount{
-								ObjectMeta: metav1.ObjectMeta{
-									Namespace: namespace,
-									Name:      name,
-									UID:       "service-account-uid",
-									Annotations: map[string]string{
-										"prefix.io/annotation-1": "value1",
-										"prefix.io/annotation-2": "value2",
-									},
-								},
-							}, nil
-						},
-						getServiceAccountTokenFunc: func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-							return &authenticationv1.TokenRequest{}, nil
-						},
-					},
-				},
-				podName:            "pod-name",
-				podNamespace:       "namespace",
-				podUID:             types.UID("pod-uid"),
-				serviceAccountName: "service-account-name",
-			},
-			expectedCacheKeys: func(p *pluginProvider) []string {
-				serviceAccountCacheKey, err := generateServiceAccountCacheKey("namespace", "service-account-name", "service-account-uid", map[string]string{"prefix.io/annotation-1": "value1", "prefix.io/annotation-2": "value2"})
-				if err != nil {
-					t.Fatalf("Unexpected error %v", err)
-				}
-				cacheKey, err := generateCacheKey(globalCacheKey, serviceAccountCacheKey)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return []string{cacheKey}
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			expectedDockerConfig := credentialprovider.DockerConfig{
-				"*.registry.io": credentialprovider.DockerConfigEntry{
-					Username: "user",
-					Password: "password",
-				},
-			}
-
-			dockerConfig := test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-
-			cacheKeys := test.pluginProvider.provider.cache.ListKeys()
-
-			expectedCacheKeys := test.expectedCacheKeys(test.pluginProvider.provider)
-			if !reflect.DeepEqual(cacheKeys, expectedCacheKeys) {
-				t.Logf("actual cache keys: %#v", cacheKeys)
-				t.Logf("expected cache keys: %v", expectedCacheKeys)
-				t.Error("unexpected cache keys")
-			}
-
-			// nil out the exec plugin, this will test whether credentialproviderapi are fetched
-			// from cache, otherwise Provider should panic
-			test.pluginProvider.provider.plugin = nil
-			dockerConfig = test.pluginProvider.Provide("test.registry.io/foo/bar")
-			if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
-				t.Logf("actual docker config: %v", dockerConfig)
-				t.Logf("expected docker config: %v", expectedDockerConfig)
-				t.Fatal("unexpected docker config")
-			}
-		})
-	}
-}
-
 func Test_NoCacheResponse(t *testing.T) {
 	tclock := clock.RealClock{}
 	pluginProvider := &perPodPluginProvider{
@@ -1446,7 +1133,7 @@ func Test_NoCacheResponse(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	dockerConfig, _ := pluginProvider.provideWithCoordinates("test.registry.io/foo/bar")
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -1609,8 +1296,16 @@ func TestGenerateServiceAccountCacheKey_Deterministic(t *testing.T) {
 		for _, tc2 := range testCases {
 			tc2 := tc2
 			t.Run(fmt.Sprintf("%+v-%+v", tc, tc2), func(t *testing.T) {
-				serviceAccountCacheKey1, err1 := generateServiceAccountCacheKey(tc.serviceAccountNamespace, tc.serviceAccountName, tc.serviceAccountUID, tc.requiredAnnotations)
-				serviceAccountCacheKey2, err2 := generateServiceAccountCacheKey(tc2.serviceAccountNamespace, tc2.serviceAccountName, tc2.serviceAccountUID, tc2.requiredAnnotations)
+				serviceAccountCacheKey1, err1 := generateServiceAccountCacheKey(cacheKeyParams{
+					namespace:          tc.serviceAccountNamespace,
+					serviceAccountName: tc.serviceAccountName,
+					serviceAccountUID:  tc.serviceAccountUID,
+					saAnnotations:      tc.requiredAnnotations})
+				serviceAccountCacheKey2, err2 := generateServiceAccountCacheKey(cacheKeyParams{
+					namespace:          tc2.serviceAccountNamespace,
+					serviceAccountName: tc2.serviceAccountName,
+					serviceAccountUID:  tc2.serviceAccountUID,
+					saAnnotations:      tc2.requiredAnnotations})
 
 				if err1 != nil || err2 != nil {
 					t.Errorf("expected no error, but got err1=%v, err2=%v", err1, err2)
@@ -1642,6 +1337,7 @@ func TestGenerateServiceAccountCacheKey(t *testing.T) {
 		saName        string
 		saUID         types.UID
 		saAnnotations map[string]string
+		cacheType     kubeletconfig.ServiceAccountTokenCacheType
 		want          string
 	}{
 		{
@@ -1676,11 +1372,31 @@ func TestGenerateServiceAccountCacheKey(t *testing.T) {
 			saAnnotations: map[string]string{"domain.io/annotation-2": "value2", "domain.io/annotation-1": "value1"},
 			want:          "\x00\tnamespace\x00\x0fservice-account\x00\x13service-account-uid\x00\x00\x00\x02\x00\x16domain.io/annotation-1\x00\x06value1\x00\x16domain.io/annotation-2\x00\x06value2",
 		},
+		{
+			name:          "token hash included",
+			saNamespace:   "namespace",
+			saName:        "service-account",
+			saUID:         "service-account-uid",
+			saAnnotations: map[string]string{"domain.io/annotation-2": "value2", "domain.io/annotation-1": "value1"},
+			cacheType:     kubeletconfig.TokenServiceAccountTokenCacheType,
+			want:          "\x00\tnamespace\x00\x0fservice-account\x00\x13service-account-uid\x00\x00\x00\x02\x00\x16domain.io/annotation-1\x00\x06value1\x00\x16domain.io/annotation-2\x00\x06value2\x00\x05token\x00Gsha256:f7a41acb9633520e657fe58dedcd9e6a784e2d97e4c646492b45c61e28595c70",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := generateServiceAccountCacheKey(tc.saNamespace, tc.saName, tc.saUID, tc.saAnnotations)
+			c := cacheKeyParams{
+				namespace:          tc.saNamespace,
+				serviceAccountName: tc.saName,
+				serviceAccountUID:  tc.saUID,
+				saAnnotations:      tc.saAnnotations,
+				podName:            "pod-name",
+				podUID:             "pod-uid",
+				saTokenHash:        "sha256:f7a41acb9633520e657fe58dedcd9e6a784e2d97e4c646492b45c61e28595c70",
+				cacheType:          tc.cacheType,
+			}
+
+			got, err := generateServiceAccountCacheKey(c)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1749,5 +1465,237 @@ func TestRequiredAnnotationNotFoundErr(t *testing.T) {
 				t.Errorf("expected %v, got %v", test.expected, got)
 			}
 		})
+	}
+}
+
+func Test_CacheKeyGeneration(t *testing.T) {
+	type cacheKeyTestCase struct {
+		name                    string
+		pluginCacheKeyType      credentialproviderapi.PluginCacheKeyType
+		serviceAccountCacheType kubeletconfig.ServiceAccountTokenCacheType // empty string means no SA mode
+		expectedCacheKeyFunc    func(t *testing.T, image string, saParams *cacheKeyParams) string
+	}
+
+	testCases := []cacheKeyTestCase{
+		{
+			name:                    "image-no-sa",
+			pluginCacheKeyType:      credentialproviderapi.ImagePluginCacheKeyType,
+			serviceAccountCacheType: "",
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				return generateExpectedCacheKey(t, image, "")
+			},
+		},
+		{
+			name:                    "image-sa-serviceaccount",
+			pluginCacheKeyType:      credentialproviderapi.ImagePluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.ServiceAccountServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, image, saKey)
+			},
+		},
+		{
+			name:                    "image-sa-token",
+			pluginCacheKeyType:      credentialproviderapi.ImagePluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.TokenServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.TokenServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, image, saKey)
+			},
+		},
+		{
+			name:                    "registry-no-sa",
+			pluginCacheKeyType:      credentialproviderapi.RegistryPluginCacheKeyType,
+			serviceAccountCacheType: "",
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				registry := parseRegistry(image)
+				return generateExpectedCacheKey(t, registry, "")
+			},
+		},
+		{
+			name:                    "registry-sa-serviceaccount",
+			pluginCacheKeyType:      credentialproviderapi.RegistryPluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				registry := parseRegistry(image)
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.ServiceAccountServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, registry, saKey)
+			},
+		},
+		{
+			name:                    "registry-sa-token",
+			pluginCacheKeyType:      credentialproviderapi.RegistryPluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.TokenServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				registry := parseRegistry(image)
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.TokenServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, registry, saKey)
+			},
+		},
+		{
+			name:                    "global-no-sa",
+			pluginCacheKeyType:      credentialproviderapi.GlobalPluginCacheKeyType,
+			serviceAccountCacheType: "",
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				return generateExpectedCacheKey(t, globalCacheKey, "")
+			},
+		},
+		{
+			name:                    "global-sa-serviceaccount",
+			pluginCacheKeyType:      credentialproviderapi.GlobalPluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.ServiceAccountServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, globalCacheKey, saKey)
+			},
+		},
+		{
+			name:                    "global-sa-token",
+			pluginCacheKeyType:      credentialproviderapi.GlobalPluginCacheKeyType,
+			serviceAccountCacheType: kubeletconfig.TokenServiceAccountTokenCacheType,
+			expectedCacheKeyFunc: func(t *testing.T, image string, saParams *cacheKeyParams) string {
+				saKey := generateExpectedSACacheKey(t, saParams, kubeletconfig.TokenServiceAccountTokenCacheType)
+				return generateExpectedCacheKey(t, globalCacheKey, saKey)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var saTokenCacheType *kubeletconfig.ServiceAccountTokenCacheType
+			if tc.serviceAccountCacheType != "" {
+				saTokenCacheType = &tc.serviceAccountCacheType
+			}
+			pluginProvider := createTestPerPodPluginProvider(t, tc.pluginCacheKeyType, saTokenCacheType)
+
+			// Test image and expected SA parameters
+			testImage := "test.registry.io/foo/bar"
+			var cacheTypeValue kubeletconfig.ServiceAccountTokenCacheType
+			if saTokenCacheType != nil {
+				cacheTypeValue = *saTokenCacheType
+			}
+			saParams := &cacheKeyParams{
+				namespace:          "namespace",
+				serviceAccountName: "service-account-name",
+				serviceAccountUID:  "service-account-uid",
+				saAnnotations: map[string]string{
+					"prefix.io/annotation-1": "value1",
+					"prefix.io/annotation-2": "value2",
+				},
+				podName:     "pod-name",
+				podUID:      "pod-uid",
+				saTokenHash: getHashIfNotEmpty("token"),
+				cacheType:   cacheTypeValue,
+			}
+
+			dockerConfig, _ := pluginProvider.provideWithCoordinates(testImage)
+			verifyDockerConfig(t, dockerConfig)
+
+			// Verify the cache key is as expected
+			expectedCacheKey := tc.expectedCacheKeyFunc(t, testImage, saParams)
+			actualCacheKeys := pluginProvider.provider.cache.ListKeys()
+
+			if len(actualCacheKeys) != 1 || actualCacheKeys[0] != expectedCacheKey {
+				t.Errorf("Expected cache key %q, got %v", expectedCacheKey, actualCacheKeys)
+			}
+
+			// Test cache hit (nil out plugin to ensure cache is used)
+			pluginProvider.provider.plugin = nil
+			cachedConfig, _ := pluginProvider.provideWithCoordinates(testImage)
+			verifyDockerConfig(t, cachedConfig)
+		})
+	}
+}
+
+func createTestPerPodPluginProvider(t *testing.T, pluginCacheKeyType credentialproviderapi.PluginCacheKeyType, saTokenCacheType *kubeletconfig.ServiceAccountTokenCacheType) *perPodPluginProvider {
+	t.Helper()
+
+	tclock := clock.RealClock{}
+
+	provider := &pluginProvider{
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"*.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+		plugin: &fakeExecPlugin{
+			cacheKeyType:  pluginCacheKeyType,
+			cacheDuration: time.Hour,
+			auth: map[string]credentialproviderapi.AuthConfig{
+				"*.registry.io": {
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+	}
+
+	// Add service account provider if needed
+	if saTokenCacheType != nil {
+		provider.serviceAccountProvider = &serviceAccountProvider{
+			audience:                             "audience",
+			requiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
+			cacheType:                            *saTokenCacheType,
+			getServiceAccountFunc: func(namespace, name string) (*v1.ServiceAccount, error) {
+				return &v1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      name,
+						UID:       "service-account-uid",
+						Annotations: map[string]string{
+							"prefix.io/annotation-1": "value1",
+							"prefix.io/annotation-2": "value2",
+						},
+					},
+				}, nil
+			},
+			getServiceAccountTokenFunc: func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+				return &authenticationv1.TokenRequest{Status: authenticationv1.TokenRequestStatus{Token: "token"}}, nil
+			},
+		}
+	}
+
+	return &perPodPluginProvider{
+		provider:           provider,
+		podName:            "pod-name",
+		podNamespace:       "namespace",
+		podUID:             types.UID("pod-uid"),
+		serviceAccountName: "service-account-name",
+	}
+}
+
+func generateExpectedSACacheKey(t *testing.T, params *cacheKeyParams, cacheType kubeletconfig.ServiceAccountTokenCacheType) string {
+	t.Helper()
+
+	params.cacheType = cacheType
+	key, err := generateServiceAccountCacheKey(*params)
+	if err != nil {
+		t.Fatalf("Failed to generate SA cache key: %v", err)
+	}
+	return key
+}
+
+func generateExpectedCacheKey(t *testing.T, baseKey, saCacheKey string) string {
+	t.Helper()
+
+	key, err := generateCacheKey(baseKey, saCacheKey)
+	if err != nil {
+		t.Fatalf("Failed to generate cache key: %v", err)
+	}
+	return key
+}
+
+func verifyDockerConfig(t *testing.T, config credentialprovider.DockerConfig) {
+	t.Helper()
+
+	expected := credentialprovider.DockerConfig{
+		"*.registry.io": credentialprovider.DockerConfigEntry{
+			Username: "user",
+			Password: "password",
+		},
+	}
+
+	if !reflect.DeepEqual(config, expected) {
+		t.Errorf("Docker config mismatch. Got %v, expected %v", config, expected)
 	}
 }

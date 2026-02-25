@@ -69,4 +69,7 @@ var extFactories = map[string]extensionFactory{
 	"two-var-comprehensions": func(version uint32) cel.EnvOption {
 		return TwoVarComprehensions(TwoVarComprehensionsVersion(version))
 	},
+	"regex": func(version uint32) cel.EnvOption {
+		return Regex(RegexVersion(version))
+	},
 }

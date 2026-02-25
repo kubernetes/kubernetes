@@ -154,11 +154,9 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
 			if isDryRun {
 				fmt.Printf("[control-plane] Would update static pod manifest for %q to run run as non-root\n", componentName)
-			} else {
-				if usersAndGroups != nil {
-					if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
-						return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
-					}
+			} else if usersAndGroups != nil {
+				if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
+					return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
 				}
 			}
 		}

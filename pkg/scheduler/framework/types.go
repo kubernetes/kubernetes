@@ -26,8 +26,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -77,6 +76,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
+		fwk.Workload,
 	}
 )
 
@@ -143,7 +143,7 @@ func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent
 }
 
 func UnrollWildCardResource() []fwk.ClusterEventWithHint {
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.All}},
@@ -155,6 +155,346 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}})
+	}
+	return events
+}
+
+// NodeInfo is node level aggregated information.
+type NodeInfo struct {
+	// Overall node information.
+	node *v1.Node
+
+	// Pods running on the node.
+	Pods []fwk.PodInfo
+
+	// The subset of pods with affinity.
+	PodsWithAffinity []fwk.PodInfo
+
+	// The subset of pods with required anti-affinity.
+	PodsWithRequiredAntiAffinity []fwk.PodInfo
+
+	// Ports allocated on the node.
+	UsedPorts fwk.HostPortInfo
+
+	// Total requested resources of all pods on this node. This includes assumed
+	// pods, which scheduler has sent for binding, but may not be scheduled yet.
+	Requested *Resource
+	// Total requested resources of all pods on this node with a minimum value
+	// applied to each container's CPU and memory requests. This does not reflect
+	// the actual resource requests for this node, but is used to avoid scheduling
+	// many zero-request pods onto one node.
+	NonZeroRequested *Resource
+	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
+	// as int64, to avoid conversions and accessing map.
+	Allocatable *Resource
+
+	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
+	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
+	// state information.
+	ImageStates map[string]*fwk.ImageStateSummary
+
+	// PVCRefCounts contains a mapping of PVC names to the number of pods on the node using it.
+	// Keys are in the format "namespace/name".
+	PVCRefCounts map[string]int
+
+	// Whenever NodeInfo changes, generation is bumped.
+	// This is used to avoid cloning it if the object didn't change.
+	Generation int64
+
+	// DeclaredFeatures is a set of features published by the node
+	DeclaredFeatures ndf.FeatureSet
+}
+
+func (n *NodeInfo) GetPods() []fwk.PodInfo {
+	return n.Pods
+}
+
+func (n *NodeInfo) GetPodsWithAffinity() []fwk.PodInfo {
+	return n.PodsWithAffinity
+}
+
+func (n *NodeInfo) GetPodsWithRequiredAntiAffinity() []fwk.PodInfo {
+	return n.PodsWithRequiredAntiAffinity
+}
+
+func (n *NodeInfo) GetUsedPorts() fwk.HostPortInfo {
+	return n.UsedPorts
+}
+
+func (n *NodeInfo) GetRequested() fwk.Resource {
+	return n.Requested
+}
+
+func (n *NodeInfo) GetNonZeroRequested() fwk.Resource {
+	return n.NonZeroRequested
+}
+
+func (n *NodeInfo) GetAllocatable() fwk.Resource {
+	return n.Allocatable
+}
+
+func (n *NodeInfo) GetImageStates() map[string]*fwk.ImageStateSummary {
+	return n.ImageStates
+}
+
+func (n *NodeInfo) GetPVCRefCounts() map[string]int {
+	return n.PVCRefCounts
+}
+
+func (n *NodeInfo) GetGeneration() int64 {
+	return n.Generation
+}
+
+// GetNodeDeclaredFeatures returns the declared feature set of the node
+func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
+	return n.DeclaredFeatures
+}
+
+// NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
+// when nodes is a []*NodeInfo.
+var _ klog.KMetadata = &NodeInfo{}
+
+// GetName returns the name of the node wrapped by this NodeInfo object, or a meaningful nil representation if node or node name is nil.
+// This method is a part of interface KMetadata.
+func (n *NodeInfo) GetName() string {
+	if n == nil {
+		return "<nil>"
+	}
+	if n.node == nil {
+		return "<no node>"
+	}
+	return n.node.Name
+}
+
+// GetNamespace is a part of interface KMetadata. For NodeInfo it should always return an empty string, since Node is not a namespaced resource.
+func (n *NodeInfo) GetNamespace() string {
+	return ""
+}
+
+// Node returns overall information about this node.
+func (n *NodeInfo) Node() *v1.Node {
+	if n == nil {
+		return nil
+	}
+	return n.node
+}
+
+// Snapshot returns a copy of this node, same as SnapshotConcrete, but with returned type fwk.NodeInfo
+// (the purpose is to have NodeInfo implement interface fwk.NodeInfo).
+func (n *NodeInfo) Snapshot() fwk.NodeInfo {
+	return n.SnapshotConcrete()
+}
+
+// SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
+func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
+	clone := &NodeInfo{
+		node:             n.node,
+		Requested:        n.Requested.Clone(),
+		NonZeroRequested: n.NonZeroRequested.Clone(),
+		Allocatable:      n.Allocatable.Clone(),
+		UsedPorts:        make(fwk.HostPortInfo),
+		ImageStates:      make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
+		Generation:       n.Generation,
+		DeclaredFeatures: n.DeclaredFeatures.Clone(),
+	}
+	if len(n.Pods) > 0 {
+		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
+	}
+	if len(n.UsedPorts) > 0 {
+		// HostPortInfo is a map-in-map struct
+		// make sure it's deep copied
+		for ip, portMap := range n.UsedPorts {
+			clone.UsedPorts[ip] = make(map[fwk.ProtocolPort]struct{})
+			for protocolPort, v := range portMap {
+				clone.UsedPorts[ip][protocolPort] = v
+			}
+		}
+	}
+	if len(n.PodsWithAffinity) > 0 {
+		clone.PodsWithAffinity = append([]fwk.PodInfo(nil), n.PodsWithAffinity...)
+	}
+	if len(n.PodsWithRequiredAntiAffinity) > 0 {
+		clone.PodsWithRequiredAntiAffinity = append([]fwk.PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
+	}
+	if len(n.ImageStates) > 0 {
+		state := make(map[string]*fwk.ImageStateSummary, len(n.ImageStates))
+		for imageName, imageState := range n.ImageStates {
+			state[imageName] = imageState.Snapshot()
+		}
+		clone.ImageStates = state
+	}
+	for key, value := range n.PVCRefCounts {
+		clone.PVCRefCounts[key] = value
+	}
+	return clone
+}
+
+// String returns representation of human readable format of this NodeInfo.
+func (n *NodeInfo) String() string {
+	podKeys := make([]string, len(n.Pods))
+	for i, p := range n.Pods {
+		podKeys[i] = p.GetPod().Name
+	}
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
+		podKeys, n.Requested, n.NonZeroRequested, n.UsedPorts, n.Allocatable)
+}
+
+// AddPodInfo adds pod information to this NodeInfo.
+// Consider using this instead of AddPod if a PodInfo is already computed.
+func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
+	n.Pods = append(n.Pods, podInfo)
+	if podWithAffinity(podInfo.GetPod()) {
+		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
+	}
+	if podWithRequiredAntiAffinity(podInfo.GetPod()) {
+		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
+	}
+	n.update(podInfo, 1)
+}
+
+// AddPod is a wrapper around AddPodInfo.
+func (n *NodeInfo) AddPod(pod *v1.Pod) {
+	// ignore this err since apiserver doesn't properly validate affinity terms
+	// and we can't fix the validation for backwards compatibility.
+	podInfo, _ := NewPodInfo(pod)
+	n.AddPodInfo(podInfo)
+}
+
+func podWithAffinity(p *v1.Pod) bool {
+	affinity := p.Spec.Affinity
+	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
+}
+
+func podWithRequiredAntiAffinity(p *v1.Pod) bool {
+	affinity := p.Spec.Affinity
+	return affinity != nil && affinity.PodAntiAffinity != nil &&
+		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+}
+
+func removeFromSlice(logger klog.Logger, s []fwk.PodInfo, k string) ([]fwk.PodInfo, fwk.PodInfo) {
+	var removedPod fwk.PodInfo
+	for i := range s {
+		tmpKey, err := GetPodKey(s[i].GetPod())
+		if err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Cannot get pod key", "pod", klog.KObj(s[i].GetPod()))
+			continue
+		}
+		if k == tmpKey {
+			removedPod = s[i]
+			// delete the element
+			s[i] = s[len(s)-1]
+			// clear the reference to prevent potential memory leak
+			s[len(s)-1] = nil
+			s = s[:len(s)-1]
+			break
+		}
+	}
+	// resets the slices to nil so that we can do DeepEqual in unit tests.
+	if len(s) == 0 {
+		return nil, removedPod
+	}
+	return s, removedPod
+}
+
+// RemovePod subtracts pod information from this NodeInfo.
+func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
+	k, err := GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+	if podWithAffinity(pod) {
+		n.PodsWithAffinity, _ = removeFromSlice(logger, n.PodsWithAffinity, k)
+	}
+	if podWithRequiredAntiAffinity(pod) {
+		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
+	}
+
+	var removedPod fwk.PodInfo
+	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
+		n.update(removedPod, -1)
+		return nil
+	}
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// update node info based on the pod, and sign.
+// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
+func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
+	podResource := podInfo.CalculateResource()
+	n.Requested.MilliCPU += sign * podResource.Resource.GetMilliCPU()
+	n.Requested.Memory += sign * podResource.Resource.GetMemory()
+	n.Requested.EphemeralStorage += sign * podResource.Resource.GetEphemeralStorage()
+	if n.Requested.ScalarResources == nil && len(podResource.Resource.GetScalarResources()) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range podResource.Resource.GetScalarResources() {
+		n.Requested.ScalarResources[rName] += sign * rQuant
+	}
+	n.NonZeroRequested.MilliCPU += sign * podResource.Non0CPU
+	n.NonZeroRequested.Memory += sign * podResource.Non0Mem
+
+	// Consume ports when pod added or release ports when pod removed.
+	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
+	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
+
+	n.Generation = nextGeneration()
+}
+
+// updateUsedPorts updates the UsedPorts of NodeInfo.
+func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
+	for _, port := range schedutil.GetHostPorts(pod) {
+		if add {
+			n.UsedPorts.Add(port.HostIP, string(port.Protocol), port.HostPort)
+		} else {
+			n.UsedPorts.Remove(port.HostIP, string(port.Protocol), port.HostPort)
+		}
+	}
+}
+
+// updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
+func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+		if add {
+			n.PVCRefCounts[key] += 1
+		} else {
+			n.PVCRefCounts[key] -= 1
+			if n.PVCRefCounts[key] <= 0 {
+				delete(n.PVCRefCounts, key)
+			}
+		}
+	}
+}
+
+// SetNode sets the overall node information.
+func (n *NodeInfo) SetNode(node *v1.Node) {
+	n.node = node
+	n.Allocatable = NewResource(node.Status.Allocatable)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+	}
+	n.Generation = nextGeneration()
+}
+
+// RemoveNode removes the node object, leaving all other tracking information.
+func (n *NodeInfo) RemoveNode() {
+	n.node = nil
+	n.Generation = nextGeneration()
+}
+
+// nextGeneration: Let's make sure history never forgets the name...
+// Increments the generation number monotonically ensuring that generation numbers never collide.
+// Collision of the generation numbers would be particularly problematic if a node was deleted and
+// added back with the same name. See issue#63262.
+func nextGeneration() int64 {
+	return atomic.AddInt64(&generation, 1)
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
@@ -188,6 +528,12 @@ type QueuedPodInfo struct {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	ConsecutiveErrorsCount int
+	// WasFlushedFromUnschedulable tracks whether this pod was most recently moved to activeQ
+	// by the periodic flush from unschedulablePods due to timeout (rather than by an event).
+	// This is used to detect if the pod becomes schedulable soon after flush, which may
+	// indicate queueing hint misconfigurations or event handling bugs.
+	// This flag is cleared when the pod returns to the queue for any reason.
+	WasFlushedFromUnschedulable bool
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -207,6 +553,55 @@ type QueuedPodInfo struct {
 	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
 	GatingPluginEvents []fwk.ClusterEvent
+	// NeedsPodGroupScheduling says whether the pod needs to pass a pod group scheduling cycle or not.
+	// If set to false, it means that the pod either passed the pod group cycle
+	// or doesn't belong to any pod group.
+	// This field can only be set to true when GenericWorkload feature flag is enabled.
+	NeedsPodGroupScheduling bool
+}
+
+func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
+	return pqi.PodInfo
+}
+
+func (pqi *QueuedPodInfo) GetTimestamp() time.Time {
+	return pqi.Timestamp
+}
+
+func (pqi *QueuedPodInfo) GetAttempts() int {
+	return pqi.Attempts
+}
+
+func (pqi *QueuedPodInfo) GetBackoffExpiration() time.Time {
+	return pqi.BackoffExpiration
+}
+
+func (pqi *QueuedPodInfo) GetUnschedulableCount() int {
+	return pqi.UnschedulableCount
+}
+
+func (pqi *QueuedPodInfo) GetConsecutiveErrorsCount() int {
+	return pqi.ConsecutiveErrorsCount
+}
+
+func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *time.Time {
+	return pqi.InitialAttemptTimestamp
+}
+
+func (pqi *QueuedPodInfo) GetUnschedulablePlugins() sets.Set[string] {
+	return pqi.UnschedulablePlugins
+}
+
+func (pqi *QueuedPodInfo) GetPendingPlugins() sets.Set[string] {
+	return pqi.PendingPlugins
+}
+
+func (pqi *QueuedPodInfo) GetGatingPlugin() string {
+	return pqi.GatingPlugin
+}
+
+func (pqi *QueuedPodInfo) GetGatingPluginEvents() []fwk.ClusterEvent {
+	return pqi.GatingPluginEvents
 }
 
 // Gated returns true if the pod is gated by any plugin.
@@ -228,14 +623,54 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
+		NeedsPodGroupScheduling: pqi.NeedsPodGroupScheduling,
 	}
 }
 
-// podResource contains the result of calculateResource and is used only internally.
-type podResource struct {
-	resource Resource
-	non0CPU  int64
-	non0Mem  int64
+// ClearRejectorPlugins clears the plugin-related fields that track why a pod
+// was rejected in a previous scheduling attempt.
+func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
+	pqi.UnschedulablePlugins.Clear()
+	pqi.PendingPlugins.Clear()
+	pqi.GatingPlugin = ""
+	pqi.GatingPluginEvents = nil
+}
+
+// QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
+// the pod group's status in the scheduling queue and stores all queued pods from that pod group.
+type QueuedPodGroupInfo struct {
+	*PodGroupInfo
+	// QueuedPodInfos are the pod group's pods that are currently queued.
+	// The order of the pods is deterministic and based on the priority and InitialAttemptTimestamp.
+	QueuedPodInfos []*QueuedPodInfo
+}
+
+// PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
+// Typically used as an input to pod group scheduling cycle plugins.
+type PodGroupInfo struct {
+	// Namespace is a namespace of this pod group.
+	Namespace string
+	// WorkloadRef is a reference to this particular pod group.
+	WorkloadRef *v1.WorkloadReference
+	// UnscheduledPods are pods that are currently being considered for scheduling.
+	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
+	// WorkloadManager.PodGroupState can be used for that.
+	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	UnscheduledPods []*v1.Pod
+}
+
+func (pgi *PodGroupInfo) GetName() string {
+	if pgi.WorkloadRef == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s/%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
+}
+
+func (pgi *PodGroupInfo) GetNamespace() string {
+	if pgi.WorkloadRef == nil {
+		return ""
+	}
+	return pgi.Namespace
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
@@ -243,10 +678,10 @@ type podResource struct {
 // inter-pod affinity selectors).
 type PodInfo struct {
 	Pod                        *v1.Pod
-	RequiredAffinityTerms      []AffinityTerm
-	RequiredAntiAffinityTerms  []AffinityTerm
-	PreferredAffinityTerms     []WeightedAffinityTerm
-	PreferredAntiAffinityTerms []WeightedAffinityTerm
+	RequiredAffinityTerms      []fwk.AffinityTerm
+	RequiredAntiAffinityTerms  []fwk.AffinityTerm
+	PreferredAffinityTerms     []fwk.WeightedAffinityTerm
+	PreferredAntiAffinityTerms []fwk.WeightedAffinityTerm
 	// cachedResource contains precomputed resources for Pod (podResource).
 	// The value can change only if InPlacePodVerticalScaling is enabled.
 	// In that case, the whole PodInfo object is recreated (for assigned pods in cache).
@@ -255,7 +690,27 @@ type PodInfo struct {
 	// cachedResource is used instead, what provides a noticeable performance boost.
 	// Note: cachedResource field shouldn't be accessed directly.
 	// Use calculateResource method to obtain it instead.
-	cachedResource *podResource
+	cachedResource *fwk.PodResource
+}
+
+func (pi *PodInfo) GetPod() *v1.Pod {
+	return pi.Pod
+}
+
+func (pi *PodInfo) GetRequiredAffinityTerms() []fwk.AffinityTerm {
+	return pi.RequiredAffinityTerms
+}
+
+func (pi *PodInfo) GetRequiredAntiAffinityTerms() []fwk.AffinityTerm {
+	return pi.RequiredAntiAffinityTerms
+}
+
+func (pi *PodInfo) GetPreferredAffinityTerms() []fwk.WeightedAffinityTerm {
+	return pi.PreferredAffinityTerms
+}
+
+func (pi *PodInfo) GetPreferredAntiAffinityTerms() []fwk.WeightedAffinityTerm {
+	return pi.PreferredAntiAffinityTerms
 }
 
 // DeepCopy returns a deep copy of the PodInfo object.
@@ -292,20 +747,20 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 
 	// Attempt to parse the affinity terms
 	var parseErrs []error
-	requiredAffinityTerms, err := GetAffinityTerms(pod, GetPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
-	requiredAntiAffinityTerms, err := GetAffinityTerms(pod,
-		GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
+		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
-	weightedAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAffinityTerms)
+	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
 	}
-	weightedAntiAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
+	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
 	}
@@ -319,26 +774,43 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 	return utilerrors.NewAggregate(parseErrs)
 }
 
-// AffinityTerm is a processed version of v1.PodAffinityTerm.
-type AffinityTerm struct {
-	Namespaces        sets.Set[string]
-	Selector          labels.Selector
-	TopologyKey       string
-	NamespaceSelector labels.Selector
-}
-
-// Matches returns true if the pod matches the label selector and namespaces or namespace selector.
-func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
-	if at.Namespaces.Has(pod.Namespace) || at.NamespaceSelector.Matches(nsLabels) {
-		return at.Selector.Matches(labels.Set(pod.Labels))
+func (pi *PodInfo) CalculateResource() fwk.PodResource {
+	if pi.cachedResource != nil {
+		return *pi.cachedResource
 	}
-	return false
-}
+	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
+	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+		UseStatusResources: inPlacePodVerticalScalingEnabled,
+		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+	})
+	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
+	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
+	non0Requests := requests
+	if len(nonMissingContainerRequests) > 0 {
+		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+			UseStatusResources: inPlacePodVerticalScalingEnabled,
+			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
+			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+			SkipPodLevelResources:       !podLevelResourcesEnabled,
+			NonMissingContainerRequests: nonMissingContainerRequests,
+		})
+	}
+	non0CPU := non0Requests[v1.ResourceCPU]
+	non0Mem := non0Requests[v1.ResourceMemory]
 
-// WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
-type WeightedAffinityTerm struct {
-	AffinityTerm
-	Weight int32
+	var res Resource
+	res.Add(requests)
+	podResource := fwk.PodResource{
+		Resource: &res,
+		Non0CPU:  non0CPU.MilliValue(),
+		Non0Mem:  non0Mem.Value(),
+	}
+	pi.cachedResource = &podResource
+	return podResource
 }
 
 // ExtenderName is a fake plugin name put in UnschedulablePlugins when Extender rejected some Nodes.
@@ -405,8 +877,8 @@ func (f *FitError) Error() string {
 		// the scheduling cycle went through PreFilter extension point successfully.
 		//
 		// When the prefilter plugin returns unschedulable,
-		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusMap.
-		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
+		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusReader.
+		// So, we shouldn't add the message from NodeToStatusReader when the PreFilter failed.
 		// Otherwise, we will have duplicated reasons in the error message.
 		reasons := make(map[string]int)
 		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *fwk.Status) {
@@ -415,7 +887,7 @@ func (f *FitError) Error() string {
 			}
 		})
 		if f.Diagnosis.NodeToStatus.Len() < f.NumAllNodes {
-			// Adding predefined reasons for nodes that are absent in NodeToStatusMap
+			// Adding predefined reasons for nodes that are absent in NodeToStatusReader
 			for _, reason := range f.Diagnosis.NodeToStatus.AbsentNodesStatus().Reasons() {
 				reasons[reason] += f.NumAllNodes - f.Diagnosis.NodeToStatus.Len()
 			}
@@ -445,58 +917,6 @@ func (f *FitError) Error() string {
 	return reasonMsg
 }
 
-func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	namespaces := getNamespacesFromPodAffinityTerm(pod, term)
-	nsSelector, err := metav1.LabelSelectorAsSelector(term.NamespaceSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
-}
-
-// GetAffinityTerms receives a Pod and affinity terms and returns the namespaces and
-// selectors of the terms.
-func GetAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm, error) {
-	if v1Terms == nil {
-		return nil, nil
-	}
-
-	var terms []AffinityTerm
-	for i := range v1Terms {
-		t, err := newAffinityTerm(pod, &v1Terms[i])
-		if err != nil {
-			// We get here if the label selector failed to process
-			return nil, err
-		}
-		terms = append(terms, *t)
-	}
-	return terms, nil
-}
-
-// getWeightedAffinityTerms returns the list of processed affinity terms.
-func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) ([]WeightedAffinityTerm, error) {
-	if v1Terms == nil {
-		return nil, nil
-	}
-
-	var terms []WeightedAffinityTerm
-	for i := range v1Terms {
-		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
-		if err != nil {
-			// We get here if the label selector failed to process
-			return nil, err
-		}
-		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
-	}
-	return terms, nil
-}
-
 // NewPodInfo returns a new PodInfo.
 func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
 	pInfo := &PodInfo{}
@@ -504,131 +924,9 @@ func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
 	return pInfo, err
 }
 
-func GetPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
-	if affinity != nil && affinity.PodAffinity != nil {
-		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		// }
-	}
-	return terms
-}
-
-func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
-	if affinity != nil && affinity.PodAntiAffinity != nil {
-		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		// }
-	}
-	return terms
-}
-
-// returns a set of names according to the namespaces indicated in podAffinityTerm.
-// If namespaces is empty it considers the given pod's namespace.
-func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.Set[string] {
-	names := sets.Set[string]{}
-	if len(podAffinityTerm.Namespaces) == 0 && podAffinityTerm.NamespaceSelector == nil {
-		names.Insert(pod.Namespace)
-	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
-	}
-	return names
-}
-
-// ImageStateSummary provides summarized information about the state of an image.
-type ImageStateSummary struct {
-	// Size of the image
-	Size int64
-	// Used to track how many nodes have this image, it is computed from the Nodes field below
-	// during the execution of Snapshot.
-	NumNodes int
-	// A set of node names for nodes having this image present. This field is used for
-	// keeping track of the nodes during update/add/remove events.
-	Nodes sets.Set[string]
-}
-
-// Snapshot returns a copy without Nodes field of ImageStateSummary
-func (iss *ImageStateSummary) Snapshot() *ImageStateSummary {
-	return &ImageStateSummary{
-		Size:     iss.Size,
-		NumNodes: iss.Nodes.Len(),
-	}
-}
-
-// NodeInfo is node level aggregated information.
-type NodeInfo struct {
-	// Overall node information.
-	node *v1.Node
-
-	// Pods running on the node.
-	Pods []*PodInfo
-
-	// The subset of pods with affinity.
-	PodsWithAffinity []*PodInfo
-
-	// The subset of pods with required anti-affinity.
-	PodsWithRequiredAntiAffinity []*PodInfo
-
-	// Ports allocated on the node.
-	UsedPorts HostPortInfo
-
-	// Total requested resources of all pods on this node. This includes assumed
-	// pods, which scheduler has sent for binding, but may not be scheduled yet.
-	Requested *Resource
-	// Total requested resources of all pods on this node with a minimum value
-	// applied to each container's CPU and memory requests. This does not reflect
-	// the actual resource requests for this node, but is used to avoid scheduling
-	// many zero-request pods onto one node.
-	NonZeroRequested *Resource
-	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
-	// as int64, to avoid conversions and accessing map.
-	Allocatable *Resource
-
-	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
-	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
-	// state information.
-	ImageStates map[string]*ImageStateSummary
-
-	// PVCRefCounts contains a mapping of PVC names to the number of pods on the node using it.
-	// Keys are in the format "namespace/name".
-	PVCRefCounts map[string]int
-
-	// Whenever NodeInfo changes, generation is bumped.
-	// This is used to avoid cloning it if the object didn't change.
-	Generation int64
-}
-
-// NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
-// when nodes is a []*NodeInfo.
-var _ klog.KMetadata = &NodeInfo{}
-
-func (n *NodeInfo) GetName() string {
-	if n == nil {
-		return "<nil>"
-	}
-	if n.node == nil {
-		return "<no node>"
-	}
-	return n.node.Name
-}
-func (n *NodeInfo) GetNamespace() string { return "" }
-
-// nextGeneration: Let's make sure history never forgets the name...
-// Increments the generation number monotonically ensuring that generation numbers never collide.
-// Collision of the generation numbers would be particularly problematic if a node was deleted and
-// added back with the same name. See issue#63262.
-func nextGeneration() int64 {
-	return atomic.AddInt64(&generation, 1)
-}
-
 // Resource is a collection of compute resource.
+// Implementation is separate from interface fwk.Resource, because implementation of functions Add and SetMaxResource
+// depends on internal scheduler util functions.
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64
@@ -638,6 +936,26 @@ type Resource struct {
 	AllowedPodNumber int
 	// ScalarResources
 	ScalarResources map[v1.ResourceName]int64
+}
+
+func (r *Resource) GetMilliCPU() int64 {
+	return r.MilliCPU
+}
+
+func (r *Resource) GetMemory() int64 {
+	return r.Memory
+}
+
+func (r *Resource) GetEphemeralStorage() int64 {
+	return r.EphemeralStorage
+}
+
+func (r *Resource) GetAllowedPodNumber() int {
+	return r.AllowedPodNumber
+}
+
+func (r *Resource) GetScalarResources() map[v1.ResourceName]int64 {
+	return r.ScalarResources
 }
 
 // NewResource creates a Resource from ResourceList
@@ -733,175 +1051,14 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		NonZeroRequested: &Resource{},
 		Allocatable:      &Resource{},
 		Generation:       nextGeneration(),
-		UsedPorts:        make(HostPortInfo),
-		ImageStates:      make(map[string]*ImageStateSummary),
+		UsedPorts:        make(fwk.HostPortInfo),
+		ImageStates:      make(map[string]*fwk.ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
 	}
 	return ni
-}
-
-// Node returns overall information about this node.
-func (n *NodeInfo) Node() *v1.Node {
-	if n == nil {
-		return nil
-	}
-	return n.node
-}
-
-// Snapshot returns a copy of this node, Except that ImageStates is copied without the Nodes field.
-func (n *NodeInfo) Snapshot() *NodeInfo {
-	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		UsedPorts:        make(HostPortInfo),
-		ImageStates:      make(map[string]*ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
-		Generation:       n.Generation,
-	}
-	if len(n.Pods) > 0 {
-		clone.Pods = append([]*PodInfo(nil), n.Pods...)
-	}
-	if len(n.UsedPorts) > 0 {
-		// HostPortInfo is a map-in-map struct
-		// make sure it's deep copied
-		for ip, portMap := range n.UsedPorts {
-			clone.UsedPorts[ip] = make(map[ProtocolPort]struct{})
-			for protocolPort, v := range portMap {
-				clone.UsedPorts[ip][protocolPort] = v
-			}
-		}
-	}
-	if len(n.PodsWithAffinity) > 0 {
-		clone.PodsWithAffinity = append([]*PodInfo(nil), n.PodsWithAffinity...)
-	}
-	if len(n.PodsWithRequiredAntiAffinity) > 0 {
-		clone.PodsWithRequiredAntiAffinity = append([]*PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
-	}
-	if len(n.ImageStates) > 0 {
-		state := make(map[string]*ImageStateSummary, len(n.ImageStates))
-		for imageName, imageState := range n.ImageStates {
-			state[imageName] = imageState.Snapshot()
-		}
-		clone.ImageStates = state
-	}
-	for key, value := range n.PVCRefCounts {
-		clone.PVCRefCounts[key] = value
-	}
-	return clone
-}
-
-// String returns representation of human readable format of this NodeInfo.
-func (n *NodeInfo) String() string {
-	podKeys := make([]string, len(n.Pods))
-	for i, p := range n.Pods {
-		podKeys[i] = p.Pod.Name
-	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
-		podKeys, n.Requested, n.NonZeroRequested, n.UsedPorts, n.Allocatable)
-}
-
-// AddPodInfo adds pod information to this NodeInfo.
-// Consider using this instead of AddPod if a PodInfo is already computed.
-func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
-	n.Pods = append(n.Pods, podInfo)
-	if podWithAffinity(podInfo.Pod) {
-		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
-	}
-	if podWithRequiredAntiAffinity(podInfo.Pod) {
-		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
-	}
-	n.update(podInfo, 1)
-}
-
-// AddPod is a wrapper around AddPodInfo.
-func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	// ignore this err since apiserver doesn't properly validate affinity terms
-	// and we can't fix the validation for backwards compatibility.
-	podInfo, _ := NewPodInfo(pod)
-	n.AddPodInfo(podInfo)
-}
-
-func podWithAffinity(p *v1.Pod) bool {
-	affinity := p.Spec.Affinity
-	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
-}
-
-func podWithRequiredAntiAffinity(p *v1.Pod) bool {
-	affinity := p.Spec.Affinity
-	return affinity != nil && affinity.PodAntiAffinity != nil &&
-		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
-}
-
-func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, *PodInfo) {
-	var removedPod *PodInfo
-	for i := range s {
-		tmpKey, err := GetPodKey(s[i].Pod)
-		if err != nil {
-			utilruntime.HandleErrorWithLogger(logger, err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
-			continue
-		}
-		if k == tmpKey {
-			removedPod = s[i]
-			// delete the element
-			s[i] = s[len(s)-1]
-			s = s[:len(s)-1]
-			break
-		}
-	}
-	// resets the slices to nil so that we can do DeepEqual in unit tests.
-	if len(s) == 0 {
-		return nil, removedPod
-	}
-	return s, removedPod
-}
-
-// RemovePod subtracts pod information from this NodeInfo.
-func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
-	k, err := GetPodKey(pod)
-	if err != nil {
-		return err
-	}
-	if podWithAffinity(pod) {
-		n.PodsWithAffinity, _ = removeFromSlice(logger, n.PodsWithAffinity, k)
-	}
-	if podWithRequiredAntiAffinity(pod) {
-		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
-	}
-
-	var removedPod *PodInfo
-	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
-		n.update(removedPod, -1)
-		return nil
-	}
-	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
-}
-
-// update node info based on the pod, and sign.
-// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
-func (n *NodeInfo) update(podInfo *PodInfo, sign int64) {
-	podResource := podInfo.calculateResource()
-	n.Requested.MilliCPU += sign * podResource.resource.MilliCPU
-	n.Requested.Memory += sign * podResource.resource.Memory
-	n.Requested.EphemeralStorage += sign * podResource.resource.EphemeralStorage
-	if n.Requested.ScalarResources == nil && len(podResource.resource.ScalarResources) > 0 {
-		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
-	}
-	for rName, rQuant := range podResource.resource.ScalarResources {
-		n.Requested.ScalarResources[rName] += sign * rQuant
-	}
-	n.NonZeroRequested.MilliCPU += sign * podResource.non0CPU
-	n.NonZeroRequested.Memory += sign * podResource.non0Mem
-
-	// Consume ports when pod added or release ports when pod removed.
-	n.updateUsedPorts(podInfo.Pod, sign > 0)
-	n.updatePVCRefCounts(podInfo.Pod, sign > 0)
-
-	n.Generation = nextGeneration()
 }
 
 // getNonMissingContainerRequests returns the default non-zero CPU and memory
@@ -955,85 +1112,6 @@ func getNonMissingContainerRequests(requests v1.ResourceList, podLevelResourcesS
 
 }
 
-func (pi *PodInfo) calculateResource() podResource {
-	if pi.cachedResource != nil {
-		return *pi.cachedResource
-	}
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
-	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: inPlacePodVerticalScalingEnabled,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-	})
-	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
-	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
-	non0Requests := requests
-	if len(nonMissingContainerRequests) > 0 {
-		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: inPlacePodVerticalScalingEnabled,
-			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:       !podLevelResourcesEnabled,
-			NonMissingContainerRequests: nonMissingContainerRequests,
-		})
-	}
-	non0CPU := non0Requests[v1.ResourceCPU]
-	non0Mem := non0Requests[v1.ResourceMemory]
-
-	var res Resource
-	res.Add(requests)
-	podResource := podResource{
-		resource: res,
-		non0CPU:  non0CPU.MilliValue(),
-		non0Mem:  non0Mem.Value(),
-	}
-	pi.cachedResource = &podResource
-	return podResource
-}
-
-// updateUsedPorts updates the UsedPorts of NodeInfo.
-func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for _, port := range schedutil.GetHostPorts(pod) {
-		if add {
-			n.UsedPorts.Add(port.HostIP, string(port.Protocol), port.HostPort)
-		} else {
-			n.UsedPorts.Remove(port.HostIP, string(port.Protocol), port.HostPort)
-		}
-	}
-}
-
-// updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
-func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
-	for _, v := range pod.Spec.Volumes {
-		if v.PersistentVolumeClaim == nil {
-			continue
-		}
-
-		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
-		if add {
-			n.PVCRefCounts[key] += 1
-		} else {
-			n.PVCRefCounts[key] -= 1
-			if n.PVCRefCounts[key] <= 0 {
-				delete(n.PVCRefCounts, key)
-			}
-		}
-	}
-}
-
-// SetNode sets the overall node information.
-func (n *NodeInfo) SetNode(node *v1.Node) {
-	n.node = node
-	n.Allocatable = NewResource(node.Status.Allocatable)
-	n.Generation = nextGeneration()
-}
-
-// RemoveNode removes the node object, leaving all other tracking information.
-func (n *NodeInfo) RemoveNode() {
-	n.node = nil
-	n.Generation = nextGeneration()
-}
-
 // GetPodKey returns the string key of a pod.
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
@@ -1046,118 +1124,4 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 // GetNamespacedName returns the string format of a namespaced resource name.
 func GetNamespacedName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
-}
-
-// DefaultBindAllHostIP defines the default ip address used to bind to all host.
-const DefaultBindAllHostIP = "0.0.0.0"
-
-// ProtocolPort represents a protocol port pair, e.g. tcp:80.
-type ProtocolPort struct {
-	Protocol string
-	Port     int32
-}
-
-// NewProtocolPort creates a ProtocolPort instance.
-func NewProtocolPort(protocol string, port int32) *ProtocolPort {
-	pp := &ProtocolPort{
-		Protocol: protocol,
-		Port:     port,
-	}
-
-	if len(pp.Protocol) == 0 {
-		pp.Protocol = string(v1.ProtocolTCP)
-	}
-
-	return pp
-}
-
-// HostPortInfo stores mapping from ip to a set of ProtocolPort
-type HostPortInfo map[string]map[ProtocolPort]struct{}
-
-// Add adds (ip, protocol, port) to HostPortInfo
-func (h HostPortInfo) Add(ip, protocol string, port int32) {
-	if port <= 0 {
-		return
-	}
-
-	h.sanitize(&ip, &protocol)
-
-	pp := NewProtocolPort(protocol, port)
-	if _, ok := h[ip]; !ok {
-		h[ip] = map[ProtocolPort]struct{}{
-			*pp: {},
-		}
-		return
-	}
-
-	h[ip][*pp] = struct{}{}
-}
-
-// Remove removes (ip, protocol, port) from HostPortInfo
-func (h HostPortInfo) Remove(ip, protocol string, port int32) {
-	if port <= 0 {
-		return
-	}
-
-	h.sanitize(&ip, &protocol)
-
-	pp := NewProtocolPort(protocol, port)
-	if m, ok := h[ip]; ok {
-		delete(m, *pp)
-		if len(h[ip]) == 0 {
-			delete(h, ip)
-		}
-	}
-}
-
-// Len returns the total number of (ip, protocol, port) tuple in HostPortInfo
-func (h HostPortInfo) Len() int {
-	length := 0
-	for _, m := range h {
-		length += len(m)
-	}
-	return length
-}
-
-// CheckConflict checks if the input (ip, protocol, port) conflicts with the existing
-// ones in HostPortInfo.
-func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
-	if port <= 0 {
-		return false
-	}
-
-	h.sanitize(&ip, &protocol)
-
-	pp := NewProtocolPort(protocol, port)
-
-	// If ip is 0.0.0.0 check all IP's (protocol, port) pair
-	if ip == DefaultBindAllHostIP {
-		for _, m := range h {
-			if _, ok := m[*pp]; ok {
-				return true
-			}
-		}
-		return false
-	}
-
-	// If ip isn't 0.0.0.0, only check IP and 0.0.0.0's (protocol, port) pair
-	for _, key := range []string{DefaultBindAllHostIP, ip} {
-		if m, ok := h[key]; ok {
-			if _, ok2 := m[*pp]; ok2 {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// sanitize the parameters
-func (h HostPortInfo) sanitize(ip, protocol *string) {
-	if len(*ip) == 0 {
-		*ip = DefaultBindAllHostIP
-	}
-	if len(*protocol) == 0 {
-		*protocol = string(v1.ProtocolTCP)
-	}
 }

@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,90 +49,98 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	// type Struct
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type Struct")...)
 
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.MapField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField(keys)")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField")...)
 			return
-		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
+		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }), oldObj != nil)...)
 
 	// field Struct.MapTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[UnvalidatedStringType]string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj map[UnvalidatedStringType]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UnvalidatedStringType) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypedefField(keys)")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypedefField")...)
 			return
-		}(fldPath.Child("mapTypedefField"), obj.MapTypedefField, safe.Field(oldObj, func(oldObj *Struct) map[UnvalidatedStringType]string { return oldObj.MapTypedefField }))...)
+		}(fldPath.Child("mapTypedefField"), obj.MapTypedefField, safe.Field(oldObj, func(oldObj *Struct) map[UnvalidatedStringType]string { return oldObj.MapTypedefField }), oldObj != nil)...)
 
 	// field Struct.MapValidatedTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[ValidatedStringType]string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj map[ValidatedStringType]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedStringType) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapValidatedTypedefField(keys)")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapValidatedTypedefField")...)
+			// iterate the map and call the key type's validation function
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_ValidatedStringType)...)
 			return
-		}(fldPath.Child("mapValidatedTypedefField"), obj.MapValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) map[ValidatedStringType]string { return oldObj.MapValidatedTypedefField }))...)
+		}(fldPath.Child("mapValidatedTypedefField"), obj.MapValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) map[ValidatedStringType]string { return oldObj.MapValidatedTypedefField }), oldObj != nil)...)
 
 	// field Struct.MapTypeField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj UnvalidatedMapType) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj UnvalidatedMapType, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypeField(keys)")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypeField")...)
 			return
-		}(fldPath.Child("mapTypeField"), obj.MapTypeField, safe.Field(oldObj, func(oldObj *Struct) UnvalidatedMapType { return oldObj.MapTypeField }))...)
+		}(fldPath.Child("mapTypeField"), obj.MapTypeField, safe.Field(oldObj, func(oldObj *Struct) UnvalidatedMapType { return oldObj.MapTypeField }), oldObj != nil)...)
 
 	// field Struct.ValidatedMapTypeField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ValidatedMapType) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj ValidatedMapType, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ValidatedMapTypeField(keys)")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ValidatedMapTypeField")...)
+			// call the type's validation function
 			errs = append(errs, Validate_ValidatedMapType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("validatedMapTypeField"), obj.ValidatedMapTypeField, safe.Field(oldObj, func(oldObj *Struct) ValidatedMapType { return oldObj.ValidatedMapTypeField }))...)
+		}(fldPath.Child("validatedMapTypeField"), obj.ValidatedMapTypeField, safe.Field(oldObj, func(oldObj *Struct) ValidatedMapType { return oldObj.ValidatedMapTypeField }), oldObj != nil)...)
 
 	return errs
 }
 
+// Validate_ValidatedMapType validates an instance of ValidatedMapType according
+// to declarative validation rules in the API schema.
 func Validate_ValidatedMapType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ValidatedMapType) (errs field.ErrorList) {
-	// type ValidatedMapType
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ValidatedMapType(keys)")
 	})...)
@@ -140,11 +149,9 @@ func Validate_ValidatedMapType(ctx context.Context, op operation.Operation, fldP
 	return errs
 }
 
+// Validate_ValidatedStringType validates an instance of ValidatedStringType according
+// to declarative validation rules in the API schema.
 func Validate_ValidatedStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedStringType) (errs field.ErrorList) {
-	// type ValidatedStringType
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "ValidatedStringType")...)
 
 	return errs

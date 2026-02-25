@@ -24,12 +24,26 @@ import (
 
 // ContainerPortApplyConfiguration represents a declarative configuration of the ContainerPort type for use
 // with apply.
+//
+// ContainerPort represents a network port in a single container.
 type ContainerPortApplyConfiguration struct {
-	Name          *string          `json:"name,omitempty"`
-	HostPort      *int32           `json:"hostPort,omitempty"`
-	ContainerPort *int32           `json:"containerPort,omitempty"`
-	Protocol      *corev1.Protocol `json:"protocol,omitempty"`
-	HostIP        *string          `json:"hostIP,omitempty"`
+	// If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
+	// named port in a pod must have a unique name. Name for the port that can be
+	// referred to by services.
+	Name *string `json:"name,omitempty"`
+	// Number of port to expose on the host.
+	// If specified, this must be a valid port number, 0 < x < 65536.
+	// If HostNetwork is specified, this must match ContainerPort.
+	// Most containers do not need this.
+	HostPort *int32 `json:"hostPort,omitempty"`
+	// Number of port to expose on the pod's IP address.
+	// This must be a valid port number, 0 < x < 65536.
+	ContainerPort *int32 `json:"containerPort,omitempty"`
+	// Protocol for port. Must be UDP, TCP, or SCTP.
+	// Defaults to "TCP".
+	Protocol *corev1.Protocol `json:"protocol,omitempty"`
+	// What host IP to bind the external port to.
+	HostIP *string `json:"hostIP,omitempty"`
 }
 
 // ContainerPortApplyConfiguration constructs a declarative configuration of the ContainerPort type for use with

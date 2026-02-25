@@ -1,13 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - caesarxuchao
-  - deads2k
+  - sig-api-machinery-approvers
 reviewers:
-  - caesarxuchao
-  - deads2k
-  - jpbetz
+  - sig-api-machinery-reviewers
 labels:
   - sig/api-machinery
 emeritus_approvers:
+  - caesarxuchao
   - lavalamp

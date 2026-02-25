@@ -30,6 +30,7 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -39,6 +40,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type ReplicationController
 	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/", "/scale":
@@ -46,74 +48,87 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	return nil
 }
 
+// Validate_ReplicationController validates an instance of ReplicationController according
+// to declarative validation rules in the API schema.
 func Validate_ReplicationController(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationController) (errs field.ErrorList) {
 	// field corev1.ReplicationController.TypeMeta has no validation
-	// field corev1.ReplicationController.ObjectMeta has no validation
+
+	// field corev1.ReplicationController.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *metav1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
 
 	// field corev1.ReplicationController.Spec
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
 			errs = append(errs, Validate_ReplicationControllerSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *corev1.ReplicationControllerSpec { return &oldObj.Spec }))...)
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *corev1.ReplicationControllerSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field corev1.ReplicationController.Status has no validation
 	return errs
 }
 
-func Validate_ReplicationControllerList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerList) (errs field.ErrorList) {
-	// field corev1.ReplicationControllerList.TypeMeta has no validation
-	// field corev1.ReplicationControllerList.ListMeta has no validation
-
-	// field corev1.ReplicationControllerList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []corev1.ReplicationController) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ReplicationController)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerList) []corev1.ReplicationController { return oldObj.Items }))...)
-
-	return errs
-}
-
+// Validate_ReplicationControllerSpec validates an instance of ReplicationControllerSpec according
+// to declarative validation rules in the API schema.
 func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
 	// field corev1.ReplicationControllerSpec.Replicas
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }))...)
+		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }), oldObj != nil)...)
 
 	// field corev1.ReplicationControllerSpec.MinReadySeconds
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }))...)
+		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }), oldObj != nil)...)
 
 	// field corev1.ReplicationControllerSpec.Selector has no validation
 	// field corev1.ReplicationControllerSpec.Template has no validation

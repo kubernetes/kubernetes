@@ -19,6 +19,7 @@ package drain
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 )
 
 type DrainCmdOptions struct {
@@ -151,10 +151,11 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams)
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 		drainer: &drain.Helper{
-			GracePeriodSeconds: -1,
-			Out:                ioStreams.Out,
-			ErrOut:             ioStreams.ErrOut,
-			ChunkSize:          cmdutil.DefaultChunkSize,
+			GracePeriodSeconds:   -1,
+			EvictErrorRetryDelay: 5 * time.Second,
+			Out:                  ioStreams.Out,
+			ErrOut:               ioStreams.ErrOut,
+			ChunkSize:            cmdutil.DefaultChunkSize,
 		},
 	}
 	o.drainer.OnPodDeletionOrEvictionFinished = o.onPodDeletionOrEvictionFinished
@@ -285,7 +286,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	// Set default WarningPrinter if not already set.
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	builder := f.NewBuilder().

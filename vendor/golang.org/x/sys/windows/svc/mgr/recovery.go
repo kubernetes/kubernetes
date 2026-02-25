@@ -99,8 +99,13 @@ func (s *Service) ResetPeriod() (uint32, error) {
 // SetRebootMessage sets service s reboot message.
 // If msg is "", the reboot message is deleted and no message is broadcast.
 func (s *Service) SetRebootMessage(msg string) error {
+	msgPointer, err := syscall.UTF16PtrFromString(msg)
+	if err != nil {
+		return err
+	}
+
 	rActions := windows.SERVICE_FAILURE_ACTIONS{
-		RebootMsg: syscall.StringToUTF16Ptr(msg),
+		RebootMsg: msgPointer,
 	}
 	return windows.ChangeServiceConfig2(s.Handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, (*byte)(unsafe.Pointer(&rActions)))
 }
@@ -118,8 +123,13 @@ func (s *Service) RebootMessage() (string, error) {
 // SetRecoveryCommand sets the command line of the process to execute in response to the RunCommand service controller action.
 // If cmd is "", the command is deleted and no program is run when the service fails.
 func (s *Service) SetRecoveryCommand(cmd string) error {
+	cmdPointer, err := syscall.UTF16PtrFromString(cmd)
+	if err != nil {
+		return err
+	}
+
 	rActions := windows.SERVICE_FAILURE_ACTIONS{
-		Command: syscall.StringToUTF16Ptr(cmd),
+		Command: cmdPointer,
 	}
 	return windows.ChangeServiceConfig2(s.Handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, (*byte)(unsafe.Pointer(&rActions)))
 }

@@ -1,4 +1,4 @@
-apiVersion: resource.k8s.io/v1beta1
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
   name: pause-template
@@ -11,7 +11,8 @@ spec:
     devices:
       requests:
       - name: my-device
-        deviceClassName: example
+        exactly:
+          deviceClassName: example
       config:
       - opaque:
           driver: test-driver.cdi.k8s.io

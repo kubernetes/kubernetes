@@ -53,7 +53,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 
 	client1, err := clientset.NewForConfig(s1.ClientConfig)
@@ -63,7 +63,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 
 	ns := framework.CreateNamespaceOrDie(client1, "test-enable-disable-service-cidr", t)
 	// make 2 services , there will be 3 services counting the kubernetes.default
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if _, err := client1.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 	defer s3.TearDownFn()
 

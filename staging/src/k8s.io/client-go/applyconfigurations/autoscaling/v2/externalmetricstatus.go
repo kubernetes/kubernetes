@@ -20,8 +20,13 @@ package v2
 
 // ExternalMetricStatusApplyConfiguration represents a declarative configuration of the ExternalMetricStatus type for use
 // with apply.
+//
+// ExternalMetricStatus indicates the current value of a global metric
+// not associated with any Kubernetes object.
 type ExternalMetricStatusApplyConfiguration struct {
-	Metric  *MetricIdentifierApplyConfiguration  `json:"metric,omitempty"`
+	// metric identifies the target metric by name and selector
+	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
+	// current contains the current value for the given metric
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 

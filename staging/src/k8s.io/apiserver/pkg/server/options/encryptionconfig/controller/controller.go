@@ -92,7 +92,7 @@ func NewDynamicEncryptionConfiguration(
 
 // Run starts the controller and blocks until ctx is canceled.
 func (d *DynamicEncryptionConfigContent) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	klog.InfoS("Starting controller", "name", d.name)
 	defer klog.InfoS("Shutting down controller", "name", d.name)
@@ -101,7 +101,7 @@ func (d *DynamicEncryptionConfigContent) Run(ctx context.Context) {
 
 	wg.Add(1)
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer wg.Done()
 		defer d.queue.ShutDown()
 		<-ctx.Done()
@@ -109,7 +109,7 @@ func (d *DynamicEncryptionConfigContent) Run(ctx context.Context) {
 
 	wg.Add(1)
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer wg.Done()
 		d.runWorker(ctx)
 	}()
@@ -174,7 +174,7 @@ func (d *DynamicEncryptionConfigContent) processWorkItem(serverCtx context.Conte
 		}
 
 		if updatedEffectiveConfig && err == nil {
-			metrics.RecordEncryptionConfigAutomaticReloadSuccess(d.apiServerID)
+			metrics.RecordEncryptionConfigAutomaticReloadSuccess(d.apiServerID, encryptionConfiguration.EncryptionFileContentHash)
 		}
 
 		if err != nil {

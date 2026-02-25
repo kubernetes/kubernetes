@@ -66,21 +66,6 @@ items:
     namespace: kube-system
   rules:
   - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    verbs:
-    - watch
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-controller-manager
-    resources:
-    - configmaps
-    verbs:
-    - get
-    - update
-  - apiGroups:
     - coordination.k8s.io
     resources:
     - leases
@@ -110,21 +95,6 @@ items:
     name: system::leader-locking-kube-scheduler
     namespace: kube-system
   rules:
-  - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    verbs:
-    - watch
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - configmaps
-    verbs:
-    - get
-    - update
   - apiGroups:
     - coordination.k8s.io
     resources:

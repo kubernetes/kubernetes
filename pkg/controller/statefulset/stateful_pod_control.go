@@ -19,21 +19,20 @@ package statefulset
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this
@@ -124,12 +123,10 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	if apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		}
+	// Set PVC policy as much as is possible at this point.
+	if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		spc.recordPodEvent("update", set, pod, err)
+		return err
 	}
 	spc.recordPodEvent("create", set, pod, err)
 	return err
@@ -155,19 +152,17 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 				return err
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
-			// and dirty the pod.
-			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
+		// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
+		// and dirty the pod.
+		if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
+			spc.recordPodEvent("update", set, pod, err)
+			return err
+		} else if !match {
+			if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
-			} else if !match {
-				if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-					spc.recordPodEvent("update", set, pod, err)
-					return err
-				}
-				consistent = false
 			}
+			consistent = false
 		}
 
 		// if the Pod is not dirty, do nothing
@@ -187,7 +182,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 			// make a copy so we don't mutate the shared cache
 			pod = updated.DeepCopy()
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s: %w", set.Namespace, pod.Name, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Error getting updated Pod from lister", "pod", klog.KRef(set.Namespace, pod.Name))
 		}
 
 		return updateErr
@@ -198,10 +193,17 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 	return err
 }
 
+// DeleteStatefulPod deletes a Pod. A NotFound is considered a successful response, since the
+// end result is the same: the pod is deleted.
 func (spc *StatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.objectMgr.DeletePod(pod)
-	spc.recordPodEvent("delete", set, pod, err)
-	return err
+	if err := spc.objectMgr.DeletePod(pod); err != nil {
+		if !apierrors.IsNotFound(err) {
+			spc.recordPodEvent("delete", set, pod, err)
+			return err
+		}
+	}
+	spc.recordPodEvent("delete", set, pod, nil)
+	return nil
 }
 
 // ClaimsMatchRetentionPolicy returns false if the PVCs for pod are not consistent with set's PVC deletion policy.
@@ -289,14 +291,14 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *apps.StatefulSet, pod *v1.Po
 // have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s successful",
-			strings.ToLower(verb), pod.Name, set.Name)
+			cases.Title(language.English).String(verb), pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s failed error: %s",
-			strings.ToLower(verb), pod.Name, set.Name, err)
+			cases.Title(language.English).String(verb), pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
 	}
 }
@@ -306,14 +308,14 @@ func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet
 // reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Claim %s Pod %s in StatefulSet %s success",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name)
+			cases.Title(language.English).String(verb), claim.Name, pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Claim %s for Pod %s in StatefulSet %s failed error: %s",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name, err)
+			cases.Title(language.English).String(verb), claim.Name, pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
 	}
 }
@@ -323,13 +325,10 @@ func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.C
 	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 		return err
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		}
+	// Set PVC policy as much as is possible at this point.
+	if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		spc.recordPodEvent("update", set, pod, err)
+		return err
 	}
 	return nil
 }

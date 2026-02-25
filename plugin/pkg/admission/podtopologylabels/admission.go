@@ -41,7 +41,7 @@ const PluginName = "PodTopologyLabels"
 // This configuration is used by kube-apiserver.
 // It is not exported to avoid any chance of accidentally mutating the variable.
 var defaultConfig = Config{
-	Labels: []string{"topology.k8s.io/zone", "topology.k8s.io/region"},
+	Labels: []string{"topology.kubernetes.io/zone", "topology.kubernetes.io/region"},
 }
 
 // Register registers a plugin

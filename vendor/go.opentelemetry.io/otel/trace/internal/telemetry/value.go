@@ -257,10 +257,10 @@ func (v Value) Kind() ValueKind {
 	}
 }
 
-// Empty returns if v does not hold any value.
+// Empty reports whether v does not hold any value.
 func (v Value) Empty() bool { return v.Kind() == ValueKindEmpty }
 
-// Equal returns if v is equal to w.
+// Equal reports whether v is equal to w.
 func (v Value) Equal(w Value) bool {
 	k1 := v.Kind()
 	k2 := w.Kind()
@@ -316,7 +316,7 @@ func (v Value) String() string {
 	case ValueKindBool:
 		return strconv.FormatBool(v.asBool())
 	case ValueKindBytes:
-		return fmt.Sprint(v.asBytes())
+		return string(v.asBytes())
 	case ValueKindMap:
 		return fmt.Sprint(v.asMap())
 	case ValueKindSlice:

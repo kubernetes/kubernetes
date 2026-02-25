@@ -31,10 +31,9 @@ package dialer
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type dialResult struct {
@@ -87,6 +86,6 @@ func timeoutDialer(address string, timeout time.Duration) (net.Conn, error) {
 				dr.c.Close()
 			}
 		}()
-		return nil, errors.Errorf("dial %s: timeout", address)
+		return nil, fmt.Errorf("dial %s: timeout", address)
 	}
 }

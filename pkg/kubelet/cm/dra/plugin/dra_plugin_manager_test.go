@@ -31,7 +31,7 @@ func TestAddSameName(t *testing.T) {
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, "old.sock", "", defaultClientCallTimeout), "add first plugin")
 	p, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get first plugin")
@@ -60,9 +60,14 @@ func TestAddSameName(t *testing.T) {
 func TestDelete(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
+	socketFile := "dra.sock"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", defaultClientCallTimeout), "add plugin")
-	draPlugins.remove(driverName, "")
+
+	draPlugins.remove(driverName, socketFile)
+
+	_, err := draPlugins.GetPlugin(driverName)
+	require.Error(t, err, "plugin should not exist after being removed")
 }

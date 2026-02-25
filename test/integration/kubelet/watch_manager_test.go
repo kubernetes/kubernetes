@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -66,22 +67,25 @@ func TestWatchBasedManager(t *testing.T) {
 	// We want all watches to be up and running to stress test it.
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
+	listWatcherWithWatchListSemanticsWrapper := func(lw *cache.ListWatch) cache.ListerWatcher {
+		return cache.ToListWatcherWithWatchListSemantics(lw, client)
+	}
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	stopCh := make(chan struct{})
 	t.Cleanup(func() { close(stopCh) })
 
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, listWatcherWithWatchListSemanticsWrapper, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				name := fmt.Sprintf("s%d", i*100+j)
 				if _, err := client.CoreV1().Secrets(testNamespace).Create(ctx, &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
 					select {
@@ -105,11 +109,11 @@ func TestWatchBasedManager(t *testing.T) {
 	// fetch all secrets
 	wg = sync.WaitGroup{}
 	errCh = make(chan error, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
 				store.AddReference(testNamespace, name, types.UID(name))

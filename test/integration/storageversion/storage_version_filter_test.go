@@ -168,8 +168,10 @@ func TestStorageVersionBootstrap(t *testing.T) {
 		}
 	}
 	// Restart api server, enable the storage version API and the feature gates.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionAPI: true,
+		features.APIServerIdentity: true,
+	})
 	server = kubeapiservertesting.StartTestServerOrDie(t,
 		&kubeapiservertesting.TestServerInstanceOptions{
 			StorageVersionWrapFunc: wrapperFunc,

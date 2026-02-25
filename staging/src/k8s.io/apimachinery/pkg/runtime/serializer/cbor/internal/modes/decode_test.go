@@ -211,6 +211,20 @@ func TestDecode(t *testing.T) {
 				}
 			}),
 		},
+		{
+			name:          "text unmarshaler",
+			in:            hex("4161"),
+			into:          &RoundtrippableText{},
+			want:          &RoundtrippableText{Text: "a"},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "json unmarshaler",
+			in:            hex("4161"),
+			into:          &RoundtrippableJSON{},
+			want:          &RoundtrippableJSON{Raw: `"a"`},
+			assertOnError: assertNilError,
+		},
 	})
 
 	group(t, "text string", []test{
@@ -234,6 +248,20 @@ func TestDecode(t *testing.T) {
 			name:          "empty text string",
 			in:            hex("60"), // ""
 			want:          "",
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "text unmarshaler",
+			in:            hex("6161"),
+			into:          &RoundtrippableText{},
+			want:          &RoundtrippableText{Text: "a"},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "json unmarshaler",
+			in:            hex("6161"),
+			into:          &RoundtrippableJSON{},
+			want:          &RoundtrippableJSON{Raw: `"a"`},
 			assertOnError: assertNilError,
 		},
 	})

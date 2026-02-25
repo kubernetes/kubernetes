@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )
@@ -106,7 +105,7 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
 		logger.Error(err, "Could not create hostpath recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, err
 	}
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -117,18 +116,12 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
 		logger.Error(err, "Could not create NFS recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, err
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-
-	var err error
-	allPlugins, err = appendLegacyControllerProviders(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 
 	var filteredPlugins []volume.VolumePlugin
 	if filter == nil {

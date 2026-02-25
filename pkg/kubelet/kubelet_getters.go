@@ -33,8 +33,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -58,7 +58,7 @@ func (kl *Kubelet) getPodLogsDir() string {
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodsDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodsDirName)
 }
 
 // getPluginsDir returns the full path to the directory under which plugin
@@ -66,7 +66,7 @@ func (kl *Kubelet) getPodsDir() string {
 // they need to persist.  Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getPluginsDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPluginsDirName)
 }
 
 // getPluginsRegistrationDir returns the full path to the directory under which
@@ -74,7 +74,7 @@ func (kl *Kubelet) getPluginsDir() string {
 // More information is available about plugin registration in the pluginwatcher
 // module
 func (kl *Kubelet) getPluginsRegistrationDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsRegistrationDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPluginsRegistrationDirName)
 }
 
 // getPluginDir returns a data directory name for a given plugin name.
@@ -87,7 +87,7 @@ func (kl *Kubelet) getPluginDir(pluginName string) string {
 // getCheckpointsDir returns a data directory name for checkpoints.
 // Checkpoints can be stored in this directory for further use.
 func (kl *Kubelet) getCheckpointsDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletCheckpointsDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletCheckpointsDirName)
 }
 
 // getVolumeDevicePluginsDir returns the full path to the directory under which plugin
@@ -95,14 +95,14 @@ func (kl *Kubelet) getCheckpointsDir() string {
 // they need to persist.  Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getVolumeDevicePluginsDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPluginsDirName)
 }
 
 // getVolumeDevicePluginDir returns a data directory name for a given plugin name.
 // Plugins can use these directories to store data that they need to persist.
 // For per-pod plugin data, see getVolumeDevicePluginsDir.
 func (kl *Kubelet) getVolumeDevicePluginDir(pluginName string) string {
-	return filepath.Join(kl.getVolumeDevicePluginsDir(), pluginName, config.DefaultKubeletVolumeDevicesDirName)
+	return filepath.Join(kl.getVolumeDevicePluginsDir(), pluginName, kubeletconfig.DefaultKubeletVolumeDevicesDirName)
 }
 
 // GetPodDir returns the full path to the per-pod data directory for the
@@ -133,8 +133,8 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.
-func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
-	return kl.getKubeletMappings()
+func (kl *Kubelet) GetKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
+	return kl.getKubeletMappings(logger, idsPerPod)
 }
 
 func (kl *Kubelet) GetMaxPods() int {
@@ -144,11 +144,11 @@ func (kl *Kubelet) GetMaxPods() int {
 func (kl *Kubelet) GetUserNamespacesIDsPerPod() uint32 {
 	userNs := kl.kubeletConfiguration.UserNamespaces
 	if userNs == nil {
-		return config.DefaultKubeletUserNamespacesIDsPerPod
+		return kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod
 	}
 	idsPerPod := userNs.IDsPerPod
 	if idsPerPod == nil || *idsPerPod == 0 {
-		return config.DefaultKubeletUserNamespacesIDsPerPod
+		return kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod
 	}
 	// The value is already validated to be <= MaxUint32,
 	// so we can safely drop the upper bits.
@@ -165,14 +165,14 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 // which subpath volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist or subpaths are not specified.
 func (kl *Kubelet) getPodVolumeSubpathsDir(podUID types.UID) string {
-	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletVolumeSubpathsDirName)
+	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletVolumeSubpathsDirName)
 }
 
 // getPodVolumesDir returns the full path to the per-pod data directory under
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
-	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletVolumesDirName)
+	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletVolumesDirName)
 }
 
 // getPodVolumeDir returns the full path to the directory which represents the
@@ -186,7 +186,7 @@ func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeNa
 // which volumes are created for the specified pod. This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumeDevicesDir(podUID types.UID) string {
-	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletVolumeDevicesDirName)
+	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletVolumeDevicesDirName)
 }
 
 // getPodVolumeDeviceDir returns the full path to the directory which represents the
@@ -199,7 +199,7 @@ func (kl *Kubelet) getPodVolumeDeviceDir(podUID types.UID, pluginName string) st
 // which plugins may store data for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
-	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletPluginsDirName)
+	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletPluginsDirName)
 }
 
 // getPodPluginDir returns a data directory name for a given plugin name for a
@@ -213,12 +213,12 @@ func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
 // which container data is held for the specified pod.  This directory may not
 // exist if the pod or container does not exist.
 func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
-	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletContainersDirName, ctrName)
+	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletContainersDirName, ctrName)
 }
 
 // getPodResourcesSocket returns the full path to the directory containing the pod resources socket
 func (kl *Kubelet) getPodResourcesDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodResourcesDirName)
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodResourcesDirName)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
@@ -286,9 +286,9 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 }
 
 // GetNode returns the node info for the configured node name of this Kubelet.
-func (kl *Kubelet) GetNode() (*v1.Node, error) {
+func (kl *Kubelet) GetNode(ctx context.Context) (*v1.Node, error) {
 	if kl.kubeClient == nil {
-		return kl.initialNode(context.TODO())
+		return kl.initialNode(ctx)
 	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
@@ -298,13 +298,11 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
-func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
-			return n, nil
-		}
+func (kl *Kubelet) getNodeAnyWay(ctx context.Context) (*v1.Node, error) {
+	if n, err := kl.GetNode(ctx); err == nil {
+		return n, nil
 	}
-	return kl.initialNode(context.TODO())
+	return kl.initialNode(ctx)
 }
 
 // GetNodeConfig returns the container manager node config.
@@ -319,8 +317,8 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
-	node, err := kl.getNodeAnyWay()
+func (kl *Kubelet) getHostIPsAnyWay(ctx context.Context) ([]net.IP, error) {
+	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -336,20 +334,20 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 
 // getPodVolumePathListFromDisk returns a list of the volume paths by reading the
 // volume directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getPodVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		klog.V(6).InfoS("Path does not exist", "path", podVolDir)
+		logger.V(6).Info("Path does not exist", "path", podVolDir)
 		return volumes, nil
 	}
 
 	volumePluginDirs, err := os.ReadDir(podVolDir)
 	if err != nil {
-		klog.ErrorS(err, "Could not read directory", "path", podVolDir)
+		logger.Error(err, "Could not read directory", "path", podVolDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -380,9 +378,9 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
-func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getMountedVolumePathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	mountedVolumes := []string{}
-	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
+	volumePaths, err := kl.getPodVolumePathListFromDisk(logger, podUID)
 	if err != nil {
 		return mountedVolumes, err
 	}
@@ -405,7 +403,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 
 // getPodVolumeSubpathListFromDisk returns a list of the volume-subpath paths by reading the
 // subpath directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
@@ -418,7 +416,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	// Explicitly walks /<volume>/<container name>/<subPathIndex>
 	volumePluginDirs, err := os.ReadDir(podSubpathsDir)
 	if err != nil {
-		klog.ErrorS(err, "Could not read directory", "path", podSubpathsDir)
+		logger.Error(err, "Could not read directory", "path", podSubpathsDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -469,10 +467,11 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 }
 
 // getLastStableNodeAddresses returns the last observed node addresses.
-func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
-	node, err := kl.GetNode()
+func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAddress {
+	logger := klog.FromContext(ctx)
+	node, err := kl.GetNode(ctx)
 	if err != nil || node == nil {
-		klog.V(4).InfoS("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
+		logger.V(4).Info("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
 		return nil
 	}
 	return node.Status.Addresses

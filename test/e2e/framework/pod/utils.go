@@ -62,6 +62,9 @@ func GetDefaultTestImage() string {
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 // If the node OS is linux, return busybox image
 func GetDefaultTestImageID() imageutils.ImageID {
+	if framework.NodeOSDistroIs("windows") {
+		return GetTestImageID(imageutils.Agnhost)
+	}
 	return GetTestImageID(imageutils.BusyBox)
 }
 
@@ -175,7 +178,7 @@ func GetRestrictedContainerSecurityContext() *v1.SecurityContext {
 	}
 }
 
-var psaEvaluator, _ = psapolicy.NewEvaluator(psapolicy.DefaultChecks())
+var psaEvaluator, _ = psapolicy.NewEvaluator(psapolicy.DefaultChecks(), nil)
 
 // MustMixinRestrictedPodSecurity makes the given pod compliant with the restricted pod security level.
 // If doing so would overwrite existing non-conformant configuration, a test failure is triggered.

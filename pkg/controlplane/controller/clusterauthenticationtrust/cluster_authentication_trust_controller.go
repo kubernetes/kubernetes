@@ -463,7 +463,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	go c.kubeSystemConfigMapInformer.Run(ctx.Done())
 
 	// wait for your secondary caches to fill before starting your work
-	if !cache.WaitForNamedCacheSync("cluster_authentication_trust_controller", ctx.Done(), c.preRunCaches...) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.preRunCaches...) {
 		return
 	}
 

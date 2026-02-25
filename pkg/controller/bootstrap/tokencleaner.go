@@ -19,6 +19,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -111,18 +112,24 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting token cleaner controller")
-	defer logger.Info("Shutting down token cleaner controller")
 
-	if !cache.WaitForNamedCacheSync("token_cleaner", ctx.Done(), tc.secretSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down token cleaner controller")
+		tc.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.secretSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, tc.worker, 10*time.Second)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, tc.worker, 10*time.Second)
+	})
 	<-ctx.Done()
 }
 

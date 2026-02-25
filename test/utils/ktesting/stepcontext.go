@@ -16,13 +16,6 @@ limitations under the License.
 
 package ktesting
 
-import (
-	"fmt"
-	"strings"
-
-	"k8s.io/klog/v2"
-)
-
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
 // trail of "bread crumbs" that help figure out where in a test some problem
@@ -33,12 +26,10 @@ import (
 // The string should describe the operation that is about to happen ("starting
 // the controller", "list items") or what is being operated on ("HTTP server").
 // Multiple different prefixes get concatenated with a colon.
-func WithStep(tCtx TContext, what string) TContext {
-	sCtx := &stepContext{
-		TContext: tCtx,
-		what:     what,
-	}
-	return WithLogger(sCtx, klog.LoggerWithName(sCtx.Logger(), what))
+func (tc *TC) WithStep(step string) *TC {
+	tc = tc.clone()
+	tc.steps += step + ": "
+	return tc
 }
 
 // Step is useful when the context with the step information is
@@ -54,59 +45,27 @@ func WithStep(tCtx TContext, what string) TContext {
 // Inside the callback, the tCtx variable is the one where the step
 // has been added. This avoids the need to introduce multiple different
 // context variables and risk of using the wrong one.
-func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
-	tCtx.Helper()
-	cb(WithStep(tCtx, what))
+func (tc *TC) Step(step string, cb func(tCtx TContext)) {
+	tc.Helper()
+	cb(tc.WithStep(step))
 }
 
-type stepContext struct {
-	TContext
-	what string
-}
-
-func (sCtx *stepContext) Log(args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Log(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
-}
-
-func (sCtx *stepContext) Logf(format string, args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Log(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
-}
-
-func (sCtx *stepContext) Error(args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Error(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
-}
-
-func (sCtx *stepContext) Errorf(format string, args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Error(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
-}
-
-func (sCtx *stepContext) Fatal(args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Fatal(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintln(args...)))
-}
-
-func (sCtx *stepContext) Fatalf(format string, args ...any) {
-	sCtx.Helper()
-	sCtx.TContext.Fatal(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
-}
-
-// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT".
-func (sCtx *stepContext) Value(key any) any {
-	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
-		if reporter, ok := sCtx.TContext.Value(key).(ginkgoReporter); ok {
-			return ginkgoReporter(&stepReporter{reporter: reporter, what: sCtx.what})
+// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
+// wraps the underlying reporter so that the steps are visible in the report.
+func (tc *TC) Value(key any) any {
+	if tc.steps != "" {
+		if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
+			if reporter, ok := tc.Context.Value(key).(ginkgoReporter); ok {
+				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tc.steps})
+			}
 		}
 	}
-	return sCtx.TContext.Value(key)
+	return tc.Context.Value(key)
 }
 
 type stepReporter struct {
 	reporter ginkgoReporter
-	what     string
+	steps    string
 }
 
 var _ ginkgoReporter = &stepReporter{}
@@ -114,6 +73,6 @@ var _ ginkgoReporter = &stepReporter{}
 func (s *stepReporter) AttachProgressReporter(reporter func() string) func() {
 	return s.reporter.AttachProgressReporter(func() string {
 		report := reporter()
-		return s.what + ": " + report
+		return s.steps + report
 	})
 }

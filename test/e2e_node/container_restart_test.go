@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -67,7 +66,10 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: time.Duration(30 * time.Second)}
-			initialConfig.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = true
 		})
 
 		ginkgo.BeforeEach(func() {
@@ -88,18 +90,19 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 	ginkgo.Context("Reduced default container restart backs off as expected", func() {
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{"ReduceDefaultCrashLoopBackOffDecay": true}
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = true
 		})
 
 		ginkgo.BeforeEach(func() {
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-		})
-
-		ginkgo.AfterEach(func() {
-			err := resetCRIProxyInjector(e2eCriProxy)
-			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
 		})
 
 		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {
@@ -111,20 +114,21 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 	ginkgo.Context("Lower node config container restart takes precedence", func() {
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{"ReduceDefaultCrashLoopBackOffDecay": true}
 			initialConfig.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: time.Duration(1 * time.Second)}
-			initialConfig.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = true
+			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = true
 		})
 
 		ginkgo.BeforeEach(func() {
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-		})
-
-		ginkgo.AfterEach(func() {
-			err := resetCRIProxyInjector(e2eCriProxy)
-			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
 		})
 
 		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {

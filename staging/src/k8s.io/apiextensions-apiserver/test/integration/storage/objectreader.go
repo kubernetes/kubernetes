@@ -128,3 +128,16 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 
 	return c, clientv3.NewKV(c), nil
 }
+
+// SetStoredCustomResourceDefinition writes the storage representation of a CRD to etcd.
+func (s *EtcdObjectReader) SetStoredCustomResourceDefinition(name string, crd *apiextensionsv1.CustomResourceDefinition) error {
+	bs, err := json.Marshal(crd)
+	if err != nil {
+		return err
+	}
+	key := path.Join("/", s.storagePrefix, "apiextensions.k8s.io", "customresourcedefinitions", name)
+	if _, err := s.etcdClient.Put(context.Background(), key, string(bs)); err != nil {
+		return fmt.Errorf("error setting CRD %s in etcd at key %s: %w", name, key, err)
+	}
+	return nil
+}

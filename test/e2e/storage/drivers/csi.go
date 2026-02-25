@@ -40,6 +40,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +55,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -160,13 +160,22 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
-		storageframework.CapVolumeGroupSnapshot:            true,
+		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
+		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
+		storageframework.CapSELinuxMount: false,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
 		// test. --maxvolumespernode=10 gets
 		// added when patching the deployment.
 		storageframework.CapVolumeLimits: true,
+	}
+	// TODO: It can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		capabilities[storageframework.CapVolumeGroupSnapshot] = true
+	}
+	if os.Getenv("CSI_PROW_ENABLE_SNAPSHOT_METADATA") == "true" {
+		capabilities[storageframework.CapSnapshotMetadata] = true
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -176,6 +185,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshot-metadata/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
@@ -218,8 +228,8 @@ func (h *hostpathCSIDriver) GetSnapshotClass(ctx context.Context, config *storag
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
-	return storageframework.CopyVolumeAttributesClass(&storagev1beta1.VolumeAttributesClass{
+func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
 		DriverName: config.GetUniqueDriverName(),
 		Parameters: map[string]string{
 			hostpathCSIDriverMutableParameterName: hostpathCSIDriverMutableParameterValue,
@@ -291,6 +301,24 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
 
+	// VGS E2E FeatureGate patches
+	// TODO: These can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "csi-snapshotter",
+			DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
+		})
+	}
+
+	// SnapshotMetadata feature E2E patches
+	// TODO: These can be removed after the SnapshotMetadata feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_SNAPSHOT_METADATA") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "hostpath",
+			DriverContainerArguments: []string{"--enable-snapshot-metadata"},
+		})
+	}
+
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		for _, o := range patches {
 			if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
@@ -308,16 +336,34 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		switch item := item.(type) {
 		case *appsv1.StatefulSet:
 			var containers []v1.Container
+			var volumes []v1.Volume
 			for _, container := range item.Spec.Template.Spec.Containers {
 				switch container.Name {
 				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
 					// Remove these containers.
+				case "csi-snapshot-metadata":
+					// Only keep the snapshot metadata sidecar when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						containers = append(containers, container)
+					}
 				default:
 					// Keep the others.
 					containers = append(containers, container)
 				}
 			}
+			for _, volume := range item.Spec.Template.Spec.Volumes {
+				switch volume.Name {
+				case "csi-snapshot-metadata-server-certs":
+					// Only keep the snapshot metadata sidecar when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						volumes = append(volumes, volume)
+					}
+				default:
+					volumes = append(volumes, volume)
+				}
+			}
 			item.Spec.Template.Spec.Containers = containers
+			item.Spec.Template.Spec.Volumes = volumes
 		}
 		return nil
 	}, h.manifests...)
@@ -338,25 +384,27 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo                 storageframework.DriverInfo
-	manifests                  []string
-	podInfo                    *bool
-	storageCapacity            *bool
-	attachable                 bool
-	attachLimit                int
-	enableTopology             bool
-	enableNodeExpansion        bool
-	hooks                      Hooks
-	tokenRequests              []storagev1.TokenRequest
-	requiresRepublish          *bool
-	fsGroupPolicy              *storagev1.FSGroupPolicy
-	enableVolumeMountGroup     bool
-	enableNodeVolumeCondition  bool
-	embedded                   bool
-	calls                      MockCSICalls
-	embeddedCSIDriver          *mockdriver.CSIDriver
-	enableSELinuxMount         *bool
-	disableControllerExpansion bool
+	driverInfo                           storageframework.DriverInfo
+	manifests                            []string
+	podInfo                              *bool
+	storageCapacity                      *bool
+	attachable                           bool
+	attachLimit                          int
+	enableTopology                       bool
+	enableNodeExpansion                  bool
+	hooks                                Hooks
+	tokenRequests                        []storagev1.TokenRequest
+	requiresRepublish                    *bool
+	serviceAccountTokenInSecrets         *bool
+	fsGroupPolicy                        *storagev1.FSGroupPolicy
+	enableVolumeMountGroup               bool
+	enableNodeVolumeCondition            bool
+	embedded                             bool
+	calls                                MockCSICalls
+	embeddedCSIDriver                    *mockdriver.CSIDriver
+	enableSELinuxMount                   *bool
+	disableControllerExpansion           bool
+	enableMutableCSINodeAllocatableCount bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -390,22 +438,24 @@ type MockCSITestDriver interface {
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver             bool
-	DisableAttach              bool
-	PodInfo                    *bool
-	StorageCapacity            *bool
-	AttachLimit                int
-	EnableTopology             bool
-	EnableResizing             bool
-	EnableNodeExpansion        bool
-	DisableControllerExpansion bool
-	EnableSnapshot             bool
-	EnableVolumeMountGroup     bool
-	EnableNodeVolumeCondition  bool
-	TokenRequests              []storagev1.TokenRequest
-	RequiresRepublish          *bool
-	FSGroupPolicy              *storagev1.FSGroupPolicy
-	EnableSELinuxMount         *bool
+	RegisterDriver                       bool
+	DisableAttach                        bool
+	PodInfo                              *bool
+	StorageCapacity                      *bool
+	AttachLimit                          int
+	EnableTopology                       bool
+	EnableResizing                       bool
+	EnableNodeExpansion                  bool
+	DisableControllerExpansion           bool
+	EnableSnapshot                       bool
+	EnableVolumeMountGroup               bool
+	EnableNodeVolumeCondition            bool
+	TokenRequests                        []storagev1.TokenRequest
+	ServiceAccountTokenInSecrets         *bool
+	RequiresRepublish                    *bool
+	FSGroupPolicy                        *storagev1.FSGroupPolicy
+	EnableSELinuxMount                   *bool
+	EnableMutableCSINodeAllocatableCount bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -547,22 +597,24 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
-		manifests:                  driverManifests,
-		podInfo:                    driverOpts.PodInfo,
-		storageCapacity:            driverOpts.StorageCapacity,
-		enableTopology:             driverOpts.EnableTopology,
-		attachable:                 !driverOpts.DisableAttach,
-		attachLimit:                driverOpts.AttachLimit,
-		enableNodeExpansion:        driverOpts.EnableNodeExpansion,
-		enableNodeVolumeCondition:  driverOpts.EnableNodeVolumeCondition,
-		disableControllerExpansion: driverOpts.DisableControllerExpansion,
-		tokenRequests:              driverOpts.TokenRequests,
-		requiresRepublish:          driverOpts.RequiresRepublish,
-		fsGroupPolicy:              driverOpts.FSGroupPolicy,
-		enableVolumeMountGroup:     driverOpts.EnableVolumeMountGroup,
-		enableSELinuxMount:         driverOpts.EnableSELinuxMount,
-		embedded:                   driverOpts.Embedded,
-		hooks:                      driverOpts.Hooks,
+		manifests:                            driverManifests,
+		podInfo:                              driverOpts.PodInfo,
+		storageCapacity:                      driverOpts.StorageCapacity,
+		enableTopology:                       driverOpts.EnableTopology,
+		attachable:                           !driverOpts.DisableAttach,
+		attachLimit:                          driverOpts.AttachLimit,
+		enableNodeExpansion:                  driverOpts.EnableNodeExpansion,
+		enableNodeVolumeCondition:            driverOpts.EnableNodeVolumeCondition,
+		disableControllerExpansion:           driverOpts.DisableControllerExpansion,
+		tokenRequests:                        driverOpts.TokenRequests,
+		requiresRepublish:                    driverOpts.RequiresRepublish,
+		serviceAccountTokenInSecrets:         driverOpts.ServiceAccountTokenInSecrets,
+		fsGroupPolicy:                        driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup:               driverOpts.EnableVolumeMountGroup,
+		enableSELinuxMount:                   driverOpts.EnableSELinuxMount,
+		enableMutableCSINodeAllocatableCount: driverOpts.EnableMutableCSINodeAllocatableCount,
+		embedded:                             driverOpts.Embedded,
+		hooks:                                driverOpts.Hooks,
 	}
 }
 
@@ -636,7 +688,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{
-				F:             f,
+				TCtx:          f.TContext(context.Background() /* no cancellation, the traditional behavior! */),
 				Namespace:     m.driverNamespace.Name,
 				PodName:       podname,
 				ContainerName: "busybox",
@@ -712,11 +764,15 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			storagev1.VolumeLifecyclePersistent,
 			storagev1.VolumeLifecycleEphemeral,
 		},
-		TokenRequests:     m.tokenRequests,
-		RequiresRepublish: m.requiresRepublish,
-		FSGroupPolicy:     m.fsGroupPolicy,
-		SELinuxMount:      m.enableSELinuxMount,
-		Features:          map[string][]string{},
+		TokenRequests:                m.tokenRequests,
+		RequiresRepublish:            m.requiresRepublish,
+		ServiceAccountTokenInSecrets: m.serviceAccountTokenInSecrets,
+		FSGroupPolicy:                m.fsGroupPolicy,
+		SELinuxMount:                 m.enableSELinuxMount,
+		Features:                     map[string][]string{},
+	}
+	if m.enableMutableCSINodeAllocatableCount {
+		o.Features["csi-attacher"] = []string{"MutableCSINodeAllocatableCount=true"}
 	}
 
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {

@@ -24,17 +24,49 @@ import (
 
 // PersistentVolumeSpecApplyConfiguration represents a declarative configuration of the PersistentVolumeSpec type for use
 // with apply.
+//
+// PersistentVolumeSpec is the specification of a persistent volume.
 type PersistentVolumeSpecApplyConfiguration struct {
-	Capacity                                 *corev1.ResourceList `json:"capacity,omitempty"`
+	// capacity is the description of the persistent volume's resources and capacity.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
+	Capacity *corev1.ResourceList `json:"capacity,omitempty"`
+	// persistentVolumeSource is the actual volume backing the persistent volume.
 	PersistentVolumeSourceApplyConfiguration `json:",inline"`
-	AccessModes                              []corev1.PersistentVolumeAccessMode   `json:"accessModes,omitempty"`
-	ClaimRef                                 *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty"`
-	PersistentVolumeReclaimPolicy            *corev1.PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
-	StorageClassName                         *string                               `json:"storageClassName,omitempty"`
-	MountOptions                             []string                              `json:"mountOptions,omitempty"`
-	VolumeMode                               *corev1.PersistentVolumeMode          `json:"volumeMode,omitempty"`
-	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
-	VolumeAttributesClassName                *string                               `json:"volumeAttributesClassName,omitempty"`
+	// accessModes contains all ways the volume can be mounted.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+	// Expected to be non-nil when bound.
+	// claim.VolumeName is the authoritative bind between PV and PVC.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
+	ClaimRef *ObjectReferenceApplyConfiguration `json:"claimRef,omitempty"`
+	// persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim.
+	// Valid options are Retain (default for manually created PersistentVolumes), Delete (default
+	// for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
+	// Recycle must be supported by the volume plugin underlying this PersistentVolume.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
+	PersistentVolumeReclaimPolicy *corev1.PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
+	// storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	StorageClassName *string `json:"storageClassName,omitempty"`
+	// mountOptions is the list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+	// simply fail if one is invalid.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+	MountOptions []string `json:"mountOptions,omitempty"`
+	// volumeMode defines if a volume is intended to be used with a formatted filesystem
+	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
+	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
+	// nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+	// This field influences the scheduling of pods that use this volume.
+	// This field is mutable if MutablePVNodeAffinity feature gate is enabled.
+	NodeAffinity *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. When this field is not set, it indicates that this volume does not belong to any
+	// VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+	// after a volume has been updated successfully to a new class.
+	// For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+	// PersistentVolumeClaims during the binding process.
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
 }
 
 // PersistentVolumeSpecApplyConfiguration constructs a declarative configuration of the PersistentVolumeSpec type for use with

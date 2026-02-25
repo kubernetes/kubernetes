@@ -37,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzDNS,
 		fuzzNodeRegistration,
 		fuzzLocalEtcd,
+		fuzzExternalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
@@ -114,6 +115,15 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c randfill.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.DataDir = "foo"
+}
+
+// TODO: Remove this once v1beta3 API was removed.
+func fuzzExternalEtcd(obj *kubeadm.ExternalEtcd, c randfill.Continue) {
+	c.FillNoCustom(obj)
+
+	// Ensure HTTPEndpoints equals Endpoints to maintain roundtrip compatibility
+	// with v1beta3 which doesn't have HTTPEndpoints field
+	obj.HTTPEndpoints = obj.Endpoints
 }
 
 func fuzzNetworking(obj *kubeadm.Networking, c randfill.Continue) {

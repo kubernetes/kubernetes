@@ -31,6 +31,17 @@ const (
 	// Reserved for use by Kubernetes, DRA driver controllers must
 	// use their own finalizer.
 	Finalizer = "resource.kubernetes.io/delete-protection"
+	// ExtendedResourceClaimAnnotation is the annotation applied on the generated
+	// special ResourceClaim. Its single valid value is "true".
+	// This is used only inside the scheduler.
+	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// Resource device class prefix is for generating implicit extended resource
+	// name for a device class when its ExtendedResourceName field is not
+	// specified. The generated name is this prefix + the device class name.
+	// The generated name may not be a valid extended resource name for use
+	// in pod.Spec.Resources.Requests, in that case, a valid name has to be specified
+	// explicitly in device class.
+	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -134,10 +145,13 @@ type ResourceSliceSpec struct {
 
 	// Devices lists some or all of the devices in this pool.
 	//
-	// Must not have more than 128 entries.
+	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
+	//
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
 	//
 	// +optional
 	// +listType=atomic
+	// +zeroOrOneOf=ResourceSliceType
 	Devices []Device
 
 	// PerDeviceNodeSelection defines whether the access from nodes to
@@ -155,19 +169,22 @@ type ResourceSliceSpec struct {
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
-	// The names of the SharedCounters must be unique in the ResourceSlice.
+	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// The maximum number of counters in all sets is 32.
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
+	// The maximum number of counter sets is 8.
 	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
+	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
 }
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
-// ResourceSlice.
+// ResourcePool.
 //
 // The counters are not allocatable by themselves, but
 // can be referenced by devices. When a device is allocated,
@@ -183,7 +200,7 @@ type CounterSet struct {
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters in all sets is 32.
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter
@@ -232,11 +249,27 @@ type ResourcePool struct {
 
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
+const ResourceSliceMaxDevicesWithTaintsOrConsumesCounters = 64
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const BindingConditionsMaxSize = 4
+const BindingFailureConditionsMaxSize = 4
 
-// Defines the max number of shared counters that can be specified
-// in a ResourceSlice. The number is summed up across all sets.
-const ResourceSliceMaxSharedCounters = 32
+// Defines the maximum number of counter sets (through the
+// SharedCounters field) that can be defined in a ResourceSlice.
+const ResourceSliceMaxCounterSets = 8
+
+// Defines the maximum number of counters that can be defined
+// in a counter set.
+const ResourceSliceMaxCountersPerCounterSet = 32
+
+// Defines the maximum number of device counter consumptions
+// (through the ConsumesCounters field) that can be defined per
+// device.
+const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
+
+// Defines the maximum number of counters that can be defined
+// per device counter consumption.
+const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -269,10 +302,8 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of device counter consumptions per
+	// device is 2.
 	//
 	// +optional
 	// +listType=atomic
@@ -313,7 +344,9 @@ type Device struct {
 
 	// If specified, these are the driver-defined taints.
 	//
-	// The maximum number of taints is 4.
+	// The maximum number of taints is 16. If taints are set for
+	// any device in a ResourceSlice, then the maximum number of
+	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.
@@ -322,6 +355,60 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint
+
+	// BindsToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
+	// to match the node where the allocation was made.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindsToNode *bool
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	//
+	// The maximum number of binding conditions is 4.
+	// All entries are condition types, which means
+	// they must be labels.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingConditions []string
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	//
+	// The maximum number of binding conditions is 4.
+	// All entries are condition types, which means
+	// they must be labels.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingFailureConditions []string
+
+	// AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
+	//
+	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
+	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	AllowMultipleAllocations *bool
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -335,10 +422,7 @@ type DeviceCounterConsumption struct {
 
 	// Counters defines the counters that will be consumed by the device.
 	//
-	// The maximum number counters in a device is 32.
-	// In addition, the maximum number of all counters
-	// in all devices is 1024 (for example, 64 devices with
-	// 16 counters each).
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter
@@ -346,13 +430,28 @@ type DeviceCounterConsumption struct {
 
 // DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacity struct {
-	// Value defines how much of a certain device capacity is available.
+	// Value defines how much of a certain capacity that device has.
+	//
+	// This field reflects the fixed total capacity and does not change.
+	// The consumed amount is tracked separately by scheduler
+	// and does not affect this value.
 	//
 	// +required
 	Value resource.Quantity
 
-	// potential future addition: fields which define how to "consume"
-	// capacity (= share a single device between different consumers).
+	// RequestPolicy defines how this DeviceCapacity must be consumed
+	// when the device is allowed to be shared by multiple allocations.
+	//
+	// The Device must have allowMultipleAllocations set to true in order to set a requestPolicy.
+	//
+	// If unset, capacity requests are unconstrained:
+	// requests can consume any amount of capacity, as long as the total consumed
+	// across all allocations does not exceed the device's defined capacity.
+	// If request is also unset, default is the full capacity value.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	RequestPolicy *CapacityRequestPolicy
 }
 
 // Counter describes a quantity associated with a device.
@@ -363,16 +462,91 @@ type Counter struct {
 	Value resource.Quantity
 }
 
+// CapacityRequestPolicyDiscreteMaxOptions limits the number of discrete capacity values allowed in a requestPolicy.
+const CapacityRequestPolicyDiscreteMaxOptions = 10
+
+// CapacityRequestPolicy defines how requests consume device capacity.
+//
+// Must not set more than one ValidRequestValues.
+type CapacityRequestPolicy struct {
+	// Default specifies how much of this capacity is consumed by a request
+	// that does not contain an entry for it in DeviceRequest's Capacity.
+	//
+	// +optional
+	Default *resource.Quantity
+
+	// ValidValues defines a set of acceptable quantity values in consuming requests.
+	//
+	// Must not contain more than 10 entries.
+	// Must be sorted in ascending order.
+	//
+	// If this field is set,
+	// Default must be defined and it must be included in ValidValues list.
+	//
+	// If the requested amount does not match any valid value but smaller than some valid values,
+	// the scheduler calculates the smallest valid value that is greater than or equal to the request.
+	// That is: min(ceil(requestedValue) ∈ validValues), where requestedValue ≤ max(validValues).
+	//
+	// If the requested amount exceeds all valid values, the request violates the policy,
+	// and this device cannot be allocated.
+	//
+	// +optional
+	// +listType=atomic
+	// +oneOf=ValidRequestValues
+	ValidValues []resource.Quantity
+
+	// ValidRange defines an acceptable quantity value range in consuming requests.
+	//
+	// If this field is set,
+	// Default must be defined and it must fall within the defined ValidRange.
+	//
+	// If the requested amount does not fall within the defined range, the request violates the policy,
+	// and this device cannot be allocated.
+	//
+	// If the request doesn't contain this capacity entry, Default value is used.
+	//
+	// +optional
+	// +oneOf=ValidRequestValues
+	ValidRange *CapacityRequestPolicyRange
+}
+
+// CapacityRequestPolicyRange defines a valid range for consumable capacity values.
+//
+//   - If the requested amount is less than Min, it is rounded up to the Min value.
+//   - If Step is set and the requested amount is between Min and Max but not aligned with Step,
+//     it will be rounded up to the next value equal to Min + (n * Step).
+//   - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).
+//   - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,
+//     and the device cannot be allocated.
+type CapacityRequestPolicyRange struct {
+	// Min specifies the minimum capacity allowed for a consumption request.
+	//
+	// Min must be greater than or equal to zero,
+	// and less than or equal to the capacity value.
+	// requestPolicy.default must be more than or equal to the minimum.
+	//
+	// +required
+	Min *resource.Quantity
+
+	// Max defines the upper limit for capacity that can be requested.
+	//
+	// Max must be less than or equal to the capacity value.
+	// Min and requestPolicy.default must be less than or equal to the maximum.
+	//
+	// +optional
+	Max *resource.Quantity
+
+	// Step defines the step size between valid capacity amounts within the range.
+	//
+	// Max (if set) and requestPolicy.default must be a multiple of Step.
+	// Min + Step must be less than or equal to the capacity value.
+	//
+	// +optional
+	Step *resource.Quantity
+}
+
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
-
-// Limit for the total number of counters in each device.
-const ResourceSliceMaxCountersPerDevice = 32
-
-// Limit for the total number of counters defined in devices in
-// a ResourceSlice. We want to allow up to 64 devices to specify
-// up to 16 counters, so the limit for the ResourceSlice will be 1024.
-const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 
 // QualifiedName is the name of a device attribute or capacity.
 //
@@ -436,8 +610,8 @@ type DeviceAttribute struct {
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
 
-// DeviceTaintsMaxLength is the maximum number of taints per device.
-const DeviceTaintsMaxLength = 4
+// DeviceTaintsMaxLength is the maximum number of taints per Device.
+const DeviceTaintsMaxLength = 16
 
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,
@@ -457,8 +631,10 @@ type DeviceTaint struct {
 
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-	// nodes is not valid here.
+	//
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here. More effects may get added in the future.
+	// Consumers must treat unknown effects like None.
 	//
 	// +required
 	Effect DeviceTaintEffect
@@ -467,6 +643,14 @@ type DeviceTaint struct {
 	//
 	// Implementing PreferNoSchedule would depend on a scoring solution for DRA.
 	// It might get added as part of that.
+	//
+	// A possible future new effect is NoExecuteWithPodDisruptionBudget:
+	// honor the pod disruption budget instead of simply deleting pods.
+	// This is currently undecided, it could also be a separate field.
+	//
+	// Validation must be prepared to allow unknown enums in stored objects,
+	// which will enable adding new enums within a single release without
+	// ratcheting.
 
 	// TimeAdded represents the time at which the taint was added.
 	// Added automatically during create or update if not set.
@@ -485,6 +669,9 @@ type DeviceTaint struct {
 type DeviceTaintEffect string
 
 const (
+	// No effect, the taint is purely informational.
+	DeviceTaintEffectNone DeviceTaintEffect = "None"
+
 	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
 	// but allow all pods submitted to Kubelet without going through the scheduler
 	// to start, and allow all already-running pods to continue running.
@@ -731,6 +918,23 @@ type ExactDeviceRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// Capacity define resource requirements against each capacity.
+	//
+	// If this field is unset and the device supports multiple allocations,
+	// the default value will be applied to each capacity according to requestPolicy.
+	// For the capacity that has no requestPolicy, default is the full capacity value.
+	//
+	// Applies to each device allocation.
+	// If Count > 1,
+	// the request fails if there aren't enough devices that meet the requirements.
+	// If AllocationMode is set to All,
+	// the request fails if there are devices that otherwise match the request,
+	// and have this capacity, with a value >= the requested amount, but which cannot be allocated to this request.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	Capacity *CapacityRequirements
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -825,6 +1029,52 @@ type DeviceSubRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// Capacity define resource requirements against each capacity.
+	//
+	// If this field is unset and the device supports multiple allocations,
+	// the default value will be applied to each capacity according to requestPolicy.
+	// For the capacity that has no requestPolicy, default is the full capacity value.
+	//
+	// Applies to each device allocation.
+	// If Count > 1,
+	// the request fails if there aren't enough devices that meet the requirements.
+	// If AllocationMode is set to All,
+	// the request fails if there are devices that otherwise match the request,
+	// and have this capacity, with a value >= the requested amount, but which cannot be allocated to this request.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	Capacity *CapacityRequirements
+}
+
+// CapacityRequirements defines the capacity requirements for a specific device request.
+type CapacityRequirements struct {
+	// Requests represent individual device resource requests for distinct resources,
+	// all of which must be provided by the device.
+	//
+	// This value is used as an additional filtering condition against the available capacity on the device.
+	// This is semantically equivalent to a CEL selector with
+	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
+	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
+	//
+	// When a requestPolicy is defined, the requested amount is adjusted upward
+	// to the nearest valid value based on the policy.
+	// If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows—
+	// the device is considered ineligible for allocation.
+	//
+	// For any capacity that is not explicitly requested:
+	// - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity
+	//   (i.e., the whole device is claimed).
+	// - If a requestPolicy is set, the default consumed capacity is determined according to that policy.
+	//
+	// If the device allows multiple allocation,
+	// the aggregated amount across all requests must not exceed the capacity value.
+	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
+	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	//
+	// +optional
+	Requests map[QualifiedName]resource.Quantity
 }
 
 const (
@@ -864,6 +1114,8 @@ type CELDeviceSelector struct {
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
 	//    of the attributes which were prefixed by "dra.example.com".
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
+	//  - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device
+	//    (v1.34+ with the DRAConsumableCapacity feature enabled).
 	//
 	// Example: Consider a device with driver="dra.example.com", which exposes
 	// two attributes named "model" and "ext.example.com/family" and which
@@ -977,6 +1229,22 @@ type DeviceConstraint struct {
 	// criteria.
 	//
 	// MatchExpression string
+
+	// DistinctAttribute requires that all devices in question have this
+	// attribute and that its type and value are unique across those devices.
+	//
+	// This acts as the inverse of MatchAttribute.
+	//
+	// This constraint is used to avoid allocating multiple requests to the same device
+	// by ensuring attribute-level differentiation.
+	//
+	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
+	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
+	//
+	// +optional
+	// +oneOf=ConstraintType
+	// +featureGate=DRAConsumableCapacity
+	DistinctAttribute *FullyQualifiedName
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
@@ -1138,6 +1406,7 @@ type ResourceClaimStatus struct {
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
+	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus
 }
@@ -1183,6 +1452,16 @@ type AllocationResult struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// Controller string
+
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	AllocationTimestamp *metav1.Time
 }
 
 // DeviceAllocationResult is the result of allocating devices.
@@ -1272,6 +1551,50 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// BindingConditions contains a copy of the BindingConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingConditions []string
+
+	// BindingFailureConditions contains a copy of the BindingFailureConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingFailureConditions []string
+
+	// ShareID uniquely identifies an individual allocation share of the device,
+	// used when the device supports multiple simultaneous allocations.
+	// It serves as an additional map key to differentiate concurrent shares
+	// of the same device.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *types.UID
+
+	// ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
+	// The consumed amount may differ from the requested amount: it is rounded up to the nearest valid
+	// value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).
+	//
+	// The total consumed capacity for each device must not exceed the DeviceCapacity's Value.
+	//
+	// This field is populated only for devices that allow multiple allocations.
+	// All capacity entries are included, even if the consumed amount is zero.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ConsumedCapacity map[QualifiedName]resource.Quantity
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1301,8 +1624,8 @@ type AllocationConfigSource string
 
 // Valid [DeviceAllocationConfiguration.Source] values.
 const (
-	AllocationConfigSourceClass = "FromClass"
-	AllocationConfigSourceClaim = "FromClaim"
+	AllocationConfigSourceClass AllocationConfigSource = "FromClass"
+	AllocationConfigSourceClaim AllocationConfigSource = "FromClaim"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1367,6 +1690,19 @@ type DeviceClassSpec struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// SuitableNodes *core.NodeSelector
+
+	// ExtendedResourceName is the extended resource name for the devices of this class.
+	// The devices of this class can be used to satisfy a pod's extended resource requests.
+	// It has the same format as the name of a pod's extended resource.
+	// It should be unique among all the device classes in a cluster.
+	// If two device classes have the same name, then the class created later
+	// is picked to satisfy a pod's extended resource requests.
+	// If two classes are created at the same time, then the name of the class
+	// lexicographically sorted first is picked.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResource
+	ExtendedResourceName *string
 }
 
 // DeviceClassConfiguration is used in DeviceClass.
@@ -1454,6 +1790,9 @@ const (
 
 // AllocatedDeviceStatus contains the status of an allocated device, if the
 // driver chooses to report it. This may include driver-specific information.
+//
+// The combination of Driver, Pool, Device, and ShareID must match the corresponding key
+// in Status.Allocation.Devices.
 type AllocatedDeviceStatus struct {
 	// Driver specifies the name of the DRA driver whose kubelet
 	// plugin should be invoked to process the allocation once the claim is
@@ -1479,6 +1818,12 @@ type AllocatedDeviceStatus struct {
 	//
 	// +required
 	Device string
+
+	// ShareID uniquely identifies an individual allocation share of the device.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *string
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim
@@ -1553,18 +1898,16 @@ type DeviceTaintRule struct {
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec DeviceTaintRuleSpec
 
-	// ^^^
-	// A spec gets added because adding a status seems likely.
-	// Such a status could provide feedback on applying the
-	// eviction and/or statistics (number of matching devices,
-	// affected allocated claims, pods remaining to be evicted,
-	// etc.).
+	// Status provides information about what was requested in the spec.
+	//
+	// +optional
+	Status DeviceTaintRuleStatus
 }
 
 // DeviceTaintRuleSpec specifies the selector and one taint.
 type DeviceTaintRuleSpec struct {
 	// DeviceSelector defines which device(s) the taint is applied to.
-	// All selector criteria must be satified for a device to
+	// All selector criteria must be satisfied for a device to
 	// match. The empty selector matches all devices. Without
 	// a selector, no devices are matches.
 	//
@@ -1581,13 +1924,6 @@ type DeviceTaintRuleSpec struct {
 // The empty selector matches all devices. Without a selector, no devices
 // are matched.
 type DeviceTaintSelector struct {
-	// If DeviceClassName is set, the selectors defined there must be
-	// satisfied by a device to be selected. This field corresponds
-	// to class.metadata.name.
-	//
-	// +optional
-	DeviceClassName *string
-
 	// If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	//
@@ -1614,15 +1950,42 @@ type DeviceTaintSelector struct {
 	//
 	// +optional
 	Device *string
+}
 
-	// Selectors contains the same selection criteria as a ResourceClaim.
-	// Currently, CEL expressions are supported. All of these selectors
-	// must be satisfied.
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+type DeviceTaintRuleStatus struct {
+	// Conditions provide information about the state of the DeviceTaintRule
+	// and the cluster at some point in time,
+	// in a machine-readable and human-readable format.
+	//
+	// The following condition is currently defined as part of this API, more may
+	// get added:
+	// - Type: EvictionInProgress
+	// - Status: True if there are currently pods which need to be evicted, False otherwise
+	//   (includes the effects which don't cause eviction).
+	// - Reason: not specified, may change
+	// - Message: includes information about number of pending pods and already evicted pods
+	//   in a human-readable format, updated periodically, may change
+	//
+	// For `effect: None`, the condition above gets set once for each change to
+	// the spec, with the message containing information about what would happen
+	// if the effect was `NoExecute`. This feedback can be used to decide whether
+	// changing the effect to `NoExecute` will work as intended. It only gets
+	// set once to avoid having to constantly update the status.
+	//
+	// Must have 8 or less entries.
 	//
 	// +optional
-	// +listType=atomic
-	Selectors []DeviceSelector
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
 }
+
+// DeviceTaintRuleStatusMaxConditions is the maximum number of conditions in DeviceTaintRuleStatus.
+const DeviceTaintRuleStatusMaxConditions = 8
+
+// DeviceTaintConditionEvictionInProgress is the publicly documented condition type for the DeviceTaintRuleStatus.
+const DeviceTaintConditionEvictionInProgress = "EvictionInProgress"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

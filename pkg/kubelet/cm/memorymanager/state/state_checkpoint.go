@@ -30,6 +30,7 @@ var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
 	sync.RWMutex
+	logger            klog.Logger
 	cache             State
 	policyName        string
 	checkpointManager checkpointmanager.CheckpointManager
@@ -37,13 +38,15 @@ type stateCheckpoint struct {
 }
 
 // NewCheckpointState creates new State for keeping track of memory/pod assignment with checkpoint backend
-func NewCheckpointState(stateDir, checkpointName, policyName string) (State, error) {
+func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName string) (State, error) {
+	logger = klog.LoggerWithName(logger, "Memory Manager state checkpoint")
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
 	}
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewMemoryState(),
+		logger:            logger,
+		cache:             NewMemoryState(logger),
 		policyName:        policyName,
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
@@ -79,7 +82,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	sc.cache.SetMachineState(checkpoint.MachineState)
 	sc.cache.SetMemoryAssignments(checkpoint.Entries)
 
-	klog.V(2).InfoS("State checkpoint: restored state from checkpoint")
+	sc.logger.V(2).Info("State checkpoint: restored state from checkpoint")
 
 	return nil
 }
@@ -93,7 +96,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
-		klog.ErrorS(err, "Could not save checkpoint")
+		sc.logger.Error(err, "Could not save checkpoint")
 		return err
 	}
 	return nil
@@ -131,7 +134,7 @@ func (sc *stateCheckpoint) SetMachineState(memoryMap NUMANodeMap) {
 	sc.cache.SetMachineState(memoryMap)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }
 
@@ -143,7 +146,7 @@ func (sc *stateCheckpoint) SetMemoryBlocks(podUID string, containerName string, 
 	sc.cache.SetMemoryBlocks(podUID, containerName, blocks)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
 	}
 }
 
@@ -155,7 +158,7 @@ func (sc *stateCheckpoint) SetMemoryAssignments(assignments ContainerMemoryAssig
 	sc.cache.SetMemoryAssignments(assignments)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }
 
@@ -167,7 +170,7 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.cache.Delete(podUID, containerName)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
 	}
 }
 
@@ -179,6 +182,6 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.cache.ClearState()
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }

@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	drav1beta1 "k8s.io/dynamic-resource-allocation/api/v1beta1"
+	drav1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
 	"k8s.io/klog/v2"
 )
 
@@ -34,6 +35,7 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(drav1beta1.AddToScheme(scheme))
+	utilruntime.Must(drav1beta2.AddToScheme(scheme))
 }
 
 // In all of the following generics:
@@ -45,18 +47,20 @@ func init() {
 //
 // More legacy types will get added when reaching GA.
 
-func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any](c *client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC]) *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC] {
-	return &convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]{
+func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any, O2P objectPtr[O2], O2, O2L, O2AC any](c *Client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC], v1beta2 funcs[O2, O2L, O2AC]) *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC] {
+	return &convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]{
 		c:       c,
 		native:  native,
 		v1beta1: v1beta1,
+		v1beta2: v1beta2,
 	}
 }
 
-type convertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any] struct {
-	c       *client
+type convertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any, O2P objectPtr[O2], O2, O2L, O2AC any] struct {
+	c       *Client
 	native  funcs[N, NL, NAC]
 	v1beta1 funcs[O, OL, OAC]
+	v1beta2 funcs[O2, O2L, O2AC]
 }
 
 type funcs[T, TL, TAC any] interface {
@@ -76,12 +80,16 @@ type funcsWithStatus[T, TL, TAC any] interface {
 	ApplyStatus(context.Context, *TAC, metav1.ApplyOptions) (*T, error)
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Create(ctx context.Context, obj *N, opts metav1.CreateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Create(ctx context.Context, obj *N, opts metav1.CreateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return putWithConversion(obj, func(obj *O) (*O, error) {
 				return t.v1beta1.Create(ctx, obj, opts)
+			})
+		case useV1beta2API:
+			return putWithConversion(obj, func(obj *O2) (*O2, error) {
+				return t.v1beta2.Create(ctx, obj, opts)
 			})
 		default:
 			return t.native.Create(ctx, obj, opts)
@@ -90,12 +98,16 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Create(ctx context.Co
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Update(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Update(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return putWithConversion(obj, func(obj *O) (*O, error) {
 				return t.v1beta1.Update(ctx, obj, opts)
+			})
+		case useV1beta2API:
+			return putWithConversion(obj, func(obj *O2) (*O2, error) {
+				return t.v1beta2.Update(ctx, obj, opts)
 			})
 		default:
 			return t.native.Update(ctx, obj, opts)
@@ -104,12 +116,16 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Update(ctx context.Co
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) UpdateStatus(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) UpdateStatus(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return putWithConversion(obj, func(obj *O) (*O, error) {
 				return t.v1beta1.(funcsWithStatus[O, OL, OAC]).UpdateStatus(ctx, obj, opts)
+			})
+		case useV1beta2API:
+			return putWithConversion(obj, func(obj *O2) (*O2, error) {
+				return t.v1beta1.(funcsWithStatus[O2, O2L, O2AC]).UpdateStatus(ctx, obj, opts)
 			})
 		default:
 			return t.native.(funcsWithStatus[N, NL, NAC]).UpdateStatus(ctx, obj, opts)
@@ -118,11 +134,13 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) UpdateStatus(ctx cont
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return nil, t.v1beta1.Delete(ctx, name, opts)
+		case useV1beta2API:
+			return nil, t.v1beta2.Delete(ctx, name, opts)
 		default:
 			return nil, t.native.Delete(ctx, name, opts)
 		}
@@ -131,11 +149,13 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Delete(ctx context.Co
 	return err
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return nil, t.v1beta1.DeleteCollection(ctx, opts, listOpts)
+		case useV1beta2API:
+			return nil, t.v1beta2.DeleteCollection(ctx, opts, listOpts)
 		default:
 			return nil, t.native.DeleteCollection(ctx, opts, listOpts)
 		}
@@ -144,12 +164,16 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) DeleteCollection(ctx 
 	return err
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Get(ctx context.Context, name string, opts metav1.GetOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Get(ctx context.Context, name string, opts metav1.GetOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return getWithConversion[N, O](func() (*O, error) {
 				return t.v1beta1.Get(ctx, name, opts)
+			})
+		case useV1beta2API:
+			return getWithConversion[N, O2](func() (*O2, error) {
+				return t.v1beta2.Get(ctx, name, opts)
 			})
 		default:
 			return t.native.Get(ctx, name, opts)
@@ -158,12 +182,16 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Get(ctx context.Conte
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) List(ctx context.Context, opts metav1.ListOptions) (*NL, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) List(ctx context.Context, opts metav1.ListOptions) (*NL, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*NL, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return getWithConversion[NL, OL](func() (*OL, error) {
 				return t.v1beta1.List(ctx, opts)
+			})
+		case useV1beta2API:
+			return getWithConversion[NL, O2L](func() (*O2L, error) {
+				return t.v1beta2.List(ctx, opts)
 			})
 		default:
 			return t.native.List(ctx, opts)
@@ -172,12 +200,16 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) List(ctx context.Cont
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	apis := newCall(t.c, func(currentAPI int32) (watch.Interface, error) {
 		switch currentAPI {
 		case useV1beta1API:
 			return watchWithConversion[NP, N, OP](func() (watch.Interface, error) {
 				return t.v1beta1.Watch(ctx, opts)
+			})
+		case useV1beta2API:
+			return watchWithConversion[NP, N, O2P](func() (watch.Interface, error) {
+				return t.v1beta2.Watch(ctx, opts)
 			})
 		default:
 			return t.native.Watch(ctx, opts)
@@ -186,19 +218,19 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Watch(ctx context.Con
 	return apis.run()
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Apply(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) Apply(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
-func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) ApplyStatus(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) ApplyStatus(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
-func newCall[N any](c *client, call func(currentAPI int32) (N, error)) callSequence[N] {
+func newCall[N any](c *Client, call func(currentAPI int32) (N, error)) callSequence[N] {
 	seq := callSequence[N]{
 		c:    c,
 		call: call,
@@ -207,7 +239,7 @@ func newCall[N any](c *client, call func(currentAPI int32) (N, error)) callSeque
 }
 
 type callSequence[N any] struct {
-	c    *client
+	c    *Client
 	call func(currentAPI int32) (N, error)
 }
 
@@ -303,6 +335,8 @@ func (w *watchSomething[NP, N, OP]) ResultChan() <-chan watch.Event {
 }
 
 func (w *watchSomething[NP, N, OP]) run() {
+	defer utilruntime.HandleCrash()
+	defer close(w.resultChan)
 	resultChan := w.upstream.ResultChan()
 	for {
 		e, ok := <-resultChan
@@ -320,9 +354,6 @@ func (w *watchSomething[NP, N, OP]) run() {
 				Type:   e.Type,
 				Object: NP(out),
 			}
-		} else {
-			//nolint:logcheck // Shouldn't happen.
-			klog.Errorf("unexpected object with type %T received from watch", e.Object)
 		}
 		// This must not get blocked when the consumer stops reading,
 		// hence the stopChan.

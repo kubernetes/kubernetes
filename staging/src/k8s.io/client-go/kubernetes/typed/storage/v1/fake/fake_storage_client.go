@@ -48,6 +48,10 @@ func (c *FakeStorageV1) VolumeAttachments() v1.VolumeAttachmentInterface {
 	return newFakeVolumeAttachments(c)
 }
 
+func (c *FakeStorageV1) VolumeAttributesClasses() v1.VolumeAttributesClassInterface {
+	return newFakeVolumeAttributesClasses(c)
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeStorageV1) RESTClient() rest.Interface {

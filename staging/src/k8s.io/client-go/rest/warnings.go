@@ -96,11 +96,8 @@ var _ WarningHandlerWithContext = NoWarnings{}
 // WarningLogger is an implementation of [WarningHandler] and [WarningHandlerWithContext] that logs code 299 warnings
 type WarningLogger struct{}
 
-func (WarningLogger) HandleWarningHeader(code int, agent string, message string) {
-	if code != 299 || len(message) == 0 {
-		return
-	}
-	klog.Background().Info("Warning: " + message)
+func (w WarningLogger) HandleWarningHeader(code int, agent string, message string) {
+	w.HandleWarningHeaderWithContext(context.Background(), code, agent, message)
 }
 
 func (WarningLogger) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, message string) {

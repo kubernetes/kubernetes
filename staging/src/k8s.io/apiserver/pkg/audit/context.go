@@ -132,7 +132,7 @@ func (ac *AuditContext) ProcessEventStage(ctx context.Context, stage auditintern
 	return processed
 }
 
-func (ac *AuditContext) LogImpersonatedUser(user user.Info) {
+func (ac *AuditContext) LogImpersonatedUser(user user.Info, constraint string) {
 	ac.visitEvent(func(ev *auditinternal.Event) {
 		if ev == nil || ev.Level.Less(auditinternal.LevelMetadata) {
 			return
@@ -145,6 +145,12 @@ func (ac *AuditContext) LogImpersonatedUser(user user.Info) {
 		ev.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
 		for k, v := range user.GetExtra() {
 			ev.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
+		}
+		if len(constraint) > 0 {
+			if ev.AuthenticationMetadata == nil {
+				ev.AuthenticationMetadata = &auditinternal.AuthenticationMetadata{}
+			}
+			ev.AuthenticationMetadata.ImpersonationConstraint = constraint
 		}
 	})
 }
@@ -176,6 +182,25 @@ func (ac *AuditContext) LogRequestPatch(patch []byte) {
 			ContentType: runtime.ContentTypeJSON,
 		}
 	})
+}
+
+// GetEventUser returns a copy of the User associated with the audit Event.
+func (ac *AuditContext) GetEventUser() authnv1.UserInfo {
+	var val *authnv1.UserInfo
+	ac.visitEvent(func(ev *auditinternal.Event) {
+		val = ev.User.DeepCopy()
+	})
+	return *val
+}
+
+// GetEventImpersonatedUser returns a copy of the ImpersonatedUser associated with the audit Event,
+// or returns nil when there is no ImpersonatedUser.
+func (ac *AuditContext) GetEventImpersonatedUser() *authnv1.UserInfo {
+	var val *authnv1.UserInfo
+	ac.visitEvent(func(ev *auditinternal.Event) {
+		val = ev.ImpersonatedUser.DeepCopy()
+	})
+	return val
 }
 
 func (ac *AuditContext) GetEventAnnotation(key string) (string, bool) {

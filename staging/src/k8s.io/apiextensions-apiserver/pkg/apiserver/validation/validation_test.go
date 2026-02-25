@@ -18,6 +18,7 @@ package validation
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -308,6 +309,7 @@ func TestValidateCustomResource(t *testing.T) {
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+					`<nil>: Invalid value: "": Checked value must be of type integer (default format) in field`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
@@ -357,6 +359,7 @@ func TestValidateCustomResource(t *testing.T) {
 					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+					`<nil>: Invalid value: "": Checked value must be of type integer (default format) in field`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
 					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
@@ -463,7 +466,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": "y"},
 					oldObject: map[string]interface{}{"field": "x"},
 					expectErrs: []string{
-						`field: Invalid value: "string": failed rule: self == oldSelf`,
+						`field: Invalid value: "y": failed rule: self == oldSelf`,
 					}},
 			},
 		},
@@ -511,7 +514,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 0.9}}},
 					oldObject: map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 1.0}}},
 					expectErrs: []string{
-						`field[0].v1: Invalid value: "number": failed rule: self >= oldSelf`,
+						`field[0].v1: Invalid value: 0.9: failed rule: self >= oldSelf`,
 					}},
 			},
 		},
@@ -550,7 +553,7 @@ func TestValidateCustomResource(t *testing.T) {
 				{
 					object: map[string]interface{}{"field": []interface{}{map[string]interface{}{"x": "y"}}},
 					expectErrs: []string{
-						`field[0].x: Invalid value: "string": failed rule: self == 'x'`,
+						`field[0].x: Invalid value: "y": failed rule: self == 'x'`,
 					}},
 			},
 		},
@@ -634,6 +637,93 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"fieldX": "a-"}, expectErrs: []string{
 					`fieldX: Invalid value: "a-": fieldX in body must be of type k8s-short-name: "a-"`,
 				}},
+			},
+		},
+		{name: "numeric formats valid",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"intThirtyTwo":  {Type: "integer", Format: "int32"},
+					"intSixtyFour":  {Type: "integer", Format: "int64"},
+					"floatThreeTwo": {Type: "number", Format: "float"},
+					"floatSixFour":  {Type: "number", Format: "double"},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{
+					"intThirtyTwo":  int64(math.MinInt32),
+					"intSixtyFour":  int64(math.MinInt64),
+					"floatThreeTwo": float64(-math.MaxFloat32),
+					"floatSixFour":  float64(-math.MaxFloat64),
+				},
+				map[string]interface{}{
+					"intThirtyTwo":  int64(0),
+					"intSixtyFour":  int64(0),
+					"floatThreeTwo": float64(0),
+					"floatSixFour":  float64(0),
+				},
+				map[string]interface{}{
+					"intThirtyTwo":  int64(math.MaxInt32),
+					"intSixtyFour":  int64(math.MaxInt64),
+					"floatThreeTwo": float64(math.MaxFloat32),
+					"floatSixFour":  float64(math.MaxFloat64),
+				},
+			},
+		},
+		{name: "numeric formats invalid",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"intThirtyTwo":  {Type: "integer", Format: "int32"},
+					"intSixtyFour":  {Type: "integer", Format: "int64"},
+					"floatThreeTwo": {Type: "number", Format: "float"},
+					"floatSixFour":  {Type: "number", Format: "double"},
+				},
+			},
+			failingObjects: []failingObject{
+				{
+					object: map[string]interface{}{"intThirtyTwo": int64(math.MaxInt32 + 1)},
+					expectErrs: []string{
+						`<nil>: Invalid value: "": Checked value must be of type integer with format int32 in intThirtyTwo`,
+					},
+				},
+				{
+					object: map[string]interface{}{"intThirtyTwo": int64(math.MinInt32 - 1)},
+					expectErrs: []string{
+						`<nil>: Invalid value: "": Checked value must be of type integer with format int32 in intThirtyTwo`,
+					},
+				},
+				// int64 overflow is not possible with int64 input, but we can test it with float64
+				{
+					object: map[string]interface{}{"intSixtyFour": float64(math.MaxInt64) * 1.1},
+					expectErrs: []string{
+						`intSixtyFour: Invalid value: "float64": intSixtyFour in body must be of type int64: "float64"`,
+						`<nil>: Invalid value: "": Checked value must be of type integer with format int64 in intSixtyFour`,
+					},
+				},
+				{
+					object: map[string]interface{}{"intSixtyFour": float64(math.MinInt64) * 1.1},
+					expectErrs: []string{
+						`intSixtyFour: Invalid value: "float64": intSixtyFour in body must be of type int64: "float64"`,
+						`<nil>: Invalid value: "": Checked value must be of type integer with format int64 in intSixtyFour`,
+					},
+				},
+				{
+					object: map[string]interface{}{"floatThreeTwo": float64(math.MaxFloat32 * 1.1)},
+					expectErrs: []string{
+						`<nil>: Invalid value: "": Checked value must be of type number with format float in floatThreeTwo`,
+					},
+				},
+				{
+					object: map[string]interface{}{"floatThreeTwo": float64(-math.MaxFloat32 * 1.1)},
+					expectErrs: []string{
+						`<nil>: Invalid value: "": Checked value must be of type number with format float in floatThreeTwo`,
+					},
+				},
+				// double overflow (float64) is handled by JSON parsing, but we can try to pass a value that might trigger it if not parsed as such.
+				// However, standard JSON unmarshalling usually caps at float64 limits or errors out.
+				// The validator itself checks ranges. Since Go's float64 matches double, true overflow is hard to represent without a custom numeric type.
+				// We will skip explicit double overflow tests here as they often result in +Inf/-Inf which might be handled differently or parse errors.
 			},
 		},
 	}

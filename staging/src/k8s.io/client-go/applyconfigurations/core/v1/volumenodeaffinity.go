@@ -20,7 +20,10 @@ package v1
 
 // VolumeNodeAffinityApplyConfiguration represents a declarative configuration of the VolumeNodeAffinity type for use
 // with apply.
+//
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 type VolumeNodeAffinityApplyConfiguration struct {
+	// required specifies hard node constraints that must be met.
 	Required *NodeSelectorApplyConfiguration `json:"required,omitempty"`
 }
 

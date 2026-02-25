@@ -24,11 +24,11 @@ func (t notADirectoryError) Error() string {
 }
 
 type BeADirectoryMatcher struct {
-	expected interface{}
+	expected any
 	err      error
 }
 
-func (matcher *BeADirectoryMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeADirectoryMatcher) Match(actual any) (success bool, err error) {
 	actualFilename, ok := actual.(string)
 	if !ok {
 		return false, fmt.Errorf("BeADirectoryMatcher matcher expects a file path")
@@ -47,10 +47,10 @@ func (matcher *BeADirectoryMatcher) Match(actual interface{}) (success bool, err
 	return true, nil
 }
 
-func (matcher *BeADirectoryMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeADirectoryMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, fmt.Sprintf("to be a directory: %s", matcher.err))
 }
 
-func (matcher *BeADirectoryMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeADirectoryMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not be a directory")
 }

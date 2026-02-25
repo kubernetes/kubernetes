@@ -30,18 +30,14 @@ func TestStorageObjectCountTracker(t *testing.T) {
 	tests := []struct {
 		name          string
 		lastUpdated   time.Duration
+		skipSetting   bool
 		count         int64
 		errExpected   error
 		countExpected int64
 	}{
 		{
 			name:        "object count not tracked for given resource",
-			count:       -2,
-			errExpected: ObjectCountNotFoundErr,
-		},
-		{
-			name:        "transient failure",
-			count:       -1,
+			skipSetting: true,
 			errExpected: ObjectCountNotFoundErr,
 		},
 		{
@@ -76,7 +72,9 @@ func TestStorageObjectCountTracker(t *testing.T) {
 			key := "foo.bar.resource"
 			now := time.Now()
 			fakeClock.SetTime(now.Add(-test.lastUpdated))
-			tracker.Set(key, storage.Stats{ObjectCount: test.count})
+			if !test.skipSetting {
+				tracker.Set(key, storage.Stats{ObjectCount: test.count})
+			}
 
 			fakeClock.SetTime(now)
 			stats, err := tracker.Get(key)

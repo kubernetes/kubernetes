@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,7 +16,7 @@ package procfs
 import (
 	"bytes"
 	"math/bits"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -94,8 +94,7 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 
 	s := ProcStatus{PID: p.PID}
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if !bytes.Contains([]byte(line), []byte(":")) {
 			continue
 		}
@@ -146,7 +145,11 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 			}
 		}
 	case "NSpid":
-		s.NSpids = calcNSPidsList(vString)
+		nspids, err := calcNSPidsList(vString)
+		if err != nil {
+			return err
+		}
+		s.NSpids = nspids
 	case "VmPeak":
 		s.VmPeak = vUintBytes
 	case "VmSize":
@@ -218,21 +221,21 @@ func calcCpusAllowedList(cpuString string) []uint64 {
 
 	}
 
-	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
+	slices.Sort(g)
 	return g
 }
 
-func calcNSPidsList(nspidsString string) []uint64 {
-	s := strings.Split(nspidsString, " ")
+func calcNSPidsList(nspidsString string) ([]uint64, error) {
+	s := strings.Split(nspidsString, "\t")
 	var nspids []uint64
 
 	for _, nspid := range s {
-		nspid, _ := strconv.ParseUint(nspid, 10, 64)
-		if nspid == 0 {
-			continue
+		nspid, err := strconv.ParseUint(nspid, 10, 64)
+		if err != nil {
+			return nil, err
 		}
 		nspids = append(nspids, nspid)
 	}
 
-	return nspids
+	return nspids, nil
 }

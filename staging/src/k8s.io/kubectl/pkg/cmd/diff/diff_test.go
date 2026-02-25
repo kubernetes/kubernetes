@@ -197,7 +197,7 @@ func TestDiffer(t *testing.T) {
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
-	err = diff.Diff(&obj, Printer{}, true)
+	err = diff.Diff(&obj, Printer{}, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ metadata:
 				},
 			}
 
-			err = diff.Diff(&obj, Printer{}, tc.showManagedFields)
+			err = diff.Diff(&obj, Printer{}, tc.showManagedFields, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -629,6 +629,94 @@ func TestMasker(t *testing.T) {
 				if diff := cmp.Diff(to, tc.want.to); diff != "" {
 					t.Errorf("to: (-want +got):\n%s", diff)
 				}
+			}
+		})
+	}
+}
+
+func TestShowSecrets(t *testing.T) {
+	diff, err := NewDiffer("LIVE", "MERGED")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer diff.TearDown()
+
+	testCases := []struct {
+		name                string
+		showSecrets         bool
+		expectedFromContent string
+		expectedToContent   string
+	}{
+		{
+			name:        "without show secrets",
+			showSecrets: false,
+			expectedFromContent: `apiVersion: v1
+data:
+  password: '***'
+kind: Secret
+metadata:
+  name: mysecret
+`,
+			expectedToContent: `apiVersion: v1
+data:
+  password: '***'
+kind: Secret
+metadata:
+  name: mysecret
+`,
+		},
+		{
+			name:        "with show secrets",
+			showSecrets: true,
+			expectedFromContent: `apiVersion: v1
+data:
+  password: mypassword
+kind: Secret
+metadata:
+  name: mysecret
+`,
+			expectedToContent: `apiVersion: v1
+data:
+  password: mypassword
+kind: Secret
+metadata:
+  name: mysecret
+`,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			secretArgs := map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Secret",
+				"metadata": map[string]interface{}{
+					"name": "mysecret",
+				},
+				"data": map[string]interface{}{
+					"password": "mypassword",
+				},
+			}
+
+			obj := FakeObject{
+				name:   fmt.Sprintf("TestCase%d", i),
+				live:   secretArgs,
+				merged: secretArgs,
+			}
+
+			err = diff.Diff(&obj, Printer{}, false, tc.showSecrets)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actualFromContent, _ := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
+			if string(actualFromContent) != tc.expectedFromContent {
+				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
+			}
+
+			actualToContent, _ := os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
+			if string(actualToContent) != tc.expectedToContent {
+				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
 			}
 		})
 	}

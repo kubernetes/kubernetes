@@ -51,9 +51,14 @@ func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 // Newest first.
 type podSandboxByCreated []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreated) Len() int           { return len(p) }
-func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
+func (p podSandboxByCreated) Len() int      { return len(p) }
+func (p podSandboxByCreated) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByCreated) Less(i, j int) bool {
+	if p[i].Metadata == nil || p[j].Metadata == nil {
+		return p[i].CreatedAt > p[j].CreatedAt
+	}
+	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
+}
 
 type containerStatusByCreated []*kubecontainer.Status
 
@@ -78,7 +83,7 @@ func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
 }
 
 // toRuntimeProtocol converts v1.Protocol to runtimeapi.Protocol.
-func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
+func toRuntimeProtocol(logger klog.Logger, protocol v1.Protocol) runtimeapi.Protocol {
 	switch protocol {
 	case v1.ProtocolTCP:
 		return runtimeapi.Protocol_TCP
@@ -88,12 +93,12 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_SCTP
 	}
 
-	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
+	logger.Info("Unknown protocol, defaulting to TCP", "protocol", protocol)
 	return runtimeapi.Protocol_TCP
 }
 
 // toKubeContainer converts runtimeapi.Container to kubecontainer.Container.
-func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*kubecontainer.Container, error) {
+func (m *kubeGenericRuntimeManager) toKubeContainer(ctx context.Context, c *runtimeapi.Container) (*kubecontainer.Container, error) {
 	if c == nil || c.Id == "" || c.Image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -104,7 +109,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		imageID = c.ImageId
 	}
 
-	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
+	annotatedInfo := getContainerInfoFromAnnotations(ctx, c.Annotations)
 	return &kubecontainer.Container{
 		ID:                  kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
 		Name:                c.GetMetadata().GetName(),

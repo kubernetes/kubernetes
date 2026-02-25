@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -40,7 +40,7 @@ import (
 )
 
 var nodeInfoCmpOpts = []cmp.Option{
-	cmp.AllowUnexported(NodeInfo{}, PodInfo{}, podResource{}),
+	cmp.AllowUnexported(NodeInfo{}, PodInfo{}, fwk.PodResource{}),
 }
 
 func TestNewResource(t *testing.T) {
@@ -263,16 +263,16 @@ func TestNewNodeInfo(t *testing.T) {
 		},
 		Allocatable: &Resource{},
 		Generation:  2,
-		UsedPorts: HostPortInfo{
-			"127.0.0.1": map[ProtocolPort]struct{}{
+		UsedPorts: fwk.HostPortInfo{
+			"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:  map[string]*ImageStateSummary{},
+		ImageStates:  map[string]*fwk.ImageStateSummary{},
 		PVCRefCounts: map[string]int{},
-		Pods: []*PodInfo{
-			{
+		Pods: []fwk.PodInfo{
+			&PodInfo{
 				Pod: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "node_info_cache_test",
@@ -300,16 +300,16 @@ func TestNewNodeInfo(t *testing.T) {
 						NodeName: nodeName,
 					},
 				},
-				cachedResource: &podResource{
-					resource: Resource{
+				cachedResource: &fwk.PodResource{
+					Resource: &Resource{
 						MilliCPU: 100,
 						Memory:   500,
 					},
-					non0CPU: 100,
-					non0Mem: 500,
+					Non0CPU: 100,
+					Non0Mem: 500,
 				},
 			},
-			{
+			&PodInfo{
 				Pod: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "node_info_cache_test",
@@ -337,13 +337,13 @@ func TestNewNodeInfo(t *testing.T) {
 						NodeName: nodeName,
 					},
 				},
-				cachedResource: &podResource{
-					resource: Resource{
+				cachedResource: &fwk.PodResource{
+					Resource: &Resource{
 						MilliCPU: 200,
 						Memory:   1024,
 					},
-					non0CPU: 200,
-					non0Mem: 1024,
+					Non0CPU: 200,
+					Non0Mem: 1024,
 				},
 			},
 		},
@@ -372,16 +372,16 @@ func TestNodeInfoClone(t *testing.T) {
 				NonZeroRequested: &Resource{},
 				Allocatable:      &Resource{},
 				Generation:       2,
-				UsedPorts: HostPortInfo{
-					"127.0.0.1": map[ProtocolPort]struct{}{
+				UsedPorts: fwk.HostPortInfo{
+					"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
-				Pods: []*PodInfo{
-					{
+				Pods: []fwk.PodInfo{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -409,16 +409,16 @@ func TestNodeInfoClone(t *testing.T) {
 								NodeName: nodeName,
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 100,
 								Memory:   500,
 							},
-							non0CPU: 100,
-							non0Mem: 500,
+							Non0CPU: 100,
+							Non0Mem: 500,
 						},
 					},
-					{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -446,13 +446,13 @@ func TestNodeInfoClone(t *testing.T) {
 								NodeName: nodeName,
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 200,
 								Memory:   1024,
 							},
-							non0CPU: 200,
-							non0Mem: 1024,
+							Non0CPU: 200,
+							Non0Mem: 1024,
 						},
 					},
 				},
@@ -462,16 +462,16 @@ func TestNodeInfoClone(t *testing.T) {
 				NonZeroRequested: &Resource{},
 				Allocatable:      &Resource{},
 				Generation:       2,
-				UsedPorts: HostPortInfo{
-					"127.0.0.1": map[ProtocolPort]struct{}{
+				UsedPorts: fwk.HostPortInfo{
+					"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
-				Pods: []*PodInfo{
-					{
+				Pods: []fwk.PodInfo{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -499,16 +499,16 @@ func TestNodeInfoClone(t *testing.T) {
 								NodeName: nodeName,
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 100,
 								Memory:   500,
 							},
-							non0CPU: 100,
-							non0Mem: 500,
+							Non0CPU: 100,
+							Non0Mem: 500,
 						},
 					},
-					{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -536,16 +536,38 @@ func TestNodeInfoClone(t *testing.T) {
 								NodeName: nodeName,
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 200,
 								Memory:   1024,
 							},
-							non0CPU: 200,
-							non0Mem: 1024,
+							Non0CPU: 200,
+							Non0Mem: 1024,
 						},
 					},
 				},
+			},
+		},
+		{
+			nodeInfo: &NodeInfo{
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+			},
+			expected: &NodeInfo{
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
 			},
 		},
 	}
@@ -716,16 +738,16 @@ func TestNodeInfoAddPod(t *testing.T) {
 		},
 		Allocatable: &Resource{},
 		Generation:  2,
-		UsedPorts: HostPortInfo{
-			"127.0.0.1": map[ProtocolPort]struct{}{
+		UsedPorts: fwk.HostPortInfo{
+			"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:  map[string]*ImageStateSummary{},
+		ImageStates:  map[string]*fwk.ImageStateSummary{},
 		PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
-		Pods: []*PodInfo{
-			{
+		Pods: []fwk.PodInfo{
+			&PodInfo{
 				Pod: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "node_info_cache_test",
@@ -765,16 +787,16 @@ func TestNodeInfoAddPod(t *testing.T) {
 						},
 					},
 				},
-				cachedResource: &podResource{
-					resource: Resource{
+				cachedResource: &fwk.PodResource{
+					Resource: &Resource{
 						MilliCPU: 600,
 						Memory:   500,
 					},
-					non0CPU: 600,
-					non0Mem: 500,
+					Non0CPU: 600,
+					Non0Mem: 500,
 				},
 			},
-			{
+			&PodInfo{
 				Pod: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "node_info_cache_test",
@@ -814,16 +836,16 @@ func TestNodeInfoAddPod(t *testing.T) {
 						},
 					},
 				},
-				cachedResource: &podResource{
-					resource: Resource{
+				cachedResource: &fwk.PodResource{
+					Resource: &Resource{
 						MilliCPU: 700,
 						Memory:   500,
 					},
-					non0CPU: 700,
-					non0Mem: schedutil.DefaultMemoryRequest + 500,
+					Non0CPU: 700,
+					Non0Mem: schedutil.DefaultMemoryRequest + 500,
 				},
 			},
-			{
+			&PodInfo{
 				Pod: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "node_info_cache_test",
@@ -873,13 +895,13 @@ func TestNodeInfoAddPod(t *testing.T) {
 						},
 					},
 				},
-				cachedResource: &podResource{
-					resource: Resource{
+				cachedResource: &fwk.PodResource{
+					Resource: &Resource{
 						MilliCPU: 1000,
 						Memory:   schedutil.DefaultMemoryRequest + 500,
 					},
-					non0CPU: 1000,
-					non0Mem: schedutil.DefaultMemoryRequest + 500,
+					Non0CPU: 1000,
+					Non0Mem: schedutil.DefaultMemoryRequest + 500,
 				},
 			},
 		},
@@ -966,16 +988,16 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				},
 				Allocatable: &Resource{},
 				Generation:  2,
-				UsedPorts: HostPortInfo{
-					"127.0.0.1": map[ProtocolPort]struct{}{
+				UsedPorts: fwk.HostPortInfo{
+					"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 1},
-				Pods: []*PodInfo{
-					{
+				Pods: []fwk.PodInfo{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -1016,16 +1038,16 @@ func TestNodeInfoRemovePod(t *testing.T) {
 								},
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 600,
 								Memory:   1000,
 							},
-							non0CPU: 600,
-							non0Mem: 1000,
+							Non0CPU: 600,
+							Non0Mem: 1000,
 						},
 					},
-					{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -1057,13 +1079,13 @@ func TestNodeInfoRemovePod(t *testing.T) {
 								},
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 700,
 								Memory:   1524,
 							},
-							non0CPU: 700,
-							non0Mem: 1524,
+							Non0CPU: 700,
+							Non0Mem: 1524,
 						},
 					},
 				},
@@ -1133,15 +1155,15 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				},
 				Allocatable: &Resource{},
 				Generation:  3,
-				UsedPorts: HostPortInfo{
-					"127.0.0.1": map[ProtocolPort]struct{}{
+				UsedPorts: fwk.HostPortInfo{
+					"127.0.0.1": map[fwk.ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts: map[string]int{},
-				Pods: []*PodInfo{
-					{
+				Pods: []fwk.PodInfo{
+					&PodInfo{
 						Pod: &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: "node_info_cache_test",
@@ -1173,13 +1195,13 @@ func TestNodeInfoRemovePod(t *testing.T) {
 								},
 							},
 						},
-						cachedResource: &podResource{
-							resource: Resource{
+						cachedResource: &fwk.PodResource{
+							Resource: &Resource{
 								MilliCPU: 700,
 								Memory:   1524,
 							},
-							non0CPU: 700,
-							non0Mem: 1524,
+							Non0CPU: 700,
+							Non0Mem: 1524,
 						},
 					},
 				},
@@ -1217,6 +1239,64 @@ func TestNodeInfoRemovePod(t *testing.T) {
 	}
 }
 
+func TestSetNodeDeclaredFeatures(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureGateEnabled bool
+		nodeStatus         v1.NodeStatus
+		expectedFeatures   ndf.FeatureSet
+	}{
+		{
+			name:               "Feature gate disabled",
+			featureGateEnabled: false,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+		{
+			name:               "Feature gate enabled, node has features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
+			},
+			expectedFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+		},
+		{
+			name:               "Feature gate enabled, node has no features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{},
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+		{
+			name:               "Feature gate enabled, node status has nil features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: nil,
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureGateEnabled)
+			ni := NewNodeInfo()
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     tt.nodeStatus,
+			}
+			ni.SetNode(node)
+			gotFeatures := ni.GetNodeDeclaredFeatures()
+			if !gotFeatures.Equal(tt.expectedFeatures) {
+				t.Errorf("SetNode() or GetNodeDeclaredFeatures() unexpected result, got: %v, want: %v", gotFeatures, tt.expectedFeatures)
+			}
+		})
+	}
+}
+
 func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := NewNodeInfo(pods...)
 	ni.SetNode(&v1.Node{
@@ -1225,262 +1305,6 @@ func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		},
 	})
 	return ni
-}
-
-type hostPortInfoParam struct {
-	protocol, ip string
-	port         int32
-}
-
-func TestHostPortInfo_AddRemove(t *testing.T) {
-	tests := []struct {
-		desc    string
-		added   []hostPortInfoParam
-		removed []hostPortInfoParam
-		length  int
-	}{
-		{
-			desc: "normal add case",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-				// this might not make sense in real case, but the struct doesn't forbid it.
-				{"TCP", "0.0.0.0", 79},
-				{"UDP", "0.0.0.0", 80},
-				{"TCP", "0.0.0.0", 81},
-				{"TCP", "0.0.0.0", 82},
-				{"TCP", "0.0.0.0", 0},
-				{"TCP", "0.0.0.0", -1},
-			},
-			length: 8,
-		},
-		{
-			desc: "empty ip and protocol add should work",
-			added: []hostPortInfoParam{
-				{"", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"", "127.0.0.1", 81},
-				{"", "127.0.0.1", 82},
-				{"", "", 79},
-				{"UDP", "", 80},
-				{"", "", 81},
-				{"", "", 82},
-				{"", "", 0},
-				{"", "", -1},
-			},
-			length: 8,
-		},
-		{
-			desc: "normal remove case",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-				{"TCP", "0.0.0.0", 79},
-				{"UDP", "0.0.0.0", 80},
-				{"TCP", "0.0.0.0", 81},
-				{"TCP", "0.0.0.0", 82},
-			},
-			removed: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-				{"TCP", "0.0.0.0", 79},
-				{"UDP", "0.0.0.0", 80},
-				{"TCP", "0.0.0.0", 81},
-				{"TCP", "0.0.0.0", 82},
-			},
-			length: 0,
-		},
-		{
-			desc: "empty ip and protocol remove should work",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-				{"TCP", "0.0.0.0", 79},
-				{"UDP", "0.0.0.0", 80},
-				{"TCP", "0.0.0.0", 81},
-				{"TCP", "0.0.0.0", 82},
-			},
-			removed: []hostPortInfoParam{
-				{"", "127.0.0.1", 79},
-				{"", "127.0.0.1", 81},
-				{"", "127.0.0.1", 82},
-				{"UDP", "127.0.0.1", 80},
-				{"", "", 79},
-				{"", "", 81},
-				{"", "", 82},
-				{"UDP", "", 80},
-			},
-			length: 0,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			hp := make(HostPortInfo)
-			for _, param := range test.added {
-				hp.Add(param.ip, param.protocol, param.port)
-			}
-			for _, param := range test.removed {
-				hp.Remove(param.ip, param.protocol, param.port)
-			}
-			if hp.Len() != test.length {
-				t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
-				t.Error(hp)
-			}
-		})
-	}
-}
-
-func TestHostPortInfo_Check(t *testing.T) {
-	tests := []struct {
-		desc   string
-		added  []hostPortInfoParam
-		check  hostPortInfoParam
-		expect bool
-	}{
-		{
-			desc: "empty check should check 0.0.0.0 and TCP",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 80},
-			},
-			check:  hostPortInfoParam{"", "", 81},
-			expect: false,
-		},
-		{
-			desc: "empty check should check 0.0.0.0 and TCP (conflicted)",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 80},
-			},
-			check:  hostPortInfoParam{"", "", 80},
-			expect: true,
-		},
-		{
-			desc: "empty port check should pass",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 80},
-			},
-			check:  hostPortInfoParam{"", "", 0},
-			expect: false,
-		},
-		{
-			desc: "0.0.0.0 should check all registered IPs",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 80},
-			},
-			check:  hostPortInfoParam{"TCP", "0.0.0.0", 80},
-			expect: true,
-		},
-		{
-			desc: "0.0.0.0 with different protocol should be allowed",
-			added: []hostPortInfoParam{
-				{"UDP", "127.0.0.1", 80},
-			},
-			check:  hostPortInfoParam{"TCP", "0.0.0.0", 80},
-			expect: false,
-		},
-		{
-			desc: "0.0.0.0 with different port should be allowed",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-			},
-			check:  hostPortInfoParam{"TCP", "0.0.0.0", 80},
-			expect: false,
-		},
-		{
-			desc: "normal ip should check all registered 0.0.0.0",
-			added: []hostPortInfoParam{
-				{"TCP", "0.0.0.0", 80},
-			},
-			check:  hostPortInfoParam{"TCP", "127.0.0.1", 80},
-			expect: true,
-		},
-		{
-			desc: "normal ip with different port/protocol should be allowed (0.0.0.0)",
-			added: []hostPortInfoParam{
-				{"TCP", "0.0.0.0", 79},
-				{"UDP", "0.0.0.0", 80},
-				{"TCP", "0.0.0.0", 81},
-				{"TCP", "0.0.0.0", 82},
-			},
-			check:  hostPortInfoParam{"TCP", "127.0.0.1", 80},
-			expect: false,
-		},
-		{
-			desc: "normal ip with different port/protocol should be allowed",
-			added: []hostPortInfoParam{
-				{"TCP", "127.0.0.1", 79},
-				{"UDP", "127.0.0.1", 80},
-				{"TCP", "127.0.0.1", 81},
-				{"TCP", "127.0.0.1", 82},
-			},
-			check:  hostPortInfoParam{"TCP", "127.0.0.1", 80},
-			expect: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			hp := make(HostPortInfo)
-			for _, param := range test.added {
-				hp.Add(param.ip, param.protocol, param.port)
-			}
-			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
-				t.Errorf("expected %t; got %t", test.expect, !test.expect)
-			}
-		})
-	}
-}
-
-func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
-	tests := []struct {
-		name string
-		term *v1.PodAffinityTerm
-		want sets.Set[string]
-	}{
-		{
-			name: "podAffinityTerm_namespace_empty",
-			term: &v1.PodAffinityTerm{},
-			want: sets.Set[string]{metav1.NamespaceDefault: sets.Empty{}},
-		},
-		{
-			name: "podAffinityTerm_namespace_not_empty",
-			term: &v1.PodAffinityTerm{
-				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
-			},
-			want: sets.New(metav1.NamespacePublic, metav1.NamespaceSystem),
-		},
-		{
-			name: "podAffinityTerm_namespace_selector_not_nil",
-			term: &v1.PodAffinityTerm{
-				NamespaceSelector: &metav1.LabelSelector{},
-			},
-			want: sets.Set[string]{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got := getNamespacesFromPodAffinityTerm(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "topologies_pod",
-					Namespace: metav1.NamespaceDefault,
-				},
-			}, test.term)
-			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("Unexpected namespaces (-want, +got):\n%s", diff)
-			}
-		})
-	}
 }
 
 func TestFitError_Error(t *testing.T) {
@@ -1630,16 +1454,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 		containers               []v1.Container
 		podResources             *v1.ResourceRequirements
 		podLevelResourcesEnabled bool
-		expectedResource         podResource
+		expectedResource         fwk.PodResource
 		initContainers           []v1.Container
 	}{
 		{
 			name:       "requestless container",
 			containers: []v1.Container{{}},
-			expectedResource: podResource{
-				resource: Resource{},
-				non0CPU:  schedutil.DefaultMilliCPURequest,
-				non0Mem:  schedutil.DefaultMemoryRequest,
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{},
+				Non0CPU:  schedutil.DefaultMilliCPURequest,
+				Non0Mem:  schedutil.DefaultMemoryRequest,
 			},
 		},
 		{
@@ -1654,13 +1478,13 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue(),
 					Memory:   mem500M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: mem500M.Value(),
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
 			},
 		},
 		{
@@ -1683,13 +1507,13 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
 					Memory:   mem500M.Value() + mem800M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
-				non0Mem: mem500M.Value() + mem800M.Value(),
+				Non0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem800M.Value(),
 			},
 		},
 		{
@@ -1721,13 +1545,13 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem1200M,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu1200m.MilliValue(),
 					Memory:   mem1200M.Value(),
 				},
-				non0CPU: cpu1200m.MilliValue(),
-				non0Mem: mem1200M.Value(),
+				Non0CPU: cpu1200m.MilliValue(),
+				Non0Mem: mem1200M.Value(),
 			},
 		},
 		{
@@ -1760,13 +1584,13 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem1200M,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu1200m.MilliValue(),
 					Memory:   mem1200M.Value(),
 				},
-				non0CPU: cpu1200m.MilliValue(),
-				non0Mem: mem1200M.Value(),
+				Non0CPU: cpu1200m.MilliValue(),
+				Non0Mem: mem1200M.Value(),
 			},
 		},
 		{
@@ -1787,12 +1611,12 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem1200M,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					Memory: mem1200M.Value(),
 				},
-				non0CPU: schedutil.DefaultMilliCPURequest,
-				non0Mem: mem1200M.Value(),
+				Non0CPU: schedutil.DefaultMilliCPURequest,
+				Non0Mem: mem1200M.Value(),
 			},
 		},
 		{
@@ -1813,12 +1637,12 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceCPU: cpu500m,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: schedutil.DefaultMemoryRequest,
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: schedutil.DefaultMemoryRequest,
 			},
 		},
 		{
@@ -1847,13 +1671,13 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceCPU: cpu500m,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU:         cpu500m.MilliValue(),
 					EphemeralStorage: mem800M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: schedutil.DefaultMemoryRequest,
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: schedutil.DefaultMemoryRequest,
 			},
 		},
 	}
@@ -1870,7 +1694,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			}
-			res := podInfo.calculateResource()
+			res := podInfo.CalculateResource()
 			if diff := cmp.Diff(tc.expectedResource, res, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Unexpected resource (-want,+got):\n%s", diff)
 			}
@@ -1880,6 +1704,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 
 func TestCalculatePodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
 	testpod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "pod_resize_test",
@@ -1894,10 +1721,23 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 
 	preparePodInfo := func(pod v1.Pod,
+		podRequests, podStatusResources,
 		requests, statusResources,
 		initRequests, initStatusResources,
 		sidecarRequests, sidecarStatusResources *v1.ResourceList,
 		resizeStatus []*v1.PodCondition) PodInfo {
+
+		if podRequests != nil {
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Requests: *podRequests,
+			}
+		}
+
+		if podStatusResources != nil {
+			pod.Status.Resources = &v1.ResourceRequirements{
+				Requests: *podStatusResources,
+			}
+		}
 
 		if requests != nil {
 			pod.Spec.Containers = append(pod.Spec.Containers,
@@ -1961,27 +1801,44 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                   string
-		requests               v1.ResourceList
-		statusResources        v1.ResourceList
-		initRequests           *v1.ResourceList
-		initStatusResources    *v1.ResourceList
-		resizeStatus           []*v1.PodCondition
-		sidecarRequests        *v1.ResourceList
-		sidecarStatusResources *v1.ResourceList
-		expectedResource       podResource
+		name                    string
+		podLevelRequests        *v1.ResourceList
+		requests                v1.ResourceList
+		statusResources         v1.ResourceList
+		podLevelStatusResources *v1.ResourceList
+		initRequests            *v1.ResourceList
+		initStatusResources     *v1.ResourceList
+		resizeStatus            []*v1.PodCondition
+		sidecarRequests         *v1.ResourceList
+		sidecarStatusResources  *v1.ResourceList
+		expectedResource        fwk.PodResource
 	}{
 		{
 			name:            "Pod with no pending resize",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue(),
 					Memory:   mem500M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: mem500M.Value(),
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                    "Pod with pod-level resources no pending resize",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem500M.Value(),
 			},
 		},
 		{
@@ -1994,13 +1851,34 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue(),
 					Memory:   mem500M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: mem500M.Value(),
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                    "Pod with pod-level resources and resize in progress",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem500M},
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem500M.Value(),
 			},
 		},
 		{
@@ -2014,13 +1892,35 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 					Reason: v1.PodReasonDeferred,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu700m.MilliValue(),
 					Memory:   mem800M.Value(),
 				},
-				non0CPU: cpu700m.MilliValue(),
-				non0Mem: mem800M.Value(),
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
+			},
+		},
+		{
+			name:                    "Pod with pod-level resources and with deferred resize",
+			podLevelRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			requests:                v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			podLevelStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(),
+					Memory:   mem800M.Value(),
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
 			},
 		},
 		{
@@ -2034,13 +1934,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 					Reason: v1.PodReasonInfeasible,
 				},
 			},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue(),
 					Memory:   mem500M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue(),
-				non0Mem: mem500M.Value(),
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
 			},
 		},
 		{
@@ -2049,13 +1949,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			statusResources:     v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			initRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			initStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu700m.MilliValue(),
 					Memory:   mem800M.Value(),
 				},
-				non0CPU: cpu700m.MilliValue(),
-				non0Mem: mem800M.Value(),
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
 			},
 		},
 		{
@@ -2066,13 +1966,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			initStatusResources:    &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			sidecarRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			sidecarStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			expectedResource: podResource{
-				resource: Resource{
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
 					MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
 					Memory:   mem500M.Value() + mem800M.Value(),
 				},
-				non0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
-				non0Mem: mem500M.Value() + mem800M.Value(),
+				Non0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem800M.Value(),
 			},
 		},
 	}
@@ -2080,12 +1980,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			podInfo := preparePodInfo(*testpod.DeepCopy(),
+				tt.podLevelRequests, tt.podLevelStatusResources,
 				&tt.requests, &tt.statusResources,
 				tt.initRequests, tt.initStatusResources,
 				tt.sidecarRequests, tt.sidecarStatusResources,
 				tt.resizeStatus)
 
-			res := podInfo.calculateResource()
+			res := podInfo.CalculateResource()
 			if diff := cmp.Diff(tt.expectedResource, res, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Unexpected podResource (-want, +got):\n%s", diff)
 			}
@@ -2176,30 +2077,30 @@ func TestNodeInfoKMetadata(t *testing.T) {
 
 func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 	testCases := []struct {
-		ports HostPortInfo
+		ports fwk.HostPortInfo
 		pod   *v1.Pod
-		want  HostPortInfo
+		want  fwk.HostPortInfo
 	}{
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod:   nil,
-			want:  HostPortInfo{},
+			want:  fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: nil,
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod: st.MakePod().
 				ContainerPort([]v1.ContainerPort{
 					{
@@ -2207,10 +2108,10 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{},
+			want: fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod: st.MakePod().
 				ContainerPort([]v1.ContainerPort{
 					{
@@ -2219,16 +2120,16 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2239,15 +2140,15 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
-					ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod: st.MakePod().
 				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
 					{
@@ -2256,12 +2157,12 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{},
+			want: fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2272,14 +2173,14 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod: st.MakePod().
 				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
 					{
@@ -2288,16 +2189,16 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2308,16 +2209,16 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2328,10 +2229,10 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
-					ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 		},
@@ -2347,30 +2248,30 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 
 func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 	testCases := []struct {
-		ports HostPortInfo
+		ports fwk.HostPortInfo
 		pod   *v1.Pod
-		want  HostPortInfo
+		want  fwk.HostPortInfo
 	}{
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod:   nil,
-			want:  HostPortInfo{},
+			want:  fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: nil,
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{},
+			ports: fwk.HostPortInfo{},
 			pod: st.MakePod().
 				ContainerPort([]v1.ContainerPort{
 					{
@@ -2378,12 +2279,12 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{},
+			want: fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2394,12 +2295,12 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{},
+			want: fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2410,17 +2311,17 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
-					ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2431,16 +2332,16 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2451,16 +2352,16 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2471,12 +2372,12 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{},
+			want: fwk.HostPortInfo{},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2487,17 +2388,17 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
-			ports: HostPortInfo{
+			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
-					ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2508,9 +2409,9 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 						Protocol:      v1.ProtocolTCP,
 					}}).
 				Obj(),
-			want: HostPortInfo{
+			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},

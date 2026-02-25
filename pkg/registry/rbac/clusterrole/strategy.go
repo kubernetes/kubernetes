@@ -19,6 +19,7 @@ package clusterrole
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -75,7 +76,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
 	}
-	return validation.ValidateClusterRole(clusterRole, opts)
+	allErrs := validation.ValidateClusterRole(clusterRole, opts)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, clusterRole, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -93,8 +96,9 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
-	errorList := validation.ValidateClusterRole(newObj, opts)
-	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole), opts)...)
+	errs := validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

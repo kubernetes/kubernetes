@@ -29,11 +29,24 @@ import (
 
 // ResourceClaimApplyConfiguration represents a declarative configuration of the ResourceClaim type for use
 // with apply.
+//
+// ResourceClaim describes a request for access to resources in the cluster,
+// for use by workloads. For example, if a workload needs an accelerator device
+// with specific properties, this is how that request is expressed. The status
+// stanza tracks whether this claim has been satisfied and what specific
+// resources have been allocated.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type ResourceClaimApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ResourceClaimStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec describes what is being requested and how to configure it.
+	// The spec is immutable.
+	Spec *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status describes whether the claim is ready to use and what has been allocated.
+	Status *ResourceClaimStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ResourceClaim constructs a declarative configuration of the ResourceClaim type for use with
@@ -47,29 +60,14 @@ func ResourceClaim(name, namespace string) *ResourceClaimApplyConfiguration {
 	return b
 }
 
-// ExtractResourceClaim extracts the applied configuration owned by fieldManager from
-// resourceClaim. If no managedFields are found in resourceClaim for fieldManager, a
-// ResourceClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractResourceClaimFrom extracts the applied configuration owned by fieldManager from
+// resourceClaim for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // resourceClaim must be a unmodified ResourceClaim API object that was retrieved from the Kubernetes API.
-// ExtractResourceClaim provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractResourceClaimFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractResourceClaim(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
-	return extractResourceClaim(resourceClaim, fieldManager, "")
-}
-
-// ExtractResourceClaimStatus is the same as ExtractResourceClaim except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractResourceClaimStatus(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
-	return extractResourceClaim(resourceClaim, fieldManager, "status")
-}
-
-func extractResourceClaim(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string, subresource string) (*ResourceClaimApplyConfiguration, error) {
+func ExtractResourceClaimFrom(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string, subresource string) (*ResourceClaimApplyConfiguration, error) {
 	b := &ResourceClaimApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaim, internal.Parser().Type("io.k8s.api.resource.v1beta1.ResourceClaim"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +80,27 @@ func extractResourceClaim(resourceClaim *resourcev1beta1.ResourceClaim, fieldMan
 	b.WithAPIVersion("resource.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractResourceClaim extracts the applied configuration owned by fieldManager from
+// resourceClaim. If no managedFields are found in resourceClaim for fieldManager, a
+// ResourceClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// resourceClaim must be a unmodified ResourceClaim API object that was retrieved from the Kubernetes API.
+// ExtractResourceClaim provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractResourceClaim(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
+	return ExtractResourceClaimFrom(resourceClaim, fieldManager, "")
+}
+
+// ExtractResourceClaimStatus extracts the applied configuration owned by fieldManager from
+// resourceClaim for the status subresource.
+func ExtractResourceClaimStatus(resourceClaim *resourcev1beta1.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
+	return ExtractResourceClaimFrom(resourceClaim, fieldManager, "status")
+}
+
 func (b ResourceClaimApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

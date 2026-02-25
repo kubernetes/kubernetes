@@ -152,7 +152,7 @@ func (c *checker) checkOptSelect(e ast.Expr) {
 		}
 		c.errors.notAnOptionalFieldSelectionCall(e.ID(), c.location(e),
 			fmt.Sprintf(
-				"incorrect signature.%s argument count: %d%s", t, len(call.Args())))
+				"incorrect signature.%s argument count: %d", t, len(call.Args())))
 		return
 	}
 

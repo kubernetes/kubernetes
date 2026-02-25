@@ -15,9 +15,23 @@
 ARG BASEIMAGE
 ARG REGISTRY
 ARG OS_VERSION
+ARG GOLANG_VERSION
+
+FROM --platform=linux/$BUILDARCH golang:$GOLANG_VERSION AS prepregistry
+
+RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
+    apt-get update && apt-get install -y jq
+
+COPY fakeregistryserver/prepare_registry.sh /prepare_registry.sh
+COPY fakeregistryserver/images.txt /images.txt
+
+RUN chmod +x /prepare_registry.sh
+
+# run the script during the build to create the artifact inside the image
+RUN /prepare_registry.sh
 
 # We're using a Linux image to unpack the archives, then we're copying them over to Windows.
-FROM --platform=linux/amd64 alpine:3.21 as prep
+FROM --platform=linux/$BUILDARCH alpine:3.21 as prep
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 ADD https://iperf.fr/download/windows/iperf-2.0.9-win64.zip /iperf.zip
@@ -32,6 +46,8 @@ RUN tar -xzvf /coredns.tgz &&\
     mv coreutils-8.31-28-windows-64bit wincoreutils &&\
     mkdir /uploads
 
+# TODO: Change to linux/$BUILDARCH when windows-servercore-cache has arm64 variant
+# Keep linux/amd64 hardcoded: windows-servercore-cache only has amd64 variant (no arm64 available)
 FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
 FROM $BASEIMAGE
 
@@ -48,6 +64,8 @@ COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/n
 COPY --from=prep /coredns.exe /coredns.exe
 COPY --from=prep /iperf /iperf
 COPY --from=prep /wincoreutils/sync.exe /bin/sync.exe
+# Copy the fake registry data from the preparer stage
+COPY --from=prepregistry /registry /var/registry
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
 ENV PATH="C:\dig\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"

@@ -22,6 +22,7 @@ import (
 	"hash"
 	"sync"
 
+	"k8s.io/apiserver/pkg/util/configmetrics"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -53,10 +54,20 @@ var (
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
+
+	encryptionConfigLastConfigInfo = metrics.NewDesc(
+		metrics.BuildFQName(namespace, subsystem, "last_config_info"),
+		"Information about the last applied encryption configuration with hash as label, split by apiserver identity.",
+		[]string{"apiserver_id_hash", "hash"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
 )
 
 var registerMetrics sync.Once
 var hashPool *sync.Pool
+var configHashProvider = configmetrics.NewAtomicHashProvider()
 
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
@@ -67,7 +78,13 @@ func RegisterMetrics() {
 		}
 		legacyregistry.MustRegister(encryptionConfigAutomaticReloadsTotal)
 		legacyregistry.MustRegister(encryptionConfigAutomaticReloadLastTimestampSeconds)
+		legacyregistry.CustomMustRegister(configmetrics.NewConfigInfoCustomCollector(encryptionConfigLastConfigInfo, configHashProvider))
 	})
+}
+
+func ResetMetricsForTest() {
+	encryptionConfigAutomaticReloadsTotal.Reset()
+	encryptionConfigAutomaticReloadLastTimestampSeconds.Reset()
 }
 
 func RecordEncryptionConfigAutomaticReloadFailure(apiServerID string) {
@@ -76,14 +93,20 @@ func RecordEncryptionConfigAutomaticReloadFailure(apiServerID string) {
 	recordEncryptionConfigAutomaticReloadTimestamp("failure", apiServerIDHash)
 }
 
-func RecordEncryptionConfigAutomaticReloadSuccess(apiServerID string) {
+func RecordEncryptionConfigAutomaticReloadSuccess(apiServerID, encryptionConfigDataHash string) {
 	apiServerIDHash := getHash(apiServerID)
 	encryptionConfigAutomaticReloadsTotal.WithLabelValues("success", apiServerIDHash).Inc()
 	recordEncryptionConfigAutomaticReloadTimestamp("success", apiServerIDHash)
+
+	RecordEncryptionConfigLastConfigInfo(apiServerID, encryptionConfigDataHash)
 }
 
 func recordEncryptionConfigAutomaticReloadTimestamp(result, apiServerIDHash string) {
 	encryptionConfigAutomaticReloadLastTimestampSeconds.WithLabelValues(result, apiServerIDHash).SetToCurrentTime()
+}
+
+func RecordEncryptionConfigLastConfigInfo(apiServerID, encryptionConfigDataHash string) {
+	configHashProvider.SetHashes(getHash(apiServerID), encryptionConfigDataHash)
 }
 
 func getHash(data string) string {

@@ -1,8 +1,6 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//go:generate stringer -type=ValueKind -trimprefix=ValueKind
-
 package telemetry
 
 import (
@@ -23,7 +21,7 @@ import (
 // A zero value is valid and represents an empty value.
 type Value struct {
 	// Ensure forward compatibility by explicitly making this not comparable.
-	noCmp [0]func() //nolint: unused  // This is indeed used.
+	noCmp [0]func() //nolint:unused  // This is indeed used.
 
 	// num holds the value for Int64, Float64, and Bool. It holds the length
 	// for String, Bytes, Slice, Map.
@@ -92,7 +90,7 @@ func IntValue(v int) Value { return Int64Value(int64(v)) }
 
 // Int64Value returns a [Value] for an int64.
 func Int64Value(v int64) Value {
-	return Value{num: uint64(v), any: ValueKindInt64}
+	return Value{num: uint64(v), any: ValueKindInt64} //nolint:gosec  // Raw value conv.
 }
 
 // Float64Value returns a [Value] for a float64.
@@ -164,7 +162,7 @@ func (v Value) AsInt64() int64 {
 // this will return garbage.
 func (v Value) asInt64() int64 {
 	// Assumes v.num was a valid int64 (overflow not checked).
-	return int64(v.num) // nolint: gosec
+	return int64(v.num) //nolint:gosec  // Bounded.
 }
 
 // AsBool returns the value held by v as a bool.
@@ -309,13 +307,13 @@ func (v Value) String() string {
 		return v.asString()
 	case ValueKindInt64:
 		// Assumes v.num was a valid int64 (overflow not checked).
-		return strconv.FormatInt(int64(v.num), 10) // nolint: gosec
+		return strconv.FormatInt(int64(v.num), 10) //nolint:gosec  // Bounded.
 	case ValueKindFloat64:
 		return strconv.FormatFloat(v.asFloat64(), 'g', -1, 64)
 	case ValueKindBool:
 		return strconv.FormatBool(v.asBool())
 	case ValueKindBytes:
-		return fmt.Sprint(v.asBytes())
+		return string(v.asBytes())
 	case ValueKindMap:
 		return fmt.Sprint(v.asMap())
 	case ValueKindSlice:
@@ -343,7 +341,7 @@ func (v *Value) MarshalJSON() ([]byte, error) {
 	case ValueKindInt64:
 		return json.Marshal(struct {
 			Value string `json:"intValue"`
-		}{strconv.FormatInt(int64(v.num), 10)})
+		}{strconv.FormatInt(int64(v.num), 10)}) //nolint:gosec  // Raw value conv.
 	case ValueKindFloat64:
 		return json.Marshal(struct {
 			Value float64 `json:"doubleValue"`

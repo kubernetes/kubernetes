@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -848,7 +849,6 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 				return s, nil
 			}
 			if tok2 == CommaToken {
-				p.consume(Values)
 				s.Insert("") // to handle ,, Double "" removed by StringSet
 			}
 		default: // it can be operator
@@ -927,7 +927,7 @@ func parse(selector string, path *field.Path) (internalSelector, error) {
 }
 
 func validateLabelKey(k string, path *field.Path) *field.Error {
-	if errs := validation.IsQualifiedName(k); len(errs) != 0 {
+	if errs := content.IsLabelKey(k); len(errs) != 0 {
 		return field.Invalid(path, k, strings.Join(errs, "; "))
 	}
 	return nil

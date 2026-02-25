@@ -12,7 +12,7 @@ func Abort(details AbortDetails) {
 	panic(details)
 }
 
-func AbortGracefullyWith(format string, args ...interface{}) {
+func AbortGracefullyWith(format string, args ...any) {
 	Abort(AbortDetails{
 		ExitCode:  0,
 		Error:     fmt.Errorf(format, args...),
@@ -20,7 +20,7 @@ func AbortGracefullyWith(format string, args ...interface{}) {
 	})
 }
 
-func AbortWith(format string, args ...interface{}) {
+func AbortWith(format string, args ...any) {
 	Abort(AbortDetails{
 		ExitCode:  1,
 		Error:     fmt.Errorf(format, args...),
@@ -28,7 +28,7 @@ func AbortWith(format string, args ...interface{}) {
 	})
 }
 
-func AbortWithUsage(format string, args ...interface{}) {
+func AbortWithUsage(format string, args ...any) {
 	Abort(AbortDetails{
 		ExitCode:  1,
 		Error:     fmt.Errorf(format, args...),

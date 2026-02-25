@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -81,6 +83,7 @@ func NewInitializedVolumePluginMgr(
 		configMapManager:          configMapManager,
 		tokenManager:              tokenManager,
 		clusterTrustBundleManager: clusterTrustBundleManager,
+		podCertificateManager:     kubelet.podCertificateManager,
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
@@ -110,6 +113,7 @@ type kubeletVolumeHost struct {
 	tokenManager              *token.Manager
 	configMapManager          configmap.Manager
 	clusterTrustBundleManager clustertrustbundle.Manager
+	podCertificateManager     podcertificate.Manager
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
@@ -215,12 +219,9 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
-func (kvh *kubeletVolumeHost) GetHostName() string {
-	return kvh.kubelet.hostname
-}
-
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	node, err := kvh.kubelet.getNodeAnyWay()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -261,8 +262,13 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSe
 	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
 }
 
+func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, podUID, volumeName, sourceIndex)
+}
+
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
-	node, err := kvh.kubelet.GetNode()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -270,7 +276,8 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 }
 
 func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
-	node, err := kvh.kubelet.GetNode()
+	// TODO: Pass proper context when VolumeHost interface methods support context parameters
+	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

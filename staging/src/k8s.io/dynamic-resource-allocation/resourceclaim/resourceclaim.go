@@ -30,8 +30,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -117,14 +116,23 @@ func BaseRequestRef(requestRef string) string {
 	return segments[0]
 }
 
+// CreateSubRequestRef combines the names from a request and a subrequest into
+// a reference to the subrequest.
+func CreateSubRequestRef(requestName, subRequestName string) string {
+	return fmt.Sprintf("%s/%s", requestName, subRequestName)
+}
+
+// IsSubRequestRef checks if the provided reference is to a subrequest and returns
+// true if it is. Otherwise it returns false.
+func IsSubRequestRef(requestRef string) bool {
+	segments := strings.Split(requestRef, "/")
+	return len(segments) == 2
+}
+
 // ConfigForResult returns the configs that are applicable to device
 // allocated for the provided result.
-//
-// Called by DRA drivers and therefore uses the v1beta2 API.
-// The other methods are called by control plane components
-// which still use v1beta1.
-func ConfigForResult(deviceConfigurations []resourcev1beta2.DeviceAllocationConfiguration, result resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.DeviceAllocationConfiguration {
-	var configs []resourcev1beta2.DeviceAllocationConfiguration
+func ConfigForResult(deviceConfigurations []resourceapi.DeviceAllocationConfiguration, result resourceapi.DeviceRequestAllocationResult) []resourceapi.DeviceAllocationConfiguration {
+	var configs []resourceapi.DeviceAllocationConfiguration
 	for _, deviceConfiguration := range deviceConfigurations {
 		if deviceConfiguration.Opaque != nil &&
 			isMatch(deviceConfiguration.Requests, result.Request) {

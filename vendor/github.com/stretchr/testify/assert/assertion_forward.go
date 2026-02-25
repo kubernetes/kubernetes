@@ -92,10 +92,19 @@ func (a *Assertions) ElementsMatchf(listA interface{}, listB interface{}, msg st
 	return ElementsMatchf(a.t, listA, listB, msg, args...)
 }
 
-// Empty asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// Empty asserts that the given value is "empty".
+//
+// [Zero values] are "empty".
+//
+// Arrays are "empty" if every element is the zero value of the type (stricter than "empty").
+//
+// Slices, maps and channels with zero length are "empty".
+//
+// Pointer values are "empty" if the pointer is nil or if the pointed value is "empty".
 //
 //	a.Empty(obj)
+//
+// [Zero values]: https://go.dev/ref/spec#The_zero_value
 func (a *Assertions) Empty(object interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -103,10 +112,19 @@ func (a *Assertions) Empty(object interface{}, msgAndArgs ...interface{}) bool {
 	return Empty(a.t, object, msgAndArgs...)
 }
 
-// Emptyf asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// Emptyf asserts that the given value is "empty".
+//
+// [Zero values] are "empty".
+//
+// Arrays are "empty" if every element is the zero value of the type (stricter than "empty").
+//
+// Slices, maps and channels with zero length are "empty".
+//
+// Pointer values are "empty" if the pointer is nil or if the pointed value is "empty".
 //
 //	a.Emptyf(obj, "error message %s", "formatted")
+//
+// [Zero values]: https://go.dev/ref/spec#The_zero_value
 func (a *Assertions) Emptyf(object interface{}, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -224,10 +242,8 @@ func (a *Assertions) Equalf(expected interface{}, actual interface{}, msg string
 
 // Error asserts that a function returned an error (i.e. not `nil`).
 //
-//	  actualObj, err := SomeFunction()
-//	  if a.Error(err) {
-//		   assert.Equal(t, expectedError, err)
-//	  }
+//	actualObj, err := SomeFunction()
+//	a.Error(err)
 func (a *Assertions) Error(err error, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -297,10 +313,8 @@ func (a *Assertions) ErrorIsf(err error, target error, msg string, args ...inter
 
 // Errorf asserts that a function returned an error (i.e. not `nil`).
 //
-//	  actualObj, err := SomeFunction()
-//	  if a.Errorf(err, "error message %s", "formatted") {
-//		   assert.Equal(t, expectedErrorf, err)
-//	  }
+//	actualObj, err := SomeFunction()
+//	a.Errorf(err, "error message %s", "formatted")
 func (a *Assertions) Errorf(err error, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -868,7 +882,29 @@ func (a *Assertions) IsNonIncreasingf(object interface{}, msg string, args ...in
 	return IsNonIncreasingf(a.t, object, msg, args...)
 }
 
+// IsNotType asserts that the specified objects are not of the same type.
+//
+//	a.IsNotType(&NotMyStruct{}, &MyStruct{})
+func (a *Assertions) IsNotType(theType interface{}, object interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return IsNotType(a.t, theType, object, msgAndArgs...)
+}
+
+// IsNotTypef asserts that the specified objects are not of the same type.
+//
+//	a.IsNotTypef(&NotMyStruct{}, &MyStruct{}, "error message %s", "formatted")
+func (a *Assertions) IsNotTypef(theType interface{}, object interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return IsNotTypef(a.t, theType, object, msg, args...)
+}
+
 // IsType asserts that the specified objects are of the same type.
+//
+//	a.IsType(&MyStruct{}, &MyStruct{})
 func (a *Assertions) IsType(expectedType interface{}, object interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -877,6 +913,8 @@ func (a *Assertions) IsType(expectedType interface{}, object interface{}, msgAnd
 }
 
 // IsTypef asserts that the specified objects are of the same type.
+//
+//	a.IsTypef(&MyStruct{}, &MyStruct{}, "error message %s", "formatted")
 func (a *Assertions) IsTypef(expectedType interface{}, object interface{}, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1162,8 +1200,7 @@ func (a *Assertions) NotElementsMatchf(listA interface{}, listB interface{}, msg
 	return NotElementsMatchf(a.t, listA, listB, msg, args...)
 }
 
-// NotEmpty asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// NotEmpty asserts that the specified object is NOT [Empty].
 //
 //	if a.NotEmpty(obj) {
 //	  assert.Equal(t, "two", obj[1])
@@ -1175,8 +1212,7 @@ func (a *Assertions) NotEmpty(object interface{}, msgAndArgs ...interface{}) boo
 	return NotEmpty(a.t, object, msgAndArgs...)
 }
 
-// NotEmptyf asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// NotEmptyf asserts that the specified object is NOT [Empty].
 //
 //	if a.NotEmptyf(obj, "error message %s", "formatted") {
 //	  assert.Equal(t, "two", obj[1])
@@ -1378,12 +1414,15 @@ func (a *Assertions) NotSamef(expected interface{}, actual interface{}, msg stri
 	return NotSamef(a.t, expected, actual, msg, args...)
 }
 
-// NotSubset asserts that the specified list(array, slice...) or map does NOT
-// contain all elements given in the specified subset list(array, slice...) or
-// map.
+// NotSubset asserts that the list (array, slice, or map) does NOT contain all
+// elements given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	a.NotSubset([1, 3, 4], [1, 2])
 //	a.NotSubset({"x": 1, "y": 2}, {"z": 3})
+//	a.NotSubset([1, 3, 4], {1: "one", 2: "two"})
+//	a.NotSubset({"x": 1, "y": 2}, ["z"])
 func (a *Assertions) NotSubset(list interface{}, subset interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1391,12 +1430,15 @@ func (a *Assertions) NotSubset(list interface{}, subset interface{}, msgAndArgs 
 	return NotSubset(a.t, list, subset, msgAndArgs...)
 }
 
-// NotSubsetf asserts that the specified list(array, slice...) or map does NOT
-// contain all elements given in the specified subset list(array, slice...) or
-// map.
+// NotSubsetf asserts that the list (array, slice, or map) does NOT contain all
+// elements given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	a.NotSubsetf([1, 3, 4], [1, 2], "error message %s", "formatted")
 //	a.NotSubsetf({"x": 1, "y": 2}, {"z": 3}, "error message %s", "formatted")
+//	a.NotSubsetf([1, 3, 4], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	a.NotSubsetf({"x": 1, "y": 2}, ["z"], "error message %s", "formatted")
 func (a *Assertions) NotSubsetf(list interface{}, subset interface{}, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1556,11 +1598,15 @@ func (a *Assertions) Samef(expected interface{}, actual interface{}, msg string,
 	return Samef(a.t, expected, actual, msg, args...)
 }
 
-// Subset asserts that the specified list(array, slice...) or map contains all
-// elements given in the specified subset list(array, slice...) or map.
+// Subset asserts that the list (array, slice, or map) contains all elements
+// given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	a.Subset([1, 2, 3], [1, 2])
 //	a.Subset({"x": 1, "y": 2}, {"x": 1})
+//	a.Subset([1, 2, 3], {1: "one", 2: "two"})
+//	a.Subset({"x": 1, "y": 2}, ["x"])
 func (a *Assertions) Subset(list interface{}, subset interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -1568,11 +1614,15 @@ func (a *Assertions) Subset(list interface{}, subset interface{}, msgAndArgs ...
 	return Subset(a.t, list, subset, msgAndArgs...)
 }
 
-// Subsetf asserts that the specified list(array, slice...) or map contains all
-// elements given in the specified subset list(array, slice...) or map.
+// Subsetf asserts that the list (array, slice, or map) contains all elements
+// given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	a.Subsetf([1, 2, 3], [1, 2], "error message %s", "formatted")
 //	a.Subsetf({"x": 1, "y": 2}, {"x": 1}, "error message %s", "formatted")
+//	a.Subsetf([1, 2, 3], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	a.Subsetf({"x": 1, "y": 2}, ["x"], "error message %s", "formatted")
 func (a *Assertions) Subsetf(list interface{}, subset interface{}, msg string, args ...interface{}) bool {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()

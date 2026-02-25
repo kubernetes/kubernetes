@@ -7,7 +7,7 @@ package label
 import (
 	"fmt"
 	"io"
-	"reflect"
+	"slices"
 	"unsafe"
 )
 
@@ -32,7 +32,7 @@ type Key interface {
 type Label struct {
 	key     Key
 	packed  uint64
-	untyped interface{}
+	untyped any
 }
 
 // Map is the interface to a collection of Labels indexed by key.
@@ -76,13 +76,13 @@ type mapChain struct {
 // OfValue creates a new label from the key and value.
 // This method is for implementing new key types, label creation should
 // normally be done with the Of method of the key.
-func OfValue(k Key, value interface{}) Label { return Label{key: k, untyped: value} }
+func OfValue(k Key, value any) Label { return Label{key: k, untyped: value} }
 
 // UnpackValue assumes the label was built using LabelOfValue and returns the value
 // that was passed to that constructor.
 // This method is for implementing new key types, for type safety normal
 // access should be done with the From method of the key.
-func (t Label) UnpackValue() interface{} { return t.untyped }
+func (t Label) UnpackValue() any { return t.untyped }
 
 // Of64 creates a new label from a key and a uint64. This is often
 // used for non uint64 values that can be packed into a uint64.
@@ -102,11 +102,10 @@ type stringptr unsafe.Pointer
 // This method is for implementing new key types, label creation should
 // normally be done with the Of method of the key.
 func OfString(k Key, v string) Label {
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
 	return Label{
 		key:     k,
-		packed:  uint64(hdr.Len),
-		untyped: stringptr(hdr.Data),
+		packed:  uint64(len(v)),
+		untyped: stringptr(unsafe.StringData(v)),
 	}
 }
 
@@ -115,11 +114,7 @@ func OfString(k Key, v string) Label {
 // This method is for implementing new key types, for type safety normal
 // access should be done with the From method of the key.
 func (t Label) UnpackString() string {
-	var v string
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
-	hdr.Data = uintptr(t.untyped.(stringptr))
-	hdr.Len = int(t.packed)
-	return v
+	return unsafe.String((*byte)(t.untyped.(stringptr)), int(t.packed))
 }
 
 // Valid returns true if the Label is a valid one (it has a key).
@@ -154,10 +149,8 @@ func (f *filter) Valid(index int) bool {
 
 func (f *filter) Label(index int) Label {
 	l := f.underlying.Label(index)
-	for _, f := range f.keys {
-		if l.Key() == f {
-			return Label{}
-		}
+	if slices.Contains(f.keys, l.Key()) {
+		return Label{}
 	}
 	return l
 }

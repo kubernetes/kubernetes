@@ -1,5 +1,4 @@
-//go:build linux
-// +build linux
+//go:build linux && !s390x
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -16,6 +15,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// Skip s390x: This test is disabled on s390x due to failures caused by little-endian specific input data.
+// See issue: https://github.com/kubernetes/kubernetes/issues/130343
 
 package nfacct
 

@@ -30,6 +30,33 @@ import (
 )
 
 func TestSchemaDeclType(t *testing.T) {
+	t.Run("a schema with additionalProperties: true should be an valid object type", func(t *testing.T) {
+		schema := &spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"foo": {
+						SchemaProps: spec.SchemaProps{
+							Type:                 []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{Allows: true},
+						},
+					},
+				},
+			},
+		}
+		declType := SchemaDeclType(schema, false)
+		if declType == nil {
+			t.Fatal("SchemaDeclType returned nil")
+		}
+		fooField, found := declType.FindField("foo")
+		if !found {
+			t.Fatal("field 'foo' not found")
+		}
+		fooType := fooField.Type
+		if fooType.TypeName() != "object" {
+			t.Fatalf("expected foo to be a object, but got %s", fooType.TypeName())
+		}
+	})
 	ts := testSchema()
 	cust := SchemaDeclType(ts, false)
 	if cust.TypeName() != "object" {

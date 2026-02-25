@@ -20,11 +20,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
-	minimumSeats                = 1
-	maximumSeatsLimit           = 10
 	objectsPerSeat              = 100.0
 	watchesPerSeat              = 10.0
 	enableMutatingWorkEstimator = true
@@ -40,12 +40,14 @@ type WorkEstimatorConfig struct {
 	// MinimumSeats is the minimum number of seats a request must occupy.
 	MinimumSeats uint64 `json:"minimumSeats,omitempty"`
 
-	// MaximumSeatsLimit is an upper limit on the max seats a request can occupy.
-	//
 	// NOTE: work_estimate_seats_samples metric uses the value of maximumSeats
-	// as the upper bound, so when we change maximumSeats we should also
+	// as the upper bound, so when we change maximum seats values below we should also
 	// update the buckets of the metric.
-	MaximumSeatsLimit uint64 `json:"maximumSeatsLimit,omitempty"`
+
+	// MaximumListSeatsLimit is an upper limit on the max seats a list request can occupy.
+	MaximumListSeatsLimit uint64 `json:"maximumListSeatsLimit,omitempty"`
+	// MaximumListSeatsLimit is an upper limit on the max seats a mutating request can occupy.
+	MaximumMutatingSeatsLimit uint64 `json:"maximumMutatingSeatsLimit,omitempty"`
 }
 
 // ListWorkEstimatorConfig holds work estimator parameters related to list requests.
@@ -65,9 +67,15 @@ type MutatingWorkEstimatorConfig struct {
 
 // DefaultWorkEstimatorConfig creates a new WorkEstimatorConfig with default values.
 func DefaultWorkEstimatorConfig() *WorkEstimatorConfig {
+	var maximumListSeatsLimit uint64 = 10
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		maximumListSeatsLimit = 100
+	}
+
 	return &WorkEstimatorConfig{
-		MinimumSeats:                minimumSeats,
-		MaximumSeatsLimit:           maximumSeatsLimit,
+		MinimumSeats:                1,
+		MaximumListSeatsLimit:       maximumListSeatsLimit,
+		MaximumMutatingSeatsLimit:   10,
 		ListWorkEstimatorConfig:     defaultListWorkEstimatorConfig(),
 		MutatingWorkEstimatorConfig: defaultMutatingWorkEstimatorConfig(),
 	}

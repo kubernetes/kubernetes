@@ -28,6 +28,7 @@ import (
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 // +k8s:prerelease-lifecycle-gen:deprecated=1.21
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachment
+// +k8s:supportsSubresource=/status
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -43,6 +44,8 @@ type VolumeAttachment struct {
 
 	// spec represents specification of the desired attach/detach volume behavior.
 	// Populated by the Kubernetes system.
+	// +k8s:immutable
+	// +required
 	Spec VolumeAttachmentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents status of the VolumeAttachment request.
@@ -74,6 +77,10 @@ type VolumeAttachmentList struct {
 type VolumeAttachmentSpec struct {
 	// attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
+	// +required
+	// +k8s:required
+	// +k8s:format="k8s-long-name-caseless"
+	// +k8s:maxLength=63
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
@@ -261,6 +268,8 @@ type CSIStorageCapacityList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.29
+// +k8s:prerelease-lifecycle-gen:deprecated=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttributesClass
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClass represents a specification of mutable volume attributes
@@ -295,6 +304,8 @@ type VolumeAttributesClass struct {
 }
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.29
+// +k8s:prerelease-lifecycle-gen:deprecated=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttributesClassList
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.

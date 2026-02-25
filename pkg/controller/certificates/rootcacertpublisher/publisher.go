@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -101,20 +102,26 @@ type Publisher struct {
 // Run starts process
 func (c *Publisher) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting root CA cert publisher controller")
-	defer logger.Info("Shutting down root CA cert publisher controller")
 
-	if !cache.WaitForNamedCacheSync("crt configmap", ctx.Done(), c.cmListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down root CA cert publisher controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.cmListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

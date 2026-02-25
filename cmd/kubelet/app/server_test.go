@@ -78,10 +78,12 @@ func TestMergeKubeletConfigurations(t *testing.T) {
 		kubeletConfig           *kubeletconfiginternal.KubeletConfiguration
 		dropin1                 string
 		dropin2                 string
+		customDropins           map[string]string
 		overwrittenConfigFields map[string]interface{}
 		cliArgs                 []string
 		name                    string
 		expectMergeError        string
+		expectedSkippedFiles    []string
 	}{
 		{
 			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
@@ -291,6 +293,54 @@ readOnlyPort: 10255
 `,
 			expectMergeError: "",
 		},
+		{
+			name: "yaml files are ignored, only .conf files are loaded",
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port: int32(9090),
+			},
+			customDropins: map[string]string{
+				"10-should-be-ignored.yaml": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 7777
+`,
+				"20-should-be-ignored.txt": "readme text",
+				"30-valid.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+readOnlyPort: 10255
+`,
+			},
+			overwrittenConfigFields: map[string]interface{}{
+				"Port":         int32(9090),  // Port should remain unchanged as .yaml file should be ignored
+				"ReadOnlyPort": int32(10255), // ReadOnlyPort should be set from .conf file
+			},
+			expectedSkippedFiles: []string{"10-should-be-ignored.yaml", "20-should-be-ignored.txt"},
+		},
+		{
+			name: "invalid YAML syntax in drop-in file causes merge to fail",
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port: int32(9090),
+			},
+			customDropins: map[string]string{
+				"10-malformed.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: [this is not valid
+  indentation is wrong
+    more indentation
+`,
+			},
+			expectMergeError: "10-malformed.conf",
+		},
 	}
 
 	for _, test := range testCases {
@@ -311,7 +361,7 @@ readOnlyPort: 10255
 				kubeletFlags.KubeletConfigFile = kubeletConfFile
 				kubeletConfig = test.kubeletConfig
 			}
-			if len(test.dropin1) > 0 || len(test.dropin2) > 0 {
+			if len(test.dropin1) > 0 || len(test.dropin2) > 0 || len(test.customDropins) > 0 {
 				// Create kubelet.conf.d directory and drop-in configuration files
 				kubeletConfDir := filepath.Join(tempDir, "kubelet.conf.d")
 				err := os.Mkdir(kubeletConfDir, 0755)
@@ -327,13 +377,29 @@ readOnlyPort: 10255
 					require.NoError(t, err, "failed to create config from a yaml file")
 				}
 
+				for filename, content := range test.customDropins {
+					err = os.WriteFile(filepath.Join(kubeletConfDir, filename), []byte(content), 0644)
+					require.NoError(t, err, "failed to create custom dropin file")
+				}
+
 				// Merge the kubelet configurations
-				err = mergeKubeletConfigurations(kubeletConfig, kubeletConfDir)
+				skippedFiles, err := mergeKubeletConfigurations(kubeletConfig, kubeletConfDir)
 				if test.expectMergeError == "" {
 					require.NoError(t, err, "failed to merge kubelet drop-in configs")
 				} else {
 					require.Error(t, err)
 					require.ErrorContains(t, err, test.expectMergeError)
+				}
+
+				// Verify skipped files if expected
+				if len(test.expectedSkippedFiles) > 0 {
+					// Extract just the filenames from the full paths
+					var skippedFilenames []string
+					for _, path := range skippedFiles {
+						skippedFilenames = append(skippedFilenames, filepath.Base(path))
+					}
+					require.ElementsMatch(t, test.expectedSkippedFiles, skippedFilenames,
+						"skipped files do not match expected")
 				}
 			}
 
@@ -344,6 +410,111 @@ readOnlyPort: 10255
 			// Verify the merged configuration fields
 			for fieldName, expectedValue := range test.overwrittenConfigFields {
 				value := reflect.ValueOf(kubeletConfig).Elem()
+				field := value.FieldByName(fieldName)
+				require.Equal(t, expectedValue, field.Interface(), "Field mismatch: "+fieldName)
+			}
+		})
+	}
+}
+
+func TestMergeKubeletConfigsWithSubdirs(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		kubeletConfig           *kubeletconfiginternal.KubeletConfiguration
+		dropins                 map[string]string // map[relativePath]content
+		overwrittenConfigFields map[string]interface{}
+	}{
+		{
+			name: "subdirectories are processed in lexical order",
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port:         int32(9090),
+				ReadOnlyPort: int32(10257),
+			},
+			dropins: map[string]string{
+				"10-kubelet.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 8080
+`,
+				"subdir/20-kubelet.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 7777
+readOnlyPort: 9999
+`,
+			},
+			overwrittenConfigFields: map[string]interface{}{
+				"Port":         int32(7777),
+				"ReadOnlyPort": int32(9999),
+			},
+		},
+		{
+			name: "same filename in multiple directories - lexical order applies",
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port:         int32(9090),
+				ReadOnlyPort: int32(10255),
+			},
+			dropins: map[string]string{
+				"10-kubelet.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 8080
+`,
+				"sub-dir1/10-kubelet.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 7070
+readOnlyPort: 8888
+`,
+				"sub-dir2/10-kubelet.conf": `
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+port: 6060
+readOnlyPort: 9999
+`,
+			},
+			overwrittenConfigFields: map[string]interface{}{
+				"Port":         int32(6060),
+				"ReadOnlyPort": int32(9999),
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			kubeletConfDir := filepath.Join(tempDir, "kubelet.conf.d")
+			err := os.Mkdir(kubeletConfDir, 0755)
+			require.NoError(t, err, "Failed to create kubelet.conf.d directory")
+
+			// Create drop-in files including those in subdirectories
+			for relPath, content := range test.dropins {
+				fullPath := filepath.Join(kubeletConfDir, relPath)
+				// Create subdirectory if needed
+				dir := filepath.Dir(fullPath)
+				if dir != kubeletConfDir {
+					err = os.MkdirAll(dir, 0755)
+					require.NoError(t, err, "Failed to create subdirectory: "+dir)
+				}
+				err = os.WriteFile(fullPath, []byte(content), 0644)
+				require.NoError(t, err, "Failed to create drop-in file: "+relPath)
+			}
+
+			// Merge the kubelet configurations
+			_, err = mergeKubeletConfigurations(test.kubeletConfig, kubeletConfDir)
+			require.NoError(t, err, "failed to merge kubelet drop-in configs")
+
+			// Verify the merged configuration fields
+			for fieldName, expectedValue := range test.overwrittenConfigFields {
+				value := reflect.ValueOf(test.kubeletConfig).Elem()
 				field := value.FieldByName(fieldName)
 				require.Equal(t, expectedValue, field.Interface(), "Field mismatch: "+fieldName)
 			}

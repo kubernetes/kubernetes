@@ -5,6 +5,7 @@ package sdk
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -21,15 +22,20 @@ type tracer struct {
 
 var _ trace.Tracer = tracer{}
 
-func (t tracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	var psc trace.SpanContext
+func (t tracer) Start(
+	ctx context.Context,
+	name string,
+	opts ...trace.SpanStartOption,
+) (context.Context, trace.Span) {
+	var psc, sc trace.SpanContext
 	sampled := true
 	span := new(span)
 
 	// Ask eBPF for sampling decision and span context info.
-	t.start(ctx, span, &psc, &sampled, &span.spanContext)
+	t.start(ctx, span, &psc, &sampled, &sc)
 
 	span.sampled.Store(sampled)
+	span.spanContext = sc
 
 	ctx = trace.ContextWithSpan(ctx, span)
 
@@ -58,7 +64,13 @@ func (t *tracer) start(
 // start is used for testing.
 var start = func(context.Context, *span, *trace.SpanContext, *bool, *trace.SpanContext) {}
 
-func (t tracer) traces(name string, cfg trace.SpanConfig, sc, psc trace.SpanContext) (*telemetry.Traces, *telemetry.Span) {
+var intToUint32Bound = min(math.MaxInt, math.MaxUint32)
+
+func (t tracer) traces(
+	name string,
+	cfg trace.SpanConfig,
+	sc, psc trace.SpanContext,
+) (*telemetry.Traces, *telemetry.Span) {
 	span := &telemetry.Span{
 		TraceID:      telemetry.TraceID(sc.TraceID()),
 		SpanID:       telemetry.SpanID(sc.SpanID()),
@@ -73,11 +85,16 @@ func (t tracer) traces(name string, cfg trace.SpanConfig, sc, psc trace.SpanCont
 
 	links := cfg.Links()
 	if limit := maxSpan.Links; limit == 0 {
-		span.DroppedLinks = uint32(len(links))
+		n := len(links)
+		if n > 0 {
+			bounded := max(min(n, intToUint32Bound), 0)
+			span.DroppedLinks = uint32(bounded) //nolint:gosec  // Bounds checked.
+		}
 	} else {
 		if limit > 0 {
 			n := max(len(links)-limit, 0)
-			span.DroppedLinks = uint32(n)
+			bounded := min(n, intToUint32Bound)
+			span.DroppedLinks = uint32(bounded) //nolint:gosec  // Bounds checked.
 			links = links[n:]
 		}
 		span.Links = convLinks(links)

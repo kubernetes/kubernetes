@@ -217,9 +217,16 @@ func keyedAssociativeListItemToPathElement(a value.Allocator, s *schema.Schema, 
 		} else if def != nil {
 			keyMap = append(keyMap, value.Field{Name: fieldName, Value: value.NewValueInterface(def)})
 		} else {
-			return pe, fmt.Errorf("associative list with keys has an element that omits key field %q (and doesn't have default value)", fieldName)
+			// Don't add the key to the key field list.
+			// A key field list where it is set then represents a different entry
+			// in the associate list.
 		}
 	}
+
+	if len(list.Keys) > 0 && len(keyMap) == 0 {
+		return pe, fmt.Errorf("associative list with keys has an element that omits all key fields %q (and doesn't have default values for any key fields)", list.Keys)
+	}
+
 	keyMap.Sort()
 	pe.Key = &keyMap
 	return pe, nil

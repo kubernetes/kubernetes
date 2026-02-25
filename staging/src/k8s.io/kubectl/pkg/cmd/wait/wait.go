@@ -46,7 +46,7 @@ import (
 
 var (
 	waitLong = templates.LongDesc(i18n.T(`
-		Experimental: Wait for a specific condition on one or many resources.
+		Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
 		is seen in the Status field of every given resource.
@@ -124,7 +124,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 	cmd := &cobra.Command{
 		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=create|--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
-		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
+		Short:   i18n.T("Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -132,7 +132,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(o.RunWait())
+			cmdutil.CheckErr(o.RunWaitContext(cmd.Context()))
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -317,11 +317,15 @@ type WaitOptions struct {
 // ConditionFunc is the interface for providing condition checks
 type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
 
-// RunWait runs the waiting logic
+// Deprecated: Use RunWaitContext instead, which allows canceling.
 func (o *WaitOptions) RunWait() error {
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-	defer cancel()
+	return o.RunWaitContext(context.Background())
+}
 
+// RunWaitContext runs the waiting logic
+func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, o.Timeout)
+	defer cancel()
 	if strings.ToLower(o.ForCondition) == "create" {
 		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
 		// and we have to use ResourceFinder, which contains the resource name.
@@ -343,7 +347,7 @@ func (o *WaitOptions) RunWait() error {
 			return foundResource, nil
 		}); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+				return fmt.Errorf("%s", wait.ErrorInterrupted(nil).Error()) // nolint:staticcheck // SA1019
 			}
 			return err
 		}

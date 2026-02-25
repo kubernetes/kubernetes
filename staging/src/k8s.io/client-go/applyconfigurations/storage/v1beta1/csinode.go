@@ -29,10 +29,24 @@ import (
 
 // CSINodeApplyConfiguration represents a declarative configuration of the CSINode type for use
 // with apply.
+//
+// DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
+// See the release notes for more information.
+// CSINode holds information about all CSI drivers installed on a node.
+// CSI drivers do not need to create the CSINode object directly. As long as
+// they use the node-driver-registrar sidecar container, the kubelet will
+// automatically populate the CSINode object for the CSI driver as part of
+// kubelet plugin registration.
+// CSINode has the same name as a node. If the object is missing, it means either
+// there are no CSI Drivers available on the node, or the Kubelet version is low
+// enough that it doesn't create this object.
+// CSINode has an OwnerReference that points to the corresponding node object.
 type CSINodeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata.name must be the Kubernetes node name.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the specification of CSINode
+	Spec *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSINode constructs a declarative configuration of the CSINode type for use with
@@ -45,29 +59,14 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 	return b
 }
 
-// ExtractCSINode extracts the applied configuration owned by fieldManager from
-// cSINode. If no managedFields are found in cSINode for fieldManager, a
-// CSINodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractCSINodeFrom extracts the applied configuration owned by fieldManager from
+// cSINode for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // cSINode must be a unmodified CSINode API object that was retrieved from the Kubernetes API.
-// ExtractCSINode provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractCSINodeFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
-	return extractCSINode(cSINode, fieldManager, "")
-}
-
-// ExtractCSINodeStatus is the same as ExtractCSINode except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSINodeStatus(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
-	return extractCSINode(cSINode, fieldManager, "status")
-}
-
-func extractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
+func ExtractCSINodeFrom(cSINode *storagev1beta1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
 	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSINode"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +78,21 @@ func extractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string, subres
 	b.WithAPIVersion("storage.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractCSINode extracts the applied configuration owned by fieldManager from
+// cSINode. If no managedFields are found in cSINode for fieldManager, a
+// CSINodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// cSINode must be a unmodified CSINode API object that was retrieved from the Kubernetes API.
+// ExtractCSINode provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return ExtractCSINodeFrom(cSINode, fieldManager, "")
+}
+
 func (b CSINodeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

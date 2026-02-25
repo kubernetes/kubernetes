@@ -24,11 +24,22 @@ import (
 
 // VolumeMountStatusApplyConfiguration represents a declarative configuration of the VolumeMountStatus type for use
 // with apply.
+//
+// VolumeMountStatus shows status of volume mounts.
 type VolumeMountStatusApplyConfiguration struct {
-	Name              *string                       `json:"name,omitempty"`
-	MountPath         *string                       `json:"mountPath,omitempty"`
-	ReadOnly          *bool                         `json:"readOnly,omitempty"`
+	// Name corresponds to the name of the original VolumeMount.
+	Name *string `json:"name,omitempty"`
+	// MountPath corresponds to the original VolumeMount.
+	MountPath *string `json:"mountPath,omitempty"`
+	// ReadOnly corresponds to the original VolumeMount.
+	ReadOnly *bool `json:"readOnly,omitempty"`
+	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+	// depending on the mount result.
 	RecursiveReadOnly *corev1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
+	// volumeStatus represents volume-type-specific status about the mounted
+	// volume.
+	*VolumeStatusApplyConfiguration `json:"volumeStatus,omitempty"`
 }
 
 // VolumeMountStatusApplyConfiguration constructs a declarative configuration of the VolumeMountStatus type for use with
@@ -67,4 +78,19 @@ func (b *VolumeMountStatusApplyConfiguration) WithReadOnly(value bool) *VolumeMo
 func (b *VolumeMountStatusApplyConfiguration) WithRecursiveReadOnly(value corev1.RecursiveReadOnlyMode) *VolumeMountStatusApplyConfiguration {
 	b.RecursiveReadOnly = &value
 	return b
+}
+
+// WithImage sets the Image field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Image field is set to the value of the last call.
+func (b *VolumeMountStatusApplyConfiguration) WithImage(value *ImageVolumeStatusApplyConfiguration) *VolumeMountStatusApplyConfiguration {
+	b.ensureVolumeStatusApplyConfigurationExists()
+	b.VolumeStatusApplyConfiguration.Image = value
+	return b
+}
+
+func (b *VolumeMountStatusApplyConfiguration) ensureVolumeStatusApplyConfigurationExists() {
+	if b.VolumeStatusApplyConfiguration == nil {
+		b.VolumeStatusApplyConfiguration = &VolumeStatusApplyConfiguration{}
+	}
 }

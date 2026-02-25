@@ -96,13 +96,65 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 			return nil
 		}
 
-		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		schemaType := ""
+		if len(s.Type) == 1 {
+			schemaType = s.Type[0]
+		}
+		switch schemaType {
+		case "", "string":
+			normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
+			if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+				s.Format = ""
+			}
+		case "integer":
+			if s.Format != "int32" && s.Format != "int64" {
+				s.Format = ""
+			}
+		case "number":
+			if s.Format != "float" && s.Format != "double" {
+				s.Format = ""
+			}
+		default:
+			// Format not supported on other types
 			s.Format = ""
 		}
 
 		return nil
 	}
+}
+
+// GetUnrecognizedFormats returns a list of unrecognized formats found in the given schema.
+// It uses the same source of truth as StripUnsupportedFormatsPostProcessorForVersion.
+func GetUnrecognizedFormats(schema *spec.Schema, compatibilityVersion *version.Version) []string {
+	var unrecognizedFormats []string
+	if len(schema.Format) == 0 {
+		return unrecognizedFormats
+	}
+
+	schemaType := ""
+	if len(schema.Type) == 1 {
+		schemaType = schema.Type[0]
+	}
+	switch schemaType {
+	case "", "string":
+		normalized := strings.ReplaceAll(schema.Format, "-", "") // go-openapi default format name normalization
+		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "integer":
+		if schema.Format != "int32" && schema.Format != "int64" {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "number":
+		if schema.Format != "float" && schema.Format != "double" {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	default:
+		// Format not supported on other types
+		unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+	}
+
+	return unrecognizedFormats
 }
 
 type versionedFormats struct {

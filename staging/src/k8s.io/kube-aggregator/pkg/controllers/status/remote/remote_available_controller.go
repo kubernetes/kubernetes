@@ -22,19 +22,22 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/proxy"
 	v1informers "k8s.io/client-go/informers/core/v1"
+	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
@@ -67,8 +70,8 @@ type AvailableConditionController struct {
 	serviceLister  v1listers.ServiceLister
 	servicesSynced cache.InformerSynced
 
-	endpointsLister v1listers.EndpointsLister
-	endpointsSynced cache.InformerSynced
+	endpointSliceGetter  proxy.EndpointSliceGetter
+	endpointSlicesSynced cache.InformerSynced
 
 	// proxyTransportDial specifies the dial function for creating unencrypted TCP connections.
 	proxyTransportDial         *transport.DialHolder
@@ -92,19 +95,25 @@ type AvailableConditionController struct {
 func New(
 	apiServiceInformer informers.APIServiceInformer,
 	serviceInformer v1informers.ServiceInformer,
-	endpointsInformer v1informers.EndpointsInformer,
+	endpointSliceInformer discoveryv1informers.EndpointSliceInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
 	metrics *availabilitymetrics.Metrics,
 ) (*AvailableConditionController, error) {
+
+	endpointSliceGetter, err := proxy.NewEndpointSliceIndexerGetter(endpointSliceInformer)
+	if err != nil {
+		return nil, err
+	}
+
 	c := &AvailableConditionController{
-		apiServiceClient: apiServiceClient,
-		apiServiceLister: apiServiceInformer.Lister(),
-		serviceLister:    serviceInformer.Lister(),
-		endpointsLister:  endpointsInformer.Lister(),
-		serviceResolver:  serviceResolver,
+		apiServiceClient:    apiServiceClient,
+		apiServiceLister:    apiServiceInformer.Lister(),
+		serviceLister:       serviceInformer.Lister(),
+		endpointSliceGetter: endpointSliceGetter,
+		serviceResolver:     serviceResolver,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
@@ -137,16 +146,35 @@ func New(
 	})
 	c.servicesSynced = serviceHandler.HasSynced
 
-	endpointsHandler, _ := endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addEndpoints,
-		UpdateFunc: c.updateEndpoints,
-		DeleteFunc: c.deleteEndpoints,
+	endpointSliceHandler, _ := endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.addEndpointSlice,
+		UpdateFunc: c.updateEndpointSlice,
+		DeleteFunc: c.deleteEndpointSlice,
 	})
-	c.endpointsSynced = endpointsHandler.HasSynced
+	c.endpointSlicesSynced = endpointSliceHandler.HasSynced
 
 	c.syncFn = c.sync
 
 	return c, nil
+}
+
+// BuildTransportConfig builds a transport.Config for an APIService.
+// It ignores TLS verification if InsecureSkipTLSVerify is true.
+func BuildTransportConfig(
+	proxyTransportDial *transport.DialHolder,
+	proxyClientCert, proxyClientKey []byte,
+	apiService *apiregistrationv1.APIService,
+) *transport.Config {
+	return &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+			CertData:   proxyClientCert,
+			KeyData:    proxyClientKey,
+			CAData:     apiService.Spec.CABundle,
+		},
+		DialHolder: proxyTransportDial,
+	}
 }
 
 func (c *AvailableConditionController) sync(key string) error {
@@ -165,35 +193,6 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 
 	apiService := originalAPIService.DeepCopy()
-
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	transportConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure: true,
-		},
-		DialHolder: c.proxyTransportDial,
-	}
-
-	if c.proxyCurrentCertKeyContent != nil {
-		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
-
-		transportConfig.TLS.CertData = proxyClientCert
-		transportConfig.TLS.KeyData = proxyClientKey
-	}
-	restTransport, err := transport.New(transportConfig)
-	if err != nil {
-		return err
-	}
-	discoveryClient := &http.Client{
-		Transport: restTransport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
 
 	availableCondition := apiregistrationv1.APIServiceCondition{
 		Type:               apiregistrationv1.Available,
@@ -239,39 +238,27 @@ func (c *AvailableConditionController) sync(key string) error {
 			return err
 		}
 
-		endpoints, err := c.endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-		if apierrors.IsNotFound(err) {
-			availableCondition.Status = apiregistrationv1.ConditionFalse
-			availableCondition.Reason = "EndpointsNotFound"
-			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-			return err
-		} else if err != nil {
+		endpointSlices, err := c.endpointSliceGetter.GetEndpointSlices(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name)
+		if err != nil {
 			availableCondition.Status = apiregistrationv1.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
+		} else if len(endpointSlices) == 0 {
+			availableCondition.Status = apiregistrationv1.ConditionFalse
+			availableCondition.Reason = "EndpointsNotFound"
+			availableCondition.Message = fmt.Sprintf("cannot find endpointslices for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
+			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
+			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
+			return err
 		}
-		hasActiveEndpoints := false
-	outer:
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) == 0 {
-				continue
-			}
-			for _, endpointPort := range subset.Ports {
-				if endpointPort.Name == portName {
-					hasActiveEndpoints = true
-					break outer
-				}
-			}
-		}
+		hasActiveEndpoints := hasAvailableEndpoint(portName, endpointSlices...)
 		if !hasActiveEndpoints {
 			availableCondition.Status = apiregistrationv1.ConditionFalse
 			availableCondition.Reason = "MissingEndpoints"
-			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
+			availableCondition.Message = fmt.Sprintf("endpointslices for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
@@ -279,9 +266,29 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+		// if a particular transport was specified, use that otherwise build one
+		var proxyClientCert, proxyClientKey []byte
+		if c.proxyCurrentCertKeyContent != nil {
+			proxyClientCert, proxyClientKey = c.proxyCurrentCertKeyContent()
+		}
+
+		transportConfig := BuildTransportConfig(c.proxyTransportDial, proxyClientCert, proxyClientKey, apiService)
+		restTransport, err := transport.New(transportConfig)
+		if err != nil {
+			return err
+		}
+		discoveryClient := &http.Client{
+			Transport: restTransport,
+			// the request should happen quickly.
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
 		attempts := 5
 		results := make(chan error, attempts)
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			go func() {
 				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
 				if err != nil {
@@ -322,6 +329,7 @@ func (c *AvailableConditionController) sync(key string) error {
 				select {
 				case err = <-errCh:
 					if err != nil {
+						utilnet.CloseIdleConnectionsFor(restTransport)
 						results <- fmt.Errorf("failing or missing response from %v: %w", discoveryURL, err)
 						return
 					}
@@ -329,6 +337,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					// we had trouble with slow dial and DNS responses causing us to wait too long.
 					// we added this as insurance
 				case <-time.After(6 * time.Second):
+					utilnet.CloseIdleConnectionsFor(restTransport)
 					results <- fmt.Errorf("timed out waiting for %v", discoveryURL)
 					return
 				}
@@ -338,7 +347,7 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		var lastError error
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			lastError = <-results
 			// if we had at least one success, we are successful overall and we can return now
 			if lastError == nil {
@@ -366,6 +375,20 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
+}
+
+func hasAvailableEndpoint(portName string, es ...*discoveryv1.EndpointSlice) bool {
+	return slices.ContainsFunc(es, func(s *discoveryv1.EndpointSlice) bool {
+		if !slices.ContainsFunc(s.Endpoints, func(e discoveryv1.Endpoint) bool {
+			return e.Conditions.Ready == nil || *e.Conditions.Ready
+		}) {
+			return false
+		}
+
+		return slices.ContainsFunc(s.Ports, func(p discoveryv1.EndpointPort) bool {
+			return p.Name != nil && *p.Name == portName && p.Port != nil
+		})
+	})
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
@@ -415,11 +438,11 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 	// to be called; since the handlers are three different ways of
 	// enqueueing the same thing, waiting for this permits the queue to
 	// maximally de-duplicate the entries.
-	if !controllers.WaitForCacheSync("RemoteAvailability", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
+	if !controllers.WaitForCacheSync("RemoteAvailability", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointSlicesSynced) {
 		return
 	}
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -460,7 +483,7 @@ func (c *AvailableConditionController) addAPIService(obj interface{}) {
 	c.queue.Add(castObj.Name)
 }
 
-func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface{}) {
+func (c *AvailableConditionController) updateAPIService(oldObj, newObj any) {
 	castObj := newObj.(*apiregistrationv1.APIService)
 	oldCastObj := oldObj.(*apiregistrationv1.APIService)
 	klog.V(4).Infof("Updating %s", oldCastObj.Name)
@@ -491,18 +514,13 @@ func (c *AvailableConditionController) deleteAPIService(obj interface{}) {
 	c.queue.Add(castObj.Name)
 }
 
-func (c *AvailableConditionController) getAPIServicesFor(obj runtime.Object) []string {
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return nil
-	}
+func (c *AvailableConditionController) getAPIServicesFor(serviceNamespace, serviceName string) []string {
 	c.cacheLock.RLock()
 	defer c.cacheLock.RUnlock()
-	return c.cache[metadata.GetNamespace()][metadata.GetName()]
+	return c.cache[serviceNamespace][serviceName]
 }
 
-// if the service/endpoint handler wins the race against the cache rebuilding, it may queue a no-longer-relevant apiservice
+// if the service/endpointslice handler wins the race against the cache rebuilding, it may queue a no-longer-relevant apiservice
 // (which will get processed an extra time - this doesn't matter),
 // and miss a newly relevant apiservice (which will get queued by the apiservice handler)
 func (c *AvailableConditionController) rebuildAPIServiceCache() {
@@ -526,13 +544,15 @@ func (c *AvailableConditionController) rebuildAPIServiceCache() {
 // TODO, think of a way to avoid checking on every service manipulation
 
 func (c *AvailableConditionController) addService(obj interface{}) {
-	for _, apiService := range c.getAPIServicesFor(obj.(*v1.Service)) {
+	service := obj.(*v1.Service)
+	for _, apiService := range c.getAPIServicesFor(service.Namespace, service.Name) {
 		c.queue.Add(apiService)
 	}
 }
 
 func (c *AvailableConditionController) updateService(obj, _ interface{}) {
-	for _, apiService := range c.getAPIServicesFor(obj.(*v1.Service)) {
+	service := obj.(*v1.Service)
+	for _, apiService := range c.getAPIServicesFor(service.Namespace, service.Name) {
 		c.queue.Add(apiService)
 	}
 }
@@ -551,38 +571,52 @@ func (c *AvailableConditionController) deleteService(obj interface{}) {
 			return
 		}
 	}
-	for _, apiService := range c.getAPIServicesFor(castObj) {
+	for _, apiService := range c.getAPIServicesFor(castObj.Namespace, castObj.Name) {
 		c.queue.Add(apiService)
 	}
 }
 
-func (c *AvailableConditionController) addEndpoints(obj interface{}) {
-	for _, apiService := range c.getAPIServicesFor(obj.(*v1.Endpoints)) {
+func (c *AvailableConditionController) addEndpointSlice(obj interface{}) {
+	slice := obj.(*discoveryv1.EndpointSlice)
+	serviceName := slice.Labels[discoveryv1.LabelServiceName]
+	if serviceName == "" {
+		return
+	}
+	for _, apiService := range c.getAPIServicesFor(slice.Namespace, serviceName) {
 		c.queue.Add(apiService)
 	}
 }
 
-func (c *AvailableConditionController) updateEndpoints(obj, _ interface{}) {
-	for _, apiService := range c.getAPIServicesFor(obj.(*v1.Endpoints)) {
+func (c *AvailableConditionController) updateEndpointSlice(obj, _ interface{}) {
+	slice := obj.(*discoveryv1.EndpointSlice)
+	serviceName := slice.Labels[discoveryv1.LabelServiceName]
+	if serviceName == "" {
+		return
+	}
+	for _, apiService := range c.getAPIServicesFor(slice.Namespace, serviceName) {
 		c.queue.Add(apiService)
 	}
 }
 
-func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
-	castObj, ok := obj.(*v1.Endpoints)
+func (c *AvailableConditionController) deleteEndpointSlice(obj interface{}) {
+	castObj, ok := obj.(*discoveryv1.EndpointSlice)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*v1.Endpoints)
+		castObj, ok = tombstone.Obj.(*discoveryv1.EndpointSlice)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
 		}
 	}
-	for _, apiService := range c.getAPIServicesFor(castObj) {
+	serviceName := castObj.Labels[discoveryv1.LabelServiceName]
+	if serviceName == "" {
+		return
+	}
+	for _, apiService := range c.getAPIServicesFor(castObj.Namespace, serviceName) {
 		c.queue.Add(apiService)
 	}
 }

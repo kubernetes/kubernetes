@@ -392,7 +392,7 @@ func isLabelCurried(c prometheus.Collector, label string) bool {
 func labels(code, method bool, reqMethod string, status int, extraMethods ...string) prometheus.Labels {
 	labels := prometheus.Labels{}
 
-	if !(code || method) {
+	if !code && !method {
 		return labels
 	}
 

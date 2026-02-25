@@ -49,7 +49,7 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1MaintenanceModeWarning = "cgroup v1 support is in maintenance mode, please migrate to cgroup v2"
+	CgroupV1DeprecatedWarning = "cgroup v1 detected. cgroup v1 support is deprecated and will be removed in a future release. Please migrate to cgroup v2. More information at https://git.k8s.io/enhancements/keps/sig-node/5573-remove-cgroup-v1"
 
 	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
 	// `cpu.stat` was added to root cgroup in kernel 5.8.
@@ -60,7 +60,7 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
-type GetNodeFunc func() (*v1.Node, error)
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
@@ -102,7 +102,7 @@ type ContainerManager interface {
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
-	UpdateQOSCgroups() error
+	UpdateQOSCgroups(logger klog.Logger) error
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
@@ -224,25 +224,25 @@ func int64Slice(in []int) []int64 {
 	return out
 }
 
-func podHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod) bool {
+func podHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod) bool {
 	for _, container := range pod.Spec.InitContainers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
-	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	logger.V(4).Info("Pod contains no container with pinned cpus", "podName", pod.Name)
 	return false
 }
 
-func containerHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
+func containerHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
 	exclusiveCPUs := cr.GetExclusiveCPUs(string(pod.UID), container.Name)
 	if !exclusiveCPUs.IsEmpty() {
-		klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
 		return true
 	}
 	return false

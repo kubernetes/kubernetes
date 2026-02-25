@@ -371,7 +371,31 @@ func ConsumeVarint(b []byte) (v uint64, n int) {
 func SizeVarint(v uint64) int {
 	// This computes 1 + (bits.Len64(v)-1)/7.
 	// 9/64 is a good enough approximation of 1/7
-	return int(9*uint32(bits.Len64(v))+64) / 64
+	//
+	// The Go compiler can translate the bits.LeadingZeros64 call into the LZCNT
+	// instruction, which is very fast on CPUs from the last few years. The
+	// specific way of expressing the calculation matches C++ Protobuf, see
+	// https://godbolt.org/z/4P3h53oM4 for the C++ code and how gcc/clang
+	// optimize that function for GOAMD64=v1 and GOAMD64=v3 (-march=haswell).
+
+	// By OR'ing v with 1, we guarantee that v is never 0, without changing the
+	// result of SizeVarint. LZCNT is not defined for 0, meaning the compiler
+	// needs to add extra instructions to handle that case.
+	//
+	// The Go compiler currently (go1.24.4) does not make use of this knowledge.
+	// This opportunity (removing the XOR instruction, which handles the 0 case)
+	// results in a small (1%) performance win across CPU architectures.
+	//
+	// Independently of avoiding the 0 case, we need the v |= 1 line because
+	// it allows the Go compiler to eliminate an extra XCHGL barrier.
+	v |= 1
+
+	// It would be clearer to write log2value := 63 - uint32(...), but
+	// writing uint32(...) ^ 63 is much more efficient (-14% ARM, -20% Intel).
+	// Proof of identity for our value range [0..63]:
+	// https://go.dev/play/p/Pdn9hEWYakX
+	log2value := uint32(bits.LeadingZeros64(v)) ^ 63
+	return int((log2value*9 + (64 + 9)) / 64)
 }
 
 // AppendFixed32 appends v to b as a little-endian uint32.

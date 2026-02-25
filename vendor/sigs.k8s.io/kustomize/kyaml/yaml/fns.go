@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	yaml "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
-	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 // Append creates an ElementAppender
@@ -828,6 +828,10 @@ func (e *InvalidNodeKindError) Error() string {
 		msg += fmt.Sprintf(": node contents:\n%s", content)
 	}
 	return msg
+}
+
+func (e *InvalidNodeKindError) Unwrap() error {
+	return errors.Errorf("InvalidNodeKindError")
 }
 
 func (e *InvalidNodeKindError) ActualNodeKind() Kind {

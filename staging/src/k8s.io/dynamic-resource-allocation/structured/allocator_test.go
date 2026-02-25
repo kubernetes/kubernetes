@@ -18,10 +18,10 @@ package structured
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/allocatortesting"
@@ -33,12 +33,21 @@ func TestAllocator(t *testing.T) {
 		func(
 			ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (allocatortesting.Allocator, error) {
-			return NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			allocator, err := NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			if err != nil {
+				return nil, err
+			}
+			// Return the allocator with the internal interface so the tests can
+			// check the channel for the allocator.
+			internalAllocator, ok := allocator.(internal.Allocator)
+			if !ok {
+				return nil, fmt.Errorf("allocator doesn't implement internal interface")
+			}
+			return internalAllocator, nil
 		})
 }

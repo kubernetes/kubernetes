@@ -266,7 +266,7 @@ func TestLeaseConversion(t *testing.T) {
 	}
 }
 
-func TestUpdateWithNilLabels(t *testing.T) {
+func TestUpdateWithNilLabelsOnLease(t *testing.T) {
 	setup()
 
 	// Create initial lease
@@ -278,23 +278,33 @@ func TestUpdateWithNilLabels(t *testing.T) {
 		t.Fatalf("Failed to get lease: %v", err)
 	}
 
+	leaseLock.lease.Labels = nil
+
+	leaseLock.Labels = map[string]string{"custom-key": "custom-val"}
+
+	// Update should succeed even with nil Labels on the lease itself
+	if err := leaseLock.Update(context.Background(), testRecord); err != nil {
+		t.Errorf("Update failed with nil Labels: %v", err)
+	}
+}
+
+func TestUpdateWithNilLabelsOnLeaseLock(t *testing.T) {
+	setup()
+
+	// Create initial lease
+	if err := leaseLock.Create(context.Background(), testRecord); err != nil {
+		t.Fatalf("Failed to create lease: %v", err)
+	}
+	// Get the lease to initialize leaseLock.lease
+	if _, _, err := leaseLock.Get(context.Background()); err != nil {
+		t.Fatalf("Failed to get lease: %v", err)
+	}
+
+	leaseLock.Labels = nil
+
 	leaseLock.lease.Labels = map[string]string{"custom-key": "custom-val"}
 
-	// Update labels
-	lease, err := leaseLock.Client.Leases(testNamespace).Update(context.Background(), leaseLock.lease, metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to update lease labels: %v", err)
-	}
-
-	val, exists := lease.Labels["custom-key"]
-	if !exists {
-		t.Error("Label was overidden on the lease")
-	}
-	if val != "custom-val" {
-		t.Errorf("Label value mismatch, got %q want %q", val, "custom-val")
-	}
-
-	// Update should succeed even with nil Labels
+	// Update should succeed even with nil Labels on the leaselock
 	if err := leaseLock.Update(context.Background(), testRecord); err != nil {
 		t.Errorf("Update failed with nil Labels: %v", err)
 	}

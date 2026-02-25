@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -201,7 +203,7 @@ func dashesToCapitalCase(str string) string {
 	segments := strings.Split(str, "-")
 	result := ""
 	for _, segment := range segments {
-		result += strings.Title(segment)
+		result += cases.Title(language.English).String(segment)
 	}
 	return result
 }

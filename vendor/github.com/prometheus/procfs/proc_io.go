@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -50,7 +50,7 @@ func (p Proc) IO() (ProcIO, error) {
 
 	ioFormat := "rchar: %d\nwchar: %d\nsyscr: %d\nsyscw: %d\n" +
 		"read_bytes: %d\nwrite_bytes: %d\n" +
-		"cancelled_write_bytes: %d\n"
+		"cancelled_write_bytes: %d\n" //nolint:misspell
 
 	_, err = fmt.Sscanf(string(data), ioFormat, &pio.RChar, &pio.WChar, &pio.SyscR,
 		&pio.SyscW, &pio.ReadBytes, &pio.WriteBytes, &pio.CancelledWriteBytes)

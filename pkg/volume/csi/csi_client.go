@@ -703,6 +703,9 @@ func (c *csiDriverClient) nodeGetCapabilities(ctx context.Context) ([]*csipbv1.N
 	req := &csipbv1.NodeGetCapabilitiesRequest{}
 	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
+		if !isFinalError(err) {
+			return []*csipbv1.NodeServiceCapability{}, volumetypes.NewUncertainProgressError(err.Error())
+		}
 		return []*csipbv1.NodeServiceCapability{}, err
 	}
 	return resp.GetCapabilities(), nil

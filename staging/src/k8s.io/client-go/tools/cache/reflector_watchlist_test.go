@@ -43,6 +43,62 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+type lwSupportsWatchListSemantics struct{ fakeListWatcher }
+
+func (lw *lwSupportsWatchListSemantics) IsWatchListSemanticsUnSupported() bool { return false }
+
+type lwDoesNotSupportWatchListSemantics struct{ fakeListWatcher }
+
+func (lw *lwDoesNotSupportWatchListSemantics) IsWatchListSemanticsUnSupported() bool { return true }
+
+type lwNoWatchListSemanticsUnSupportedExposed struct{ fakeListWatcher }
+
+func TestNewReflectorWithDisablementWatchList(t *testing.T) {
+	scenarios := []struct {
+		name                    string
+		enableWatchListClientFG bool
+		lw                      ListerWatcher
+		expectUseWatchListValue bool
+	}{
+		{
+			name:                    "WatchListClient feature gate off, client supports WatchList semantics",
+			enableWatchListClientFG: false,
+			lw:                      &lwSupportsWatchListSemantics{},
+			expectUseWatchListValue: false,
+		},
+		{
+			name:                    "WatchListClient feature gate on, client supports WatchList semantics",
+			enableWatchListClientFG: true,
+			lw:                      &lwSupportsWatchListSemantics{},
+			expectUseWatchListValue: true,
+		},
+		{
+			name:                    "WatchListClient feature gate on, client doesn't support the WatchList semantics",
+			enableWatchListClientFG: true,
+			lw:                      &lwDoesNotSupportWatchListSemantics{},
+			expectUseWatchListValue: false,
+		},
+		{
+			name:                    "WatchListClient feature gate on, client doesn't expose the IsWatchListSemanticsUnSupported method",
+			enableWatchListClientFG: true,
+			lw:                      &lwNoWatchListSemanticsUnSupportedExposed{},
+			expectUseWatchListValue: true,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, scenario.enableWatchListClientFG)
+
+			r := NewReflectorWithOptions(scenario.lw, struct{}{}, &fakeStore{}, ReflectorOptions{})
+
+			if r.useWatchList != scenario.expectUseWatchListValue {
+				t.Fatalf("got: %v, want: %v", r.useWatchList, scenario.expectUseWatchListValue)
+			}
+		})
+	}
+}
+
 func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 	assertNoEvents := func(t *testing.T, c <-chan time.Time) {
 		select {
@@ -110,6 +166,68 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 		target.Stop()
 		assertNoEvents(t, target.C())
 	})
+}
+
+func TestWatchListResourceVersion(t *testing.T) {
+	scenarios := []struct {
+		name                    string
+		watchEvents             []watch.Event
+		expectedResourceVersion string
+	}{
+		{
+			name:                    "empty resource version",
+			watchEvents:             []watch.Event{},
+			expectedResourceVersion: "",
+		},
+		{
+			name:                    "empty resource version without bookmark event",
+			watchEvents:             []watch.Event{{Type: watch.Added, Object: makePod("p1", "1")}},
+			expectedResourceVersion: "",
+		},
+		{
+			name: "non empty resource version with bookmark event and initial events annotation",
+			watchEvents: []watch.Event{
+				{Type: watch.Added, Object: makePod("p1", "1")},
+				{Type: watch.Bookmark, Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: "2",
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+					},
+				}},
+			},
+			expectedResourceVersion: "2",
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			scenario := scenario
+			_, ctx := ktesting.NewTestContext(t)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+			lw, s, r, ctx, cancel := testData(ctx)
+
+			go func() {
+				for _, e := range scenario.watchEvents {
+					lw.fakeWatcher.Action(e.Type, e.Object)
+				}
+				cancel(errors.New("done"))
+			}()
+
+			curRV := ""
+			trackRV := func(rv string, eventReceivedBesidesAdded bool) {
+				if eventReceivedBesidesAdded {
+					curRV = rv
+				}
+			}
+
+			_, err := handleListWatch(ctx, time.Now(), lw, s, r.expectedType, r.expectedGVK, r.name, r.typeDescription, trackRV, r.clock, nevererrc)
+			if err != nil && !errors.Is(err, errorStopRequested) {
+				t.Errorf("expected errorStopRequested, got %v", err)
+			}
+
+			require.Equal(t, scenario.expectedResourceVersion, curRV)
+		})
+	}
 }
 
 func TestWatchList(t *testing.T) {
@@ -576,7 +694,7 @@ func testData(ctx context.Context) (*fakeListWatcher, Store, *Reflector, context
 	s := NewStore(MetaNamespaceKeyFunc)
 	lw := &fakeListWatcher{
 		fakeWatcher: watch.NewFake(),
-		stop: func() {
+		stopFunc: func() {
 			cancel(errors.New("time to stop"))
 		},
 	}
@@ -592,7 +710,7 @@ type fakeListWatcher struct {
 	watchCounter            int
 	closeAfterWatchRequests int
 	closeAfterListRequests  int
-	stop                    func()
+	stopFunc                func()
 
 	requestOptions []metav1.ListOptions
 
@@ -604,7 +722,7 @@ func (lw *fakeListWatcher) List(options metav1.ListOptions) (runtime.Object, err
 	lw.listCounter++
 	lw.requestOptions = append(lw.requestOptions, options)
 	if lw.listCounter == lw.closeAfterListRequests {
-		lw.stop()
+		lw.stopFunc()
 	}
 	if lw.customListResponse != nil {
 		return lw.customListResponse, nil
@@ -616,7 +734,7 @@ func (lw *fakeListWatcher) Watch(options metav1.ListOptions) (watch.Interface, e
 	lw.watchCounter++
 	lw.requestOptions = append(lw.requestOptions, options)
 	if lw.watchCounter == lw.closeAfterWatchRequests {
-		lw.stop()
+		lw.stopFunc()
 	}
 	if lw.watchOptionsPredicate != nil {
 		if err := lw.watchOptionsPredicate(options); err != nil {
@@ -633,4 +751,16 @@ func (lw *fakeListWatcher) StopAndRecreateWatch() {
 	defer lw.lock.Unlock()
 	lw.fakeWatcher.Stop()
 	lw.fakeWatcher = watch.NewFake()
+}
+
+func (lw *fakeListWatcher) Stop() {
+	lw.lock.Lock()
+	defer lw.lock.Unlock()
+	lw.fakeWatcher.Stop()
+}
+
+func (lw *fakeListWatcher) ResultChan() <-chan watch.Event {
+	lw.lock.Lock()
+	defer lw.lock.Unlock()
+	return lw.fakeWatcher.ResultChan()
 }

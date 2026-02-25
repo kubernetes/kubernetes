@@ -19,16 +19,15 @@ package util
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -45,11 +44,12 @@ const (
 
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
-func IsZeroCIDR(cidr string) bool {
-	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
-		return true
+func IsZeroCIDR(cidr *net.IPNet) bool {
+	if cidr == nil {
+		return false
 	}
-	return false
+	prefixLen, _ := cidr.Mask.Size()
+	return prefixLen == 0
 }
 
 // ShouldSkipService checks if a given service should skip proxying
@@ -170,10 +170,7 @@ func AppendPortIfNeeded(addr string, port int32) string {
 	}
 
 	// Append port to address.
-	if ip.To4() != nil {
-		return fmt.Sprintf("%s:%d", addr, port)
-	}
-	return fmt.Sprintf("[%s]:%d", addr, port)
+	return net.JoinHostPort(addr, strconv.Itoa(int(port)))
 }
 
 // EnsureSysctl sets a kernel sysctl to a given numeric value.
@@ -215,9 +212,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
-		return true // backwards compat
-	}
 	if ing.IPMode == nil {
 		return true
 	}

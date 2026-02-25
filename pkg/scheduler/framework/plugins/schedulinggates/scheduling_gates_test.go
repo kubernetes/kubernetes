@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -56,7 +55,7 @@ func TestPreEnqueue(t *testing.T) {
 				t.Fatalf("Creating plugin: %v", err)
 			}
 
-			got := p.(framework.PreEnqueuePlugin).PreEnqueue(ctx, tt.pod)
+			got := p.(fwk.PreEnqueuePlugin).PreEnqueue(ctx, tt.pod)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}

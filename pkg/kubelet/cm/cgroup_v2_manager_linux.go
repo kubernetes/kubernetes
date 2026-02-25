@@ -27,6 +27,7 @@ import (
 	"github.com/opencontainers/cgroups/fscommon"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
@@ -45,9 +46,9 @@ type cgroupV2impl struct {
 	cgroupCommon
 }
 
-func NewCgroupV2Manager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupV2Manager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	return &cgroupV2impl{
-		cgroupCommon: newCgroupCommon(cs, cgroupDriver),
+		cgroupCommon: newCgroupCommon(logger, cs, cgroupDriver),
 	}
 }
 
@@ -166,12 +167,6 @@ func readUnifiedControllers(path string) (sets.Set[string], error) {
 func (c *cgroupV2impl) buildCgroupUnifiedPath(name CgroupName) string {
 	cgroupFsAdaptedName := c.Name(name)
 	return path.Join(cmutil.CgroupRoot, cgroupFsAdaptedName)
-}
-
-// Convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-func cpuSharesToCPUWeight(cpuShares uint64) uint64 {
-	return uint64((((cpuShares - 2) * 9999) / 262142) + 1)
 }
 
 // Convert cgroup v2 cpu.weight value to cgroup v1 cpu.shares

@@ -37,7 +37,6 @@ var (
 			Help:           "Number of reconciliations of HPA controller. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. Note that if both spec and internal errors happen during a reconciliation, the first one to occur is reported in `error` label.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error"})
-
 	reconciliationsDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      hpaControllerSubsystem,
@@ -61,12 +60,29 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error", "metric_type"})
+	numHorizontalPodAutoscalers = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "num_horizontal_pod_autoscalers",
+			Help:           "Current number of controlled HPA objects.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	desiredReplicasCount = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "desired_replicas",
+			Help:           "Current desired replica count for HPA objects.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"namespace", "hpa_name"})
 
 	metricsList = []metrics.Registerable{
 		reconciliationsTotal,
 		reconciliationsDuration,
 		metricComputationTotal,
 		metricComputationDuration,
+		numHorizontalPodAutoscalers,
+		desiredReplicasCount,
 	}
 )
 

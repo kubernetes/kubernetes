@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +58,15 @@ var sliceWithDeviceTaints = func() *resource.ResourceSlice {
 	return slice
 }()
 
-var sliceWithPartitionableDevices = &resource.ResourceSlice{
+var sliceWithBindingConditions = func() *resource.ResourceSlice {
+	slice := slice.DeepCopy()
+	slice.Spec.Devices[0].BindingConditions = []string{"cond1"}
+	slice.Spec.Devices[0].BindingFailureConditions = []string{"fail1"}
+	slice.Spec.Devices[0].BindsToNode = ptr.To(true)
+	return slice
+}()
+
+var sliceWithPartitionableDevicesPerDeviceNodeSelection = &resource.ResourceSlice{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-resource-slice",
 	},
@@ -72,15 +81,29 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 			ResourceSliceCount: 1,
 			Generation:         1,
 		},
-		SharedCounters: []resource.CounterSet{
+		Devices: []resource.Device{
 			{
-				Name: "pool-1",
-				Counters: map[string]resource.Counter{
-					"memory": {
-						Value: k8sresource.MustParse("40Gi"),
-					},
-				},
+				Name: "device",
+				NodeName: func() *string {
+					r := "valid-node-name"
+					return &r
+				}(),
 			},
+		},
+	},
+}
+
+var sliceWithPartitionableDevicesConsumesCounters = &resource.ResourceSlice{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "valid-resource-slice",
+	},
+	Spec: resource.ResourceSliceSpec{
+		NodeName: ptr.To("valid-node-name"),
+		Driver:   "testdriver.example.com",
+		Pool: resource.ResourcePool{
+			Name:               "valid-pool-name",
+			ResourceSliceCount: 1,
+			Generation:         1,
 		},
 		Devices: []resource.Device{
 			{
@@ -95,10 +118,6 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 						},
 					},
 				},
-				NodeName: func() *string {
-					r := "valid-node-name"
-					return &r
-				}(),
 				Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
 					resource.QualifiedName("version"): {
 						StringValue: func() *string {
@@ -117,6 +136,57 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 	},
 }
 
+var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "valid-resource-slice",
+	},
+	Spec: resource.ResourceSliceSpec{
+		NodeName: ptr.To("valid-node-name"),
+		Driver:   "testdriver.example.com",
+		Pool: resource.ResourcePool{
+			Name:               "valid-pool-name",
+			ResourceSliceCount: 1,
+			Generation:         1,
+		},
+		SharedCounters: []resource.CounterSet{
+			{
+				Name: "pool-1",
+				Counters: map[string]resource.Counter{
+					"memory": {
+						Value: k8sresource.MustParse("40Gi"),
+					},
+				},
+			},
+		},
+	},
+}
+
+var sliceWithCapacity = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.Devices[0].Capacity = map[resource.QualifiedName]resource.DeviceCapacity{
+		"memory": {
+			Value: k8sresource.MustParse("40Gi"),
+		},
+	}
+	return obj
+}()
+
+var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
+	obj := sliceWithCapacity.DeepCopy()
+	obj.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+	obj.Spec.Devices[0].Capacity["memory"] =
+		resource.DeviceCapacity{
+			Value: k8sresource.MustParse("40Gi"),
+			RequestPolicy: &resource.CapacityRequestPolicy{
+				Default: ptr.To(k8sresource.MustParse("1Gi")),
+				ValidRange: &resource.CapacityRequestPolicyRange{
+					Min: ptr.To(k8sresource.MustParse("1Gi")),
+				},
+			},
+		}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -132,6 +202,9 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		obj                     *resource.ResourceSlice
 		deviceTaints            bool
 		partitionableDevices    bool
+		bindingConditions       bool
+		deviceStatus            bool
+		consumableCapacity      bool
 		expectedValidationError bool
 		expectObj               *resource.ResourceSlice
 	}{
@@ -169,26 +242,15 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
-		"drop-fields-partitionable-devices": {
+		"drop-fields-partitionable-devices-with-consumes-counters": {
 			obj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.Spec.PerDeviceNodeSelection = func() *bool {
-					r := false
-					return &r
-				}()
-				obj.Spec.NodeName = ptr.To("valid-node-name")
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				return obj
 			}(),
 			partitionableDevices: false,
 			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				obj.ObjectMeta.Generation = 1
-				obj.Spec.SharedCounters = nil
-				obj.Spec.PerDeviceNodeSelection = nil
-				obj.Spec.NodeName = ptr.To("valid-node-name")
-				obj.Spec.Devices[0].NodeName = nil
-				obj.Spec.Devices[0].NodeSelector = nil
-				obj.Spec.Devices[0].AllNodes = nil
 				obj.Spec.Devices[0].ConsumesCounters = nil
 				return obj
 			}(),
@@ -197,16 +259,95 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		// have a node selector after the perDeviceNodeSelection field got
 		// dropped.
 		"drop-fields-partitionable-devices-with-per-device-node-selection": {
-			obj:                     sliceWithPartitionableDevices,
+			obj:                     sliceWithPartitionableDevicesPerDeviceNodeSelection,
 			partitionableDevices:    false,
 			expectedValidationError: true,
 		},
-		"keep-fields-partitionable-devices": {
-			obj:                  sliceWithPartitionableDevices,
+		"drop-fields-partitionable-devices-with-shared-counters": {
+			obj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				return obj
+			}(),
+			partitionableDevices: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ObjectMeta.Generation = 1
+				obj.Spec.SharedCounters = nil
+				return obj
+			}(),
+		},
+		"keep-fields-partitionable-devices-with-consumes-counters": {
+			obj:                  sliceWithPartitionableDevicesConsumesCounters,
 			partitionableDevices: true,
 			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ObjectMeta.Generation = 1
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-partitionable-devices-with-per-device-node-selection": {
+			obj:                  sliceWithPartitionableDevicesPerDeviceNodeSelection,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-partitionable-devices-with-shared-counters": {
+			obj:                  sliceWithPartitionableDevicesSharedCounters,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-binding-conditions": {
+			obj:               sliceWithBindingConditions,
+			bindingConditions: false,
+			deviceStatus:      false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-binding-conditions-with-binding-conditions": {
+			obj:               sliceWithBindingConditions,
+			bindingConditions: false,
+			deviceStatus:      true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-binding-conditions": {
+			obj:               sliceWithBindingConditions,
+			bindingConditions: true,
+			deviceStatus:      true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-consumable-capacity": {
+			obj:                sliceWithConsumableCapacity,
+			consumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			obj:                sliceWithConsumableCapacity,
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCapacity.DeepCopy()
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -214,8 +355,13 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRADeviceBindingConditions:   tc.bindingConditions,
+				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
+				features.DRAConsumableCapacity:        tc.consumableCapacity,
+			})
 
 			obj := tc.obj.DeepCopy()
 
@@ -243,6 +389,9 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		newObj                *resource.ResourceSlice
 		deviceTaints          bool
 		partitionableDevices  bool
+		deviceStatus          bool
+		bindingConditions     bool
+		consumableCapacity    bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -326,87 +475,278 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
-		"drop-fields-partitionable-devices": {
+		"drop-fields-partitionable-devices-with-consumes-counters": {
 			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				obj.ResourceVersion = "4"
-				obj.Spec.PerDeviceNodeSelection = func() *bool {
-					r := false
-					return &r
-				}()
-				obj.Spec.NodeName = ptr.To("valid-node-name")
 				return obj
 			}(),
 			partitionableDevices: false,
 			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				obj.ResourceVersion = "4"
 				obj.Generation = 1
-				obj.Spec.SharedCounters = nil
-				obj.Spec.PerDeviceNodeSelection = nil
-				obj.Spec.NodeName = ptr.To("valid-node-name")
 				obj.Spec.Devices[0].ConsumesCounters = nil
-				obj.Spec.Devices[0].NodeName = nil
 				return obj
 			}(),
 		},
 		"drop-fields-partitionable-devices-with-per-device-node-selection": {
 			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
 			partitionableDevices:  false,
 			expectValidationError: true,
 		},
-		"keep-fields-partitionable-devices": {
+		"drop-fields-partitionable-devices-with-shared-counters": {
 			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ResourceVersion = "4"
-				obj.Spec.NodeName = ptr.To("valid-node-name")
-				obj.Spec.PerDeviceNodeSelection = nil
-				obj.Spec.Devices[0].NodeName = nil
-				return obj
-			}(),
-			partitionableDevices: true,
-			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ResourceVersion = "4"
-				obj.Generation = 1
-				obj.Spec.NodeName = ptr.To("valid-node-name")
-				obj.Spec.PerDeviceNodeSelection = nil
-				obj.Spec.Devices[0].NodeName = nil
-				return obj
-			}(),
-		},
-		"keep-existing-fields-partitionable-devices": {
-			oldObj: sliceWithPartitionableDevices,
-			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ResourceVersion = "4"
-				return obj
-			}(),
-			partitionableDevices: true,
-			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ResourceVersion = "4"
-				return obj
-			}(),
-		},
-		"keep-existing-fields-partitionable-devices-disabled-feature": {
-			oldObj: sliceWithPartitionableDevices,
-			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
 			partitionableDevices: false,
 			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevices.DeepCopy()
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
 				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				obj.Spec.SharedCounters = nil
+				return obj
+			}(),
+		},
+		"keep-fields-partitionable-devices-with-consumes-counters": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-partitionable-devices-with-per-device-node-selection": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices:  true,
+			expectValidationError: true, // Spec.NodeName is immutable.
+		},
+		"keep-fields-partitionable-devices-with-shared-counters": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-with-consumes-counters": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-with-per-device-node-selection": {
+			oldObj: sliceWithPartitionableDevicesPerDeviceNodeSelection,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-with-shared-counters": {
+			oldObj: sliceWithPartitionableDevicesSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-consumes-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-per-device-node-selection-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesPerDeviceNodeSelection,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesPerDeviceNodeSelection.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partitionable-devices-shared-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-binding-conditions": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			bindingConditions: false,
+			deviceStatus:      false,
+		},
+		"drop-fields-binding-conditions-with-binding-conditions": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			bindingConditions: false,
+			deviceStatus:      true,
+		},
+		"keep-fields-binding-conditions": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			bindingConditions: true,
+			deviceStatus:      true,
+		},
+		"keep-existing-fields-binding-conditions-without-featuregate-enabled": {
+			oldObj: sliceWithBindingConditions,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			bindingConditions: false,
+			deviceStatus:      true,
+		},
+		"keep-existing-fields-consumable-capacity": {
+			oldObj: sliceWithCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-consumable-capacity-disabled-feature": {
+			oldObj: sliceWithConsumableCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			oldObj: sliceWithCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -414,8 +754,13 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRADeviceBindingConditions:   tc.bindingConditions,
+				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
+				features.DRAConsumableCapacity:        tc.consumableCapacity,
+			})
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -437,6 +782,77 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			expectObj := tc.expectObj.DeepCopy()
 			assert.Equal(t, expectObj, newObj)
 
+		})
+	}
+}
+
+func TestWarningsOnCreate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	testCases := map[string]struct {
+		obj                 *resource.ResourceSlice
+		wantWarningMessages []string
+	}{
+		"valid driver": {
+			obj:                 slice,
+			wantWarningMessages: []string{},
+		},
+		"uppercase driver warning": {
+			obj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Driver = "Foo.COM"
+				return obj
+			}(),
+			wantWarningMessages: []string{
+				`spec.driver: driver names should be lowercase; "Foo.COM" contains uppercase characters`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnCreate(ctx, tc.obj)
+			if warnings == nil {
+				warnings = []string{}
+			}
+			require.Equal(t, tc.wantWarningMessages, warnings)
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	testCases := map[string]struct {
+		newObj              *resource.ResourceSlice
+		oldObj              *resource.ResourceSlice
+		wantWarningMessages []string
+	}{
+		"valid driver update": {
+			newObj:              slice.DeepCopy(),
+			oldObj:              slice.DeepCopy(),
+			wantWarningMessages: []string{},
+		},
+		"uppercase driver warning on update": {
+			newObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Driver = "Foo.COM"
+				return obj
+			}(),
+			oldObj: slice.DeepCopy(),
+			wantWarningMessages: []string{
+				`spec.driver: driver names should be lowercase; "Foo.COM" contains uppercase characters`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnUpdate(ctx, tc.newObj, tc.oldObj)
+			if warnings == nil {
+				warnings = []string{}
+			}
+			require.Equal(t, tc.wantWarningMessages, warnings)
 		})
 	}
 }

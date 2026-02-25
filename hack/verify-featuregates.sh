@@ -15,7 +15,8 @@
 # limitations under the License.
 
 # This script checks test/compatibility_lifecycle/reference/versioned_feature_list.yaml
-# are up to date with all the feature gate features, and verifies no feature is removed before 3 versions post `lockedToDefault:true`.
+# and test/compatibility_lifecycle/reference/feature_list.md are up to date with all the
+# feature gate features, and verifies no feature is removed before 3 versions post `lockedToDefault:true`.
 # We should run `hack/update-featuregates.sh` if the list is out of date.
 # Usage: `hack/verify-featuregates.sh`.
 
@@ -31,6 +32,19 @@ kube::golang::setup_env
 cd "${KUBE_ROOT}"
 
 if ! go run test/compatibility_lifecycle/main.go feature-gates verify; then
-  echo "Please run 'hack/update-featuregates.sh' to update the feature list."
+  echo >&2 "Please run 'hack/update-featuregates.sh' to update the feature list."
+  exit 1
+fi
+
+# Verify feature_list.md is up to date
+FEATURE_LIST_MD="test/compatibility_lifecycle/reference/feature_list.md"
+TMPFILE=$(mktemp)
+trap 'rm -f "${TMPFILE}"' EXIT
+
+go run cmd/genfeaturegates/genfeaturegates.go -output="${TMPFILE}"
+
+if ! diff -q "${FEATURE_LIST_MD}" "${TMPFILE}" > /dev/null 2>&1; then
+  echo >&2 "${FEATURE_LIST_MD} is out of date."
+  echo >&2 "Please run 'hack/update-featuregates.sh' to update the feature list."
   exit 1
 fi

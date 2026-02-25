@@ -113,7 +113,7 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 					return nil, fmt.Errorf("unified resource %q quota value conversion error: %w", k, err)
 				}
 			}
-			addCpuQuota(cm, &props, quota, period)
+			addCPUQuota(cm, &props, &quota, period)
 
 		case "cpu.weight":
 			if shouldSetCPUIdle(cm, strings.TrimSpace(res["cpu.idle"])) {
@@ -175,6 +175,9 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 				if err != nil {
 					return nil, fmt.Errorf("unified resource %q value conversion error: %w", k, err)
 				}
+			}
+			if num == 0 {
+				num = 1 // systemd does not accept "0" for TasksMax
 			}
 			props = append(props,
 				newProp("TasksMax", num))
@@ -254,11 +257,19 @@ func genV2ResourcesProperties(dirPath string, r *cgroups.Resources, cm *dbusConn
 		}
 	}
 
-	addCpuQuota(cm, &properties, r.CpuQuota, r.CpuPeriod)
+	addCPUQuota(cm, &properties, &r.CpuQuota, r.CpuPeriod)
 
-	if r.PidsLimit > 0 || r.PidsLimit == -1 {
+	if r.PidsLimit != nil {
+		var tasksMax uint64
+		if limit := *r.PidsLimit; limit < 0 {
+			tasksMax = math.MaxUint64 // "infinity"
+		} else if limit == 0 {
+			tasksMax = 1 // systemd does not accept "0" for TasksMax
+		} else {
+			tasksMax = uint64(limit)
+		}
 		properties = append(properties,
-			newProp("TasksMax", uint64(r.PidsLimit)))
+			newProp("TasksMax", tasksMax))
 	}
 
 	err = addCpuset(cm, &properties, r.CpusetCpus, r.CpusetMems)
@@ -383,6 +394,16 @@ func cgroupFilesToChown() ([]string, error) {
 	return filesToChown, nil
 }
 
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *UnifiedManager) AddPid(subcgroup string, pid int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return addPid(m.dbus, getUnitName(m.cgroups), subcgroup, pid)
+}
+
 func (m *UnifiedManager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -480,6 +501,9 @@ func (m *UnifiedManager) Set(r *cgroups.Resources) error {
 	if r == nil {
 		return nil
 	}
+	// Use a copy since CpuQuota in r may be modified.
+	rCopy := *r
+	r = &rCopy
 	properties, err := genV2ResourcesProperties(m.fsMgr.Path(""), r, m.dbus)
 	if err != nil {
 		return err

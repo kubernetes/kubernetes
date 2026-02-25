@@ -85,6 +85,7 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.RWMutex
+	monitorWG   sync.WaitGroup
 	// informersStarted is closed after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -93,8 +94,9 @@ type GraphBuilder struct {
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// running tracks whether Run() has been called.
-	// it is protected by monitorLock.
+	// running is set to true when the Run() function has been called.
+	// It will revert to false when the Run() function receives a cancellation.
+	// It is protected by monitorLock.
 	running bool
 
 	eventRecorder    record.EventRecorder
@@ -221,7 +223,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
-		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
+		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
@@ -307,11 +309,42 @@ func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
 			gb.sharedInformers.Start(gb.stopCh)
-			go monitor.Run()
+			gb.monitorWG.Go(monitor.Run)
 			started++
 		}
 	}
 	logger.V(4).Info("started new monitors", "new", started, "current", len(monitors))
+}
+
+// stopMonitors terminates all running monitors.
+// stopMonitors should be called after startMonitors to do cleanup.
+//
+// This function panics unless the running flag is set to false.
+func (gb *GraphBuilder) stopMonitors(logger klog.Logger) {
+	var total, stopped int
+
+	func() {
+		gb.monitorLock.Lock()
+		defer gb.monitorLock.Unlock()
+
+		if gb.running {
+			panic("must not call stopMonitors while still marked as running")
+		}
+
+		total = len(gb.monitors)
+		for _, monitor := range gb.monitors {
+			if monitor.stopCh != nil {
+				stopped++
+				close(monitor.stopCh)
+			}
+		}
+
+		// reset monitors so that the graph builder can be safely re-run/synced.
+		gb.monitors = nil
+	}()
+
+	gb.monitorWG.Wait()
+	logger.Info("stopped monitors", "stopped", stopped, "total", total)
 }
 
 // IsResourceSynced returns true if a monitor exists for the given resource and has synced
@@ -347,6 +380,8 @@ func (gb *GraphBuilder) IsSynced(logger klog.Logger) bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (gb *GraphBuilder) Run(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Running", "component", "GraphBuilder")
 	defer logger.Info("Stopping", "component", "GraphBuilder")
@@ -357,26 +392,19 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 	gb.running = true
 	gb.monitorLock.Unlock()
 
-	// Start monitors and begin change processing until the stop channel is
-	// closed.
+	// Start monitors and begin change processing until the stop channel is closed.
 	gb.startMonitors(logger)
 	wait.Until(func() { gb.runProcessGraphChanges(logger) }, 1*time.Second, ctx.Done())
 
-	// Stop any running monitors.
+	// Mark as not running so that no new monitors can be started.
+	// Not doing this here could cause goroutine leaks and deadlocks since it would make it possible for startMonitors
+	// to proceed and start new monitors after stopMonitors has been called.
 	gb.monitorLock.Lock()
-	defer gb.monitorLock.Unlock()
-	monitors := gb.monitors
-	stopped := 0
-	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
-			stopped++
-			close(monitor.stopCh)
-		}
-	}
+	gb.running = false
+	gb.monitorLock.Unlock()
 
-	// reset monitors so that the graph builder can be safely re-run/synced.
-	gb.monitors = nil
-	logger.Info("stopped monitors", "stopped", stopped, "total", len(monitors))
+	// Stop the currently running monitors.
+	gb.stopMonitors(logger)
 }
 
 var ignoredResources = map[schema.GroupResource]struct{}{
@@ -756,7 +784,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 			// waiting for the deletion of their dependents.
 			gb.addUnblockedOwnersToDeleteQueue(logger, removed, changed)
 			// update the node itself
-			existingNode.owners = accessor.GetOwnerReferences()
+			existingNode.setOwners(accessor.GetOwnerReferences())
 			// Add the node to its new owners' dependent lists.
 			gb.addDependentToOwners(logger, existingNode, added)
 			// remove the node from the dependent list of node that are no longer in
@@ -994,27 +1022,15 @@ type Monitor struct {
 	Controller cache.Controller
 }
 
-// GetMonitor returns a monitor for the given resource.
-// If the monitor is not synced, it will return an error and the monitor to allow the caller to decide whether to retry.
-// If the monitor is not found, it will return only an error.
-func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVersionResource) (*Monitor, error) {
+// GetMonitor returns a monitor for the given resource. It will return the
+// monitor and whether or not the monitor has been synced yet.
+func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVersionResource) (*Monitor, bool, error) {
 	gb.monitorLock.RLock()
 	defer gb.monitorLock.RUnlock()
 
-	var monitor *monitor
-	if m, ok := gb.monitors[resource]; ok {
-		monitor = m
-	} else {
-		for monitorGVR, m := range gb.monitors {
-			if monitorGVR.Group == resource.Group && monitorGVR.Resource == resource.Resource {
-				monitor = m
-				break
-			}
-		}
-	}
-
-	if monitor == nil {
-		return nil, fmt.Errorf("no monitor found for resource %s", resource.String())
+	monitor, ok := gb.monitors[resource]
+	if !ok {
+		return nil, false, fmt.Errorf("no monitor found for resource %s", resource.String())
 	}
 
 	resourceMonitor := &Monitor{
@@ -1022,18 +1038,16 @@ func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVer
 		Controller: monitor.controller,
 	}
 
-	if !cache.WaitForNamedCacheSync(
-		gb.Name(),
-		ctx.Done(),
+	if !cache.WaitForNamedCacheSyncWithContext(
+		ctx,
 		func() bool {
 			return monitor.controller.HasSynced()
 		},
 	) {
-		// returning monitor to allow the caller to decide whether to retry as it can be synced later
-		return resourceMonitor, fmt.Errorf("dependency graph for resource %s is not synced", resource.String())
+		return nil, false, nil
 	}
 
-	return resourceMonitor, nil
+	return resourceMonitor, true, nil
 }
 
 func (gb *GraphBuilder) Name() string {

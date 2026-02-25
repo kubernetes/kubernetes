@@ -19,6 +19,7 @@ package proxy
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -205,7 +206,12 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	}
 
 	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
+	cidrs := cidrFamilyMap[ipFamily]
+	// zero-masked cidr means "allow any", which same as the empty loadBalancerSourceRanges.
+	if slices.ContainsFunc(cidrs, proxyutil.IsZeroCIDR) {
+		cidrs = []*net.IPNet{}
+	}
+	info.loadBalancerSourceRanges = cidrs
 
 	// Filter Load Balancer Ingress IPs to correct IP family. While proxying load
 	// balancers might choose to proxy connections from an LB IP of one family to a

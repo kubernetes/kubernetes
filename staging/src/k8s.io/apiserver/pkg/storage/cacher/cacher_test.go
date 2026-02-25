@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,6 +42,7 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -198,14 +200,14 @@ func TestLists(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
+					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
 				})
 
 				t.Run("GetListNonRecursive", func(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(server.V3Client.Client), cacher)
+					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
 				})
 			})
 		}
@@ -217,7 +219,95 @@ func TestCompactRevision(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRV(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
+	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
+}
+
+func TestMarkConsistent(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	t.Log("New cache collects snapshots, list skips etcd")
+	resourceVersion1 := createObject(t, ctx, cacher)
+	etcdRequests := etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 2 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 2, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache clears old snapshots, list hits etcd")
+	cacher.cacher.MarkConsistent(false)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache doesn't collect new snapshot, list hits etcd")
+	resourceVersion2 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion2,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Marking cache consistent allows it to collect new snapshots, list skips etcd")
+	cacher.cacher.MarkConsistent(true)
+	resourceVersion3 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion3,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 1 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 1, cacher.cacher.watchCache.snapshots.Len())
+	}
+}
+
+func createObject(t *testing.T, ctx context.Context, store storage.Interface) string {
+	var out example.Pod
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: rand.String(10)}}
+	err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out.ResourceVersion
+}
+
+func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface, recorder *storagetesting.KubernetesRecorder, opts storage.ListOptions) []storagetesting.RecordedList {
+	key := rand.String(10)
+	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
+	listOut := &example.PodList{}
+	if err := store.GetList(listCtx, "/pods/", opts, listOut); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	return recorder.ListRequestForKey(key)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -301,6 +391,11 @@ func TestStats(t *testing.T) {
 			storagetesting.RunTestStats(ctx, t, cacher, codecs.LegacyCodec(examplev1.SchemeGroupVersion), identity.NewEncryptCheckTransformer(), sizeBasedListCostEstimate)
 		})
 	}
+}
+func TestKeySchema(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestKeySchema(ctx, t, cacher)
 }
 
 func TestWatch(t *testing.T) {
@@ -424,7 +519,7 @@ type setupOptions struct {
 type setupOption func(*setupOptions)
 
 func withDefaults(options *setupOptions) {
-	prefix := "/pods"
+	prefix := "/pods/"
 
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
@@ -474,9 +569,15 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
+	listErrors := 1
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
+		// The WatchListClient feature changes the reflector to use WATCH
+		// instead of LIST, therefore we don't expect any errors
+		listErrors = 0
+	}
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
 		Interface: etcdStorage,
-		Errors:    1,
+		Errors:    listErrors,
 	}
 
 	config := Config{

@@ -1,5 +1,9 @@
 # Release Process
 
+## Create a `Version Release` issue
+
+Create a `Version Release` issue to track the release process.
+
 ## Semantic Convention Generation
 
 New versions of the [OpenTelemetry Semantic Conventions] mean new versions of the `semconv` package need to be generated.
@@ -20,7 +24,7 @@ Ensure things look correct before submitting a pull request to include the addit
 
 ## Breaking changes validation
 
-You can run `make gorelease` that runs [gorelease](https://pkg.go.dev/golang.org/x/exp/cmd/gorelease) to ensure that there are no unwanted changes done in the public API.
+You can run `make gorelease` which runs [gorelease](https://pkg.go.dev/golang.org/x/exp/cmd/gorelease) to ensure that there are no unwanted changes made in the public API.
 
 You can check/report problems with `gorelease` [here](https://golang.org/issues/26420).
 
@@ -58,7 +62,7 @@ Update go.mod for submodules to depend on the new release which will happen in t
     ```
 
 3. Update the [Changelog](./CHANGELOG.md).
-   - Make sure all relevant changes for this release are included and are in language that non-contributors to the project can understand.
+   - Make sure all relevant changes for this release are included and are written in language that non-contributors to the project can understand.
        To verify this, you can look directly at the commits since the `<last tag>`.
 
        ```
@@ -103,10 +107,49 @@ It is critical you make sure the version you push upstream is correct.
     ...
     ```
 
+## Sign artifacts
+
+To ensure we comply with CNCF best practices, we need to sign the release artifacts.
+
+Download the `.tar.gz` and `.zip` archives from the [tags page](https://github.com/open-telemetry/opentelemetry-go/tags) for the new release tag.
+Both archives need to be signed with your GPG key.
+
+You can use [this script] to verify the contents of the archives before signing them.
+
+To find your GPG key ID, run:
+
+```terminal
+gpg --list-secret-keys --keyid-format=long
+```
+
+The key ID is the 16-character string after `sec rsa4096/` (or similar).
+
+Set environment variables and sign both artifacts:
+
+```terminal
+export VERSION="<version>"  # e.g., v1.32.0
+export KEY_ID="<your-gpg-key-id>"
+
+gpg --local-user $KEY_ID --armor --detach-sign opentelemetry-go-$VERSION.tar.gz
+gpg --local-user $KEY_ID --armor --detach-sign opentelemetry-go-$VERSION.zip
+```
+
+You can verify the signatures with:
+
+```terminal
+gpg --verify opentelemetry-go-$VERSION.tar.gz.asc opentelemetry-go-$VERSION.tar.gz
+gpg --verify opentelemetry-go-$VERSION.zip.asc opentelemetry-go-$VERSION.zip
+```
+
+[this script]: https://github.com/MrAlias/attest-sh
+
 ## Release
 
 Finally create a Release for the new `<new tag>` on GitHub.
 The release body should include all the release notes from the Changelog for this release.
+
+***IMPORTANT***: GitHub Releases are immutable once created.
+You must upload the signed artifacts (`.tar.gz`, `.tar.gz.asc`, `.zip`, and `.zip.asc`) when creating the release, as they cannot be added or modified later.
 
 ## Post-Release
 
@@ -123,10 +166,16 @@ Importantly, bump any package versions referenced to be the latest one you just 
 [Go instrumentation documentation]: https://opentelemetry.io/docs/languages/go/
 [content/en/docs/languages/go]: https://github.com/open-telemetry/opentelemetry.io/tree/main/content/en/docs/languages/go
 
-### Demo Repository
+### Close the milestone
 
-Bump the dependencies in the following Go services:
+Once a release is made, ensure all issues that were fixed and PRs that were merged as part of this release are added to the corresponding milestone.
+This helps track what changes were included in each release.
 
-- [`accounting`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/accounting)
-- [`checkoutservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/checkout)
-- [`productcatalogservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/product-catalog)
+- To find issues that haven't been included in a milestone, use this [GitHub search query](https://github.com/open-telemetry/opentelemetry-go/issues?q=is%3Aissue%20no%3Amilestone%20is%3Aclosed%20sort%3Aupdated-desc%20reason%3Acompleted%20-label%3AStale%20linked%3Apr)
+- To find merged PRs that haven't been included in a milestone, use this [GitHub search query](https://github.com/open-telemetry/opentelemetry-go/pulls?q=is%3Apr+no%3Amilestone+is%3Amerged).
+
+Once all related issues and PRs have been added to the milestone, close the milestone.
+
+### Close the `Version Release` issue
+
+Once the todo list in the `Version Release` issue is complete, close the issue.

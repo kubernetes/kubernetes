@@ -104,7 +104,7 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts L
 func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(labelName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg).WithOrigin("labelKey"))
+		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg).WithOrigin("format=k8s-label-key"))
 	}
 	return allErrs
 }
@@ -115,7 +115,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 	for k, v := range labels {
 		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
 		for _, msg := range validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, v, msg).WithOrigin("format=k8s-label-value"))
 		}
 	}
 	return allErrs

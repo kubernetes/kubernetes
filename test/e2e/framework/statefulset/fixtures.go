@@ -81,8 +81,9 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "webserver",
-							Image:        imageutils.GetE2EImage(imageutils.Httpd),
+							Image:        imageutils.GetE2EImage(imageutils.AgnhostPrev),
 							VolumeMounts: mounts,
+							Args:         []string{"test-webserver"},
 						},
 					},
 					Volumes: vols,
@@ -107,7 +108,7 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 			},
 			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+					v1.ResourceStorage: resource.MustParse("10Gi"),
 				},
 			},
 		},

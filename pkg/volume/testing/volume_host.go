@@ -173,11 +173,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-// Returns the hostname of the host kubelet is running on
-func (f *fakeVolumeHost) GetHostName() string {
-	return "fakeHostName"
-}
-
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
@@ -431,4 +426,8 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, label
 	}
 
 	return fullSet.Bytes(), nil
+}
+
+func (f *fakeKubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return []byte("key\n"), []byte("cert\n"), nil
 }

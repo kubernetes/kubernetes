@@ -23,249 +23,26 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *Carp) Reset() { *m = Carp{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *CarpCondition) Reset() { *m = CarpCondition{} }
 
-func (m *Carp) Reset()      { *m = Carp{} }
-func (*Carp) ProtoMessage() {}
-func (*Carp) Descriptor() ([]byte, []int) {
-	return fileDescriptor_83e19b543dd132db, []int{0}
-}
-func (m *Carp) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Carp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Carp) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Carp.Merge(m, src)
-}
-func (m *Carp) XXX_Size() int {
-	return m.Size()
-}
-func (m *Carp) XXX_DiscardUnknown() {
-	xxx_messageInfo_Carp.DiscardUnknown(m)
-}
+func (m *CarpInfo) Reset() { *m = CarpInfo{} }
 
-var xxx_messageInfo_Carp proto.InternalMessageInfo
+func (m *CarpList) Reset() { *m = CarpList{} }
 
-func (m *CarpCondition) Reset()      { *m = CarpCondition{} }
-func (*CarpCondition) ProtoMessage() {}
-func (*CarpCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_83e19b543dd132db, []int{1}
-}
-func (m *CarpCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CarpCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CarpCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CarpCondition.Merge(m, src)
-}
-func (m *CarpCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *CarpCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_CarpCondition.DiscardUnknown(m)
-}
+func (m *CarpSpec) Reset() { *m = CarpSpec{} }
 
-var xxx_messageInfo_CarpCondition proto.InternalMessageInfo
-
-func (m *CarpList) Reset()      { *m = CarpList{} }
-func (*CarpList) ProtoMessage() {}
-func (*CarpList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_83e19b543dd132db, []int{2}
-}
-func (m *CarpList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CarpList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CarpList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CarpList.Merge(m, src)
-}
-func (m *CarpList) XXX_Size() int {
-	return m.Size()
-}
-func (m *CarpList) XXX_DiscardUnknown() {
-	xxx_messageInfo_CarpList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_CarpList proto.InternalMessageInfo
-
-func (m *CarpSpec) Reset()      { *m = CarpSpec{} }
-func (*CarpSpec) ProtoMessage() {}
-func (*CarpSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_83e19b543dd132db, []int{3}
-}
-func (m *CarpSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CarpSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CarpSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CarpSpec.Merge(m, src)
-}
-func (m *CarpSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *CarpSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_CarpSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_CarpSpec proto.InternalMessageInfo
-
-func (m *CarpStatus) Reset()      { *m = CarpStatus{} }
-func (*CarpStatus) ProtoMessage() {}
-func (*CarpStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_83e19b543dd132db, []int{4}
-}
-func (m *CarpStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CarpStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CarpStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CarpStatus.Merge(m, src)
-}
-func (m *CarpStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *CarpStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_CarpStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_CarpStatus proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*Carp)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.Carp")
-	proto.RegisterType((*CarpCondition)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.CarpCondition")
-	proto.RegisterType((*CarpList)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.CarpList")
-	proto.RegisterType((*CarpSpec)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.CarpSpec")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.CarpSpec.NodeSelectorEntry")
-	proto.RegisterType((*CarpStatus)(nil), "k8s.io.apimachinery.pkg.apis.testapigroup.v1.CarpStatus")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/apimachinery/pkg/apis/testapigroup/v1/generated.proto", fileDescriptor_83e19b543dd132db)
-}
-
-var fileDescriptor_83e19b543dd132db = []byte{
-	// 1037 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x56, 0xc1, 0x6e, 0xdb, 0x46,
-	0x13, 0x36, 0x2d, 0xc9, 0x96, 0xd6, 0x56, 0x62, 0x6f, 0x62, 0x80, 0xbf, 0x81, 0x48, 0x8e, 0x0f,
-	0x86, 0xff, 0xc2, 0xa5, 0x62, 0xa3, 0x09, 0xdc, 0xa6, 0x40, 0x11, 0xda, 0x45, 0xa5, 0xc2, 0x71,
-	0x84, 0x95, 0x81, 0x14, 0x45, 0x0f, 0x59, 0x51, 0x5b, 0x8a, 0x95, 0xc8, 0x25, 0x76, 0x57, 0x2a,
-	0x74, 0x2b, 0xfa, 0x04, 0x7d, 0x88, 0xde, 0x7a, 0xee, 0x03, 0xf4, 0x50, 0xc0, 0xc7, 0x1c, 0x73,
-	0x12, 0x6a, 0xf5, 0x2d, 0x7c, 0x2a, 0x76, 0xb9, 0xa4, 0x48, 0x4b, 0x55, 0xa3, 0xdc, 0xb8, 0x33,
-	0xdf, 0xf7, 0xcd, 0xec, 0xce, 0x68, 0x46, 0xe0, 0xf3, 0xde, 0x29, 0xb7, 0x3c, 0x5a, 0xc3, 0xa1,
-	0xe7, 0x63, 0xa7, 0xeb, 0x05, 0x84, 0x8d, 0x6a, 0x61, 0xcf, 0x95, 0x06, 0x5e, 0x13, 0x84, 0x0b,
-	0x1c, 0x7a, 0x2e, 0xa3, 0x83, 0xb0, 0x36, 0x3c, 0xae, 0xb9, 0x24, 0x20, 0x0c, 0x0b, 0xd2, 0xb1,
-	0x42, 0x46, 0x05, 0x85, 0x47, 0x11, 0xdb, 0x4a, 0xb3, 0xad, 0xb0, 0xe7, 0x4a, 0x03, 0xb7, 0xd2,
-	0x6c, 0x6b, 0x78, 0xbc, 0xfb, 0xb1, 0xeb, 0x89, 0xee, 0xa0, 0x6d, 0x39, 0xd4, 0xaf, 0xb9, 0xd4,
-	0xa5, 0x35, 0x25, 0xd2, 0x1e, 0x7c, 0xaf, 0x4e, 0xea, 0xa0, 0xbe, 0x22, 0xf1, 0xdd, 0x4f, 0x16,
-	0xa6, 0xe6, 0x13, 0x81, 0xe7, 0xa4, 0xb4, 0x5b, 0xfb, 0x37, 0x16, 0x1b, 0x04, 0xc2, 0xf3, 0xc9,
-	0x0c, 0xe1, 0xd9, 0x7f, 0x11, 0xb8, 0xd3, 0x25, 0x3e, 0xbe, 0xcb, 0xdb, 0xff, 0x75, 0x15, 0xe4,
-	0xcf, 0x30, 0x0b, 0xe1, 0x1b, 0x50, 0x94, 0xc9, 0x74, 0xb0, 0xc0, 0xa6, 0xb1, 0x67, 0x1c, 0x6e,
-	0x9c, 0x3c, 0xb1, 0x16, 0xbe, 0x8b, 0x44, 0x5b, 0xc3, 0x63, 0xeb, 0x55, 0xfb, 0x07, 0xe2, 0x88,
-	0x97, 0x44, 0x60, 0x1b, 0x5e, 0x8f, 0xab, 0x2b, 0x93, 0x71, 0x15, 0x4c, 0x6d, 0x28, 0x51, 0x85,
-	0xdf, 0x80, 0x3c, 0x0f, 0x89, 0x63, 0xae, 0x2a, 0xf5, 0x67, 0xd6, 0x32, 0xaf, 0x6e, 0xc9, 0x1c,
-	0x5b, 0x21, 0x71, 0xec, 0x4d, 0x1d, 0x23, 0x2f, 0x4f, 0x48, 0x29, 0xc2, 0x37, 0x60, 0x8d, 0x0b,
-	0x2c, 0x06, 0xdc, 0xcc, 0x29, 0xed, 0xd3, 0x0f, 0xd0, 0x56, 0x7c, 0xfb, 0x9e, 0x56, 0x5f, 0x8b,
-	0xce, 0x48, 0xeb, 0xee, 0xff, 0x9e, 0x03, 0x65, 0x09, 0x3b, 0xa3, 0x41, 0xc7, 0x13, 0x1e, 0x0d,
-	0xe0, 0x53, 0x90, 0x17, 0xa3, 0x90, 0xa8, 0xb7, 0x2a, 0xd9, 0x8f, 0xe3, 0xac, 0xae, 0x46, 0x21,
-	0xb9, 0x1d, 0x57, 0xb7, 0x33, 0x60, 0x69, 0x44, 0x0a, 0x0e, 0x3f, 0x4d, 0x52, 0x5d, 0xcd, 0x10,
-	0x75, 0xc0, 0xdb, 0x71, 0xf5, 0x7e, 0x42, 0xcb, 0xe6, 0x00, 0x5d, 0x50, 0xee, 0x63, 0x2e, 0x9a,
-	0x8c, 0xb6, 0xc9, 0x95, 0xe7, 0x13, 0x7d, 0xd9, 0x8f, 0xde, 0xaf, 0x4c, 0x92, 0x61, 0xef, 0xe8,
-	0x68, 0xe5, 0x8b, 0xb4, 0x10, 0xca, 0xea, 0xc2, 0x21, 0x80, 0xd2, 0x70, 0xc5, 0x70, 0xc0, 0xa3,
-	0xfc, 0x65, 0xb4, 0xfc, 0xd2, 0xd1, 0x76, 0x75, 0x34, 0x78, 0x31, 0xa3, 0x86, 0xe6, 0x44, 0x80,
-	0x07, 0x60, 0x8d, 0x11, 0xcc, 0x69, 0x60, 0x16, 0xd4, 0xdb, 0x24, 0xc5, 0x40, 0xca, 0x8a, 0xb4,
-	0x17, 0xfe, 0x1f, 0xac, 0xfb, 0x84, 0x73, 0xec, 0x12, 0x73, 0x4d, 0x01, 0xef, 0x6b, 0xe0, 0xfa,
-	0xcb, 0xc8, 0x8c, 0x62, 0xff, 0xfe, 0x1f, 0x06, 0x28, 0xca, 0x52, 0x5c, 0x78, 0x5c, 0xc0, 0xef,
-	0x66, 0x5a, 0xdc, 0x7a, 0xbf, 0xdb, 0x48, 0xb6, 0x6a, 0xf0, 0x2d, 0x1d, 0xa8, 0x18, 0x5b, 0x52,
-	0xed, 0xfd, 0x1a, 0x14, 0x3c, 0x41, 0x7c, 0x59, 0xd8, 0xdc, 0xe1, 0xc6, 0xc9, 0xc9, 0xf2, 0x3d,
-	0x68, 0x97, 0xb5, 0x7c, 0xa1, 0x21, 0x85, 0x50, 0xa4, 0xb7, 0xff, 0xe7, 0x7a, 0x74, 0x07, 0xd9,
-	0xf0, 0xf0, 0x02, 0x94, 0x99, 0xa4, 0x32, 0xd1, 0xa4, 0x7d, 0xcf, 0x19, 0xa9, 0x26, 0x28, 0xd9,
-	0x07, 0x71, 0x61, 0x51, 0xda, 0x79, 0x7b, 0xd7, 0x80, 0xb2, 0x64, 0xe8, 0x82, 0x47, 0x82, 0x30,
-	0xdf, 0x0b, 0xb0, 0x2c, 0xc2, 0x57, 0x0c, 0x3b, 0xa4, 0x49, 0x98, 0x47, 0x3b, 0x2d, 0xe2, 0xd0,
-	0xa0, 0xc3, 0x55, 0xd1, 0x73, 0xf6, 0xe3, 0xc9, 0xb8, 0xfa, 0xe8, 0x6a, 0x11, 0x10, 0x2d, 0xd6,
-	0x81, 0xaf, 0xc0, 0x0e, 0x76, 0x84, 0x37, 0x24, 0xe7, 0x04, 0x77, 0xfa, 0x5e, 0x40, 0xe2, 0x00,
-	0x05, 0x15, 0xe0, 0x7f, 0x93, 0x71, 0x75, 0xe7, 0xc5, 0x3c, 0x00, 0x9a, 0xcf, 0x83, 0x3f, 0x1b,
-	0x60, 0x33, 0xa0, 0x1d, 0xd2, 0x22, 0x7d, 0xe2, 0x08, 0xca, 0xcc, 0x75, 0xf5, 0xea, 0xf5, 0x0f,
-	0x9b, 0x2a, 0xd6, 0x65, 0x4a, 0xea, 0xcb, 0x40, 0xb0, 0x91, 0xfd, 0x50, 0xbf, 0xe8, 0x66, 0xda,
-	0x85, 0x32, 0x31, 0xe1, 0xd7, 0x00, 0x72, 0xc2, 0x86, 0x9e, 0x43, 0x5e, 0x38, 0x0e, 0x1d, 0x04,
-	0xe2, 0x12, 0xfb, 0xc4, 0x2c, 0xaa, 0x8a, 0x24, 0xcd, 0xdf, 0x9a, 0x41, 0xa0, 0x39, 0x2c, 0x58,
-	0x07, 0xf7, 0xb2, 0x56, 0xb3, 0xa4, 0x74, 0xf6, 0xb4, 0x8e, 0x79, 0x4e, 0x42, 0x46, 0x1c, 0x39,
-	0xba, 0xb3, 0x8a, 0xe8, 0x0e, 0x0f, 0x1e, 0x81, 0xa2, 0xcc, 0x52, 0xe5, 0x02, 0x94, 0x46, 0xd2,
-	0xb6, 0x97, 0xda, 0x8e, 0x12, 0x04, 0x7c, 0x0a, 0x36, 0xba, 0x94, 0x8b, 0x4b, 0x22, 0x7e, 0xa4,
-	0xac, 0x67, 0x6e, 0xec, 0x19, 0x87, 0x45, 0xfb, 0x81, 0x26, 0x6c, 0xd4, 0xa7, 0x2e, 0x94, 0xc6,
-	0xc9, 0xdf, 0xa0, 0x3c, 0x36, 0x1b, 0xe7, 0xe6, 0xa6, 0xa2, 0x24, 0xbf, 0xc1, 0x7a, 0x64, 0x46,
-	0xb1, 0x3f, 0x86, 0x36, 0x9a, 0x67, 0x66, 0x79, 0x16, 0xda, 0x68, 0x9e, 0xa1, 0xd8, 0x2f, 0x53,
-	0x97, 0x9f, 0x81, 0x4c, 0x7d, 0x2b, 0x9b, 0x7a, 0x5d, 0xdb, 0x51, 0x82, 0x80, 0x35, 0x50, 0xe2,
-	0x83, 0x76, 0x87, 0xfa, 0xd8, 0x0b, 0xcc, 0x6d, 0x05, 0xdf, 0xd6, 0xf0, 0x52, 0x2b, 0x76, 0xa0,
-	0x29, 0x06, 0x3e, 0x07, 0x65, 0xb9, 0x06, 0x3b, 0x83, 0x3e, 0x61, 0x2a, 0xc6, 0x03, 0x45, 0x4a,
-	0xa6, 0x62, 0x2b, 0x76, 0xaa, 0x37, 0xca, 0x62, 0x77, 0xbf, 0x00, 0xdb, 0x33, 0x5d, 0x02, 0xb7,
-	0x40, 0xae, 0x47, 0x46, 0xd1, 0x12, 0x40, 0xf2, 0x13, 0x3e, 0x04, 0x85, 0x21, 0xee, 0x0f, 0x48,
-	0x34, 0xdf, 0x51, 0x74, 0xf8, 0x6c, 0xf5, 0xd4, 0xd8, 0xff, 0x2d, 0x07, 0xc0, 0x74, 0xd5, 0xc0,
-	0x27, 0xa0, 0x10, 0x76, 0x31, 0x8f, 0x37, 0x48, 0xdc, 0x2f, 0x85, 0xa6, 0x34, 0xde, 0x8e, 0xab,
-	0x25, 0x89, 0x55, 0x07, 0x14, 0x01, 0x21, 0x05, 0xc0, 0x89, 0x77, 0x43, 0x3c, 0x66, 0x9e, 0x2f,
-	0xdf, 0xf0, 0xc9, 0x7e, 0x99, 0xee, 0xeb, 0xc4, 0xc4, 0x51, 0x2a, 0x44, 0x7a, 0xd0, 0xe6, 0x16,
-	0x0f, 0xda, 0xd4, 0xec, 0xce, 0x2f, 0x9c, 0xdd, 0x07, 0x60, 0x2d, 0x2a, 0xf6, 0xdd, 0x19, 0x1f,
-	0xf5, 0x02, 0xd2, 0x5e, 0x89, 0x73, 0x30, 0x0b, 0x1b, 0x4d, 0x3d, 0xe2, 0x13, 0xdc, 0x99, 0xb2,
-	0x22, 0xed, 0x85, 0xaf, 0x41, 0x49, 0x0d, 0x34, 0xb5, 0xa2, 0xd6, 0x97, 0x5e, 0x51, 0x65, 0xd5,
-	0x2b, 0xb1, 0x00, 0x9a, 0x6a, 0xd9, 0xe8, 0xfa, 0xa6, 0xb2, 0xf2, 0xf6, 0xa6, 0xb2, 0xf2, 0xee,
-	0xa6, 0xb2, 0xf2, 0xd3, 0xa4, 0x62, 0x5c, 0x4f, 0x2a, 0xc6, 0xdb, 0x49, 0xc5, 0x78, 0x37, 0xa9,
-	0x18, 0x7f, 0x4d, 0x2a, 0xc6, 0x2f, 0x7f, 0x57, 0x56, 0xbe, 0x3d, 0x5a, 0xe6, 0x8f, 0xe7, 0x3f,
-	0x01, 0x00, 0x00, 0xff, 0xff, 0x9e, 0xd1, 0x13, 0x90, 0xa7, 0x0a, 0x00, 0x00,
-}
+func (m *CarpStatus) Reset() { *m = CarpStatus{} }
 
 func (m *Carp) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -380,6 +157,49 @@ func (m *CarpCondition) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *CarpInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CarpInfo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CarpInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.C != nil {
+		i -= len(*m.C)
+		copy(dAtA[i:], *m.C)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.C)))
+		i--
+		dAtA[i] = 0x22
+	}
+	i -= len(m.Data)
+	copy(dAtA[i:], m.Data)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Data)))
+	i--
+	dAtA[i] = 0x1a
+	i -= len(m.B)
+	copy(dAtA[i:], m.B)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.B)))
+	i--
+	dAtA[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(m.A))
+	i--
+	dAtA[i] = 0x8
 	return len(dAtA) - i, nil
 }
 
@@ -515,7 +335,7 @@ func (m *CarpSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.NodeSelector {
 			keysForNodeSelector = append(keysForNodeSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+		sort.Strings(keysForNodeSelector)
 		for iNdEx := len(keysForNodeSelector) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.NodeSelector[string(keysForNodeSelector[iNdEx])]
 			baseI := i
@@ -572,6 +392,20 @@ func (m *CarpStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Infos) > 0 {
+		for iNdEx := len(m.Infos) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Infos[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x42
+		}
+	}
 	if m.StartTime != nil {
 		{
 			size, err := m.StartTime.MarshalToSizedBuffer(dAtA[:i])
@@ -673,6 +507,24 @@ func (m *CarpCondition) Size() (n int) {
 	return n
 }
 
+func (m *CarpInfo) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	n += 1 + sovGenerated(uint64(m.A))
+	l = len(m.B)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Data)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.C != nil {
+		l = len(*m.C)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
 func (m *CarpList) Size() (n int) {
 	if m == nil {
 		return 0
@@ -756,6 +608,12 @@ func (m *CarpStatus) Size() (n int) {
 		l = m.StartTime.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if len(m.Infos) > 0 {
+		for _, e := range m.Infos {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -792,6 +650,19 @@ func (this *CarpCondition) String() string {
 	}, "")
 	return s
 }
+func (this *CarpInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CarpInfo{`,
+		`A:` + fmt.Sprintf("%v", this.A) + `,`,
+		`B:` + fmt.Sprintf("%v", this.B) + `,`,
+		`Data:` + fmt.Sprintf("%v", this.Data) + `,`,
+		`C:` + valueToStringGenerated(this.C) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *CarpList) String() string {
 	if this == nil {
 		return "nil"
@@ -816,7 +687,7 @@ func (this *CarpSpec) String() string {
 	for k := range this.NodeSelector {
 		keysForNodeSelector = append(keysForNodeSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+	sort.Strings(keysForNodeSelector)
 	mapStringForNodeSelector := "map[string]string{"
 	for _, k := range keysForNodeSelector {
 		mapStringForNodeSelector += fmt.Sprintf("%v: %v,", k, this.NodeSelector[k])
@@ -849,6 +720,11 @@ func (this *CarpStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "CarpCondition", "CarpCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
+	repeatedStringForInfos := "[]CarpInfo{"
+	for _, f := range this.Infos {
+		repeatedStringForInfos += strings.Replace(strings.Replace(f.String(), "CarpInfo", "CarpInfo", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForInfos += "}"
 	s := strings.Join([]string{`&CarpStatus{`,
 		`Phase:` + fmt.Sprintf("%v", this.Phase) + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
@@ -857,6 +733,7 @@ func (this *CarpStatus) String() string {
 		`HostIP:` + fmt.Sprintf("%v", this.HostIP) + `,`,
 		`CarpIP:` + fmt.Sprintf("%v", this.CarpIP) + `,`,
 		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "v1.Time", 1) + `,`,
+		`Infos:` + repeatedStringForInfos + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1240,6 +1117,172 @@ func (m *CarpCondition) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CarpInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CarpInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CarpInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field A", wireType)
+			}
+			m.A = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.A |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field B", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.B = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field C", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.C = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2136,6 +2179,40 @@ func (m *CarpStatus) Unmarshal(dAtA []byte) error {
 				m.StartTime = &v1.Time{}
 			}
 			if err := m.StartTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Infos", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Infos = append(m.Infos, CarpInfo{})
+			if err := m.Infos[len(m.Infos)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

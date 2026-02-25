@@ -175,6 +175,35 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -183,6 +212,37 @@
   help: The count of hidden metrics.
   type: Counter
   stabilityLevel: BETA
+- name: image_volume_mounted_errors_total
+  subsystem: kubelet
+  help: Number of failed image volume mounts.
+  type: Counter
+  stabilityLevel: BETA
+- name: image_volume_mounted_succeed_total
+  subsystem: kubelet
+  help: Number of successful image volume mounts.
+  type: Counter
+  stabilityLevel: BETA
+- name: image_volume_requested_total
+  subsystem: kubelet
+  help: Number of requested image volumes.
+  type: Counter
+  stabilityLevel: BETA
+- name: kubernetes_build_info
+  help: A metric with a constant '1' value labeled by major, minor, git version, git
+    commit, git tree state, build date, Go version, and compiler from which Kubernetes
+    was built, and platform on which it is running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - build_date
+  - compiler
+  - git_commit
+  - git_tree_state
+  - git_version
+  - go_version
+  - major
+  - minor
+  - platform
 - name: feature_enabled
   namespace: kubernetes
   help: This metric records the data about the stage and enablement of a k8s feature.
@@ -212,6 +272,13 @@
   labels:
   - deprecated_version
   - stability_level
+- name: running_managed_controllers
+  help: Indicates where instances of a controller are currently running
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - manager
+  - name
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
@@ -241,6 +308,79 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: adds_total
+  subsystem: workqueue
+  help: Total number of adds handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: depth
+  subsystem: workqueue
+  help: Current depth of workqueue
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: longest_running_processor_seconds
+  subsystem: workqueue
+  help: How many seconds has the longest running processor for workqueue been running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: queue_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds an item stays in workqueue before being requested.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
+- name: retries_total
+  subsystem: workqueue
+  help: Total number of retries handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: unfinished_work_seconds
+  subsystem: workqueue
+  help: How many seconds of work has done that is in progress and hasn't been observed
+    by work_duration. Large values indicate stuck threads. One can deduce the number
+    of stuck threads by observing the rate at which this increases.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: work_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds processing an item from workqueue takes.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -411,9 +551,11 @@
   - 1e+08
   - 1e+09
 - name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind. In case
-    of a fetching error, the value will be -1.
+  help: '[DEPRECATED, consider using apiserver_resource_objects instead] Number of
+    stored objects at the time of last check split by kind. In case of a fetching
+    error, the value will be -1.'
   type: Gauge
+  deprecatedVersion: 1.34.0
   stabilityLevel: STABLE
   labels:
   - resource

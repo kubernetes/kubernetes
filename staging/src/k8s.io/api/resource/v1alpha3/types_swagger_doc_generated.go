@@ -49,7 +49,7 @@ var map_DeviceTaint = map[string]string{
 	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
 	"key":       "The taint key to be applied to a device. Must be a label name.",
 	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
 	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
 }
 
@@ -61,6 +61,7 @@ var map_DeviceTaintRule = map[string]string{
 	"":         "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
+	"status":   "Status provides information about what was requested in the spec.",
 }
 
 func (DeviceTaintRule) SwaggerDoc() map[string]string {
@@ -79,7 +80,7 @@ func (DeviceTaintRuleList) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintRuleSpec = map[string]string{
 	"":               "DeviceTaintRuleSpec specifies the selector and one taint.",
-	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satified for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
+	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
 	"taint":          "The taint that gets applied to matching devices.",
 }
 
@@ -87,13 +88,20 @@ func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
 	return map_DeviceTaintRuleSpec
 }
 
+var map_DeviceTaintRuleStatus = map[string]string{
+	"":           "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+	"conditions": "Conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
+}
+
+func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleStatus
+}
+
 var map_DeviceTaintSelector = map[string]string{
-	"":                "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
-	"deviceClassName": "If DeviceClassName is set, the selectors defined there must be satisfied by a device to be selected. This field corresponds to class.metadata.name.",
-	"driver":          "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
-	"pool":            "If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
-	"device":          "If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
-	"selectors":       "Selectors contains the same selection criteria as a ResourceClaim. Currently, CEL expressions are supported. All of these selectors must be satisfied.",
+	"":       "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
+	"driver": "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
+	"pool":   "If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+	"device": "If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
 }
 
 func (DeviceTaintSelector) SwaggerDoc() map[string]string {

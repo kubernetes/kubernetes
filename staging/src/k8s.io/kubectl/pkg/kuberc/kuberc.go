@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -28,12 +29,19 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/config"
 )
 
-const RecommendedKubeRCFileName = "kuberc"
+const (
+	RecommendedKubeRCFileName       = "kuberc"
+	KubeRCOriginalCommandAnnotation = "kubectl.kubernetes.io/original-command"
+)
 
 var (
 	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), clientcmd.RecommendedHomeDir)
@@ -43,11 +51,14 @@ var (
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
 )
 
+// compile-time check that these two types are aligned
+var _ = clientcmdapi.AllowlistEntry(config.AllowlistEntry{})
+
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -56,9 +67,10 @@ type Preferences struct {
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
 
 	aliases map[string]struct{}
+	policy  clientcmdapi.PluginPolicy
 }
 
-// NewPreferences returns initialized Prefrences object.
+// NewPreferences returns initialized Preferences object.
 func NewPreferences() PreferencesHandler {
 	return &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,
@@ -67,10 +79,11 @@ func NewPreferences() PreferencesHandler {
 }
 
 type aliasing struct {
-	appendArgs  []string
-	prependArgs []string
-	flags       []config.CommandOptionDefault
-	command     *cobra.Command
+	appendArgs      []string
+	prependArgs     []string
+	flags           []config.CommandOptionDefault
+	command         *cobra.Command
+	originalCommand bytes.Buffer
 }
 
 // AddFlags adds kuberc related flags into the command.
@@ -80,7 +93,7 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -98,10 +111,14 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, nil
 	}
 
-	err = validate(kuberc)
+	p.convertPluginPolicy(kuberc)
+
+	err = p.validate(kuberc)
 	if err != nil {
 		return args, err
 	}
+
+	p.applyPluginPolicy(kubeConfigFlags, kuberc)
 
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
@@ -114,6 +131,38 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 	return args, nil
 }
 
+func (p *Preferences) convertPluginPolicy(kuberc *config.Preference) {
+	var allowlist []clientcmdapi.AllowlistEntry
+	if kuberc.CredentialPluginAllowlist != nil {
+		allowlist = make([]clientcmdapi.AllowlistEntry, len(kuberc.CredentialPluginAllowlist))
+		for i := range kuberc.CredentialPluginAllowlist {
+			allowlist[i] = clientcmdapi.AllowlistEntry(kuberc.CredentialPluginAllowlist[i])
+		}
+	}
+	p.policy = clientcmdapi.PluginPolicy{
+		PolicyType: clientcmdapi.PolicyType(kuberc.CredentialPluginPolicy),
+		Allowlist:  allowlist,
+	}
+}
+
+// `applyPluginPolicy` wraps the rest client getter with one that propagates
+// the allowlist, via the rest config, to the code handling credential exec
+// plugins.
+func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference) {
+	wrapConfigFn := kubeConfigFlags.WrapConfigFn
+	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
+		if wrapConfigFn != nil {
+			c = wrapConfigFn(c)
+		}
+
+		if c.ExecProvider != nil {
+			c.ExecProvider.PluginPolicy = p.policy
+		}
+
+		return c
+	})
+}
+
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
 func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Preference, args []string, errOut io.Writer) error {
 	args = args[1:]
@@ -121,7 +170,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 	if err != nil {
 		return nil
 	}
-
+	originalCommand := bytes.Buffer{}
 	for _, c := range kuberc.Defaults {
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
@@ -160,7 +209,14 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			if err != nil {
 				return fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
+			originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
 		}
+		// Add annotation to trace back command built with default values set within kuberc
+		if cmd.Annotations == nil {
+			cmd.Annotations = make(map[string]string, 1)
+		}
+		cmd.Annotations[KubeRCOriginalCommandAnnotation] = strings.Join(args, " ") + originalCommand.String()
+		originalCommand.Reset()
 	}
 
 	return nil
@@ -179,7 +235,6 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	}
 
 	var aliasArgs *aliasing
-
 	var commandName string // first "non-flag" arguments
 	var commandIndex int
 	for index, arg := range args[1:] {
@@ -213,71 +268,112 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		newCmd.Aliases = []string{}
 		aliasCmd := &newCmd
 
-		aliasArgs = &aliasing{
-			prependArgs: alias.PrependArgs,
-			appendArgs:  alias.AppendArgs,
-			flags:       alias.Options,
-			command:     aliasCmd,
+		if alias.Name == commandName {
+			aliasArgs = &aliasing{
+				prependArgs:     alias.PrependArgs,
+				appendArgs:      alias.AppendArgs,
+				flags:           alias.Options,
+				command:         aliasCmd,
+				originalCommand: bytes.Buffer{},
+			}
+			aliasArgs.originalCommand.WriteString(alias.Command)
 		}
-		break
-	}
 
-	if aliasArgs == nil {
-		// pursue with the current behavior.
-		// This might be a built-in command, external plugin, etc.
-		return args, nil
-	}
-
-	rootCmd.AddCommand(aliasArgs.command)
-
-	foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
-	if err != nil {
-		return args, nil
-	}
-
-	// This function triggers merging the persistent flags in the parent commands.
-	_ = foundAliasCmd.InheritedFlags()
-
-	allShorthands := make(map[string]struct{})
-	foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		if flag.Shorthand != "" {
-			allShorthands[flag.Shorthand] = struct{}{}
+		if aliasArgs == nil {
+			// pursue with the current behavior.
+			// This might be a built-in command, external plugin, etc.
+			return args, nil
 		}
-	})
 
-	for _, fl := range aliasArgs.flags {
-		existingFlag := foundAliasCmd.Flag(fl.Name)
-		if existingFlag == nil {
-			return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, args[0])
-		}
-		if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
-			// Don't modify the value implicitly, if it is passed in args explicitly
-			continue
-		}
-		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
+		rootCmd.AddCommand(aliasArgs.command)
+
+		foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
 		if err != nil {
-			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
+			return args, nil
 		}
+
+		// This function triggers merging the persistent flags in the parent commands.
+		_ = foundAliasCmd.InheritedFlags()
+
+		allShorthands := make(map[string]struct{})
+		foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
+			if flag.Shorthand != "" {
+				allShorthands[flag.Shorthand] = struct{}{}
+			}
+		})
+
+		for _, fl := range aliasArgs.flags {
+			existingFlag := foundAliasCmd.Flag(fl.Name)
+			if existingFlag == nil {
+				return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, args[0])
+			}
+			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
+				// Don't modify the value implicitly, if it is passed in args explicitly
+				continue
+			}
+			err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
+			if err != nil {
+				return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
+			}
+			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
+		}
+
+		if len(aliasArgs.prependArgs) > 0 {
+			// prependArgs defined in kuberc should be inserted after the alias name.
+			if commandIndex+1 >= len(args) {
+				// command is the last item, we simply append just like appendArgs
+				args = append(args, aliasArgs.prependArgs...)
+			} else {
+				args = append(args[:commandIndex+1], append(aliasArgs.prependArgs, args[commandIndex+1:]...)...)
+			}
+		}
+		if len(aliasArgs.appendArgs) > 0 {
+			// appendArgs defined in kuberc should be appended to actual args.
+			args = append(args, aliasArgs.appendArgs...)
+		}
+		// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
+		// We are appending the additional args defined in kuberc in here and
+		// expect that it will be passed along to the actual command.
+		rootCmd.SetArgs(args[1:])
+		// Remove alias arg to add the remaining arguments that are not flags nor part of the preferences
+		sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
+		if len(sanitizedArgs) > 0 {
+			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
+		}
+		// Add annotation to trace back command built without aliases applied
+		if aliasArgs.command.Annotations == nil {
+			aliasArgs.command.Annotations = make(map[string]string, 1)
+		}
+		aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = aliasArgs.originalCommand.String()
+		aliasArgs.originalCommand.Reset()
 	}
 
-	if len(aliasArgs.prependArgs) > 0 {
-		// prependArgs defined in kuberc should be inserted after the alias name.
-		if commandIndex+1 >= len(args) {
-			// command is the last item, we simply append just like appendArgs
-			args = append(args, aliasArgs.prependArgs...)
-		} else {
-			args = append(args[:commandIndex+1], append(aliasArgs.prependArgs, args[commandIndex+1:]...)...)
-		}
-	}
-	if len(aliasArgs.appendArgs) > 0 {
-		// appendArgs defined in kuberc should be appended to actual args.
-		args = append(args, aliasArgs.appendArgs...)
-	}
-	// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
-	// We are appending the additional args defined in kuberc in here and
-	// expect that it will be passed along to the actual command.
-	rootCmd.SetArgs(args[1:])
 	return args, nil
+}
+
+// LoadKuberc returns the correct kuberc file. Explicitly specified is always highest priority.
+// If it isn't set, KUBERC environment variable is the next choice.
+// If none of them is set, default kuberc location will be used.
+func LoadKuberc(kuberc string) (string, bool, error) {
+	if val := os.Getenv("KUBERC"); val == "off" {
+		if kuberc != "" {
+			return "", false, fmt.Errorf("disabling kuberc via KUBERC=off and passing kuberc flag are mutually exclusive")
+		}
+		return "", false, nil
+	}
+	kubeRCFile := RecommendedKubeRCFile
+	explicitly := false
+	if kuberc != "" {
+		kubeRCFile = kuberc
+		explicitly = true
+	}
+
+	if kubeRCFile == RecommendedKubeRCFile && os.Getenv("KUBERC") != "" {
+		kubeRCFile = os.Getenv("KUBERC")
+		explicitly = true
+	}
+
+	return kubeRCFile, explicitly, nil
 }
 
 // DefaultGetPreferences returns KubeRCConfiguration.
@@ -287,22 +383,13 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 // where kubeconfig's defaults are residing in.
 // If KUBERC is set to "off", kuberc will be turned off and original behaviors in kubectl will be applied.
 func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference, error) {
-	if val := os.Getenv("KUBERC"); val == "off" {
-		if kuberc != "" {
-			return nil, fmt.Errorf("disabling kuberc via KUBERC=off and passing kuberc flag are mutually exclusive")
-		}
-		return nil, nil
-	}
-	kubeRCFile := RecommendedKubeRCFile
-	explicitly := false
-	if kuberc != "" {
-		kubeRCFile = kuberc
-		explicitly = true
+	kubeRCFile, explicitly, err := LoadKuberc(kuberc)
+	if err != nil {
+		return nil, err
 	}
 
-	if kubeRCFile == "" && os.Getenv("KUBERC") != "" {
-		kubeRCFile = os.Getenv("KUBERC")
-		explicitly = true
+	if kubeRCFile == "" {
+		return nil, nil
 	}
 
 	preference, err := decodePreference(kubeRCFile)
@@ -412,7 +499,7 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 	return false
 }
 
-func validate(plugin *config.Preference) error {
+func (p *Preferences) validate(plugin *config.Preference) error {
 	validateFlag := func(flags []config.CommandOptionDefault) error {
 		for _, flag := range flags {
 			if strings.HasPrefix(flag.Name, "-") {
@@ -441,6 +528,10 @@ func validate(plugin *config.Preference) error {
 		if err := validateFlag(override.Options); err != nil {
 			return err
 		}
+	}
+
+	if err := exec.ValidatePluginPolicy(p.policy); err != nil {
+		return err
 	}
 
 	return nil

@@ -24,10 +24,21 @@ import (
 
 // MutationApplyConfiguration represents a declarative configuration of the Mutation type for use
 // with apply.
+//
+// Mutation specifies the CEL expression which is used to apply the Mutation.
 type MutationApplyConfiguration struct {
-	PatchType          *admissionregistrationv1alpha1.PatchType `json:"patchType,omitempty"`
-	ApplyConfiguration *ApplyConfigurationApplyConfiguration    `json:"applyConfiguration,omitempty"`
-	JSONPatch          *JSONPatchApplyConfiguration             `json:"jsonPatch,omitempty"`
+	// patchType indicates the patch strategy used.
+	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// Required.
+	PatchType *admissionregistrationv1alpha1.PatchType `json:"patchType,omitempty"`
+	// applyConfiguration defines the desired configuration values of an object.
+	// The configuration is applied to the admission object using
+	// [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
+	// A CEL expression is used to create apply configuration.
+	ApplyConfiguration *ApplyConfigurationApplyConfiguration `json:"applyConfiguration,omitempty"`
+	// jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
+	// A CEL expression is used to create the JSON patch.
+	JSONPatch *JSONPatchApplyConfiguration `json:"jsonPatch,omitempty"`
 }
 
 // MutationApplyConfiguration constructs a declarative configuration of the Mutation type for use with

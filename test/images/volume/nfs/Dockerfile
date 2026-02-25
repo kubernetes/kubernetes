@@ -16,7 +16,7 @@ ARG BASEIMAGE
 FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-RUN yum -y install /usr/bin/ps nfs-utils && yum clean all
+RUN dnf -y install procps-ng nfs-utils && dnf clean all
 RUN mkdir -p /exports
 ADD run_nfs.sh /usr/local/bin/
 ADD index.html /tmp/index.html

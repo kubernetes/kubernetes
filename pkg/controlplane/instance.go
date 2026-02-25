@@ -49,14 +49,16 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	policyapiv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
+	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -118,6 +120,12 @@ const (
 	IdentityLeaseComponentLabelKey = controlplaneapiserver.IdentityLeaseComponentLabelKey
 	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
 	repairLoopInterval = 3 * time.Minute
+)
+
+var (
+	// AdditionalStorageProvidersForTests allows tests to inject additional test-only API groups.
+	// Only meant for use in integration tests.
+	AdditionalStorageProvidersForTests func(client *kubernetes.Clientset) []controlplaneapiserver.RESTStorageProvider
 )
 
 // Extra defines extra configuration for kube-apiserver
@@ -389,7 +397,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			NodePortRange:           c.Extra.ServiceNodePortRange,
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
 		},
-	})
+	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
 		return nil, err
 	}
@@ -401,14 +409,14 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 	// with specific priorities.
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
-	return []controlplaneapiserver.RESTStorageProvider{
+	providers := []controlplaneapiserver.RESTStorageProvider{
 		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.ControlPlane.Generic.Authentication.Authenticator, APIAudiences: c.ControlPlane.Generic.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, RuleResolver: c.ControlPlane.Generic.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
-		certificatesrest.RESTStorageProvider{},
+		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
 		networkingrest.RESTStorageProvider{},
@@ -425,71 +433,98 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
 		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
-	}, nil
+	}
+
+	if AdditionalStorageProvidersForTests != nil {
+		providers = append(providers, AdditionalStorageProvidersForTests(client)...)
+	}
+
+	return providers, nil
 }
 
 var (
-	// stableAPIGroupVersionsEnabledByDefault is a list of our stable versions.
-	stableAPIGroupVersionsEnabledByDefault = []schema.GroupVersion{
+	// genericStableAPIGroupVersionsEnabledByDefault is a list of our stable versions for API groups provided by GenericStorageProviders.
+	genericStableAPIGroupVersionsEnabledByDefault = []schema.GroupVersion{
 		admissionregistrationv1.SchemeGroupVersion,
 		apiv1.SchemeGroupVersion,
-		appsv1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authorizationapiv1.SchemeGroupVersion,
+		certificatesapiv1.SchemeGroupVersion,
+		coordinationapiv1.SchemeGroupVersion,
+		eventsv1.SchemeGroupVersion,
+		rbacv1.SchemeGroupVersion,
+		flowcontrolv1.SchemeGroupVersion,
+	}
+	// stableAPIGroupVersionsEnabledByDefault is a list of our stable versions for additional API groups only provided in kube-apiserver.
+	stableAPIGroupVersionsEnabledByDefault = []schema.GroupVersion{
+		appsv1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		autoscalingapiv2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
-		certificatesapiv1.SchemeGroupVersion,
-		coordinationapiv1.SchemeGroupVersion,
 		discoveryv1.SchemeGroupVersion,
-		eventsv1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		nodev1.SchemeGroupVersion,
 		policyapiv1.SchemeGroupVersion,
-		rbacv1.SchemeGroupVersion,
+		resourcev1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
-		flowcontrolv1.SchemeGroupVersion,
 	}
 
-	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
-	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+	// genericBetaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions for API groups provided by GenericStorageProviders.
+	genericBetaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		admissionregistrationv1beta1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		certificatesv1beta1.SchemeGroupVersion,
 		coordinationv1beta1.SchemeGroupVersion,
-		storageapiv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion,
 		flowcontrolv1beta3.SchemeGroupVersion,
+		svmv1beta1.SchemeGroupVersion,
+	}
+	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions for additional API groups only provided in kube-apiserver.
+	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		storageapiv1beta1.SchemeGroupVersion,
 		networkingapiv1beta1.SchemeGroupVersion,
 		resourcev1beta1.SchemeGroupVersion,
 		resourcev1beta2.SchemeGroupVersion,
 	}
 
-	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have.  They are always disabled by default.
-	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+	// genericAlphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for API groups provided by GenericStorageProviders. They are always disabled by default.
+	genericAlphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		admissionregistrationv1alpha1.SchemeGroupVersion,
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		authenticationv1alpha1.SchemeGroupVersion,
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		coordinationv1alpha2.SchemeGroupVersion,
-		resourcev1alpha3.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
+	}
+	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
+	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		resourcev1alpha3.SchemeGroupVersion,
+		schedulingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
-		svmv1alpha1.SchemeGroupVersion,
 	}
 )
 
-// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
-func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+// DefaultGenericAPIResourceConfigSource returns default configuration for resources served by GenericStorageProviders.
+func DefaultGenericAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha or beta versions in the list.
-	ret.EnableVersions(stableAPIGroupVersionsEnabledByDefault...)
+	ret.EnableVersions(genericStableAPIGroupVersionsEnabledByDefault...)
+	// disable alpha and beta versions explicitly so we have a full list of what's possible to serve
+	ret.DisableVersions(genericBetaAPIGroupVersionsDisabledByDefault...)
+	ret.DisableVersions(genericAlphaAPIGroupVersionsDisabledByDefault...)
+	return ret
+}
 
+// DefaultAPIResourceConfigSource returns default configuration for resources served by kube-apiserver.
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	// start with generic configuration
+	ret := DefaultGenericAPIResourceConfigSource()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha or beta versions in the list.
+	ret.EnableVersions(stableAPIGroupVersionsEnabledByDefault...)
 	// disable alpha and beta versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(betaAPIGroupVersionsDisabledByDefault...)
 	ret.DisableVersions(alphaAPIGroupVersionsDisabledByDefault...)
-
 	return ret
 }

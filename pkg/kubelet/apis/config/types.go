@@ -219,6 +219,8 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32
 	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 2m.
 	ImageMinimumGCAge metav1.Duration
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
@@ -308,6 +310,7 @@ type KubeletConfiguration struct {
 	// specify CPU limits
 	CPUCFSQuota bool
 	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	// Default: "100ms". Changing this value requires enabling the CustomCPUCFSQuotaPeriod feature gate.
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
@@ -418,7 +421,7 @@ type KubeletConfiguration struct {
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
+	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
@@ -621,6 +624,23 @@ type SerializedNodeConfigSource struct {
 	Source v1.NodeConfigSource
 }
 
+// ServiceAccountTokenCacheType is the type of cache key used for caching credentials returned by the plugin
+// when the service account token is used.
+type ServiceAccountTokenCacheType string
+
+const (
+	// TokenServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited
+	// to the input service account token's lifetime.
+	// For example, this must be used when returning the input service account token directly as a pull credential.
+	TokenServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Token"
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. This should be set if the plugin's credential retrieval logic
+	// depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderConfig is the configuration containing information about
@@ -719,6 +739,17 @@ type ServiceAccountTokenAttributes struct {
 	// serviceAccountTokenAudience is the intended audience for the projected service account token.
 	// +required
 	ServiceAccountTokenAudience string
+
+	// cacheType indicates the type of cache key use for caching the credentials returned by the plugin
+	// when the service account token is used.
+	// The most conservative option is to set this to "Token", which means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited to the service account
+	// token's lifetime.
+	// If the plugin's credential retrieval logic depends only on the service account and not on pod-specific claims,
+	// then the plugin can set this to "ServiceAccount". In this case, the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. Use this when the returned credential is valid for all pods using the same service account.
+	// +required
+	CacheType ServiceAccountTokenCacheType
 
 	// requireServiceAccount indicates whether the plugin requires the pod to have a service account.
 	// If set to true, kubelet will only invoke the plugin if the pod has a service account.
@@ -859,15 +890,20 @@ type ImagePulledRecord struct {
 
 // ImagePullCredentials describe credentials that can be used to pull an image.
 type ImagePullCredentials struct {
-	// KuberneteSecretCoordinates is an index of coordinates of all the kubernetes
+	// KubernetesSecretCoordinates is an index of coordinates of all the kubernetes
 	// secrets that were used to pull the image.
 	// +optional
 	KubernetesSecrets []ImagePullSecret
 
+	// KubernetesServiceAccounts is an index of coordinates of all the kubernetes
+	// service accounts that were used to pull the image.
+	// +optional
+	KubernetesServiceAccounts []ImagePullServiceAccount
+
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
 	//
-	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
+	// If true, it is mutually exclusive with the `kubernetesSecrets` and `kubernetesServiceAccounts` fields.
 	// +optional
 	NodePodsAccessible bool
 }
@@ -882,6 +918,14 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string
+}
+
+// ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates
+// for which the kubelet sent service account token to the credential provider plugin for image pull credentials.
+type ImagePullServiceAccount struct {
+	UID       string
+	Namespace string
+	Name      string
 }
 
 // UserNamespaces contains User Namespace configurations.

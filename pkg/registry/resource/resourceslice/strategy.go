@@ -19,13 +19,16 @@ package resourceslice
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -57,11 +60,22 @@ func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	return validation.ValidateResourceSlice(slice)
+	errorList := validation.ValidateResourceSlice(slice)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, slice, nil, errorList, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
 func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
@@ -84,11 +98,21 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	errorList := validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
 func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
@@ -170,6 +194,8 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
+	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -210,6 +236,19 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 	}
 }
 
+func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+		draBindingConditionsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].BindingConditions = nil
+		newSlice.Spec.Devices[i].BindingFailureConditions = nil
+		newSlice.Spec.Devices[i].BindsToNode = nil
+	}
+}
+
 func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 	if slice == nil {
 		return false
@@ -229,4 +268,59 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 		}
 	}
 	return false
+}
+
+func draBindingConditionsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.BindingConditions) > 0 ||
+			len(device.BindingFailureConditions) > 0 ||
+			device.BindsToNode != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func draConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	for _, device := range spec.Devices {
+		if device.AllowMultipleAllocations != nil {
+			return true
+		}
+		for _, capacity := range device.Capacity {
+			if capacity.RequestPolicy != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRAConsumableCapacityFields drops AllowMultipleAllocations and RequestPolicy
+// fields from the new slice if they were not used in the old slice.
+func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+		draConsumableCapacityFeatureInUse(oldSlice) {
+		// No need to drop anything.
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].AllowMultipleAllocations = nil
+		if newSlice.Spec.Devices[i].Capacity != nil {
+			for ci, capacity := range newSlice.Spec.Devices[i].Capacity {
+				capacity.RequestPolicy = nil
+				newSlice.Spec.Devices[i].Capacity[ci] = capacity
+			}
+		}
+	}
 }

@@ -19,6 +19,7 @@ package plugin
 import (
 	"sync"
 
+	"k8s.io/apiserver/pkg/util/configmetrics"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -33,7 +34,7 @@ var (
 	kubeletCredentialProviderPluginErrors = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           "credential_provider_plugin_errors",
+			Name:           "credential_provider_plugin_errors_total",
 			Help:           "Number of errors from credential provider plugin",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -50,12 +51,32 @@ var (
 		},
 		[]string{"plugin_name"},
 	)
+
+	// kubeletCredentialProviderConfigInfo provides information about the credential provider configuration.
+	// The hash label is typically constant for the lifetime of the kubelet process, changing only when
+	// the configuration is updated and the kubelet is restarted.
+	kubeletCredentialProviderConfigInfo = metrics.NewDesc(
+		metrics.BuildFQName("", KubeletSubsystem, "credential_provider_config_info"),
+		"Information about the last applied credential provider configuration with hash as label",
+		[]string{"hash"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
 )
+
+var configHashProvider = configmetrics.NewAtomicHashProvider()
 
 // registerMetrics registers credential provider metrics.
 func registerMetrics() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginErrors)
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginDuration)
+		legacyregistry.CustomMustRegister(configmetrics.NewConfigInfoCustomCollector(kubeletCredentialProviderConfigInfo, configHashProvider))
 	})
+}
+
+// recordCredentialProviderConfigHash records the hash of the credential provider configuration
+func recordCredentialProviderConfigHash(configHash string) {
+	configHashProvider.SetHashes(configHash)
 }

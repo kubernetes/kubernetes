@@ -24,8 +24,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -154,6 +156,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		gottenCSC, err := cscClient.Get(ctx, csc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenCSC.UID).To(gomega.Equal(createdCSC.UID))
+		gomega.Expect(gottenCSC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing in namespace")
 		cscs, err := cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
@@ -169,6 +172,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		patchedCSC, err := cscClient.Patch(ctx, createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedCSC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdCSC.ResourceVersion, patchedCSC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSC.DeepCopy()

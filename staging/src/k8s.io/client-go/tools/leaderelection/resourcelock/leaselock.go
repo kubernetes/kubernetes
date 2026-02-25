@@ -77,6 +77,9 @@ func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
 
 	if ll.Labels != nil {
+		if ll.lease.Labels == nil {
+			ll.lease.Labels = map[string]string{}
+		}
 		// Only overwrite the labels that are specifically set
 		for k, v := range ll.Labels {
 			ll.lease.Labels[k] = v

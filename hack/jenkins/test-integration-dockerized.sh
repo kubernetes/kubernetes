@@ -17,17 +17,11 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 # Runs test-integration
 # This script is intended to be run from prow.k8s.io
 
 # TODO: make test-integration should handle this automatically
 source ./hack/install-etcd.sh
-
-set -x;
-# TODO: drop KUBE_INTEGRATION_TEST_MAX_CONCURRENCY later when we've figured out 
-# stabilizing the tests / CI Setting this to a hardcoded value is fragile.
-export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 
 make test-integration KUBE_KEEP_VERBOSE_TEST_OUTPUT=y LOG_LEVEL=4

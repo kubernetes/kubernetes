@@ -19,14 +19,12 @@ const (
 	BidiStream   GRPCType = "bidi_stream"
 )
 
-var (
-	AllCodes = []codes.Code{
-		codes.OK, codes.Canceled, codes.Unknown, codes.InvalidArgument, codes.DeadlineExceeded, codes.NotFound,
-		codes.AlreadyExists, codes.PermissionDenied, codes.Unauthenticated, codes.ResourceExhausted,
-		codes.FailedPrecondition, codes.Aborted, codes.OutOfRange, codes.Unimplemented, codes.Internal,
-		codes.Unavailable, codes.DataLoss,
-	}
-)
+var AllCodes = []codes.Code{
+	codes.OK, codes.Canceled, codes.Unknown, codes.InvalidArgument, codes.DeadlineExceeded, codes.NotFound,
+	codes.AlreadyExists, codes.PermissionDenied, codes.Unauthenticated, codes.ResourceExhausted,
+	codes.FailedPrecondition, codes.Aborted, codes.OutOfRange, codes.Unimplemented, codes.Internal,
+	codes.Unavailable, codes.DataLoss,
+}
 
 type ClientReportable interface {
 	ClientReporter(context.Context, CallMeta) (Reporter, context.Context)

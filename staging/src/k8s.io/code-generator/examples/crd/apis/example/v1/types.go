@@ -72,6 +72,8 @@ type ClusterTestType struct {
 	Status ClusterTestTypeStatus `json:"status,omitempty"`
 }
 
+// Struct level comment
 type ClusterTestTypeStatus struct {
+	// Field level comment
 	Blah string `json:"blah"`
 }

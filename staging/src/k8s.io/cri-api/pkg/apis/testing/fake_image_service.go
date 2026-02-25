@@ -254,3 +254,16 @@ type pulledImage struct {
 	imageSpec  *runtimeapi.ImageSpec
 	authConfig *runtimeapi.AuthConfig
 }
+
+// Close will shutdown the internal gRPC client connection.
+func (r *FakeImageService) Close() error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Close")
+	if err := r.popError("Close"); err != nil {
+		return err
+	}
+
+	return nil
+}

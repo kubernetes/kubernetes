@@ -31,6 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/consistencydetector"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
@@ -39,15 +41,20 @@ type listerWatcher struct {
 	resourcePrefix  string
 	newListFunc     func() runtime.Object
 	contextMetadata metadata.MD
+
+	unsupportedWatchListSemantics    bool
+	watchListConsistencyCheckEnabled bool
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
 func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:         storage,
-		resourcePrefix:  resourcePrefix,
-		newListFunc:     newListFunc,
-		contextMetadata: contextMetadata,
+		storage:                          storage,
+		resourcePrefix:                   resourcePrefix,
+		newListFunc:                      newListFunc,
+		contextMetadata:                  contextMetadata,
+		unsupportedWatchListSemantics:    watchlist.DoesClientNotSupportWatchListSemantics(storage),
+		watchListConsistencyCheckEnabled: consistencydetector.IsDataConsistencyDetectionForWatchListEnabled(),
 	}
 }
 
@@ -66,6 +73,27 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 		Predicate:            pred,
 		Recursive:            true,
 	}
+
+	// The ConsistencyChecker built into reflectors for the WatchList feature is responsible
+	// for verifying that the data received from the server (potentially from the watch cache)
+	// is consistent with the data stored in etcd.
+	//
+	// To perform this verification, the checker uses the ResourceVersion obtained from the initial request
+	// and sets the ResourceVersionMatch so that it retrieves exactly the same data directly from etcd.
+	// This allows comparing both data sources and confirming their consistency.
+	//
+	// The code below checks whether the incoming request originates from the ConsistencyChecker.
+	// If so, it allows explicitly setting the ResourceVersion.
+	//
+	// As of Oct 2025, reflector on its own is not setting RVM=Exact.
+	// However, even if that changes in the meantime, we would have to propagate that
+	// down to storage to ensure the correct semantics of the request.
+	watchListEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WatchList)
+	supportedRVM := options.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	if watchListEnabled && lw.watchListConsistencyCheckEnabled && supportedRVM {
+		storageOpts.ResourceVersion = options.ResourceVersion
+	}
+
 	ctx := context.Background()
 	if lw.contextMetadata != nil {
 		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
@@ -104,4 +132,8 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	}
 
 	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
+}
+
+func (lw *listerWatcher) IsWatchListSemanticsUnSupported() bool {
+	return lw.unsupportedWatchListSemantics
 }

@@ -20,16 +20,17 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"time"
+	"testing/synctest"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetValidatingWebhookConfig(t *testing.T) {
+func TestGetValidatingWebhookConfig(t *testing.T) { synctest.Test(t, testGetValidatingWebhookConfig) }
+func testGetValidatingWebhookConfig(t *testing.T) {
 	// Build a test client that the admission plugin can use to look up the ValidatingWebhookConfiguration
 	client := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -41,6 +42,7 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 	informerFactory.WaitForCacheSync(stop)
 
 	// no configurations
+	synctest.Wait()
 	if configurations := manager.Webhooks(); len(configurations) != 0 {
 		t.Errorf("expected empty webhooks, but got %v", configurations)
 	}
@@ -55,17 +57,9 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 		ValidatingWebhookConfigurations().
 		Create(context.TODO(), webhookConfiguration, metav1.CreateOptions{})
 
-	// Wait up to 10s for the notification to be delivered.
-	// (on my system this takes < 2ms)
-	startTime := time.Now()
+	// Wait for the notification to be delivered.
+	synctest.Wait()
 	configurations := manager.Webhooks()
-	for len(configurations) == 0 {
-		if time.Since(startTime) > 10*time.Second {
-			break
-		}
-		time.Sleep(time.Millisecond)
-		configurations = manager.Webhooks()
-	}
 
 	// verify presence
 	if len(configurations) == 0 {
@@ -212,72 +206,71 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			stop := make(chan struct{})
-			defer close(stop)
-			manager := NewValidatingWebhookConfigurationManager(informerFactory)
-			managerStructPtr := manager.(*validatingWebhookConfigurationManager)
-			fakeWebhookAccessorCreator := &mockCreateValidatingWebhookAccessor{}
-			managerStructPtr.createValidatingWebhookAccessor = fakeWebhookAccessorCreator.fn
-			informerFactory.Start(stop)
-			informerFactory.WaitForCacheSync(stop)
+			synctest.Test(t, func(t *testing.T) {
+				client := fake.NewSimpleClientset()
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				stop := make(chan struct{})
+				defer close(stop)
+				manager := NewValidatingWebhookConfigurationManager(informerFactory)
+				managerStructPtr := manager.(*validatingWebhookConfigurationManager)
+				fakeWebhookAccessorCreator := &mockCreateValidatingWebhookAccessor{}
+				managerStructPtr.createValidatingWebhookAccessor = fakeWebhookAccessorCreator.fn
+				informerFactory.Start(stop)
+				informerFactory.WaitForCacheSync(stop)
 
-			// Create webhooks
-			for _, configurations := range tt.args.createWebhookConfigurations {
-				client.
-					AdmissionregistrationV1().
-					ValidatingWebhookConfigurations().
-					Create(context.TODO(), configurations, metav1.CreateOptions{})
-			}
-			// TODO use channels to wait for manager.createValidatingWebhookAccessor
-			// to be called instead of using time.Sleep
-			time.Sleep(1 * time.Second)
-			webhooks := manager.Webhooks()
-			if configurationTotalWebhooks(tt.args.createWebhookConfigurations) != len(webhooks) {
-				t.Errorf("Expected number of webhooks %d received %d",
-					configurationTotalWebhooks(tt.args.createWebhookConfigurations),
-					len(webhooks),
-				)
-			}
-			// assert creations
-			if tt.numberOfCreations != fakeWebhookAccessorCreator.calledNTimes() {
-				t.Errorf(
-					"Expected number of creations %d received %d",
-					tt.numberOfCreations, fakeWebhookAccessorCreator.calledNTimes(),
-				)
-			}
+				// Create webhooks
+				for _, configurations := range tt.args.createWebhookConfigurations {
+					client.
+						AdmissionregistrationV1().
+						ValidatingWebhookConfigurations().
+						Create(context.TODO(), configurations, metav1.CreateOptions{})
+				}
 
-			// reset mock counter
-			fakeWebhookAccessorCreator.resetCounter()
+				synctest.Wait()
+				webhooks := manager.Webhooks()
+				if configurationTotalWebhooks(tt.args.createWebhookConfigurations) != len(webhooks) {
+					t.Errorf("Expected number of webhooks %d received %d",
+						configurationTotalWebhooks(tt.args.createWebhookConfigurations),
+						len(webhooks),
+					)
+				}
+				// assert creations
+				if tt.numberOfCreations != fakeWebhookAccessorCreator.calledNTimes() {
+					t.Errorf(
+						"Expected number of creations %d received %d",
+						tt.numberOfCreations, fakeWebhookAccessorCreator.calledNTimes(),
+					)
+				}
 
-			// Update webhooks
-			for _, configurations := range tt.args.updateWebhookConfigurations {
-				client.
-					AdmissionregistrationV1().
-					ValidatingWebhookConfigurations().
-					Update(context.TODO(), configurations, metav1.UpdateOptions{})
-			}
-			// TODO use channels to wait for manager.createValidatingWebhookAccessor
-			// to be called instead of using time.Sleep
-			time.Sleep(1 * time.Second)
-			webhooks = manager.Webhooks()
-			if tt.finalNumberOfWebhookAccessors != len(webhooks) {
-				t.Errorf("Expected final number of webhooks %d received %d",
-					tt.finalNumberOfWebhookAccessors,
-					len(webhooks),
-				)
-			}
+				// reset mock counter
+				fakeWebhookAccessorCreator.resetCounter()
 
-			// assert updates
-			if tt.numberOfRefreshes != fakeWebhookAccessorCreator.calledNTimes() {
-				t.Errorf(
-					"Expected number of refreshes %d received %d",
-					tt.numberOfRefreshes, fakeWebhookAccessorCreator.calledNTimes(),
-				)
-			}
-			// reset mock counter for the next test cases
-			fakeWebhookAccessorCreator.resetCounter()
+				// Update webhooks
+				for _, configurations := range tt.args.updateWebhookConfigurations {
+					client.
+						AdmissionregistrationV1().
+						ValidatingWebhookConfigurations().
+						Update(context.TODO(), configurations, metav1.UpdateOptions{})
+				}
+				synctest.Wait()
+				webhooks = manager.Webhooks()
+				if tt.finalNumberOfWebhookAccessors != len(webhooks) {
+					t.Errorf("Expected final number of webhooks %d received %d",
+						tt.finalNumberOfWebhookAccessors,
+						len(webhooks),
+					)
+				}
+
+				// assert updates
+				if tt.numberOfRefreshes != fakeWebhookAccessorCreator.calledNTimes() {
+					t.Errorf(
+						"Expected number of refreshes %d received %d",
+						tt.numberOfRefreshes, fakeWebhookAccessorCreator.calledNTimes(),
+					)
+				}
+				// reset mock counter for the next test cases
+				fakeWebhookAccessorCreator.resetCounter()
+			})
 		})
 	}
 }

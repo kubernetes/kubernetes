@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExtractFromBadDataFile(t *testing.T) {
@@ -33,15 +33,16 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 	defer removeAll(dirName, t)
 
+	logger, _ := ktesting.NewTestContext(t)
 	fileName := filepath.Join(dirName, "test_pod_config")
 	err = os.WriteFile(fileName, []byte{1, 2, 3}, 0555)
 	if err != nil {
 		t.Fatalf("unable to write test file %#v", err)
 	}
 
-	ch := make(chan interface{}, 1)
+	ch := make(chan sourceUpdate, 1)
 	lw := newSourceFile(fileName, "localhost", time.Millisecond, ch)
-	err = lw.listConfig()
+	err = lw.listConfig(logger)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -55,18 +56,19 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 	defer removeAll(dirName, t)
 
-	ch := make(chan interface{}, 1)
+	logger, _ := ktesting.NewTestContext(t)
+	ch := make(chan sourceUpdate, 1)
 	lw := newSourceFile(dirName, "localhost", time.Millisecond, ch)
-	err = lw.listConfig()
+	err = lw.listConfig(logger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	update, ok := (<-ch).(kubetypes.PodUpdate)
+	update, ok := <-ch
 	if !ok {
 		t.Fatalf("unexpected type: %#v", update)
 	}
-	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
+	expected := createSourceUpdate() // Expect empty update.
 	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Fatalf("expected %#v, got %#v", expected, update)
 	}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -29,13 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
@@ -451,9 +450,7 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
-	}
+	pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
@@ -461,8 +458,8 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
-func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32, now time.Time) bool {
+	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: now})
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -491,8 +488,8 @@ func isTerminating(pod *v1.Pod) bool {
 }
 
 // isUnavailable returns true if pod is not available or if it is terminating
-func isUnavailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return !isRunningAndAvailable(pod, minReadySeconds) || isTerminating(pod)
+func isUnavailable(pod *v1.Pod, minReadySeconds int32, now time.Time) bool {
+	return !podutil.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: now}) || isTerminating(pod)
 }
 
 // allowsBurst is true if the alpha burst annotation is set.

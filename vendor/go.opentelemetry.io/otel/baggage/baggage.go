@@ -317,7 +317,7 @@ func parseMember(member string) (Member, error) {
 	keyValue, properties, found := strings.Cut(member, propertyDelimiter)
 	if found {
 		// Parse the member properties.
-		for _, pStr := range strings.Split(properties, propertyDelimiter) {
+		for pStr := range strings.SplitSeq(properties, propertyDelimiter) {
 			p, err := parseProperty(pStr)
 			if err != nil {
 				return newInvalidMember(), err
@@ -480,7 +480,7 @@ func Parse(bStr string) (Baggage, error) {
 	}
 
 	b := make(baggage.List)
-	for _, memberStr := range strings.Split(bStr, listDelimiter) {
+	for memberStr := range strings.SplitSeq(bStr, listDelimiter) {
 		m, err := parseMember(memberStr)
 		if err != nil {
 			return Baggage{}, err
@@ -648,7 +648,7 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	// If we couldn't find any valid key character,
 	// it means the key is either empty or invalid.
 	if keyStart == keyEnd {
-		return
+		return p, ok
 	}
 
 	// Skip spaces after the key: "   key<    >=    value  ".
@@ -658,13 +658,13 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 		// A key can have no value, like: "   key    ".
 		ok = true
 		p.key = s[keyStart:keyEnd]
-		return
+		return p, ok
 	}
 
 	// If we have not reached the end and we can't find the '=' delimiter,
 	// it means the property is invalid.
 	if s[index] != keyValueDelimiter[0] {
-		return
+		return p, ok
 	}
 
 	// Attempting to parse the value.
@@ -690,14 +690,14 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	// we have not reached the end, it means the property is
 	// invalid, something like: "   key    =    value  value1".
 	if index != len(s) {
-		return
+		return p, ok
 	}
 
 	// Decode a percent-encoded value.
 	rawVal := s[valueStart:valueEnd]
 	unescapeVal, err := url.PathUnescape(rawVal)
 	if err != nil {
-		return
+		return p, ok
 	}
 	value := replaceInvalidUTF8Sequences(len(rawVal), unescapeVal)
 
@@ -706,7 +706,7 @@ func parsePropertyInternal(s string) (p Property, ok bool) {
 	p.hasValue = true
 
 	p.value = value
-	return
+	return p, ok
 }
 
 func skipSpace(s string, offset int) int {
@@ -812,7 +812,7 @@ var safeKeyCharset = [utf8.RuneSelf]bool{
 // validateBaggageName checks if the string is a valid OpenTelemetry Baggage name.
 // Baggage name is a valid, non-empty UTF-8 string.
 func validateBaggageName(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 
@@ -828,7 +828,7 @@ func validateBaggageValue(s string) bool {
 
 // validateKey checks if the string is a valid W3C Baggage key.
 func validateKey(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 

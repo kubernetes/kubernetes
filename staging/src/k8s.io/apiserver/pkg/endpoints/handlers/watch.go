@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -31,16 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 )
-
-// nothing will ever be sent down this channel
-var neverExitWatch <-chan time.Time = make(chan time.Time)
 
 // timeoutFactory abstracts watch timeout logic for testing
 type TimeoutFactory interface {
@@ -56,7 +58,8 @@ type realTimeoutFactory struct {
 // and a cleanup function to call when this happens.
 func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	if w.timeout == 0 {
-		return neverExitWatch, func() bool { return false }
+		// nothing will ever be sent down this channel
+		return nil, func() bool { return false }
 	}
 	t := time.NewTimer(w.timeout)
 	return t.C, t.Stop
@@ -204,6 +207,29 @@ type WatchServer struct {
 	metricsScope string
 }
 
+// watchEventMetricsRecorder allows the caller to count bytes written and report the size of the event.
+// It is thread-safe, as long as underlying io.Writer is thread-safe.
+// Once all Write calls for a given watch event have finished, RecordEvent must be called.
+type watchEventMetricsRecorder struct {
+	writer      io.Writer
+	countMetric compbasemetrics.CounterMetric
+	sizeMetric  compbasemetrics.ObserverMetric
+	byteCount   atomic.Int64
+}
+
+// Write implements io.Writer.
+func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
+	n, err = c.writer.Write(p)
+	c.byteCount.Add(int64(n))
+	return
+}
+
+// Record reports the metrics and resets the byte count.
+func (c *watchEventMetricsRecorder) RecordEvent() {
+	c.countMetric.Inc()
+	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
+}
+
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
@@ -241,7 +267,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	gvr := s.Scope.Resource
-	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, framer)
+
+	recorder := &watchEventMetricsRecorder{
+		writer:      framer,
+		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+	}
+
+	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -265,7 +298,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
 			if err := watchEncoder.Encode(event); err != nil {
@@ -273,12 +305,23 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
+			recorder.RecordEvent()
 
 			if len(ch) == 0 {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
-				metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope)
+				// Record completion of initial listing phase for WatchList
+				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("unable to measure watchlist latency because no received ts found in the ctx, gvr: %s", s.Scope.Resource))
+				} else {
+					initLatency := time.Since(receivedTimestamp)
+					metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope, initLatency)
+					auditID := audit.GetAuditIDTruncated(req.Context())
+					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
+					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
+				}
 			}
 		}
 	}

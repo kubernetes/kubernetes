@@ -46,33 +46,38 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []kubecontainer.Image
-	ImageFsStats      []*runtimeapi.FilesystemUsage
-	ContainerFsStats  []*runtimeapi.FilesystemUsage
-	APIPodStatus      v1.PodStatus
-	PodStatus         kubecontainer.PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *kubecontainer.RuntimeStatus
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	SyncResults       *kubecontainer.PodSyncResult
-	Err               error
-	InspectErr        error
-	StatusErr         error
+	CalledFunctions     []string
+	PodList             []*FakePod
+	AllPodList          []*FakePod
+	ImageList           []kubecontainer.Image
+	ImageFsStats        []*runtimeapi.FilesystemUsage
+	ContainerFsStats    []*runtimeapi.FilesystemUsage
+	APIPodStatus        v1.PodStatus
+	PodStatus           kubecontainer.PodStatus
+	StartedPods         []string
+	KilledPods          []string
+	StartedContainers   []string
+	KilledContainers    []string
+	RuntimeStatus       *kubecontainer.RuntimeStatus
+	VersionInfo         string
+	APIVersionInfo      string
+	RuntimeType         string
+	PodResizeInProgress bool
+	SyncResults         *kubecontainer.PodSyncResult
+	Err                 error
+	InspectErr          error
+	StatusErr           error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
-	SwapBehavior         map[string]kubetypes.SwapBehavior
-	T                    TB
+	// imagePullErrBucket sends an error to a PullImage() call
+	// blocked by BlockImagePulls. This is used to simulate
+	// a failure in some of the parallel pull image calls.
+	imagePullErrBucket chan error
+	SwapBehavior       map[string]kubetypes.SwapBehavior
+	T                  TB
 }
 
 const FakeHost = "localhost:12345"
@@ -232,7 +237,7 @@ func (f *FakeRuntime) GetPods(_ context.Context, all bool) ([]*kubecontainer.Pod
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -289,13 +294,13 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
-func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*kubecontainer.PodStatus, error) {
+func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GeneratePodStatus")
 	status := f.PodStatus
-	return &status, f.Err
+	return &status
 }
 
 func (f *FakeRuntime) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
@@ -318,6 +323,30 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	if f.imagePullErrBucket == nil {
+		f.imagePullErrBucket = make(chan error, 1)
+	}
+
+	blockImagePulls := f.BlockImagePulls
+	f.Unlock()
+
+	if blockImagePulls {
+		// Block the function before adding the image to f.ImageList
+		select {
+		case <-ctx.Done():
+		case <-f.imagePullTokenBucket:
+		case pullImageErr := <-f.imagePullErrBucket:
+			return "", nil, pullImageErr
+		}
+	}
+
+	f.Lock()
+	defer f.Unlock()
+
 	if f.Err == nil {
 		i := kubecontainer.Image{
 			ID:   image.Image,
@@ -332,23 +361,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		retCreds = &creds[0]
 	}
 
-	if !f.BlockImagePulls {
-		f.Unlock()
-		return image.Image, retCreds, f.Err
-	}
-
-	retErr := f.Err
-	if f.imagePullTokenBucket == nil {
-		f.imagePullTokenBucket = make(chan bool, 1)
-	}
-	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
-	f.Unlock()
-	select {
-	case <-ctx.Done():
-	case <-f.imagePullTokenBucket:
-	}
-
-	return image.Image, retCreds, retErr
+	return image.Image, retCreds, f.Err
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
@@ -359,6 +372,17 @@ func (f *FakeRuntime) UnblockImagePulls(count int) {
 			case f.imagePullTokenBucket <- true:
 			default:
 			}
+		}
+	}
+}
+
+// SendImagePullError sends an error to a PullImage() call blocked by BlockImagePulls.
+// PullImage() immediately returns after receiving the error.
+func (f *FakeRuntime) SendImagePullError(err error) {
+	if f.imagePullErrBucket != nil {
+		select {
+		case f.imagePullErrBucket <- err:
+		default:
 		}
 	}
 }
@@ -531,12 +555,12 @@ func (f *FakeContainerCommandRunner) RunInContainer(_ context.Context, container
 	return []byte(f.Stdout), f.Err
 }
 
-func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.ContainerID) (status *kubecontainer.Status, err error) {
+func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ types.UID, _ kubecontainer.ContainerID) (status *kubecontainer.Status, err error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
-	return nil, f.Err
+	return &kubecontainer.Status{}, f.Err
 }
 
 func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
@@ -544,4 +568,12 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 		return f.SwapBehavior[container.Name]
 	}
 	return kubetypes.NoSwap
+}
+
+func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	return f.PodResizeInProgress
+}
+
+func (f *FakeRuntime) UpdateActuatedPodLevelResources(allocatedPod *v1.Pod) error {
+	return nil
 }

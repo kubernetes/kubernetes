@@ -45,13 +45,11 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -106,7 +104,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -176,7 +173,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -244,7 +240,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500

@@ -53,7 +53,7 @@ func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.V
 	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
 		return nil, -1, &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInvalid,
-			Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+			Detail: "validation failed due to running out of cost budget, no further validation rules will be run",
 			Cause:  apiservercel.ErrOutOfBudget,
 		}
 	}
@@ -1035,7 +1035,7 @@ func TestContextCanceled(t *testing.T) {
 
 	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
 	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
-	fc := cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	fc := cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	f := fc.CompileCondition([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.StoredExpressions)
 	v := validator{
 		failPolicy:       &fail,

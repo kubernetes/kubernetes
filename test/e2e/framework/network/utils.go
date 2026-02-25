@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -867,10 +868,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 	if config.DualStackEnabled {
 		numEndpoints = 2 * len(config.EndpointPods)
 	}
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", nodePortServiceName, config.Namespace)
 	ginkgo.By("Waiting for Session Affinity service to expose endpoint")
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, sessionAffinityServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, sessionAffinityServiceName, numEndpoints)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", sessionAffinityServiceName, config.Namespace)
 }
 
@@ -924,7 +925,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	if config.DualStackEnabled {
 		numEndpoints = 2 * len(config.EndpointPods)
 	}
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints)
 	if err != nil {
 		framework.Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}

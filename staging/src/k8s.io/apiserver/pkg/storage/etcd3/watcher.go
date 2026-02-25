@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -55,44 +56,44 @@ const (
 var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
-var fatalOnDecodeError = false
+var fatalOnDecodeError atomic.Bool
 
 func init() {
 	// check to see if we are running in a test environment
-	TestOnlySetFatalOnDecodeError(true)
-	fatalOnDecodeError, _ = strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
+	b, _ := strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
+	TestOnlySetFatalOnDecodeError(b)
 }
 
 // TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
 func TestOnlySetFatalOnDecodeError(b bool) {
-	fatalOnDecodeError = b
+	fatalOnDecodeError.Store(b)
 }
 
 type watcher struct {
-	client              *clientv3.Client
-	codec               runtime.Codec
-	newFunc             func() runtime.Object
-	objectType          string
-	groupResource       schema.GroupResource
-	versioner           storage.Versioner
-	transformer         value.Transformer
-	getCurrentStorageRV func(context.Context) (uint64, error)
-	stats               *statsCache
+	client                   *clientv3.Client
+	codec                    runtime.Codec
+	newFunc                  func() runtime.Object
+	objectType               string
+	groupResource            schema.GroupResource
+	versioner                storage.Versioner
+	transformer              value.Transformer
+	getCurrentStorageRV      func(context.Context) (uint64, error)
+	getResourceSizeEstimator func() *resourceSizeEstimator
 }
 
 // watchChan implements watch.Interface.
 type watchChan struct {
-	watcher           *watcher
-	key               string
-	initialRev        int64
-	recursive         bool
-	progressNotify    bool
-	internalPred      storage.SelectionPredicate
-	ctx               context.Context
-	cancel            context.CancelFunc
-	incomingEventChan chan *event
-	resultChan        chan watch.Event
-	stats             *statsCache
+	watcher                  *watcher
+	key                      string
+	initialRev               int64
+	recursive                bool
+	progressNotify           bool
+	internalPred             storage.SelectionPredicate
+	ctx                      context.Context
+	cancel                   context.CancelFunc
+	incomingEventChan        chan *event
+	resultChan               chan watch.Event
+	getResourceSizeEstimator func() *resourceSizeEstimator
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -104,7 +105,7 @@ type watchChan struct {
 // pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
 func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
-		key += "/"
+		return nil, fmt.Errorf(`recursive key needs to end with "/"`)
 	}
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
@@ -128,15 +129,15 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 
 func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
-		watcher:           w,
-		key:               key,
-		initialRev:        rev,
-		recursive:         recursive,
-		progressNotify:    progressNotify,
-		internalPred:      pred,
-		incomingEventChan: make(chan *event, incomingBufSize),
-		resultChan:        make(chan watch.Event, outgoingBufSize),
-		stats:             w.stats,
+		watcher:                  w,
+		key:                      key,
+		initialRev:               rev,
+		recursive:                recursive,
+		progressNotify:           progressNotify,
+		internalPred:             pred,
+		incomingEventChan:        make(chan *event, incomingBufSize),
+		resultChan:               make(chan watch.Event, outgoingBufSize),
+		getResourceSizeEstimator: w.getResourceSizeEstimator,
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
@@ -385,6 +386,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 		opts = append(opts, clientv3.WithProgressNotify())
 	}
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
+	estimator := wc.getResourceSizeEstimator()
 	for wres := range wch {
 		if wres.Err() != nil {
 			err := wres.Err()
@@ -405,12 +407,12 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 		}
 
 		for _, e := range wres.Events {
-			if wc.stats != nil {
+			if estimator != nil {
 				switch e.Type {
 				case clientv3.EventTypePut:
-					wc.stats.UpdateKey(e.Kv)
+					estimator.UpdateKey(e.Kv)
 				case clientv3.EventTypeDelete:
-					wc.stats.DeleteKey(e.Kv)
+					estimator.DeleteKey(e.Kv)
 				}
 			}
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
@@ -757,7 +759,7 @@ func (w *watcher) transformIfCorruptObjectError(e *event, err error) error {
 func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
-		if fatalOnDecodeError {
+		if fatalOnDecodeError.Load() {
 			// we are running in a test environment and thus an
 			// error here is due to a coder mistake if the defer
 			// does not catch it

@@ -189,10 +189,10 @@ func updateCSIDriver(pluginName string) error {
 	return nil
 }
 
-func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
+func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
 	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
-		klog.ErrorS(nil, "Invalid volume spec for CSI", "nodeName", nodeName)
-		return
+		klog.ErrorS(nil, "Invalid volume spec for CSI")
+		return false
 	}
 
 	pluginName := spec.PersistentVolume.Spec.CSI.Driver
@@ -200,16 +200,16 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.No
 	driver, err := p.getCSIDriver(pluginName)
 	if err != nil {
 		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
-		return
+		return false
 	}
 
 	period := getNodeAllocatableUpdatePeriod(driver)
 	if period == 0 {
-		return
+		return false
 	}
 
 	volumeHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
-	attachmentName := getAttachmentName(volumeHandle, pluginName, string(nodeName))
+	attachmentName := getAttachmentName(volumeHandle, pluginName, string(p.host.GetNodeName()))
 	kubeClient := p.host.GetKubeClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
@@ -218,7 +218,7 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.No
 	attachment, err := kubeClient.StorageV1().VolumeAttachments().Get(ctx, attachmentName, meta.GetOptions{})
 	if err != nil {
 		klog.ErrorS(err, "Failed to get volume attachment", "attachmentName", attachmentName)
-		return
+		return false
 	}
 
 	if isResourceExhaustError(attachment) {
@@ -226,7 +226,9 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.No
 		if err := updateCSIDriver(pluginName); err != nil {
 			klog.ErrorS(err, "Failed to update CSIDriver", "pluginName", pluginName)
 		}
+		return true
 	}
+	return false
 }
 
 func isResourceExhaustError(attachment *storage.VolumeAttachment) bool {
@@ -340,7 +342,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return true
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+			return true
 		},
 	}
 
@@ -385,8 +387,8 @@ func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedInd
 		// after max retry steps.
 		initBackoff := wait.Backoff{
 			Steps:    6,
-			Duration: 15 * time.Millisecond,
-			Factor:   6.0,
+			Duration: 30 * time.Millisecond,
+			Factor:   8.0,
 			Jitter:   0.1,
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {

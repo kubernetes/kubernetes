@@ -34,6 +34,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/mount-utils"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -57,7 +58,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	if quotasRequested {
 		priority = 1
 	}
-	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
+	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v, userNamespacesEnabled: %v)", quotasRequested, userNamespacesEnabled)), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
@@ -134,7 +135,7 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
 		Spec: v1.PodSpec{
-			HostUsers:     &falseVar,
+			HostUsers:     ptr.To(false),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{

@@ -388,66 +388,85 @@ func (e equalMemoryTypes) Skip(a, b *types.Type) {
 }
 
 func (e equalMemoryTypes) Equal(a, b *types.Type) bool {
-	// alreadyVisitedTypes holds all the types that have already been checked in the structural type recursion.
-	alreadyVisitedTypes := make(map[*types.Type]bool)
-	return e.cachingEqual(a, b, alreadyVisitedTypes)
+	equal, _ := e.cachingEqual(a, b, nil)
+	return equal
 }
 
-func (e equalMemoryTypes) cachingEqual(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
+// cachingEqual recursively compares a and b for memory equality,
+// using a cache of previously computed results, and caching the result before returning when possible.
+// alreadyVisitedStack is used to check for cycles during recursion.
+// The returned cacheable boolean tells the caller whether the equal result is a definitive answer that can be safely cached,
+// or if it's a temporary assumption made to break a cycle in a recursively defined type.
+func (e equalMemoryTypes) cachingEqual(a, b *types.Type, alreadyVisitedStack []*types.Type) (equal, cacheable bool) {
 	if a == b {
-		return true
+		return true, true
 	}
 	if equal, ok := e[conversionPair{a, b}]; ok {
-		return equal
+		return equal, true
 	}
 	if equal, ok := e[conversionPair{b, a}]; ok {
-		return equal
+		return equal, true
 	}
-	result := e.equal(a, b, alreadyVisitedTypes)
-	e[conversionPair{a, b}] = result
-	e[conversionPair{b, a}] = result
-	return result
+	result, cacheable := e.equal(a, b, alreadyVisitedStack)
+	if cacheable {
+		e[conversionPair{a, b}] = result
+		e[conversionPair{b, a}] = result
+	}
+	return result, cacheable
 }
 
-func (e equalMemoryTypes) equal(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
+// equal recursively compares a and b for memory equality.
+// alreadyVisitedStack is used to check for cycles during recursion.
+// The returned cacheable boolean tells the caller whether the equal result is a definitive answer that can be safely cached,
+// or if it's a temporary assumption made to break a cycle in a recursively defined type.
+func (e equalMemoryTypes) equal(a, b *types.Type, alreadyVisitedStack []*types.Type) (equal, cacheable bool) {
 	in, out := unwrapAlias(a), unwrapAlias(b)
 	switch {
 	case in == out:
-		return true
+		return true, true
 	case in.Kind == out.Kind:
-		// if the type exists already, return early to avoid recursion
-		if alreadyVisitedTypes[in] {
-			return true
+		for _, v := range alreadyVisitedStack {
+			if v == in {
+				// if the type was visited in this stack already, return early to avoid infinite recursion, but do not cache the results
+				return true, false
+			}
 		}
-		alreadyVisitedTypes[in] = true
+		alreadyVisitedStack = append(alreadyVisitedStack, in)
 
 		switch in.Kind {
 		case types.Struct:
 			if len(in.Members) != len(out.Members) {
-				return false
+				return false, true
 			}
+			cacheable = true
 			for i, inMember := range in.Members {
 				outMember := out.Members[i]
-				if !e.cachingEqual(inMember.Type, outMember.Type, alreadyVisitedTypes) {
-					return false
+				memberEqual, memberCacheable := e.cachingEqual(inMember.Type, outMember.Type, alreadyVisitedStack)
+				if !memberEqual {
+					return false, true
+				}
+				if !memberCacheable {
+					cacheable = false
 				}
 			}
-			return true
+			return true, cacheable
 		case types.Pointer:
-			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
 		case types.Map:
-			return e.cachingEqual(in.Key, out.Key, alreadyVisitedTypes) && e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			keyEqual, keyCacheable := e.cachingEqual(in.Key, out.Key, alreadyVisitedStack)
+			valueEqual, valueCacheable := e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
+			return keyEqual && valueEqual, keyCacheable && valueCacheable
 		case types.Slice:
-			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
 		case types.Interface:
 			// TODO: determine whether the interfaces are actually equivalent - for now, they must have the
 			// same type.
-			return false
+			return false, true
 		case types.Builtin:
-			return in.Name.Name == out.Name.Name
+			return in.Name.Name == out.Name.Name, true
 		}
 	}
-	return false
+	return false, true
 }
 
 func findMember(t *types.Type, name string) (types.Member, bool) {
@@ -666,6 +685,16 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 	return function, ok
 }
 
+func (g *genConversion) preexistsPointers(inType, outType *types.Type) (*types.Type, bool) {
+	if inType.Kind != types.Pointer {
+		return nil, false
+	}
+	if outType.Kind != types.Pointer {
+		return nil, false
+	}
+	return g.preexists(inType.Elem, outType.Elem)
+}
+
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	klogV := klog.V(6)
 	if klogV.Enabled() {
@@ -845,9 +874,16 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			}
 		} else {
 			conversionExists := true
+			conditionalConversionExists := false
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := $.|raw$(&val, newVal, s); err != nil {\n", function)
+			} else if function, ok := g.preexistsPointers(inType.Elem, outType.Elem); ok {
+				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
+				sw.Do("if val != nil {\n", nil)
+				sw.Do("*newVal = new($.|raw$)\n", outType.Elem.Elem)
+				sw.Do("if err := $.|raw$(val, *newVal, s); err != nil {\n", function)
+				conditionalConversionExists = true
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := "+nameTmpl+"(&val, newVal, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
@@ -860,6 +896,9 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			if conversionExists {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
+				if conditionalConversionExists {
+					sw.Do("}\n", nil)
+				}
 				if inType.Key == outType.Key {
 					sw.Do("(*out)[key] = *newVal\n", nil)
 				} else {
@@ -889,8 +928,14 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			}
 		} else {
 			conversionExists := true
+			conditionalConversionExists := false
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
+			} else if function, ok := g.preexistsPointers(inType.Elem, outType.Elem); ok {
+				sw.Do("if (*in)[i] != nil {\n", nil)
+				sw.Do("(*out)[i] = new($.|raw$)\n", outType.Elem.Elem)
+				sw.Do("if err := $.|raw$((*in)[i], (*out)[i], s); err != nil {\n", function)
+				conditionalConversionExists = true
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
@@ -902,6 +947,9 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			if conversionExists {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
+				if conditionalConversionExists {
+					sw.Do("}\n", nil)
+				}
 			}
 		}
 		sw.Do("}\n", nil)
@@ -923,6 +971,17 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 		if !found {
 			// This field doesn't exist in the peer.
 			sw.Do("// WARNING: in."+inMember.Name+" requires manual conversion: does not exist in peer-type\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
+			continue
+		}
+
+		if namer.IsPrivateGoName(inMember.Name) && g.outputPackage != inType.Name.Package {
+			sw.Do("// WARNING: in."+inMember.Name+" is not exported and cannot be read\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
+			continue
+		}
+		if namer.IsPrivateGoName(outMember.Name) && g.outputPackage != outType.Name.Package {
+			sw.Do("// WARNING: out."+inMember.Name+" is not exported and cannot be set\n", nil)
 			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
 			continue
 		}

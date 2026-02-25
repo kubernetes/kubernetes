@@ -75,18 +75,6 @@ func TestBuildKubeletArgs(t *testing.T) {
 				{Name: "register-with-taints", Value: "foo=bar:baz,key=val:eff"},
 			},
 		},
-		{
-			name: "pause image is set",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{},
-				criSocket:   "unix:///var/run/containerd/containerd.sock",
-				pauseImage:  "registry.k8s.io/pause:ver",
-			},
-			expected: []kubeadmapi.Arg{
-				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
-				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -200,15 +188,15 @@ func TestReadKubeadmFlags(t *testing.T) {
 	}{
 		{
 			name:          "valid kubeadm flags with container-runtime-endpoint",
-			fileContent:   `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:1.0"`,
-			expectedValue: []string{"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock", "--pod-infra-container-image=registry.k8s.io/pause:1.0"},
+			fileContent:   `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock"`,
+			expectedValue: []string{"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock"},
 			expectError:   false,
 		},
 		{
-			name:          "no container-runtime-endpoint found",
-			fileContent:   `KUBELET_KUBEADM_ARGS="--pod-infra-container-image=registry.k8s.io/pause:1.0"`,
-			expectedValue: []string{"--pod-infra-container-image=registry.k8s.io/pause:1.0"},
-			expectError:   true,
+			name:          "has KUBELET_KUBEADM_ARGS line but no args",
+			fileContent:   `KUBELET_KUBEADM_ARGS=""`,
+			expectedValue: nil,
+			expectError:   false,
 		},
 		{
 			name:          "no KUBELET_KUBEADM_ARGS line",
@@ -260,8 +248,8 @@ func TestReadKubeadmFlags(t *testing.T) {
 			}
 
 			value, err := ReadKubeletDynamicEnvFile(tmpFile.Name())
-			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+			if tt.expectError != (err != nil) {
+				t.Errorf("Expect error: %v, got: %v, error: %v", tt.expectError, err != nil, err)
 			}
 
 			assert.Equal(t, tt.expectedValue, value)

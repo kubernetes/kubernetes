@@ -23,7 +23,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -380,9 +381,15 @@ func (p *PodWrapper) PodResourceClaims(podResourceClaims ...v1.PodResourceClaim)
 	return p
 }
 
-// PodResourceClaims appends claim statuses into PodSpec of the inner pod.
+// ResourceClaimStatuses appends claim statuses into PodStatus of the inner pod.
 func (p *PodWrapper) ResourceClaimStatuses(resourceClaimStatuses ...v1.PodResourceClaimStatus) *PodWrapper {
 	p.Status.ResourceClaimStatuses = append(p.Status.ResourceClaimStatuses, resourceClaimStatuses...)
+	return p
+}
+
+// ExendedResourceClaimStatus sets ExtendedResourceClaimStatus in PodStatus of the inner pod.
+func (p *PodWrapper) ExtendedResourceClaimStatus(extendedResourceClaimStatus *v1.PodExtendedResourceClaimStatus) *PodWrapper {
+	p.Status.ExtendedResourceClaimStatus = extendedResourceClaimStatus
 	return p
 }
 
@@ -408,6 +415,12 @@ func (p *PodWrapper) Terminating() *PodWrapper {
 // ZeroTerminationGracePeriod sets the TerminationGracePeriodSeconds of the inner pod to zero.
 func (p *PodWrapper) ZeroTerminationGracePeriod() *PodWrapper {
 	p.Spec.TerminationGracePeriodSeconds = &zero
+	return p
+}
+
+// TerminationGracePeriodSeconds sets the TerminationGracePeriodSeconds of the inner pod.
+func (p *PodWrapper) TerminationGracePeriodSeconds(s int64) *PodWrapper {
+	p.Spec.TerminationGracePeriodSeconds = &s
 	return p
 }
 
@@ -553,6 +566,12 @@ func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
 	for _, gate := range gates {
 		p.Spec.SchedulingGates = append(p.Spec.SchedulingGates, v1.PodSchedulingGate{Name: gate})
 	}
+	return p
+}
+
+// ResourceVersion sets the inner pod's ResurceVersion.
+func (p *PodWrapper) ResourceVersion(version string) *PodWrapper {
+	p.ObjectMeta.ResourceVersion = version
 	return p
 }
 
@@ -775,6 +794,22 @@ func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	return p
 }
 
+// Resources sets requests and limits at pod-level.
+func (p *PodWrapper) PodLevelResourceRequests(reqMap map[v1.ResourceName]string) *PodWrapper {
+	if len(reqMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Resources = &v1.ResourceRequirements{
+		Requests: res,
+	}
+	return p
+}
+
 // Req adds a new container to the inner pod with given resource map of requests.
 func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
 	if len(reqMap) == 0 {
@@ -828,6 +863,12 @@ func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 // Overhead sets the give ResourceList to the inner pod
 func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	p.Spec.Overhead = rl
+	return p
+}
+
+// WorkloadRef sets workloadRef of the inner pod.
+func (p *PodWrapper) WorkloadRef(workloadRef *v1.WorkloadReference) *PodWrapper {
+	p.Spec.WorkloadRef = workloadRef
 	return p
 }
 
@@ -909,6 +950,12 @@ func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 // Unschedulable applies the unschedulable field.
 func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
 	n.Spec.Unschedulable = unschedulable
+	return n
+}
+
+// DeclaredFeatures applies the declared features in node status.
+func (n *NodeWrapper) DeclaredFeatures(declaredFeatures []string) *NodeWrapper {
+	n.Status.DeclaredFeatures = declaredFeatures
 	return n
 }
 
@@ -1092,6 +1139,18 @@ func (wrapper *ResourceClaimWrapper) Name(s string) *ResourceClaimWrapper {
 	return wrapper
 }
 
+// GenerateName sets `s` as the GenerateName of the inner object.
+func (wrapper *ResourceClaimWrapper) GenerateName(s string) *ResourceClaimWrapper {
+	wrapper.SetGenerateName(s)
+	return wrapper
+}
+
+// Annotations sets `s` as the annotations of the inner object.
+func (wrapper *ResourceClaimWrapper) Annotations(s map[string]string) *ResourceClaimWrapper {
+	wrapper.SetAnnotations(s)
+	return wrapper
+}
+
 // UID sets `s` as the UID of the inner object.
 func (wrapper *ResourceClaimWrapper) UID(s string) *ResourceClaimWrapper {
 	wrapper.SetUID(types.UID(s))
@@ -1118,23 +1177,61 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
+// OwnerRef sets `ref` as the owner reference of the object.
+func (wrapper *ResourceClaimWrapper) OwnerRef(ref metav1.OwnerReference) *ResourceClaimWrapper {
+	wrapper.OwnerReferences = []metav1.OwnerReference{ref}
+	return wrapper
+}
+
 // Request adds one device request for the given device class.
 func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceClaimWrapper {
 	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
 		resourceapi.DeviceRequest{
 			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
-			// Cannot rely on defaulting here, this is used in unit tests.
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           1,
-			DeviceClassName: deviceClassName,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           1,
+				DeviceClassName: deviceClassName,
+			},
 		},
 	)
 	return wrapper
 }
 
+// RequestWithName adds one device request for the given device class with given request name.
+func (wrapper *ResourceClaimWrapper) RequestWithName(name, deviceClassName string) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: name,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           1,
+				DeviceClassName: deviceClassName,
+			},
+		})
+	return wrapper
+}
+
+// RequestWithNameCount adds one device request for the given device class with given request name and count.
+func (wrapper *ResourceClaimWrapper) RequestWithNameCount(name, deviceClassName string, count int64) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: name,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           count,
+				DeviceClassName: deviceClassName,
+			},
+		})
+	return wrapper
+}
+
 // RequestWithPrioritizedList adds one device request with one subrequest
 // per provided deviceClassName.
-func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedListFromDeviceClasses(deviceClassNames ...string) *ResourceClaimWrapper {
 	var prioritizedList []resourceapi.DeviceSubRequest
 	for i, deviceClassName := range deviceClassNames {
 		prioritizedList = append(prioritizedList, resourceapi.DeviceSubRequest{
@@ -1154,12 +1251,57 @@ func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames
 	return wrapper
 }
 
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	return wrapper.NamedRequestWithPrioritizedList(fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1), subRequests...)
+}
+
+func (wrapper *ResourceClaimWrapper) NamedRequestWithPrioritizedList(name string, subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name:           name,
+			FirstAvailable: subRequests,
+		},
+	)
+	return wrapper
+}
+
+func SubRequest(name, deviceClassName string, count int64) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           count,
+		DeviceClassName: deviceClassName,
+	}
+}
+
+func SubRequestWithSelector(name, deviceClassName, selector string) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           1,
+		DeviceClassName: deviceClassName,
+		Selectors: []resourceapi.DeviceSelector{
+			{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: selector,
+				},
+			},
+		},
+	}
+}
+
 // Allocation sets the allocation of the inner object.
 func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
 	if !slices.Contains(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer) {
 		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
 	}
 	wrapper.ResourceClaim.Status.Allocation = allocation
+	return wrapper
+}
+
+// AllocatedDeviceStatuses sets the AllocatedDeviceStatuses of the inner object.
+func (wrapper *ResourceClaimWrapper) AllocatedDeviceStatuses(ads []resourceapi.AllocatedDeviceStatus) *ResourceClaimWrapper {
+	wrapper.Status.Devices = ads
 	return wrapper
 }
 
@@ -1187,8 +1329,19 @@ type ResourceSliceWrapper struct {
 func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper := new(ResourceSliceWrapper)
 	wrapper.Name = nodeName + "-" + driverName
-	wrapper.Spec.NodeName = nodeName
+	wrapper.Spec.NodeName = &nodeName
 	wrapper.Spec.Pool.Name = nodeName
+	wrapper.Spec.Pool.ResourceSliceCount = 1
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
+func MakeResourceSliceWithPerDeviceNodeSelection(namePrefix, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = namePrefix + "-" + driverName
+	wrapper.Spec.PerDeviceNodeSelection = ptr.To(true)
+	wrapper.Spec.Pool.Name = namePrefix
+	wrapper.Spec.Pool.ResourceSliceCount = 1
 	wrapper.Spec.Driver = driverName
 	return wrapper
 }
@@ -1210,23 +1363,34 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
+type NodeName string
+
 // Device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
-	device := resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{}}
+	device := resourceapi.Device{Name: name}
 	for _, field := range otherFields {
 		switch typedField := field.(type) {
 		case map[resourceapi.QualifiedName]resourceapi.DeviceAttribute:
-			device.Basic.Attributes = typedField
+			device.Attributes = typedField
 		case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
-			device.Basic.Capacity = typedField
+			device.Capacity = typedField
 		case resourceapi.DeviceTaint:
-			device.Basic.Taints = append(device.Basic.Taints, typedField)
+			device.Taints = append(device.Taints, typedField)
+		case NodeName:
+			device.NodeName = (*string)(&typedField)
+		case *v1.NodeSelector:
+			device.NodeSelector = typedField
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
 		}
 	}
 	wrapper.Spec.Devices = append(wrapper.Spec.Devices, device)
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) ResourceSliceCount(count int) *ResourceSliceWrapper {
+	wrapper.Spec.Pool.ResourceSliceCount = int64(count)
 	return wrapper
 }
 
@@ -1400,4 +1564,69 @@ func (c *VolumeAttachmentWrapper) Source(source storagev1.VolumeAttachmentSource
 func (c *VolumeAttachmentWrapper) Attached(attached bool) *VolumeAttachmentWrapper {
 	c.Status.Attached = attached
 	return c
+}
+
+// WorkloadWrapper wraps a Workload inside.
+type WorkloadWrapper struct{ schedulingapi.Workload }
+
+// MakeWorkload creates a Workload wrapper.
+func MakeWorkload() *WorkloadWrapper {
+	return &WorkloadWrapper{}
+}
+
+// Obj returns the inner Workload.
+func (wrapper *WorkloadWrapper) Obj() *schedulingapi.Workload {
+	return &wrapper.Workload
+}
+
+// Name sets `name` as the name of the inner Workload.
+func (wrapper *WorkloadWrapper) Name(name string) *WorkloadWrapper {
+	wrapper.SetName(name)
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner Workload.
+func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
+	wrapper.SetNamespace(namespace)
+	return wrapper
+}
+
+// PodGroup injects the pod group into the inner Workload.
+func (wrapper *WorkloadWrapper) PodGroup(pg *schedulingapi.PodGroup) *WorkloadWrapper {
+	wrapper.Spec.PodGroups = append(wrapper.Spec.PodGroups, *pg)
+	return wrapper
+}
+
+// PodGroupWrapper wraps a PodGroup inside.
+type PodGroupWrapper struct{ schedulingapi.PodGroup }
+
+// MakePodGroup creates a PodGroup wrapper.
+func MakePodGroup() *PodGroupWrapper {
+	return &PodGroupWrapper{}
+}
+
+// Obj returns the inner PodGroup.
+func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
+	return &wrapper.PodGroup
+}
+
+// Name sets `name` as the name of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Name(name string) *PodGroupWrapper {
+	wrapper.PodGroup.Name = name
+	return wrapper
+}
+
+// MinCount sets the MinCount for the Gang scheduling policy.
+func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
+	if wrapper.Policy.Gang == nil {
+		wrapper.Policy.Gang = &schedulingapi.GangSchedulingPolicy{}
+	}
+	wrapper.Policy.Gang.MinCount = count
+	return wrapper
+}
+
+// BasicPolicy sets the PodGroup policy to Basic.
+func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
+	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	return wrapper
 }

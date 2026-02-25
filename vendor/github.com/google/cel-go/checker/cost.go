@@ -545,16 +545,17 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 	if len(overloadIDs) == 0 {
 		return CostEstimate{}
 	}
-	var targetType AstNode
+	var targetType *AstNode
 	if call.IsMemberFunction() {
 		sum = sum.Add(c.cost(call.Target()))
-		targetType = c.newAstNode(call.Target())
+		var t AstNode = c.newAstNode(call.Target())
+		targetType = &t
 	}
 	// Pick a cost estimate range that covers all the overload cost estimation ranges
 	fnCost := CostEstimate{Min: uint64(math.MaxUint64), Max: 0}
 	var resultSize *SizeEstimate
 	for _, overload := range overloadIDs {
-		overloadCost := c.functionCost(e, call.FunctionName(), overload, &targetType, argTypes, argCosts)
+		overloadCost := c.functionCost(e, call.FunctionName(), overload, targetType, argTypes, argCosts)
 		fnCost = fnCost.Union(overloadCost.CostEstimate)
 		if overloadCost.ResultSize != nil {
 			if resultSize == nil {

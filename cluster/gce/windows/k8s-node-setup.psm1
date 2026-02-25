@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.33.0'
-$CRICTL_SHA512 = '81c91c76bb9059837e62b33b7df9f1503013a30525fceb248ca379b57c7ad8ba043dbb0432870224ebc42853c740caa422ddd62989b4a58829b66505f8e11969'
+$CRICTL_VERSION = 'v1.35.0'
+$CRICTL_SHA512 = '73572c89c62d882c31f5f3d2efef0f20c849a80bb868cbf41679fedd5f8cafa9b9d8d4a50cf78cdb1c739a935fa87e8d6bbb00d5fed04907037ecaf29410f8c3'
 
 Import-Module -Force C:\common.psm1
 
@@ -1013,7 +1013,6 @@ function Start-WorkerServices {
   # otherwise kubelet and kube-proxy will not be able to run properly.
   $instance_name = "$(Get-InstanceMetadata 'name' | Out-String)"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${env:INFRA_CONTAINER}",
       "--hostname-override=${instance_name}"
   )
 
@@ -2309,7 +2308,7 @@ function DownloadAndInstall-AuthProviderGcpBinary {
       Log-Output "Installing auth provider gcp binaries"
       $tmp_dir = 'C:\k8s_tmp'
       New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
-      $url = "${env:AUTH_PROVIDER_GCP_STORAGE_PATH}/${env:AUTH_PROVIDER_GCP_VERSION}/windows_amd64/$filename"
+      $url = "${env:AUTH_PROVIDER_GCP_STORAGE_PATH}/${env:AUTH_PROVIDER_GCP_VERSION}/auth-provider-gcp/windows/amd64/$filename"
       MustDownload-File -Hash $AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64 -Algorithm SHA512 -OutFile $tmp_dir\$filename -URLs $url
       Move-Item -Force $tmp_dir\$filename ${env:AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}
       Remove-Item -Force -Recurse $tmp_dir

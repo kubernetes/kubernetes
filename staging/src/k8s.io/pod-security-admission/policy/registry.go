@@ -18,7 +18,7 @@ package policy
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +46,7 @@ type checkRegistry struct {
 // 2. Check.Level must be either Baseline or Restricted
 // 3. Checks must have a non-empty set of versions, sorted in a strictly increasing order
 // 4. Check.Versions cannot include 'latest'
-func NewEvaluator(checks []Check) (Evaluator, error) {
+func NewEvaluator(checks []Check, emulationVersion *api.Version) (*checkRegistry, error) {
 	if err := validateChecks(checks); err != nil {
 		return nil, err
 	}
@@ -55,6 +55,12 @@ func NewEvaluator(checks []Check) (Evaluator, error) {
 		restrictedChecks: map[api.Version][]CheckPodFn{},
 	}
 	populate(r, checks)
+
+	// lower the max version if we're emulating an older minor
+	if emulationVersion != nil && (*emulationVersion).Older(r.maxVersion) {
+		r.maxVersion = *emulationVersion
+	}
+
 	return r, nil
 }
 
@@ -157,8 +163,8 @@ func populate(r *checkRegistry, validChecks []Check) {
 	}
 
 	// Sort the IDs to maintain consistent error messages.
-	sort.Slice(restrictedIDs, func(i, j int) bool { return restrictedIDs[i] < restrictedIDs[j] })
-	sort.Slice(baselineIDs, func(i, j int) bool { return baselineIDs[i] < baselineIDs[j] })
+	slices.Sort(restrictedIDs)
+	slices.Sort(baselineIDs)
 	orderedIDs := append(baselineIDs, restrictedIDs...) // Baseline checks first, then restricted.
 
 	for v := api.MajorMinorVersion(1, 0); v.Older(nextMinor(r.maxVersion)); v = nextMinor(v) {

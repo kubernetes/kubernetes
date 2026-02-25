@@ -117,10 +117,19 @@ func ElementsMatchf(t TestingT, listA interface{}, listB interface{}, msg string
 	t.FailNow()
 }
 
-// Empty asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// Empty asserts that the given value is "empty".
+//
+// [Zero values] are "empty".
+//
+// Arrays are "empty" if every element is the zero value of the type (stricter than "empty").
+//
+// Slices, maps and channels with zero length are "empty".
+//
+// Pointer values are "empty" if the pointer is nil or if the pointed value is "empty".
 //
 //	require.Empty(t, obj)
+//
+// [Zero values]: https://go.dev/ref/spec#The_zero_value
 func Empty(t TestingT, object interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -131,10 +140,19 @@ func Empty(t TestingT, object interface{}, msgAndArgs ...interface{}) {
 	t.FailNow()
 }
 
-// Emptyf asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// Emptyf asserts that the given value is "empty".
+//
+// [Zero values] are "empty".
+//
+// Arrays are "empty" if every element is the zero value of the type (stricter than "empty").
+//
+// Slices, maps and channels with zero length are "empty".
+//
+// Pointer values are "empty" if the pointer is nil or if the pointed value is "empty".
 //
 //	require.Emptyf(t, obj, "error message %s", "formatted")
+//
+// [Zero values]: https://go.dev/ref/spec#The_zero_value
 func Emptyf(t TestingT, object interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -279,10 +297,8 @@ func Equalf(t TestingT, expected interface{}, actual interface{}, msg string, ar
 
 // Error asserts that a function returned an error (i.e. not `nil`).
 //
-//	  actualObj, err := SomeFunction()
-//	  if require.Error(t, err) {
-//		   require.Equal(t, expectedError, err)
-//	  }
+//	actualObj, err := SomeFunction()
+//	require.Error(t, err)
 func Error(t TestingT, err error, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -373,10 +389,8 @@ func ErrorIsf(t TestingT, err error, target error, msg string, args ...interface
 
 // Errorf asserts that a function returned an error (i.e. not `nil`).
 //
-//	  actualObj, err := SomeFunction()
-//	  if require.Errorf(t, err, "error message %s", "formatted") {
-//		   require.Equal(t, expectedErrorf, err)
-//	  }
+//	actualObj, err := SomeFunction()
+//	require.Errorf(t, err, "error message %s", "formatted")
 func Errorf(t TestingT, err error, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1097,7 +1111,35 @@ func IsNonIncreasingf(t TestingT, object interface{}, msg string, args ...interf
 	t.FailNow()
 }
 
+// IsNotType asserts that the specified objects are not of the same type.
+//
+//	require.IsNotType(t, &NotMyStruct{}, &MyStruct{})
+func IsNotType(t TestingT, theType interface{}, object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if assert.IsNotType(t, theType, object, msgAndArgs...) {
+		return
+	}
+	t.FailNow()
+}
+
+// IsNotTypef asserts that the specified objects are not of the same type.
+//
+//	require.IsNotTypef(t, &NotMyStruct{}, &MyStruct{}, "error message %s", "formatted")
+func IsNotTypef(t TestingT, theType interface{}, object interface{}, msg string, args ...interface{}) {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if assert.IsNotTypef(t, theType, object, msg, args...) {
+		return
+	}
+	t.FailNow()
+}
+
 // IsType asserts that the specified objects are of the same type.
+//
+//	require.IsType(t, &MyStruct{}, &MyStruct{})
 func IsType(t TestingT, expectedType interface{}, object interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1109,6 +1151,8 @@ func IsType(t TestingT, expectedType interface{}, object interface{}, msgAndArgs
 }
 
 // IsTypef asserts that the specified objects are of the same type.
+//
+//	require.IsTypef(t, &MyStruct{}, &MyStruct{}, "error message %s", "formatted")
 func IsTypef(t TestingT, expectedType interface{}, object interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1469,8 +1513,7 @@ func NotElementsMatchf(t TestingT, listA interface{}, listB interface{}, msg str
 	t.FailNow()
 }
 
-// NotEmpty asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// NotEmpty asserts that the specified object is NOT [Empty].
 //
 //	if require.NotEmpty(t, obj) {
 //	  require.Equal(t, "two", obj[1])
@@ -1485,8 +1528,7 @@ func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) {
 	t.FailNow()
 }
 
-// NotEmptyf asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// NotEmptyf asserts that the specified object is NOT [Empty].
 //
 //	if require.NotEmptyf(t, obj, "error message %s", "formatted") {
 //	  require.Equal(t, "two", obj[1])
@@ -1745,12 +1787,15 @@ func NotSamef(t TestingT, expected interface{}, actual interface{}, msg string, 
 	t.FailNow()
 }
 
-// NotSubset asserts that the specified list(array, slice...) or map does NOT
-// contain all elements given in the specified subset list(array, slice...) or
-// map.
+// NotSubset asserts that the list (array, slice, or map) does NOT contain all
+// elements given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	require.NotSubset(t, [1, 3, 4], [1, 2])
 //	require.NotSubset(t, {"x": 1, "y": 2}, {"z": 3})
+//	require.NotSubset(t, [1, 3, 4], {1: "one", 2: "two"})
+//	require.NotSubset(t, {"x": 1, "y": 2}, ["z"])
 func NotSubset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1761,12 +1806,15 @@ func NotSubset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...i
 	t.FailNow()
 }
 
-// NotSubsetf asserts that the specified list(array, slice...) or map does NOT
-// contain all elements given in the specified subset list(array, slice...) or
-// map.
+// NotSubsetf asserts that the list (array, slice, or map) does NOT contain all
+// elements given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	require.NotSubsetf(t, [1, 3, 4], [1, 2], "error message %s", "formatted")
 //	require.NotSubsetf(t, {"x": 1, "y": 2}, {"z": 3}, "error message %s", "formatted")
+//	require.NotSubsetf(t, [1, 3, 4], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	require.NotSubsetf(t, {"x": 1, "y": 2}, ["z"], "error message %s", "formatted")
 func NotSubsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1971,11 +2019,15 @@ func Samef(t TestingT, expected interface{}, actual interface{}, msg string, arg
 	t.FailNow()
 }
 
-// Subset asserts that the specified list(array, slice...) or map contains all
-// elements given in the specified subset list(array, slice...) or map.
+// Subset asserts that the list (array, slice, or map) contains all elements
+// given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	require.Subset(t, [1, 2, 3], [1, 2])
 //	require.Subset(t, {"x": 1, "y": 2}, {"x": 1})
+//	require.Subset(t, [1, 2, 3], {1: "one", 2: "two"})
+//	require.Subset(t, {"x": 1, "y": 2}, ["x"])
 func Subset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1986,11 +2038,15 @@ func Subset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...inte
 	t.FailNow()
 }
 
-// Subsetf asserts that the specified list(array, slice...) or map contains all
-// elements given in the specified subset list(array, slice...) or map.
+// Subsetf asserts that the list (array, slice, or map) contains all elements
+// given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	require.Subsetf(t, [1, 2, 3], [1, 2], "error message %s", "formatted")
 //	require.Subsetf(t, {"x": 1, "y": 2}, {"x": 1}, "error message %s", "formatted")
+//	require.Subsetf(t, [1, 2, 3], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	require.Subsetf(t, {"x": 1, "y": 2}, ["x"], "error message %s", "formatted")
 func Subsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()

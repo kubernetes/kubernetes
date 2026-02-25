@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,107 +49,135 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.StructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *InnerStruct) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *InnerStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
-			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield")
-			})...)
+			// call field-attached validations
+			func() { // cohort stringField
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield")
+				})...)
+			}()
 			return
-		}(fldPath.Child("structField"), &obj.StructField, safe.Field(oldObj, func(oldObj *Struct) *InnerStruct { return &oldObj.StructField }))...)
+		}(fldPath.Child("structField"), &obj.StructField, safe.Field(oldObj, func(oldObj *Struct) *InnerStruct { return &oldObj.StructField }), oldObj != nil)...)
 
 	// field Struct.StructPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *InnerStruct) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj *InnerStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield-ptr")
-			})...)
+			func() { // cohort stringField
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield-ptr")
+				})...)
+			}()
 			return
-		}(fldPath.Child("structPtrField"), obj.StructPtrField, safe.Field(oldObj, func(oldObj *Struct) *InnerStruct { return oldObj.StructPtrField }))...)
+		}(fldPath.Child("structPtrField"), obj.StructPtrField, safe.Field(oldObj, func(oldObj *Struct) *InnerStruct { return oldObj.StructPtrField }), oldObj != nil)...)
 
 	// field Struct.StringSliceField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-slice")
 			})...)
 			return
-		}(fldPath.Child("stringSliceField"), obj.StringSliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.StringSliceField }))...)
+		}(fldPath.Child("stringSliceField"), obj.StringSliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.StringSliceField }), oldObj != nil)...)
 
 	// field Struct.StringMapField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-map-val")
 			})...)
 			return
-		}(fldPath.Child("stringMapField"), obj.StringMapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.StringMapField }))...)
+		}(fldPath.Child("stringMapField"), obj.StringMapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.StringMapField }), oldObj != nil)...)
 
 	// field Struct.StringMapKeyField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-key")
 			})...)
 			return
-		}(fldPath.Child("stringMapKeyField"), obj.StringMapKeyField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.StringMapKeyField }))...)
+		}(fldPath.Child("stringMapKeyField"), obj.StringMapKeyField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.StringMapKeyField }), oldObj != nil)...)
 
 	// field Struct.ValidatedSliceField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj ValidatedStringSlice, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
 			errs = append(errs, Validate_ValidatedStringSlice(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("validatedSliceField"), obj.ValidatedSliceField, safe.Field(oldObj, func(oldObj *Struct) ValidatedStringSlice { return oldObj.ValidatedSliceField }))...)
+		}(fldPath.Child("validatedSliceField"), obj.ValidatedSliceField, safe.Field(oldObj, func(oldObj *Struct) ValidatedStringSlice { return oldObj.ValidatedSliceField }), oldObj != nil)...)
 
 	// field Struct.ValidatedStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *ValidatedInnerStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
 			errs = append(errs, Validate_ValidatedInnerStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("validatedStructField"), &obj.ValidatedStructField, safe.Field(oldObj, func(oldObj *Struct) *ValidatedInnerStruct { return &oldObj.ValidatedStructField }))...)
+		}(fldPath.Child("validatedStructField"), &obj.ValidatedStructField, safe.Field(oldObj, func(oldObj *Struct) *ValidatedInnerStruct { return &oldObj.ValidatedStructField }), oldObj != nil)...)
 
 	return errs
 }
 
+// Validate_ValidatedInnerStruct validates an instance of ValidatedInnerStruct according
+// to declarative validation rules in the API schema.
 func Validate_ValidatedInnerStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
-	// type ValidatedInnerStruct
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
-	errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *ValidatedInnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-struct")
-	})...)
+	func() { // cohort stringField
+		errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *ValidatedInnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-struct")
+		})...)
+	}()
 
 	// field ValidatedInnerStruct.StringField has no validation
 	return errs
 }
 
+// Validate_ValidatedStringSlice validates an instance of ValidatedStringSlice according
+// to declarative validation rules in the API schema.
 func Validate_ValidatedStringSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
-	// type ValidatedStringSlice
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef")
 	})...)

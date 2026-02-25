@@ -19,6 +19,8 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/admissionregistration/v1
 // +groupName=admissionregistration.k8s.io
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/admissionregistration/v1
 
 // Package v1 is the v1 version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration

@@ -29,11 +29,17 @@ import (
 
 // ImageReviewApplyConfiguration represents a declarative configuration of the ImageReview type for use
 // with apply.
+//
+// ImageReview checks if the set of images in a pod are allowed.
 type ImageReviewApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ImageReviewSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec holds information about the pod being evaluated
+	Spec *ImageReviewSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is filled in by the backend and indicates whether the pod should be allowed.
+	Status *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ImageReview constructs a declarative configuration of the ImageReview type for use with
@@ -46,29 +52,14 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 	return b
 }
 
-// ExtractImageReview extracts the applied configuration owned by fieldManager from
-// imageReview. If no managedFields are found in imageReview for fieldManager, a
-// ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractImageReviewFrom extracts the applied configuration owned by fieldManager from
+// imageReview for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
-// ExtractImageReview provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractImageReviewFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "")
-}
-
-// ExtractImageReviewStatus is the same as ExtractImageReview except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "status")
-}
-
-func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
+func ExtractImageReviewFrom(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
 	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +71,27 @@ func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManag
 	b.WithAPIVersion("imagepolicy.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractImageReview extracts the applied configuration owned by fieldManager from
+// imageReview. If no managedFields are found in imageReview for fieldManager, a
+// ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
+// ExtractImageReview provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return ExtractImageReviewFrom(imageReview, fieldManager, "")
+}
+
+// ExtractImageReviewStatus extracts the applied configuration owned by fieldManager from
+// imageReview for the status subresource.
+func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return ExtractImageReviewFrom(imageReview, fieldManager, "status")
+}
+
 func (b ImageReviewApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

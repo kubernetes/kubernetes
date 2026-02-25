@@ -14,7 +14,7 @@ type OrMatcher struct {
 	firstSuccessfulMatcher types.GomegaMatcher
 }
 
-func (m *OrMatcher) Match(actual interface{}) (success bool, err error) {
+func (m *OrMatcher) Match(actual any) (success bool, err error) {
 	m.firstSuccessfulMatcher = nil
 	for _, matcher := range m.Matchers {
 		success, err := matcher.Match(actual)
@@ -29,16 +29,16 @@ func (m *OrMatcher) Match(actual interface{}) (success bool, err error) {
 	return false, nil
 }
 
-func (m *OrMatcher) FailureMessage(actual interface{}) (message string) {
+func (m *OrMatcher) FailureMessage(actual any) (message string) {
 	// not the most beautiful list of matchers, but not bad either...
 	return format.Message(actual, fmt.Sprintf("To satisfy at least one of these matchers: %s", m.Matchers))
 }
 
-func (m *OrMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *OrMatcher) NegatedFailureMessage(actual any) (message string) {
 	return m.firstSuccessfulMatcher.NegatedFailureMessage(actual)
 }
 
-func (m *OrMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
+func (m *OrMatcher) MatchMayChangeInTheFuture(actual any) bool {
 	/*
 		Example with 3 matchers: A, B, C
 

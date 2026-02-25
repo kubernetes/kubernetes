@@ -1,7 +1,7 @@
 # One external resource claim, two pods, two containers in each pod.
 # Pods share the same resource.
 # One container uses resource, one does not.
-apiVersion: resource.k8s.io/v1beta1
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaim
 metadata:
   name: shared-claim
@@ -9,7 +9,8 @@ spec:
   devices:
     requests:
     - name: my-device
-      deviceClassName: example
+      exactly:
+        deviceClassName: example
     config:
     - opaque:
         driver: test-driver.cdi.k8s.io

@@ -29,11 +29,19 @@ import (
 
 // PriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
+//
+// PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// `metadata` is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
+	// `spec` is the specification of the desired behavior of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *PriorityLevelConfigurationSpecApplyConfiguration `json:"spec,omitempty"`
+	// `status` is the current status of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PriorityLevelConfiguration constructs a declarative configuration of the PriorityLevelConfiguration type for use with
@@ -46,29 +54,14 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 	return b
 }
 
-// ExtractPriorityLevelConfiguration extracts the applied configuration owned by fieldManager from
-// priorityLevelConfiguration. If no managedFields are found in priorityLevelConfiguration for fieldManager, a
-// PriorityLevelConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPriorityLevelConfigurationFrom extracts the applied configuration owned by fieldManager from
+// priorityLevelConfiguration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // priorityLevelConfiguration must be a unmodified PriorityLevelConfiguration API object that was retrieved from the Kubernetes API.
-// ExtractPriorityLevelConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPriorityLevelConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
-	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
-}
-
-// ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
-	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
-}
-
-func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +73,27 @@ func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1
 	b.WithAPIVersion("flowcontrol.apiserver.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractPriorityLevelConfiguration extracts the applied configuration owned by fieldManager from
+// priorityLevelConfiguration. If no managedFields are found in priorityLevelConfiguration for fieldManager, a
+// PriorityLevelConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// priorityLevelConfiguration must be a unmodified PriorityLevelConfiguration API object that was retrieved from the Kubernetes API.
+// ExtractPriorityLevelConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "")
+}
+
+// ExtractPriorityLevelConfigurationStatus extracts the applied configuration owned by fieldManager from
+// priorityLevelConfiguration for the status subresource.
+func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "status")
+}
+
 func (b PriorityLevelConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

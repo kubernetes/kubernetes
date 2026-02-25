@@ -17,6 +17,7 @@ limitations under the License.
 package ipallocator
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -391,6 +392,10 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 		ip, err := item.allocator.AllocateNextService(service)
 		if err == nil {
 			return ip, nil
+		}
+		// only keep trying if the allocator is full or not ready
+		if !errors.Is(err, ErrFull) && !errors.Is(err, ErrNotReady) {
+			return nil, err
 		}
 	}
 	return nil, ErrFull

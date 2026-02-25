@@ -16,6 +16,10 @@ limitations under the License.
 
 package features
 
+import (
+	"k8s.io/apimachinery/pkg/util/version"
+)
+
 // Every feature gate should have an entry here following this template:
 //
 // // owner: @username
@@ -27,6 +31,13 @@ package features
 // of code conflicts because changes are more likely to be scattered
 // across the file.
 const (
+	// owner: @michaelasp
+	// beta: v1.36
+	//
+	// Allow the client to process events atomically rather than a stream of
+	// events for items popped off the FIFO.
+	AtomicFIFO Feature = "AtomicFIFO"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -54,30 +65,61 @@ const (
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
-	// owner: @nilekhc
+	// owner: @yue9944882
+	// beta: v1.35
+	//
+	// Allow InOrderInformer to process incoming events in batches to expedite the process rate.
+	InOrderInformersBatchProcess Feature = "InOrderInformersBatchProcess"
+
+	// owner: @enj, @michaelasp
 	// alpha: v1.30
+	// GA: v1.35
 	InformerResourceVersion Feature = "InformerResourceVersion"
+
+	// owner: @michaelasp
+	// beta: v1.36
+	//
+	// Allow the FIFO to unlock while processing items to allow other goroutines to add items to the queue.
+	UnlockWhileProcessingFIFO Feature = "UnlockWhileProcessingFIFO"
 
 	// owner: @p0lyn0mial
 	// beta: v1.30
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
-	//
-	// NOTE:
-	//  The feature is disabled in Beta by default because
-	//  it will only be turned on for selected control plane component(s).
 	WatchListClient Feature = "WatchListClient"
 )
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 //
 // To add a new feature, define a key for it above and add it here.
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
-var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
+	AtomicFIFO: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsPreferCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	InOrderInformers: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: GA, LockToDefault: true},
+	},
+	InOrderInformersBatchProcess: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
+	InformerResourceVersion: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: GA},
+	},
+	UnlockWhileProcessingFIFO: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	WatchListClient: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
 }

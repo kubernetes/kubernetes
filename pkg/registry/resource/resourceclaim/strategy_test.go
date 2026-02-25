@@ -22,12 +22,15 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -149,39 +152,6 @@ var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaim{
 	},
 }
 
-var objStatusInNonAdminNamespace = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Spec: resource.ResourceClaimSpec{
-		Devices: resource.DeviceClaim{
-			Requests: []resource.DeviceRequest{
-				{
-					Name: "req-0",
-					Exactly: &resource.ExactDeviceRequest{
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
-					},
-				},
-			},
-		},
-	},
-	Status: resource.ResourceClaimStatus{
-		Allocation: &resource.AllocationResult{
-			Devices: resource.DeviceAllocationResult{
-				Results: []resource.DeviceRequestAllocationResult{
-					{
-						Request: "req-0",
-						Driver:  "dra.example.com",
-						Pool:    "pool-0",
-						Device:  "device-0",
-					},
-				},
-			},
-		},
-	},
-}
 var objWithAdminAccessStatusInNonAdminNamespace = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -218,10 +188,31 @@ var objWithAdminAccessStatusInNonAdminNamespace = &resource.ResourceClaim{
 	},
 }
 
+var objWithDeviceTaints = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						Tolerations:     []resource.DeviceToleration{{Key: "some-key", Operator: resource.DeviceTolerationOpExists}},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithPrioritizedList = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -234,6 +225,31 @@ var objWithPrioritizedList = &resource.ResourceClaim{
 							DeviceClassName: "class",
 							AllocationMode:  resource.DeviceAllocationModeExactCount,
 							Count:           1,
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithDeviceTaintsInPrioritizedList = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           1,
+							Tolerations:     []resource.DeviceToleration{{Key: "some-key", Operator: resource.DeviceTolerationOpExists}},
 						},
 					},
 				},
@@ -278,6 +294,67 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
+var objWithDeviceBindingConditions = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request:                  "req-0",
+						Driver:                   "dra.example.com",
+						Pool:                     "pool-0",
+						Device:                   "device-0",
+						BindingConditions:        []string{"condition-1", "condition-2"},
+						BindingFailureConditions: []string{"condition-3", "condition-4"},
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithCapacityRequests = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						Capacity: &resource.CapacityRequirements{
+							Requests: map[resource.QualifiedName]apiresource.Quantity{
+								resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
 var ns1 = &corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "default",
@@ -295,13 +372,26 @@ var adminAccessError = "Forbidden: admin access to devices requires the `resourc
 var fieldImmutableError = "field is immutable"
 var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 var deviceRequestError = "exactly one of `exactly` or `firstAvailable` is required"
+var constraintError = "matchAttribute: Required value"
 
 const (
+	req0        = "req-0"
+	subReq0     = "subreq-0"
+	req0SubReq0 = "req-0/subreq-0"
+
 	testRequest = "test-request"
 	testDriver  = "test-driver"
 	testPool    = "test-pool"
 	testDevice  = "test-device"
 )
+
+var (
+	testShareID = ptr.To(types.UID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+)
+
+var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
+	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+}
 
 func TestStrategy(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
@@ -320,7 +410,11 @@ func TestStrategyCreate(t *testing.T) {
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
+		deviceTaints          bool
 		prioritizedList       bool
+		bindingConditions     bool
+		deviceStatus          bool
+		consumableCapacity    bool
 		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
@@ -369,6 +463,48 @@ func TestStrategyCreate(t *testing.T) {
 				ns := as[0].(testclient.GetAction).GetName()
 				if ns != "kube-system" {
 					t.Errorf("expected to get the kube-system namespace but got '%s'", ns)
+				}
+			},
+		},
+		"drop-fields-device-taints": {
+			obj:          objWithDeviceTaints,
+			deviceTaints: false,
+			expectObj:    obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints": {
+			obj:          objWithDeviceTaints,
+			deviceTaints: true,
+			expectObj:    objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-device-taints-in-prioritized-list": {
+			obj:             objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints-in-prioritized-list": {
+			obj:             objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
 				}
 			},
 		},
@@ -423,20 +559,81 @@ func TestStrategyCreate(t *testing.T) {
 				}
 			},
 		},
+		"keep-fields-consumable-capacity": {
+			obj:                objWithCapacityRequests,
+			consumableCapacity: true,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			obj:                objWithCapacityRequests,
+			consumableCapacity: false,
+			expectObj:          obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-with-distinct-attribute": {
+			obj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, nil, false)
+				addDistinctAttribute(obj)
+				return obj
+			}(),
+			consumableCapacity:    false,
+			expectValidationError: constraintError,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-with-prioritized-list": {
+			obj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				return obj
+			}(),
+			consumableCapacity: false,
+			prioritizedList:    true,
+			expectObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
+				features.DRAPrioritizedList:    tc.prioritizedList,
+				features.DRAConsumableCapacity: tc.consumableCapacity,
+			})
 			strategy := NewStrategy(mockNSClient)
 
 			obj := tc.obj.DeepCopy()
 			strategy.PrepareForCreate(ctx, obj)
 			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.Len(t, errs, 1, "exactly one error expected")
 				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
 			}
@@ -459,8 +656,10 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
 		adminAccess           bool
-		expectValidationError string
+		deviceTaints          bool
 		prioritizedList       bool
+		consumableCapacity    bool
+		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
 	}{
@@ -547,7 +746,7 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
 			prioritizedList:       false,
-			expectValidationError: deviceRequestError,
+			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -587,6 +786,163 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"keep-existing-fields-consumable-capacity": {
+			oldObj:             objWithCapacityRequests,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: true,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-consumable-capacity-disabled-feature": {
+			oldObj:             objWithCapacityRequests,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: false,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			oldObj:             obj,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, nil, false)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-with-prioritized-list": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				return obj
+			}(),
+			consumableCapacity: false,
+			prioritizedList:    true,
+			expectObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-device-taints": {
+			oldObj:          obj,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints": {
+			oldObj:                obj,
+			newObj:                objWithDeviceTaints,
+			deviceTaints:          true,
+			prioritizedList:       true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints": {
+			oldObj:          objWithDeviceTaints,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-disabled-feature": {
+			oldObj:          objWithDeviceTaints,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-device-taints-in-prioritized-list": {
+			oldObj:          objWithPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints-in-prioritized-list": {
+			oldObj:                objWithPrioritizedList,
+			newObj:                objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:          true,
+			prioritizedList:       true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-in-prioritized-list": {
+			oldObj:          objWithDeviceTaintsInPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-in-prioritized-list-disabled-feature": {
+			oldObj:          objWithDeviceTaintsInPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -594,9 +950,14 @@ func TestStrategyUpdate(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
+				features.DRAPrioritizedList:    tc.prioritizedList,
+				features.DRAConsumableCapacity: tc.consumableCapacity,
+			})
+
 			strategy := NewStrategy(mockNSClient)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -604,6 +965,10 @@ func TestStrategyUpdate(t *testing.T) {
 
 			strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.Len(t, errs, 1, "exactly one error expected")
 				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
 			}
@@ -625,13 +990,16 @@ func TestStrategyUpdate(t *testing.T) {
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	testcases := map[string]struct {
-		oldObj                  *resource.ResourceClaim
-		newObj                  *resource.ResourceClaim
-		adminAccess             bool
-		deviceStatusFeatureGate bool
-		expectValidationError   string
-		expectObj               *resource.ResourceClaim
-		verify                  func(*testing.T, []testclient.Action)
+		oldObj                        *resource.ResourceClaim
+		newObj                        *resource.ResourceClaim
+		adminAccess                   bool
+		deviceStatusFeatureGate       bool
+		consumableCapacityFeatureGate bool
+		prioritizedListFeatureGate    bool
+		bindingConditions             bool
+		expectValidationError         string
+		expectObj                     *resource.ResourceClaim
+		verify                        func(*testing.T, []testclient.Action)
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -707,7 +1075,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access-NonAdminNamespace": {
-			oldObj:                objStatusInNonAdminNamespace,
+			oldObj:                objInNonAdminNamespace,
 			newObj:                objWithAdminAccessStatusInNonAdminNamespace,
 			adminAccess:           true,
 			expectValidationError: adminAccessError,
@@ -764,21 +1132,21 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
 				return obj
 			}(),
 			newObj: func() *resource.ResourceClaim { // Status is added
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			deviceStatusFeatureGate: false,
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -791,23 +1159,23 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			newObj: func() *resource.ResourceClaim { // Status is added
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			deviceStatusFeatureGate: false,
 			expectObj: func() *resource.ResourceClaim { // Status is still there (as the status was set in the old object)
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -820,22 +1188,22 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
 				return obj
 			}(),
 			newObj: func() *resource.ResourceClaim { // Status is added
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			deviceStatusFeatureGate: true,
 			expectObj: func() *resource.ResourceClaim { // Status is still there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -848,14 +1216,14 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			newObj: func() *resource.ResourceClaim { // device is deallocated
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			deviceStatusFeatureGate: true,
@@ -874,20 +1242,305 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			newObj: func() *resource.ResourceClaim { // device is deallocated
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
-				addStatusDevices(obj, testDriver, testPool, testDevice)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			deviceStatusFeatureGate: false,
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-binding-conditions": {
+			oldObj:    obj,
+			newObj:    objWithDeviceBindingConditions,
+			expectObj: objWithDeviceBindingConditions,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       true,
+			deviceStatusFeatureGate: true,
+		},
+		"keep-exist-fields-disable-bindingconditions-feature-gate": {
+			oldObj:    objWithDeviceBindingConditions,
+			newObj:    objWithDeviceBindingConditions,
+			expectObj: objWithDeviceBindingConditions,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: true,
+		},
+		"drop-fields-binding-conditions": {
+			oldObj:    obj,
+			newObj:    objWithDeviceBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: true,
+		},
+		"drop-fields-binding-conditions-disable-feature-gate": {
+			oldObj:    obj,
+			newObj:    objWithDeviceBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: false,
+		},
+		"drop-fields-binding-conditions-disable-binding-conditions-feature-gate": {
+			oldObj:    obj,
+			newObj:    objWithDeviceBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: true,
+		},
+		"keep-fields-consumable-capacity-with-device-status": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added with share id and consumed capacities
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: true,
+			prioritizedListFeatureGate:    false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-consumable-capacity-disabled-feature-gate-with-device-status": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added with share id and consumed capacities
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-consumable-capacity-with-device-status-disabled-feature-gate": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status should not be added
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       false,
+			consumableCapacityFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-consumable-capacity-with-device-status-with-prioritized-list-disabled-feature-gate": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				addDistinctAttribute(obj)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added with share id and consumed capacities but FirstAvailable should not be set
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0SubReq0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: true,
+			prioritizedListFeatureGate:    false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0SubReq0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-gate": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				return obj
+			}(),
+			consumableCapacityFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-gate-with-prioritized-list": {
+			oldObj: objWithPrioritizedList,
+			newObj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				addDistinctAttribute(obj)
+				return obj
+			}(),
+			prioritizedListFeatureGate:    true,
+			consumableCapacityFeatureGate: false,
+			expectObj:                     objWithPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-gate-with-device-status": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+				addDistinctAttribute(obj)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, testShareID, testCapacity)
+				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity-disabled-feature-gate-with-device-status-default-shareid": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, req0)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -904,8 +1557,17 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 			strategy := NewStrategy(mockNSClient)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatusFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:               tc.adminAccess,
+				features.DRAResourceClaimDeviceStatus: tc.deviceStatusFeatureGate,
+				features.DRADeviceBindingConditions:   tc.bindingConditions,
+			})
+			klog.InfoS("Testing strategy", "adminAccess", tc.adminAccess, "bindingConditions", tc.bindingConditions, "deviceStatus", tc.deviceStatusFeatureGate)
+
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: tc.consumableCapacityFeatureGate,
+				features.DRAPrioritizedList:    tc.prioritizedListFeatureGate,
+			})
 			statusStrategy := NewStatusStrategy(strategy)
 
 			oldObj := tc.oldObj.DeepCopy()
@@ -914,6 +1576,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 
 			statusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := statusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.Len(t, errs, 1, "exactly one error expected")
 				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
 			}
@@ -939,22 +1605,49 @@ func addSpecDevicesRequest(resourceClaim *resource.ResourceClaim, request string
 	})
 }
 
-func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, request string) {
+func modifySpecDeviceRequestWithCapacityRequests(resourceClaim *resource.ResourceClaim,
+	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature bool) {
+	if capacity != nil {
+		if prioritizedListFeature {
+			resourceClaim.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+				Requests: capacity,
+			}
+		} else {
+			resourceClaim.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+				Requests: capacity,
+			}
+		}
+	}
+}
+
+func addDistinctAttribute(resourceClaim *resource.ResourceClaim) {
+	distinctConstraint := resource.DeviceConstraint{
+		Requests:          []string{req0},
+		DistinctAttribute: ptr.To(resource.FullyQualifiedName("driver-a/attr")),
+	}
+	resourceClaim.Spec.Devices.Constraints = append(resourceClaim.Spec.Devices.Constraints, distinctConstraint)
+}
+
+func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, request string,
+	shareID *types.UID, consumedCapacity map[resource.QualifiedName]apiresource.Quantity) {
 	if resourceClaim.Status.Allocation == nil {
 		resourceClaim.Status.Allocation = &resource.AllocationResult{}
 	}
 	resourceClaim.Status.Allocation.Devices.Results = append(resourceClaim.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
-		Request: request,
-		Driver:  driver,
-		Pool:    pool,
-		Device:  device,
+		Request:          request,
+		Driver:           driver,
+		Pool:             pool,
+		Device:           device,
+		ShareID:          shareID,
+		ConsumedCapacity: consumedCapacity,
 	})
 }
 
-func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool string, device string) {
+func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, shareID *types.UID) {
 	resourceClaim.Status.Devices = append(resourceClaim.Status.Devices, resource.AllocatedDeviceStatus{
-		Driver: driver,
-		Pool:   pool,
-		Device: device,
+		Driver:  driver,
+		Pool:    pool,
+		Device:  device,
+		ShareID: (*string)(shareID),
 	})
 }

@@ -28,6 +28,8 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -696,6 +698,27 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 			fakeCloser.Check()
 		}
 	}
+}
+
+func TestNodeSupportsStageUnstageReturnNewUncertainProgressError(t *testing.T) {
+	fakeCloser := fake.NewCloser(t)
+	client := &csiDriverClient{
+		driverName: "Fake Driver Name",
+		nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeClient := fake.NewNodeClient(true)
+			nodeClient.SetGetCapabilitiesErr(status.Errorf(codes.Unavailable, "connection error"))
+			return nodeClient, fakeCloser, nil
+		},
+	}
+
+	_, err := client.NodeSupportsStageUnstage(context.Background())
+
+	uncertainProgressError := volumetypes.IsUncertainProgressError(err)
+	if !uncertainProgressError {
+		t.Errorf("Expected IsUncertainProgressError to be true, got %v", uncertainProgressError)
+	}
+
+	fakeCloser.Check()
 }
 
 func TestClientNodeSupportsStageUnstage(t *testing.T) {

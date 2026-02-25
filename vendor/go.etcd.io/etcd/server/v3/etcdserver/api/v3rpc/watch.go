@@ -269,6 +269,22 @@ func (sws *serverWatchStream) recvLoop() error {
 				// support  >= key queries
 				creq.RangeEnd = []byte{}
 			}
+			if creq.StartRevision < 0 {
+				wr := &pb.WatchResponse{
+					Header:       sws.newResponseHeader(sws.watchStream.Rev()),
+					WatchId:      clientv3.InvalidWatchID,
+					Canceled:     true,
+					Created:      true,
+					CancelReason: rpctypes.ErrCompacted.Error(),
+				}
+
+				select {
+				case sws.ctrlStream <- wr:
+					continue
+				case <-sws.closec:
+					return nil
+				}
+			}
 
 			err := sws.isWatchPermitted(creq)
 			if err != nil {
@@ -305,12 +321,7 @@ func (sws *serverWatchStream) recvLoop() error {
 
 			filters := FiltersFromRequest(creq)
 
-			wsrev := sws.watchStream.Rev()
-			rev := creq.StartRevision
-			if rev == 0 {
-				rev = wsrev + 1
-			}
-			id, err := sws.watchStream.Watch(mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, rev, filters...)
+			id, err := sws.watchStream.Watch(mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, creq.StartRevision, filters...)
 			if err == nil {
 				sws.mu.Lock()
 				if creq.ProgressNotify {
@@ -328,7 +339,7 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 
 			wr := &pb.WatchResponse{
-				Header:   sws.newResponseHeader(wsrev),
+				Header:   sws.newResponseHeader(sws.watchStream.Rev()),
 				WatchId:  int64(id),
 				Created:  true,
 				Canceled: err != nil,

@@ -181,7 +181,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(ctx context.Context, config *
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
-	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
+	defer metrics.RunPodSandboxDuration.ObserveSince(startTime, runtimeHandler)()
 
 	out, err := in.service.RunPodSandbox(ctx, config, runtimeHandler)
 	recordError(operation, err)
@@ -335,6 +335,15 @@ func (in instrumentedImageManagerService) ImageFsInfo(ctx context.Context) (*run
 	return fsInfo, nil
 }
 
+func (in instrumentedImageManagerService) Close() error {
+	const operation = "close"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.Close()
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedRuntimeService) CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error {
 	const operation = "checkpoint_container"
 	defer recordOperation(operation, time.Now())
@@ -378,4 +387,13 @@ func (in instrumentedRuntimeService) RuntimeConfig(ctx context.Context) (*runtim
 	out, err := in.service.RuntimeConfig(ctx)
 	recordError(operation, err)
 	return out, err
+}
+
+func (in instrumentedRuntimeService) Close() error {
+	const operation = "close"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.Close()
+	recordError(operation, err)
+	return err
 }

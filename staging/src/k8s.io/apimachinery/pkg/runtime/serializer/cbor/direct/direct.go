@@ -25,31 +25,13 @@ import (
 
 // Marshal serializes a value to CBOR. If there is more than one way to encode the value, it will
 // make the same choice as the CBOR implementation of runtime.Serializer.
-//
-// Note: Support for CBOR is at an alpha stage. If the value (or, for composite types, any of its
-// nested values) implement any of the interfaces encoding.TextMarshaler, encoding.TextUnmarshaler,
-// encoding/json.Marshaler, or encoding/json.Unmarshaler, a non-nil error will be returned unless
-// the value also implements the corresponding CBOR interfaces. This limitation will ultimately be
-// removed in favor of automatic transcoding to CBOR.
-func Marshal(src interface{}) ([]byte, error) {
-	if err := modes.RejectCustomMarshalers(src); err != nil {
-		return nil, err
-	}
+func Marshal(src any) ([]byte, error) {
 	return modes.Encode.Marshal(src)
 }
 
 // Unmarshal deserializes from CBOR into an addressable value. If there is more than one way to
 // unmarshal a value, it will make the same choice as the CBOR implementation of runtime.Serializer.
-//
-// Note: Support for CBOR is at an alpha stage. If the value (or, for composite types, any of its
-// nested values) implement any of the interfaces encoding.TextMarshaler, encoding.TextUnmarshaler,
-// encoding/json.Marshaler, or encoding/json.Unmarshaler, a non-nil error will be returned unless
-// the value also implements the corresponding CBOR interfaces. This limitation will ultimately be
-// removed in favor of automatic transcoding to CBOR.
-func Unmarshal(src []byte, dst interface{}) error {
-	if err := modes.RejectCustomMarshalers(dst); err != nil {
-		return err
-	}
+func Unmarshal(src []byte, dst any) error {
 	return modes.Decode.Unmarshal(src, dst)
 }
 

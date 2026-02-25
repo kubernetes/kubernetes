@@ -130,11 +130,11 @@ func mapBindMountDevice(devicePath string, mapPath string, linkName string) erro
 		// Check if device file
 		// TODO: Need to check if this device file is actually the expected bind mount
 		if file.Mode()&os.ModeDevice == os.ModeDevice {
-			klog.Warningf("Warning: Map skipped because bind mount already exist on the path: %v", linkPath)
+			klog.Warningf("Warning: Map skipped because bind mount already exists on the path: %v", linkPath)
 			return nil
 		}
 
-		klog.Warningf("Warning: file %s is already exist but not mounted, skip creating file", linkPath)
+		klog.Warningf("Warning: file %s already exists but is not mounted, skip creating file", linkPath)
 	}
 
 	// Bind mount file

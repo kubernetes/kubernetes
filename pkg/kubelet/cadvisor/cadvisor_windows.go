@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -24,6 +23,8 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -36,7 +37,7 @@ var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
-	client, err := winstats.NewPerfCounterClient()
+	client, err := winstats.NewPerfCounterClient(klog.TODO())
 	return &cadvisorClient{
 		rootPath:       rootPath,
 		winStatsClient: client,
@@ -57,7 +58,7 @@ func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, optio
 }
 
 func (cu *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return cu.winStatsClient.WinMachineInfo()
+	return cu.winStatsClient.WinMachineInfo(klog.TODO())
 }
 
 func (cu *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {

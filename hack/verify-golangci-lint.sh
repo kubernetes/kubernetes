@@ -21,7 +21,7 @@
 
 usage () {
   cat <<EOF >&2
-Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flags>] [packages]"
+Usage: $0 [-r <revision>|-a] [-c none|<config>] [-- <golangci-lint run flags>] [packages]"
    -r <revision>: only report issues in code added since that revision
    -a: automatically select the common base of origin/master and HEAD
        as revision
@@ -54,7 +54,7 @@ golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 hints=
 githubactions=
-while getopts "ar:sng:c:" o; do
+while getopts "ar:ng:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -140,20 +140,22 @@ if [ "${golangci_config}" ]; then
   GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/sorted.so" -buildmode=plugin k8s.io/kubernetes/hack/tools/golangci-lint/sorted/plugin
 fi
 
-# Verify that the given config is valid. "golangci-lint run" does not
+# Verify that the given config is valid (if one is provided). "golangci-lint run" does not
 # do that, which makes it easy to miss mistakes while editing the configuration.
-if ! failures=$( "${GOBIN}/golangci-lint" config verify --config="${golangci_config:-}" 2>&1 ); then
-  cat >&2 <<EOF
+if [ "${golangci_config}" ]; then
+  if ! failures=$( "${GOBIN}/golangci-lint" config verify --config="${golangci_config}" 2>&1 ); then
+    cat >&2 <<EOF
 
 Verification of the golangci-lint configuration failed. Command:
 
-   ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}")
+   ${GOBIN}/golangci-lint config verify --config="${golangci_config}")
 
 Result:
 
 $failures
 EOF
-    exit 1
+      exit 1
+  fi
 fi
 
 if [ "${golangci_config}" ]; then

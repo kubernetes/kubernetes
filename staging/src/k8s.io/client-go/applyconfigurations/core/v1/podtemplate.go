@@ -29,10 +29,16 @@ import (
 
 // PodTemplateApplyConfiguration represents a declarative configuration of the PodTemplate type for use
 // with apply.
+//
+// PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplateApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Template                             *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	// Template defines the pods that will be created from this pod template.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Template *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // PodTemplate constructs a declarative configuration of the PodTemplate type for use with
@@ -46,29 +52,14 @@ func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 	return b
 }
 
-// ExtractPodTemplate extracts the applied configuration owned by fieldManager from
-// podTemplate. If no managedFields are found in podTemplate for fieldManager, a
-// PodTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodTemplateFrom extracts the applied configuration owned by fieldManager from
+// podTemplate for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // podTemplate must be a unmodified PodTemplate API object that was retrieved from the Kubernetes API.
-// ExtractPodTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodTemplateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
-	return extractPodTemplate(podTemplate, fieldManager, "")
-}
-
-// ExtractPodTemplateStatus is the same as ExtractPodTemplate except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodTemplateStatus(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
-	return extractPodTemplate(podTemplate, fieldManager, "status")
-}
-
-func extractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
+func ExtractPodTemplateFrom(podTemplate *corev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
 	b := &PodTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +72,21 @@ func extractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string, su
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractPodTemplate extracts the applied configuration owned by fieldManager from
+// podTemplate. If no managedFields are found in podTemplate for fieldManager, a
+// PodTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// podTemplate must be a unmodified PodTemplate API object that was retrieved from the Kubernetes API.
+// ExtractPodTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+	return ExtractPodTemplateFrom(podTemplate, fieldManager, "")
+}
+
 func (b PodTemplateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

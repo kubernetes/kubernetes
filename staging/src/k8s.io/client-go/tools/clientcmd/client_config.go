@@ -533,6 +533,21 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 		if err := merge(mergedAuthInfo, &config.overrides.AuthInfo); err != nil {
 			return clientcmdapi.AuthInfo{}, err
 		}
+
+		// Handle ClientKey/ClientKeyData conflict: if override sets ClientKey, also use override's ClientKeyData
+		// otherwise if original config has ClientKeyData set,
+		// validation returns error "client-key-data and client-key are both specified <user-name>"
+		if len(config.overrides.AuthInfo.ClientKey) > 0 || len(config.overrides.AuthInfo.ClientKeyData) > 0 {
+			mergedAuthInfo.ClientKey = config.overrides.AuthInfo.ClientKey
+			mergedAuthInfo.ClientKeyData = config.overrides.AuthInfo.ClientKeyData
+		}
+		// Handle ClientCertificate/ClientCertificateData conflict, if override sets ClientCertificate, also use override's ClientCertificateData
+		// otherwise if original config has ClientCertificateData set,
+		// validation returns error "client-cert-data and client-cert are both specified <user-name>"
+		if len(config.overrides.AuthInfo.ClientCertificate) > 0 || len(config.overrides.AuthInfo.ClientCertificateData) > 0 {
+			mergedAuthInfo.ClientCertificate = config.overrides.AuthInfo.ClientCertificate
+			mergedAuthInfo.ClientCertificateData = config.overrides.AuthInfo.ClientCertificateData
+		}
 	}
 
 	return *mergedAuthInfo, nil
@@ -664,11 +679,13 @@ func (config *inClusterClientConfig) Possible() bool {
 // to the default config.
 func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
+		//nolint:logcheck // A helper function like this should not log. But this is probably part of the the established client-go API and not worth changing.
 		klog.Warning("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
 		kubeconfig, err := restclient.InClusterConfig()
 		if err == nil {
 			return kubeconfig, nil
 		}
+		//nolint:logcheck // A helper function like this should not log. But this is probably part of the the established client-go API and not worth changing.
 		klog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
 	return NewNonInteractiveDeferredLoadingClientConfig(

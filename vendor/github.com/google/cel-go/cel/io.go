@@ -126,6 +126,55 @@ func ValueAsAlphaProto(res ref.Val) (*exprpb.Value, error) {
 	return alpha, err
 }
 
+// RefValToExprValue converts between ref.Val and google.api.expr.v1alpha1.ExprValue.
+// The result ExprValue is the serialized proto form.
+func RefValToExprValue(res ref.Val) (*exprpb.ExprValue, error) {
+	return ExprValueAsAlphaProto(res)
+}
+
+// ExprValueAsAlphaProto converts between ref.Val and google.api.expr.v1alpha1.ExprValue.
+// The result ExprValue is the serialized proto form.
+func ExprValueAsAlphaProto(res ref.Val) (*exprpb.ExprValue, error) {
+	canonical, err := ExprValueAsProto(res)
+	if err != nil {
+		return nil, err
+	}
+	alpha := &exprpb.ExprValue{}
+	err = convertProto(canonical, alpha)
+	return alpha, err
+}
+
+// ExprValueAsProto converts between ref.Val and cel.expr.ExprValue.
+// The result ExprValue is the serialized proto form.
+func ExprValueAsProto(res ref.Val) (*celpb.ExprValue, error) {
+	switch res := res.(type) {
+	case *types.Unknown:
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Unknown{
+				Unknown: &celpb.UnknownSet{
+					Exprs: res.IDs(),
+				},
+			}}, nil
+	case *types.Err:
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Error{
+				Error: &celpb.ErrorSet{
+					// Keeping the error code as UNKNOWN since there's no error codes associated with
+					// Cel-Go runtime errors.
+					Errors: []*celpb.Status{{Code: 2, Message: res.Error()}},
+				},
+			},
+		}, nil
+	default:
+		val, err := ValueAsProto(res)
+		if err != nil {
+			return nil, err
+		}
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Value{Value: val}}, nil
+	}
+}
+
 // ValueAsProto converts between ref.Val and cel.expr.Value.
 // The result Value is the serialized proto form. The ref.Val must not be error or unknown.
 func ValueAsProto(res ref.Val) (*celpb.Value, error) {

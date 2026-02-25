@@ -49,6 +49,7 @@ func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher, kubernetes.Int
 
 func TestPolicySourceHasSyncedEmpty(t *testing.T) {
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -81,6 +82,7 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -150,6 +152,7 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },

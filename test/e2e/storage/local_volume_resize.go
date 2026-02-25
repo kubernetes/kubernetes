@@ -122,6 +122,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 			gomega.Expect(pv).NotTo(gomega.BeNil())
 			testVol.pv = pv
 
+			// since there is no external-resizer involved for this local volume,
+			// we need to update the PVC status to reflect the new size.
+			pvc, err := modifyPVCStatus(ctx, testVol.pvc, newSize, f.ClientSet)
+			framework.ExpectNoError(err, "while updating pvc status to more size")
+			gomega.Expect(pvc).NotTo(gomega.BeNil())
+			testVol.pvc = pvc
+
 			ginkgo.By("Waiting for file system resize to finish")
 			testVol.pvc, err = testsuites.WaitForFSResize(ctx, testVol.pvc, f.ClientSet)
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
@@ -133,6 +140,41 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 	})
 
 })
+
+func modifyPVCStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	pvcName := pvc.Name
+	pvcToUpdate := pvc.DeepCopy()
+
+	var lastError error
+	waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
+		var err error
+		pvcToUpdate, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("error fetching pvc %s: %w", pvcName, err)
+		}
+		pvcToUpdate.Status.AllocatedResources = v1.ResourceList{
+			v1.ResourceStorage: size,
+		}
+		pvcToUpdate.Status.AllocatedResourceStatuses = map[v1.ResourceName]v1.ClaimResourceStatus{
+			v1.ResourceStorage: v1.PersistentVolumeClaimNodeResizePending,
+		}
+
+		pvcToUpdate, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).UpdateStatus(ctx, pvcToUpdate, metav1.UpdateOptions{})
+		if err != nil {
+			framework.Logf("error updating PVC %s: %v", pvcName, err)
+			lastError = err
+			return false, nil
+		}
+		return true, nil
+	})
+	if wait.Interrupted(waitErr) {
+		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %w", lastError)
+	}
+	if waitErr != nil {
+		return nil, fmt.Errorf("failed to expand PVC size: %w", waitErr)
+	}
+	return pvcToUpdate, nil
+}
 
 func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolume, error) {
 	pvName := pv.Name

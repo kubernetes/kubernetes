@@ -18,6 +18,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -240,5 +241,17 @@ func SetDefaults_NodeResourcesFitArgs(obj *configv1.NodeResourcesFitArgs) {
 		if obj.ScoringStrategy.Resources[i].Weight == 0 {
 			obj.ScoringStrategy.Resources[i].Weight = 1
 		}
+	}
+}
+
+func SetDefaults_DynamicResourcesArgs(obj *configv1.DynamicResourcesArgs) {
+	if obj.FilterTimeout == nil && feature.DefaultFeatureGate.Enabled(features.DRASchedulerFilterTimeout) {
+		obj.FilterTimeout = &metav1.Duration{Duration: configv1.DynamicResourcesFilterTimeoutDefault}
+	}
+
+	if obj.BindingTimeout == nil &&
+		feature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) &&
+		feature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		obj.BindingTimeout = &metav1.Duration{Duration: configv1.DynamicResourcesBindingTimeoutDefault}
 	}
 }

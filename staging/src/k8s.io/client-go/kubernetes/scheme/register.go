@@ -33,8 +33,6 @@ import (
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -63,6 +61,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -72,7 +71,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -98,8 +97,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	authorizationv1beta1.AddToScheme,
 	autoscalingv1.AddToScheme,
 	autoscalingv2.AddToScheme,
-	autoscalingv2beta1.AddToScheme,
-	autoscalingv2beta2.AddToScheme,
 	batchv1.AddToScheme,
 	batchv1beta1.AddToScheme,
 	certificatesv1.AddToScheme,
@@ -128,6 +125,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	rbacv1.AddToScheme,
 	rbacv1beta1.AddToScheme,
 	rbacv1alpha1.AddToScheme,
+	resourcev1.AddToScheme,
 	resourcev1beta2.AddToScheme,
 	resourcev1beta1.AddToScheme,
 	resourcev1alpha3.AddToScheme,
@@ -137,7 +135,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	storagev1beta1.AddToScheme,
 	storagev1.AddToScheme,
 	storagev1alpha1.AddToScheme,
-	storagemigrationv1alpha1.AddToScheme,
+	storagemigrationv1beta1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

@@ -273,7 +273,6 @@ func TestContainerOutputsMatcher(ctx context.Context, f *framework.Framework,
 
 	expectedNameOutputs := make(map[string][]string, len(expectedOutputs))
 	for containerIndex, expectedOutput := range expectedOutputs {
-		expectedOutput := expectedOutput
 		if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
 			framework.Failf("Invalid container index: %d", containerIndex)
 		}

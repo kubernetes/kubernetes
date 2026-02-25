@@ -41,6 +41,9 @@ const (
 type Monitor interface {
 	ObserveReconciliationResult(action ActionLabel, err ErrorLabel, duration time.Duration)
 	ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType)
+	ObserveHPAAddition()
+	ObserveHPADeletion()
+	ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32)
 }
 
 type monitor struct{}
@@ -59,4 +62,19 @@ func (r *monitor) ObserveReconciliationResult(action ActionLabel, err ErrorLabel
 func (r *monitor) ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType) {
 	metricComputationTotal.WithLabelValues(string(action), string(err), string(metricType)).Inc()
 	metricComputationDuration.WithLabelValues(string(action), string(err), string(metricType)).Observe(duration.Seconds())
+}
+
+// ObserveHPAAddition observes the addition of an HPA object.
+func (r *monitor) ObserveHPAAddition() {
+	numHorizontalPodAutoscalers.Inc()
+}
+
+// ObserveHPADeletion observes the deletion of an HPA object.
+func (r *monitor) ObserveHPADeletion() {
+	numHorizontalPodAutoscalers.Dec()
+}
+
+// ObserveDesiredReplicas records the desired replica count for an HPA object.
+func (r *monitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
+	desiredReplicasCount.WithLabelValues(namespace, hpaName).Set(float64(desiredReplicas))
 }

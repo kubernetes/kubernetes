@@ -18,12 +18,16 @@ package internal
 
 import (
 	"context"
+	"errors"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	draapi "k8s.io/dynamic-resource-allocation/api"
 )
+
+// ErrFailedAllocationOnNode is an empty sentinel for errors.Is.
+// See allocator.go for details.
+var ErrFailedAllocationOnNode = errors.New("")
 
 type DeviceClassLister interface {
 	// List returns a list of all DeviceClasses.
@@ -33,19 +37,52 @@ type DeviceClassLister interface {
 }
 
 // Allocator is intentionally not documented here. See the main package for docs.
+//
+// This interface is also broader than the public one.
 type Allocator interface {
-	ClaimsToAllocate() []*resourceapi.ResourceClaim
-	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
+	Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error)
+	Channel() AllocatorChannel
 }
 
-// Features contains all feature gates that may influence the behavior of ResourceClaim allocation.
+// AllocatorExtended is an optional interface. Not all variants implement it.
+type AllocatorExtended interface {
+	// Stats shows statistics from the allocation process.
+	// May return nil if not implemented.
+	GetStats() Stats
+}
+
+// Stats shows statistics from the allocation process.
+type Stats struct {
+	// NumAllocateOneInvocations counts the number of times the allocateOne function
+	// got called.
+	NumAllocateOneInvocations int64
+}
+
+type AllocatorChannel string
+
+const (
+	Experimental = "experimental"
+	Stable       = "stable"
+	Incubating   = "incubating"
+)
+
+// Features control optional functionality during ResourceClaim allocation.
+// Each entry must correspond to at least one control flow change. Entries can
+// be removed when the control flow change is no longer necessary (= feature is
+// considered stable and always enabled).
+//
+// This often corresponds to feature gates, but not always: if a KEP implementation
+// depends on a set of feature gates, then a single entry here should control whether
+// that implementation is active.
 type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
 
-	AdminAccess          bool
-	DeviceTaints         bool
-	PartitionableDevices bool
-	PrioritizedList      bool
+	AdminAccess            bool
+	ConsumableCapacity     bool
+	DeviceBindingAndStatus bool
+	DeviceTaints           bool
+	PartitionableDevices   bool
+	PrioritizedList        bool
 }
 
 // Set returns all features which are set to true.
@@ -59,6 +96,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.AdminAccess {
 		enabled.Insert("DRAAdminAccess")
 	}
+	if f.ConsumableCapacity {
+		enabled.Insert("DRAConsumableCapacity")
+	}
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
 	}
@@ -68,28 +108,17 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.DeviceBindingAndStatus {
+		enabled.Insert("DRADeviceBindingConditions+DRAResourceClaimDeviceStatus")
+	}
 	return enabled
 }
 
 var FeaturesAll = Features{
-	AdminAccess:          true,
-	DeviceTaints:         true,
-	PartitionableDevices: true,
-	PrioritizedList:      true,
-}
-
-type DeviceID struct {
-	Driver, Pool, Device draapi.UniqueString
-}
-
-func (d DeviceID) String() string {
-	return d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String()
-}
-
-func MakeDeviceID(driver, pool, device string) DeviceID {
-	return DeviceID{
-		Driver: draapi.MakeUniqueString(driver),
-		Pool:   draapi.MakeUniqueString(pool),
-		Device: draapi.MakeUniqueString(device),
-	}
+	AdminAccess:            true,
+	ConsumableCapacity:     true,
+	DeviceBindingAndStatus: true,
+	DeviceTaints:           true,
+	PartitionableDevices:   true,
+	PrioritizedList:        true,
 }

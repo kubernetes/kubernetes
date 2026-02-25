@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -27,8 +26,6 @@ import (
 )
 
 // sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
-// TODO(vinaykul,InPlacePodVerticalScaling): Address issue that sets min req/limit to 2m/10m before beta
-// See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r662552642
 func sharesToMilliCPU(shares int64) int64 {
 	milliCPU := int64(0)
 	if shares >= int64(cm.MinShares) {

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -63,14 +64,14 @@ import (
 
 // imported from testutils
 var (
-	initRegistryAndConfig = func(t *testing.T, plugins ...framework.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
+	initRegistryAndConfig = func(t *testing.T, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
 		return schedulerutils.InitRegistryAndConfig(t, newPlugin, plugins...)
 	}
 )
 
 // newPlugin returns a plugin factory with specified Plugin.
-func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func newPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		switch pl := plugin.(type) {
 		case *PermitPlugin:
 			pl.fh = fh
@@ -83,16 +84,20 @@ func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
 
 type QueueSortPlugin struct {
 	// lessFunc is used to compare two queued pod infos.
-	lessFunc func(info1, info2 *framework.QueuedPodInfo) bool
+	lessFunc func(info1, info2 fwk.QueuedPodInfo) bool
 }
 
 type PreEnqueuePlugin struct {
-	called int
+	called atomic.Int64
 	admit  bool
 }
 
+type PreEnqueueGateAfterPreBindPlugin struct {
+	preBind *PreBindPlugin
+}
+
 type PreFilterPlugin struct {
-	numPreFilterCalled   int
+	numPreFilterCalled   atomic.Int64
 	failPreFilter        bool
 	rejectPreFilter      bool
 	preFilterResultNodes sets.Set[string]
@@ -159,7 +164,7 @@ func (fp *FilterPlugin) deepCopy() *FilterPlugin {
 
 type PostFilterPlugin struct {
 	name                string
-	fh                  framework.Handle
+	fh                  fwk.Handle
 	numPostFilterCalled int
 	failPostFilter      bool
 	rejectPostFilter    bool
@@ -269,7 +274,7 @@ type PermitPlugin struct {
 	waitingPod          string
 	rejectingPod        string
 	allowingPod         string
-	fh                  framework.Handle
+	fh                  fwk.Handle
 }
 
 func (pp *PermitPlugin) deepCopy() *PermitPlugin {
@@ -305,32 +310,34 @@ const (
 	preBindPluginName            = "prebind-plugin"
 	postBindPluginName           = "postbind-plugin"
 	permitPluginName             = "permit-plugin"
+	preEnqueueGatePluginName     = "preenqueue-gate-plugin"
 )
 
-var _ framework.PreEnqueuePlugin = &PreEnqueuePlugin{}
-var _ framework.PreFilterPlugin = &PreFilterPlugin{}
-var _ framework.PostFilterPlugin = &PostFilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.FilterPlugin = &FilterPlugin{}
-var _ framework.EnqueueExtensions = &FilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
-var _ framework.EnqueueExtensions = &ScorePlugin{}
-var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.PreScorePlugin = &PreScorePlugin{}
-var _ framework.PreBindPlugin = &PreBindPlugin{}
-var _ framework.EnqueueExtensions = &PreBindPlugin{}
-var _ framework.BindPlugin = &BindPlugin{}
-var _ framework.PostBindPlugin = &PostBindPlugin{}
-var _ framework.PermitPlugin = &PermitPlugin{}
-var _ framework.EnqueueExtensions = &PermitPlugin{}
-var _ framework.QueueSortPlugin = &QueueSortPlugin{}
+var _ fwk.PreEnqueuePlugin = &PreEnqueuePlugin{}
+var _ fwk.PreFilterPlugin = &PreFilterPlugin{}
+var _ fwk.PostFilterPlugin = &PostFilterPlugin{}
+var _ fwk.ScorePlugin = &ScorePlugin{}
+var _ fwk.FilterPlugin = &FilterPlugin{}
+var _ fwk.EnqueueExtensions = &FilterPlugin{}
+var _ fwk.ScorePlugin = &ScorePlugin{}
+var _ fwk.ScorePlugin = &ScoreWithNormalizePlugin{}
+var _ fwk.EnqueueExtensions = &ScorePlugin{}
+var _ fwk.ReservePlugin = &ReservePlugin{}
+var _ fwk.PreScorePlugin = &PreScorePlugin{}
+var _ fwk.PreBindPlugin = &PreBindPlugin{}
+var _ fwk.EnqueueExtensions = &PreBindPlugin{}
+var _ fwk.BindPlugin = &BindPlugin{}
+var _ fwk.PostBindPlugin = &PostBindPlugin{}
+var _ fwk.PermitPlugin = &PermitPlugin{}
+var _ fwk.EnqueueExtensions = &PermitPlugin{}
+var _ fwk.QueueSortPlugin = &QueueSortPlugin{}
+var _ fwk.PreEnqueuePlugin = &PreEnqueueGateAfterPreBindPlugin{}
 
 func (ep *QueueSortPlugin) Name() string {
 	return queuesortPluginName
 }
 
-func (ep *QueueSortPlugin) Less(info1, info2 *framework.QueuedPodInfo) bool {
+func (ep *QueueSortPlugin) Less(info1, info2 fwk.QueuedPodInfo) bool {
 	if ep.lessFunc != nil {
 		return ep.lessFunc(info1, info2)
 	}
@@ -338,7 +345,7 @@ func (ep *QueueSortPlugin) Less(info1, info2 *framework.QueuedPodInfo) bool {
 	return true
 }
 
-func NewQueueSortPlugin(lessFunc func(info1, info2 *framework.QueuedPodInfo) bool) *QueueSortPlugin {
+func NewQueueSortPlugin(lessFunc func(info1, info2 fwk.QueuedPodInfo) bool) *QueueSortPlugin {
 	return &QueueSortPlugin{
 		lessFunc: lessFunc,
 	}
@@ -349,7 +356,7 @@ func (ep *PreEnqueuePlugin) Name() string {
 }
 
 func (ep *PreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
-	ep.called++
+	ep.called.Add(1)
 	if ep.admit {
 		return nil
 	}
@@ -362,7 +369,7 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -375,12 +382,12 @@ func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Po
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
 		sp.highScoreNode = nodeInfo.Node().Name
-		score = framework.MaxNodeScore
+		score = fwk.MaxNodeScore
 	}
 	return score, nil
 }
 
-func (sp *ScorePlugin) ScoreExtensions() framework.ScoreExtensions {
+func (sp *ScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -394,7 +401,7 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -403,12 +410,12 @@ func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleSt
 	return score, nil
 }
 
-func (sp *ScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
+func (sp *ScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
 	sp.numNormalizeScoreCalled++
 	return nil
 }
 
-func (sp *ScoreWithNormalizePlugin) ScoreExtensions() framework.ScoreExtensions {
+func (sp *ScoreWithNormalizePlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return sp
 }
 
@@ -419,7 +426,7 @@ func (fp *FilterPlugin) Name() string {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
-func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	fp.mutex.Lock()
 	defer fp.mutex.Unlock()
 
@@ -478,7 +485,7 @@ func (*PreScorePlugin) Name() string {
 }
 
 // PreScore is a test function.
-func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) *fwk.Status {
+func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []fwk.NodeInfo) *fwk.Status {
 	pfp.numPreScoreCalled++
 	if pfp.failPreScore {
 		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -493,8 +500,8 @@ func (pp *PreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight is a test function that returns nil for testing.
-func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, nil
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.
@@ -518,6 +525,16 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod 
 
 func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
+}
+
+func (pp *PreBindPlugin) hasTriedPreBind(uid types.UID) bool {
+	pp.mutex.Lock()
+	defer pp.mutex.Unlock()
+	if pp.podUIDs == nil {
+		return false
+	}
+	_, ok := pp.podUIDs[uid]
+	return ok
 }
 
 const bindPluginAnnotation = "bindPluginName"
@@ -576,13 +593,13 @@ func (pp *PreFilterPlugin) Name() string {
 }
 
 // Extensions returns the PreFilterExtensions interface.
-func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+func (pp *PreFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
-	pp.numPreFilterCalled++
+func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	pp.numPreFilterCalled.Add(1)
 	if pp.failPreFilter {
 		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
@@ -590,7 +607,7 @@ func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, 
 		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	if len(pp.preFilterResultNodes) != 0 {
-		return &framework.PreFilterResult{NodeNames: pp.preFilterResultNodes}, nil
+		return &fwk.PreFilterResult{NodeNames: pp.preFilterResultNodes}, nil
 	}
 	return nil, nil
 }
@@ -600,7 +617,7 @@ func (pp *PostFilterPlugin) Name() string {
 	return pp.name
 }
 
-func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, _ framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	pp.numPostFilterCalled++
 	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
@@ -660,7 +677,7 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v
 		}
 		if pp.waitAndRejectPermit {
 			pp.rejectingPod = pod.Name
-			pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) {
+			pp.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 				wp.Reject(pp.name, fmt.Sprintf("reject pod %v", wp.GetPod().Name))
 			})
 			return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
@@ -676,18 +693,31 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v
 
 // allowAllPods allows all waiting pods.
 func (pp *PermitPlugin) allowAllPods() {
-	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Allow(pp.name) })
+	pp.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) { wp.Allow(pp.name) })
 }
 
 // rejectAllPods rejects all waiting pods.
 func (pp *PermitPlugin) rejectAllPods() {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
-	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
+	pp.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
 func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
+}
+
+// Name returns name of the plugin.
+func (pl *PreEnqueueGateAfterPreBindPlugin) Name() string {
+	return preEnqueueGatePluginName
+}
+
+// PreEnqueue is a test function that blocks re-enqueue after PreBind was attempted.
+func (pl *PreEnqueueGateAfterPreBindPlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
+	if pl.preBind != nil && pl.preBind.hasTriedPreBind(p.UID) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "test gate: block re-enqueue after PreBind was attempted")
+	}
+	return nil
 }
 
 // TestPreFilterPlugin tests invocation of prefilter plugins.
@@ -765,7 +795,7 @@ func TestPreFilterPlugin(t *testing.T) {
 				}
 			}
 
-			if preFilterPlugin.numPreFilterCalled == 0 {
+			if preFilterPlugin.numPreFilterCalled.Load() == 0 {
 				t.Errorf("Expected the prefilter plugin to be called.")
 			}
 		})
@@ -778,24 +808,24 @@ func TestQueueSortPlugin(t *testing.T) {
 		name           string
 		podNames       []string
 		expectedOrder  []string
-		customLessFunc func(info1, info2 *framework.QueuedPodInfo) bool
+		customLessFunc func(info1, info2 fwk.QueuedPodInfo) bool
 	}{
 		{
 			name:          "timestamp_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-1", "pod-2", "pod-3"},
-			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
-				return info1.Timestamp.Before(info2.Timestamp)
+			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
+				return info1.GetTimestamp().Before(info2.GetTimestamp())
 			},
 		},
 		{
 			name:          "priority_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-3", "pod-2", "pod-1"}, // depends on pod priority
-			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
-				p1 := corev1helpers.PodPriority(info1.Pod)
-				p2 := corev1helpers.PodPriority(info2.Pod)
-				return (p1 > p2) || (p1 == p2 && info1.Timestamp.Before(info2.Timestamp))
+			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
+				p1 := corev1helpers.PodPriority(info1.GetPodInfo().GetPod())
+				p2 := corev1helpers.PodPriority(info2.GetPodInfo().GetPod())
+				return (p1 > p2) || (p1 == p2 && info1.GetTimestamp().Before(info2.GetTimestamp()))
 			},
 		},
 	}
@@ -1419,7 +1449,7 @@ func TestUnReserveReservePlugins(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var pls []framework.Plugin
+			var pls []fwk.Plugin
 			for _, pl := range test.plugins {
 				pls = append(pls, pl)
 			}
@@ -1517,7 +1547,7 @@ func TestUnReservePermitPlugins(t *testing.T) {
 				name:        "reservePlugin",
 				failReserve: false,
 			}
-			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+			registry, profile := initRegistryAndConfig(t, []fwk.Plugin{test.plugin, reservePlugin}...)
 
 			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
 				scheduler.WithProfiles(profile),
@@ -1589,7 +1619,8 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 				name:        "reservePlugin",
 				failReserve: false,
 			}
-			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+			requeueGate := &PreEnqueueGateAfterPreBindPlugin{preBind: test.plugin}
+			registry, profile := initRegistryAndConfig(t, []fwk.Plugin{requeueGate, test.plugin, reservePlugin}...)
 
 			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
 				scheduler.WithProfiles(profile),
@@ -1658,7 +1689,7 @@ func TestUnReserveBindPlugins(t *testing.T) {
 				name:        "reservePlugin",
 				failReserve: false,
 			}
-			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+			registry, profile := initRegistryAndConfig(t, []fwk.Plugin{test.plugin, reservePlugin}...)
 
 			test.plugin.client = testContext.ClientSet
 
@@ -2093,7 +2124,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 		t.Errorf("Error while creating a test pod: %v", err)
 	}
 
-	var waitingPod framework.WaitingPod
+	var waitingPod fwk.WaitingPod
 	// Wait until the test pod is actually waiting.
 	wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
@@ -2145,7 +2176,7 @@ func TestPermitPluginsCancelled(t *testing.T) {
 		t.Errorf("Error while creating a test pod: %v", err)
 	}
 
-	var waitingPod framework.WaitingPod
+	var waitingPod fwk.WaitingPod
 	// Wait until the test pod is actually waiting.
 	wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
@@ -2408,7 +2439,7 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 				}
 				// Also verify enqueuePlugin is called.
-				if enqueuePlugin.called == 0 {
+				if enqueuePlugin.called.Load() == 0 {
 					t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
 				}
 			} else {
@@ -2416,8 +2447,8 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
 				}
 				// Also verify preFilterPlugin is not called.
-				if preFilterPlugin.numPreFilterCalled != 0 {
-					t.Errorf("Expected the preFilter plugin not to be called, but got %v", preFilterPlugin.numPreFilterCalled)
+				if called := preFilterPlugin.numPreFilterCalled.Load(); called != 0 {
+					t.Errorf("Expected the preFilter plugin not to be called, but got %v", called)
 				}
 			}
 		})
@@ -2554,7 +2585,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 				// Wait until the waiting-pod is actually waiting.
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 					w := false
-					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
+					permitPlugin.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) { w = true })
 					return w, nil
 				}); err != nil {
 					t.Fatalf("The waiting pod is expected to be waiting: %v", err)
@@ -2579,7 +2610,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			if w := tt.waitingPod; w != nil {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 					w := false
-					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
+					permitPlugin.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) { w = true })
 					return !w, nil
 				}); err != nil {
 					t.Fatalf("Expected the waiting pod to get preempted.")
@@ -2619,8 +2650,8 @@ const (
 	jobPluginName = "job plugin"
 )
 
-var _ framework.PreFilterPlugin = &JobPlugin{}
-var _ framework.PostBindPlugin = &PostBindPlugin{}
+var _ fwk.PreFilterPlugin = &JobPlugin{}
+var _ fwk.PostBindPlugin = &PostBindPlugin{}
 
 type JobPlugin struct {
 	podLister     listersv1.PodLister
@@ -2631,7 +2662,7 @@ func (j *JobPlugin) Name() string {
 	return jobPluginName
 }
 
-func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	labelSelector := labels.SelectorFromSet(labels.Set{"driver": ""})
 	driverPods, err := j.podLister.Pods(p.Namespace).List(labelSelector)
 	if err != nil {
@@ -2643,7 +2674,7 @@ func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, no
 	return nil, nil
 }
 
-func (j *JobPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+func (j *JobPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -2678,7 +2709,7 @@ func (j *JobPlugin) PostBind(_ context.Context, state fwk.CycleState, p *v1.Pod,
 func TestActivatePods(t *testing.T) {
 	var jobPlugin *JobPlugin
 	// Create a plugin registry for testing. Register a Job plugin.
-	registry := frameworkruntime.Registry{jobPluginName: func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	registry := frameworkruntime.Registry{jobPluginName: func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		jobPlugin = &JobPlugin{podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister()}
 		return jobPlugin, nil
 	}}
@@ -2749,10 +2780,10 @@ func TestActivatePods(t *testing.T) {
 	}
 }
 
-var _ framework.PreEnqueuePlugin = &SchedulingGatesPluginWithEvents{}
-var _ framework.EnqueueExtensions = &SchedulingGatesPluginWithEvents{}
-var _ framework.PreEnqueuePlugin = &SchedulingGatesPluginWOEvents{}
-var _ framework.EnqueueExtensions = &SchedulingGatesPluginWOEvents{}
+var _ fwk.PreEnqueuePlugin = &SchedulingGatesPluginWithEvents{}
+var _ fwk.EnqueueExtensions = &SchedulingGatesPluginWithEvents{}
+var _ fwk.PreEnqueuePlugin = &SchedulingGatesPluginWOEvents{}
+var _ fwk.EnqueueExtensions = &SchedulingGatesPluginWOEvents{}
 
 const (
 	schedulingGatesPluginWithEvents = "scheduling-gates-with-events"
@@ -2801,7 +2832,7 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]
 
 // This test helps to verify registering nil events for PreEnqueue plugin works as expected.
 func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
-	num := func(pl framework.Plugin) int {
+	num := func(pl fwk.Plugin) int {
 		switch item := pl.(type) {
 		case *SchedulingGatesPluginWithEvents:
 			return item.called
@@ -2852,7 +2883,7 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 
 				testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 				// use new plugin every time to clear counts
-				var plugin framework.PreEnqueuePlugin
+				var plugin fwk.PreEnqueuePlugin
 				if tt.withEvents {
 					plugin = &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{}}
 				} else {

@@ -25,10 +25,17 @@ import (
 
 // IngressBackendApplyConfiguration represents a declarative configuration of the IngressBackend type for use
 // with apply.
+//
+// IngressBackend describes all endpoints for a given service and port.
 type IngressBackendApplyConfiguration struct {
-	ServiceName *string                                         `json:"serviceName,omitempty"`
-	ServicePort *intstr.IntOrString                             `json:"servicePort,omitempty"`
-	Resource    *v1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
+	// serviceName specifies the name of the referenced service.
+	ServiceName *string `json:"serviceName,omitempty"`
+	// servicePort Specifies the port of the referenced service.
+	ServicePort *intstr.IntOrString `json:"servicePort,omitempty"`
+	// resource is an ObjectRef to another Kubernetes resource in the namespace
+	// of the Ingress object. If resource is specified, serviceName and servicePort
+	// must not be specified.
+	Resource *v1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
 }
 
 // IngressBackendApplyConfiguration constructs a declarative configuration of the IngressBackend type for use with

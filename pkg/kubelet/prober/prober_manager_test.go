@@ -48,6 +48,7 @@ var defaultProbe = &v1.Probe{
 }
 
 func TestAddRemovePods(t *testing.T) {
+	ctx := ktesting.Init(t)
 	noProbePod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "no_probe_pod",
@@ -94,13 +95,13 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Adding a pod with no probes should be a no-op.
-	m.AddPod(&noProbePod)
+	m.AddPod(ctx, &noProbePod)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
 
 	// Adding a pod with probes.
-	m.AddPod(&probePod)
+	m.AddPod(ctx, &probePod)
 	probePaths := []probeKey{
 		{"probe_pod", "readiness", readiness},
 		{"probe_pod", "liveness", liveness},
@@ -170,6 +171,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			probePod := v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID: "restartable_init_container_pod",
@@ -191,7 +193,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 			}
 
 			// Adding a pod with probes.
-			m.AddPod(&probePod)
+			m.AddPod(ctx, &probePod)
 			if err := expectProbes(m, tc.probePaths); err != nil {
 				t.Error(err)
 			}
@@ -215,6 +217,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 }
 
 func TestCleanupPods(t *testing.T) {
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
@@ -251,8 +254,8 @@ func TestCleanupPods(t *testing.T) {
 			}},
 		},
 	}
-	m.AddPod(&podToCleanup)
-	m.AddPod(&podToKeep)
+	m.AddPod(ctx, &podToCleanup)
+	m.AddPod(ctx, &podToKeep)
 
 	desiredPods := map[types.UID]sets.Empty{}
 	desiredPods[podToKeep.UID] = sets.Empty{}
@@ -277,6 +280,7 @@ func TestCleanupPods(t *testing.T) {
 }
 
 func TestCleanupRepeated(t *testing.T) {
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	defer cleanup(t, m)
 	podTemplate := v1.Pod{
@@ -294,7 +298,7 @@ func TestCleanupRepeated(t *testing.T) {
 	for i := 0; i < numTestPods; i++ {
 		pod := podTemplate
 		pod.UID = types.UID(strconv.Itoa(i))
-		m.AddPod(&pod)
+		m.AddPod(ctx, &pod)
 	}
 
 	for i := 0; i < 10; i++ {
@@ -303,6 +307,7 @@ func TestCleanupRepeated(t *testing.T) {
 }
 
 func TestUpdatePodStatus(t *testing.T) {
+	ctx := ktesting.Init(t)
 	unprobed := v1.ContainerStatus{
 		Name:        "unprobed_container",
 		ContainerID: "test://unprobed_container_id",
@@ -377,7 +382,7 @@ func TestUpdatePodStatus(t *testing.T) {
 	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
 
-	m.UpdatePodStatus(&v1.Pod{
+	m.UpdatePodStatus(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: testPodUID,
 		},
@@ -494,6 +499,7 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			podStatus := v1.PodStatus{
 				Phase: v1.PodRunning,
 				InitContainerStatuses: []v1.ContainerStatus{
@@ -501,7 +507,7 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 				},
 			}
 
-			m.UpdatePodStatus(&v1.Pod{
+			m.UpdatePodStatus(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID: testPodUID,
 				},
@@ -557,7 +563,7 @@ func (m *manager) extractedReadinessHandling(logger klog.Logger) {
 }
 
 func TestUpdateReadiness(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
 	m := newTestManager()
@@ -578,7 +584,7 @@ func TestUpdateReadiness(t *testing.T) {
 
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
-	m.AddPod(testPod)
+	m.AddPod(ctx, testPod)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)

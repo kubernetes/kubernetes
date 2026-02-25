@@ -35,7 +35,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 			name:    "nothing is set",
 			current: map[string]interface{}{},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -67,7 +67,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 				},
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -76,7 +76,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 				"resourceSelector": nil,
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 				"resourceSelector": []interface{}{},
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 				"resourceSelector": nil,
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -113,7 +113,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 				"resourceSelector": []interface{}{},
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: \"object\": either \"all\" or \"resourceSelector\" must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items: Invalid value: either \"all\" or \"resourceSelector\" must be set",
 			},
 		},
 		{
@@ -166,7 +166,7 @@ func TestResourceSelectorCELValidation(t *testing.T) {
 				"namespace": nil,
 			},
 			wantErrs: []string{
-				"openAPIV3Schema.properties.spec.properties.permissionClaims.items.properties.resourceSelector.items: Invalid value: \"object\": at least one field must be set",
+				"openAPIV3Schema.properties.spec.properties.permissionClaims.items.properties.resourceSelector.items: Invalid value: at least one field must be set",
 			},
 		},
 		{

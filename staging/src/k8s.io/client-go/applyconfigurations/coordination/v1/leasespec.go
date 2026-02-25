@@ -25,14 +25,33 @@ import (
 
 // LeaseSpecApplyConfiguration represents a declarative configuration of the LeaseSpec type for use
 // with apply.
+//
+// LeaseSpec is a specification of a Lease.
 type LeaseSpecApplyConfiguration struct {
-	HolderIdentity       *string                                  `json:"holderIdentity,omitempty"`
-	LeaseDurationSeconds *int32                                   `json:"leaseDurationSeconds,omitempty"`
-	AcquireTime          *metav1.MicroTime                        `json:"acquireTime,omitempty"`
-	RenewTime            *metav1.MicroTime                        `json:"renewTime,omitempty"`
-	LeaseTransitions     *int32                                   `json:"leaseTransitions,omitempty"`
-	Strategy             *coordinationv1.CoordinatedLeaseStrategy `json:"strategy,omitempty"`
-	PreferredHolder      *string                                  `json:"preferredHolder,omitempty"`
+	// holderIdentity contains the identity of the holder of a current lease.
+	// If Coordinated Leader Election is used, the holder identity must be
+	// equal to the elected LeaseCandidate.metadata.name field.
+	HolderIdentity *string `json:"holderIdentity,omitempty"`
+	// leaseDurationSeconds is a duration that candidates for a lease need
+	// to wait to force acquire it. This is measured against the time of last
+	// observed renewTime.
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+	// acquireTime is a time when the current lease was acquired.
+	AcquireTime *metav1.MicroTime `json:"acquireTime,omitempty"`
+	// renewTime is a time when the current holder of a lease has last
+	// updated the lease.
+	RenewTime *metav1.MicroTime `json:"renewTime,omitempty"`
+	// leaseTransitions is the number of transitions of a lease between
+	// holders.
+	LeaseTransitions *int32 `json:"leaseTransitions,omitempty"`
+	// Strategy indicates the strategy for picking the leader for coordinated leader election.
+	// If the field is not specified, there is no active coordination for this lease.
+	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
+	Strategy *coordinationv1.CoordinatedLeaseStrategy `json:"strategy,omitempty"`
+	// PreferredHolder signals to a lease holder that the lease has a
+	// more optimal holder and should be given up.
+	// This field can only be set if Strategy is also set.
+	PreferredHolder *string `json:"preferredHolder,omitempty"`
 }
 
 // LeaseSpecApplyConfiguration constructs a declarative configuration of the LeaseSpec type for use with

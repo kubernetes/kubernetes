@@ -33,7 +33,6 @@ import (
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -47,9 +46,10 @@ type VolumeZone struct {
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.FilterPlugin = &VolumeZone{}
-var _ framework.PreFilterPlugin = &VolumeZone{}
-var _ framework.EnqueueExtensions = &VolumeZone{}
+var _ fwk.FilterPlugin = &VolumeZone{}
+var _ fwk.PreFilterPlugin = &VolumeZone{}
+var _ fwk.EnqueueExtensions = &VolumeZone{}
+var _ fwk.SignPlugin = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -103,13 +103,20 @@ func (pl *VolumeZone) Name() string {
 	return Name
 }
 
+// Feasibility and scoring based on the non-synthetic volume sources.
+func (pl *VolumeZone) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
+	}, nil
+}
+
 // PreFilter invoked at the prefilter extension point
 //
 // # It finds the topology of the PersistentVolumes corresponding to the volumes a pod requests
 //
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
-func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
@@ -168,7 +175,7 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *VolumeZone) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -188,7 +195,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -397,7 +404,7 @@ func (pl *VolumeZone) getPVTopologies(logger klog.Logger, pv *v1.PersistentVolum
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

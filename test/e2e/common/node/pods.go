@@ -27,7 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	"golang.org/x/net/websocket"
 
@@ -49,6 +51,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -264,7 +267,7 @@ var _ = SIGDescribe("Pods", func() {
 				return podClient.Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithLogger(klog.FromContext(ctx), lw, &v1.Pod{})
 		defer w.Stop()
 
 		ctxUntil, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
@@ -901,8 +904,8 @@ var _ = SIGDescribe("Pods", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
-		testPodImage := imageutils.GetE2EImage(imageutils.Agnhost)
-		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
+		testPodImage := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+		testPodImage2 := imageutils.GetE2EImage(imageutils.Agnhost)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
 		one := int64(1)
@@ -959,6 +962,7 @@ var _ = SIGDescribe("Pods", func() {
 		p, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(ctx, testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
+		gomega.Expect(p).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		prePatchResourceVersion := p.ResourceVersion
@@ -1001,6 +1005,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
 		gomega.Expect(pod.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-pod", "patched"), "failed to patch Pod - missing label")
 		gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(testPodImage2), "failed to patch Pod - wrong image")
+		gomega.Expect(resourceversion.CompareResourceVersion(p.ResourceVersion, pod.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		var podStatusUpdate *v1.Pod

@@ -24,9 +24,43 @@ import (
 
 // DeviceConstraintApplyConfiguration represents a declarative configuration of the DeviceConstraint type for use
 // with apply.
+//
+// DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraintApplyConfiguration struct {
-	Requests       []string                            `json:"requests,omitempty"`
+	// Requests is a list of the one or more requests in this claim which
+	// must co-satisfy this constraint. If a request is fulfilled by
+	// multiple devices, then all of the devices must satisfy the
+	// constraint. If this is not specified, this constraint applies to all
+	// requests in this claim.
+	//
+	// References to subrequests must include the name of the main request
+	// and may include the subrequest using the format <main request>[/<subrequest>]. If just
+	// the main request is given, the constraint applies to all subrequests.
+	Requests []string `json:"requests,omitempty"`
+	// MatchAttribute requires that all devices in question have this
+	// attribute and that its type and value are the same across those
+	// devices.
+	//
+	// For example, if you specified "dra.example.com/numa" (a hypothetical example!),
+	// then only devices in the same NUMA node will be chosen. A device which
+	// does not have that attribute will not be chosen. All devices should
+	// use a value of the same type for this attribute because that is part of
+	// its specification, but if one device doesn't, then it also will not be
+	// chosen.
+	//
+	// Must include the domain qualifier.
 	MatchAttribute *resourcev1beta1.FullyQualifiedName `json:"matchAttribute,omitempty"`
+	// DistinctAttribute requires that all devices in question have this
+	// attribute and that its type and value are unique across those devices.
+	//
+	// This acts as the inverse of MatchAttribute.
+	//
+	// This constraint is used to avoid allocating multiple requests to the same device
+	// by ensuring attribute-level differentiation.
+	//
+	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
+	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
+	DistinctAttribute *resourcev1beta1.FullyQualifiedName `json:"distinctAttribute,omitempty"`
 }
 
 // DeviceConstraintApplyConfiguration constructs a declarative configuration of the DeviceConstraint type for use with
@@ -50,5 +84,13 @@ func (b *DeviceConstraintApplyConfiguration) WithRequests(values ...string) *Dev
 // If called multiple times, the MatchAttribute field is set to the value of the last call.
 func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1beta1.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
 	b.MatchAttribute = &value
+	return b
+}
+
+// WithDistinctAttribute sets the DistinctAttribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DistinctAttribute field is set to the value of the last call.
+func (b *DeviceConstraintApplyConfiguration) WithDistinctAttribute(value resourcev1beta1.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
+	b.DistinctAttribute = &value
 	return b
 }

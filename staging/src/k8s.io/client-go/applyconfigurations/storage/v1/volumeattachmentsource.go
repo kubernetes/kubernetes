@@ -24,9 +24,21 @@ import (
 
 // VolumeAttachmentSourceApplyConfiguration represents a declarative configuration of the VolumeAttachmentSource type for use
 // with apply.
+//
+// VolumeAttachmentSource represents a volume that should be attached.
+// Right now only PersistentVolumes can be attached via external attacher,
+// in the future we may allow also inline volumes in pods.
+// Exactly one member can be set.
 type VolumeAttachmentSourceApplyConfiguration struct {
-	PersistentVolumeName *string                                        `json:"persistentVolumeName,omitempty"`
-	InlineVolumeSpec     *corev1.PersistentVolumeSpecApplyConfiguration `json:"inlineVolumeSpec,omitempty"`
+	// persistentVolumeName represents the name of the persistent volume to attach.
+	PersistentVolumeName *string `json:"persistentVolumeName,omitempty"`
+	// inlineVolumeSpec contains all the information necessary to attach
+	// a persistent volume defined by a pod's inline VolumeSource. This field
+	// is populated only for the CSIMigration feature. It contains
+	// translated fields from a pod's inline VolumeSource to a
+	// PersistentVolumeSpec. This field is beta-level and is only
+	// honored by servers that enabled the CSIMigration feature.
+	InlineVolumeSpec *corev1.PersistentVolumeSpecApplyConfiguration `json:"inlineVolumeSpec,omitempty"`
 }
 
 // VolumeAttachmentSourceApplyConfiguration constructs a declarative configuration of the VolumeAttachmentSource type for use with

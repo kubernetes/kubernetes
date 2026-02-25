@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -33,7 +34,6 @@ import (
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
@@ -93,7 +93,7 @@ func updateReplicaSetStatus(logger klog.Logger, c appsclient.ReplicaSetInterface
 	return nil, updateErr
 }
 
-func calculateStatus(rs *apps.ReplicaSet, activePods []*v1.Pod, terminatingPods []*v1.Pod, manageReplicasErr error, controllerFeatures ReplicaSetControllerFeatures, clock clock.PassiveClock) apps.ReplicaSetStatus {
+func calculateStatus(rs *apps.ReplicaSet, activePods []*v1.Pod, terminatingPods []*v1.Pod, manageReplicasErr error, controllerFeatures ReplicaSetControllerFeatures, now time.Time) apps.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more
@@ -104,7 +104,6 @@ func calculateStatus(rs *apps.ReplicaSet, activePods []*v1.Pod, terminatingPods 
 	readyReplicasCount := 0
 	availableReplicasCount := 0
 	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
-	now := clock.Now()
 	for _, pod := range activePods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++

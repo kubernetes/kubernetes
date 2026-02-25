@@ -162,7 +162,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		}
 	})
 
-	ginkgo.Describe("should prevent a pod from starting if: ", func() {
+	ginkgo.Describe("should prevent a pod from starting if:", func() {
 
 		for _, tt := range []struct {
 			name string
@@ -503,7 +503,6 @@ func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *cert
 func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
 	cleanups := []func(context.Context){}
 	for _, ctb := range ctbs {
-		ctb := ctb
 		cleanups = append(cleanups, mustCreateCTB(ctx, f, ctb.DeepCopy()))
 	}
 

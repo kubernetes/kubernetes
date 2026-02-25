@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -64,6 +66,7 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 			ginkgo.By(fmt.Sprintf("Creating initial csiNode %q", initialCSINode.Name))
 			csiNode, err := csiNodeClient.Create(ctx, &initialCSINode, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create csiNode %q", initialCSINode.Name)
+			gomega.Expect(csiNode).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Getting initial csiNode %q", initialCSINode.Name))
 			retrievedCSINode, err := csiNodeClient.Get(ctx, initialCSINode.Name, metav1.GetOptions{})
@@ -75,6 +78,7 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 			patchedCSINode, err := csiNodeClient.Patch(ctx, csiNode.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch csiNode %q", csiNode.Name)
 			gomega.Expect(patchedCSINode.Labels).To(gomega.HaveKeyWithValue(csiNode.Name, "patched"), "Checking that patched label has been applied")
+			gomega.Expect(resourceversion.CompareResourceVersion(csiNode.ResourceVersion, patchedCSINode.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			patchedSelector := labels.Set{csiNode.Name: "patched"}.AsSelector().String()
 			ginkgo.By(fmt.Sprintf("Listing csiNodes with LabelSelector %q", patchedSelector))

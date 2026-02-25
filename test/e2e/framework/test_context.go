@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -28,10 +27,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
@@ -188,9 +185,6 @@ type TestContextType struct {
 	// The DNS Domain of the cluster.
 	ClusterDNSDomain string
 
-	// The configuration of NodeKiller.
-	NodeKiller NodeKillerConfig
-
 	// The Default IP Family of the cluster ("ipv4" or "ipv6")
 	IPFamily string
 
@@ -228,30 +222,6 @@ type TestContextType struct {
 
 	// Enable volume drivers which are disabled by default. See test/e2e/storage/in_tree_volumes.go for details.
 	EnabledVolumeDrivers []string
-}
-
-// NodeKillerConfig describes configuration of NodeKiller -- a utility to
-// simulate node failures.
-//
-// TODO: move this and the corresponding command line flags into
-// test/e2e/framework/node.
-type NodeKillerConfig struct {
-	// Enabled determines whether NodeKill should do anything at all.
-	// All other options below are ignored if Enabled = false.
-	Enabled bool
-	// FailureRatio is a percentage of all nodes that could fail simultinously.
-	FailureRatio float64
-	// Interval is time between node failures.
-	Interval time.Duration
-	// JitterFactor is factor used to jitter node failures.
-	// Node will be killed between [Interval, Interval + (1.0 + JitterFactor)].
-	JitterFactor float64
-	// SimulatedDowntime is a duration between node is killed and recreated.
-	SimulatedDowntime time.Duration
-	// NodeKillerStopCtx is a context that is used to notify NodeKiller to stop killing nodes.
-	NodeKillerStopCtx context.Context
-	// NodeKillerStop is the cancel function for NodeKillerStopCtx.
-	NodeKillerStop func()
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -459,13 +429,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flags.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
-
-	nodeKiller := &TestContext.NodeKiller
-	flags.BoolVar(&nodeKiller.Enabled, "node-killer", false, "Whether NodeKiller should kill any nodes.")
-	flags.Float64Var(&nodeKiller.FailureRatio, "node-killer-failure-ratio", 0.01, "Percentage of nodes to be killed")
-	flags.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
-	flags.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
-	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
 // generateSecureToken returns a string of length tokenLen, consisting
@@ -614,19 +577,6 @@ func AfterReadingAllFlags(t *TestContextType) {
 		}
 
 		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", func(report ginkgo.Report) {
-			// Sort specs by full name. The default is by start (or completion?) time,
-			// which is less useful in spyglass because those times are not shown
-			// and thus tests seem to be listed with no apparent order.
-			slices.SortFunc(report.SpecReports, func(a, b types.SpecReport) int {
-				res := strings.Compare(a.FullText(), b.FullText())
-				if res == 0 {
-					// Use start time as tie-breaker in the unlikely
-					// case that two specs have the same full name.
-					return a.StartTime.Compare(b.StartTime)
-				}
-				return res
-			})
-
 			// With Ginkgo v1, we used to write one file per
 			// parallel node. Now Ginkgo v2 automatically merges
 			// all results into a report for us. The 01 suffix is

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,11 +50,11 @@ func newHandlerForTest(c clientset.Interface) (*Lifecycle, informers.SharedInfor
 // newHandlerForTestWithClock returns a configured handler for testing.
 func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (*Lifecycle, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
-	handler, err := newLifecycleWithClock(sets.NewString(metav1.NamespaceDefault, metav1.NamespaceSystem), cacheClock)
+	handler, err := newLifecycleWithClock(sets.New[string](metav1.NamespaceDefault, metav1.NamespaceSystem), cacheClock)
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.New(c, nil, f, nil, nil, nil, nil)
+	pluginInitializer := kubeadmission.New(c, nil, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

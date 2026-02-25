@@ -41,7 +41,8 @@ import (
 
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -191,7 +192,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, poststart https hook
 			Description: When a post-start handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a post-start that invokes the server pod to validate that the post-start is executed.
 		*/
-		f.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should execute poststart https hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -236,7 +237,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop https hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		f.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should execute prestop https hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -257,9 +258,10 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -429,7 +431,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 			container lifecycle specifying a post-start that invokes the server pod
 			to validate that the post-start is executed.
 		*/
-		ginkgo.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23]", func(ctx context.Context) {
+		ginkgo.It("should execute poststart https hook properly", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -484,7 +486,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 			container lifecycle specifying a pre-stop that invokes the server pod to
 			validate that the pre-stop is executed.
 		*/
-		ginkgo.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23]", func(ctx context.Context) {
+		ginkgo.It("should execute prestop https hook properly", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -710,7 +712,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, framework.WithFeatureGate(features.PodLifecycleSleepActionAllowZero), func() {
+var _ = SIGDescribe("Lifecycle sleep action zero value", func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

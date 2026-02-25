@@ -297,7 +297,7 @@ func (g *GenericPLEG) Relist() {
 		status, updated, err := g.updateCache(ctx, pod, pid)
 		if err != nil {
 			// Rely on updateCache calling GetPodStatus to log the actual error.
-			g.logger.V(4).Error(err, "PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name))
+			g.logger.V(4).Info("PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name), "err", err)
 
 			// make sure we try to reinspect the pod during the next relisting
 			needsReinspection[pid] = pod

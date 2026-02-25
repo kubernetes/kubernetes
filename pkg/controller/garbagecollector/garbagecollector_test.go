@@ -41,6 +41,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -817,6 +818,14 @@ func TestGetDeletableResources(t *testing.T) {
 	}
 }
 
+type wrappedKubeClientWithUnsupportedWatchListSemantics struct {
+	kubernetes.Interface
+}
+
+func (c *wrappedKubeClientWithUnsupportedWatchListSemantics) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // TestGarbageCollectorSync ensures that a discovery client error
 // or an informer sync error will not cause the garbage collector
 // to block infinitely.
@@ -888,10 +897,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO(#115478): migrate this test to use fakeClient instead of the real client.
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
 
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
@@ -905,17 +916,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
+
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	syncPeriod := 200 * time.Millisecond
-	go gc.Run(tCtx, 1, syncPeriod)
+	wg.Go(func() {
+		gc.Run(tCtx, 1, syncPeriod)
+	})
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -930,7 +948,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	wg.Go(func() {
+		gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	})
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
@@ -2313,6 +2333,123 @@ func TestConflictingData(t *testing.T) {
 				}),
 			},
 		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/114603
+			name: "resourceVersion conflict between Get/Delete while processing object deletion",
+			steps: []step{
+				// setup, 0,1
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1)),                        // good parent
+				createObjectInClient("", "v1", "pods", "ns1", withRV(makeMetadataObj(pod2ns1, pod1ns1), "42")), // good child
+				// events, 2,3
+				processEvent(makeAddEvent(pod1ns1)),
+				processEvent(withRV(makeAddEvent(pod2ns1, pod1ns1), "42")),
+				// delete parent, 4,5,6
+				deleteObjectFromClient("", "v1", "pods", "ns1", pod1ns1.Name),
+				processEvent(makeDeleteEvent(pod1ns1)),
+				assertState(state{
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					},
+				}),
+
+				// add reactor to enforce RV precondition, 7
+				prependReactor("delete", "pods", (func() func(ctx stepContext) clientgotesting.ReactionFunc {
+					call := 0
+					return func(ctx stepContext) clientgotesting.ReactionFunc {
+						return func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+							call++
+							deleteAction, ok := action.(clientgotesting.DeleteAction)
+							if !ok {
+								ctx.t.Error("missing DeleteAction")
+								return false, nil, nil
+							}
+
+							preconditionRV := ""
+							if preconditions := deleteAction.GetDeleteOptions().Preconditions; preconditions != nil {
+								if rv := preconditions.ResourceVersion; rv != nil {
+									preconditionRV = *rv
+								}
+							}
+
+							objectRV := ""
+							var metadataObj *metav1.PartialObjectMetadata
+							if obj, err := ctx.metadataClient.Tracker().Get(deleteAction.GetResource(), deleteAction.GetNamespace(), deleteAction.GetName(), metav1.GetOptions{}); err == nil {
+								metadataObj = obj.(*metav1.PartialObjectMetadata)
+								objectRV = metadataObj.ResourceVersion
+							}
+
+							switch call {
+							case 1:
+								if preconditionRV == "42" && objectRV == "42" {
+									// simulate a concurrent change that modifies the owner references
+									ctx.t.Log("changing rv 42 --> 43 concurrently")
+									metadataObj.OwnerReferences = []metav1.OwnerReference{role1v1.OwnerReference}
+									metadataObj.ResourceVersion = "43"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 42, got 43"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=42 precondition on call 1, got %q, %q", preconditionRV, objectRV)
+								}
+							case 2:
+								if preconditionRV == "43" && objectRV == "43" {
+									// simulate a concurrent change that *does not* modify the owner references
+									ctx.t.Log("changing rv 43 --> 44 concurrently")
+									metadataObj.ResourceVersion = "44"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 43, got 44"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=43 precondition on call 2, got %q, %q", preconditionRV, objectRV)
+								}
+							case 3:
+								if preconditionRV != "" {
+									ctx.t.Errorf("expected delete with no rv precondition on call 3, got %q", preconditionRV)
+								}
+							default:
+								ctx.t.Errorf("expected delete call %d", call)
+							}
+							return false, nil, nil
+						}
+					}
+				})()),
+
+				// 8,9
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // first get sees rv=42, pod1ns1 owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2", // first delete with rv=42 precondition gets confict, triggers a live get
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // get has new ownerReferences, exits attemptToDelete
+					},
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+
+				// reattempt delete, 10,11
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // first get sees rv=43, role1v1 owner
+						"get rbac.authorization.k8s.io/v1, Resource=roles ns=ns1 name=role1", // verify missing owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // first delete RV precondition triggers a live Get
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // the object has same ownerReferences, causing unconditional Delete
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // unconditional Delete
+					},
+					absentOwnerCache: []objectReference{pod1ns1, role1v1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+			},
+		},
 	}
 
 	alwaysStarted := make(chan struct{})
@@ -2369,6 +2506,7 @@ func TestConflictingData(t *testing.T) {
 						uidToNode:     make(map[types.UID]*node),
 					},
 					attemptToDelete:  attemptToDelete,
+					attemptToOrphan:  attemptToOrphan,
 					absentOwnerCache: absentOwnerCache,
 				},
 			}
@@ -2473,6 +2611,16 @@ func makeObj(identity objectReference, owners ...objectReference) *metaonly.Meta
 	return obj
 }
 
+func withRV[T any](obj T, rv string) T {
+	switch t := any(obj).(type) {
+	case *metav1.PartialObjectMetadata:
+		t.ResourceVersion = rv
+	case *event:
+		withRV(t.obj, rv)
+	}
+	return obj
+}
+
 func makeMetadataObj(identity objectReference, owners ...objectReference) *metav1.PartialObjectMetadata {
 	obj := &metav1.PartialObjectMetadata{
 		TypeMeta:   metav1.TypeMeta{APIVersion: identity.APIVersion, Kind: identity.Kind},
@@ -2519,6 +2667,18 @@ func processPendingGraphChanges(count int) step {
 					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			}
+		},
+	}
+}
+
+type reactionFuncFactory func(ctx stepContext) clientgotesting.ReactionFunc
+
+func prependReactor(verb, resource string, reaction reactionFuncFactory) step {
+	return step{
+		name: "prependReactor",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			ctx.metadataClient.PrependReactor(verb, resource, reaction(ctx))
 		},
 	}
 }

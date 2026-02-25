@@ -31,8 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
+	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -43,6 +47,7 @@ func quantityMustParse(value string) *resource.Quantity {
 }
 
 func TestGetReclaimableThreshold(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := map[string]struct {
 		thresholds                   []evictionapi.Threshold
 		expectedThreshold            evictionapi.Threshold
@@ -129,7 +134,7 @@ func TestGetReclaimableThreshold(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		sort.Sort(byEvictionPriority(testCase.thresholds))
-		threshold, ressourceName, found := getReclaimableThreshold(testCase.thresholds)
+		threshold, ressourceName, found := getReclaimableThreshold(logger, testCase.thresholds)
 		assert.Equal(t, testCase.expectedReclaimableToBeFound, found)
 		assert.Equal(t, testCase.expectedResourceName, ressourceName)
 		assert.Equal(t, testCase.expectedThreshold.Signal, threshold.Signal)
@@ -1358,6 +1363,7 @@ func newPodStats(pod *v1.Pod, podWorkingSetBytes uint64) statsapi.PodStats {
 }
 
 func TestMakeSignalObservations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	podMaker := func(name, namespace, uid string, numContainers int) *v1.Pod {
 		pod := &v1.Pod{}
 		pod.Name = name
@@ -1453,7 +1459,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc := makeSignalObservations(fakeStats)
+	actualObservations, statsFunc := makeSignalObservations(logger, fakeStats)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
 		t.Errorf("Expected allocatable memory observation, but didn't find one")
@@ -1557,6 +1563,7 @@ func TestMakeSignalObservations(t *testing.T) {
 }
 
 func TestThresholdsMet(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hardThreshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
 		Operator: evictionapi.OpLessThan,
@@ -1621,7 +1628,7 @@ func TestThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
+		actual := thresholdsMet(logger, testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1629,6 +1636,7 @@ func TestThresholdsMet(t *testing.T) {
 }
 
 func TestThresholdsUpdatedStats(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	updatedThreshold := evictionapi.Threshold{
 		Signal: evictionapi.SignalMemoryAvailable,
 	}
@@ -1711,7 +1719,7 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsUpdatedStats(testCase.thresholds, testCase.observations, testCase.last)
+		actual := thresholdsUpdatedStats(logger, testCase.thresholds, testCase.observations, testCase.last)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1719,6 +1727,7 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 }
 
 func TestPercentageThresholdsMet(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	specificThresholds := []evictionapi.Threshold{
 		{
 			Signal:   evictionapi.SignalMemoryAvailable,
@@ -1829,7 +1838,7 @@ func TestPercentageThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinRelaim)
+		actual := thresholdsMet(logger, testCase.thresholds, testCase.observations, testCase.enforceMinRelaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1886,6 +1895,7 @@ func TestThresholdsFirstObservedAt(t *testing.T) {
 }
 
 func TestThresholdsMetGracePeriod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	now := metav1.Now()
 	hardThreshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
@@ -1936,7 +1946,7 @@ func TestThresholdsMetGracePeriod(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMetGracePeriod(testCase.observedAt, now.Time)
+		actual := thresholdsMetGracePeriod(logger, testCase.observedAt, now.Time)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -3325,9 +3335,12 @@ func newPod(name string, priority int32, containers []v1.Container, volumes []v1
 	}
 }
 
-func newPodWithInitContainers(name string, priority int32, initContainers []v1.Container, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
+func newPodWithInitContainers(name string, priority int32, resources v1.ResourceRequirements, initContainers []v1.Container, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
 	pod := newPod(name, priority, containers, volumes)
+
 	pod.Spec.InitContainers = initContainers
+	pod.Spec.Resources = &resources
+
 	return pod
 }
 
@@ -3419,16 +3432,17 @@ func TestEvictionMessage(t *testing.T) {
 		request string
 		usage   string
 	}
-	memoryExceededEvictionMessage := func(containers []memoryExceededContainer) string {
+	memoryExceededEvictionMessage := func(podMessage string, containers []memoryExceededContainer) string {
 		resourceToReclaim := v1.ResourceMemory
-		msg := fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
+		containersMessage := ""
 		for _, container := range containers {
-			msg += fmt.Sprintf(containerMessageFmt, container.name, container.usage, container.request, resourceToReclaim)
+			containersMessage += fmt.Sprintf(containerMessageFmt, container.name, container.usage, container.request, resourceToReclaim)
 		}
-		return msg
+		return fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim) + podMessage + containersMessage
 	}
 
 	const (
+		podName          = "pod-eviction-message"
 		init1            = "init1"
 		init2            = "init2"
 		init3            = "init3"
@@ -3443,12 +3457,15 @@ func TestEvictionMessage(t *testing.T) {
 
 	testcase := []struct {
 		name                     string
+		podResources             v1.ResourceRequirements
 		initContainers           []v1.Container
 		containers               []v1.Container
 		ephemeralContainers      []v1.EphemeralContainer
+		podMemoryStats           string
 		containerMemoryStats     []containerMemoryStat
-		expectedContainerMessage string
+		expectedContainerMessage []memoryExceededContainer
 		expectedAnnotations      map[string]string
+		podLevelResourcesEnabled bool
 	}{
 		{
 			name: "No container exceeds memory usage",
@@ -3464,7 +3481,7 @@ func TestEvictionMessage(t *testing.T) {
 				{name: restartableInit1, usage: "150Mi"},
 				{name: regular1, usage: "100Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+			expectedContainerMessage: nil,
 		},
 		{
 			name: "Init container exceeds memory usage",
@@ -3480,9 +3497,9 @@ func TestEvictionMessage(t *testing.T) {
 			containerMemoryStats: []containerMemoryStat{
 				{name: init1, usage: "150Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: []memoryExceededContainer{
 				{name: init1, request: "100Mi", usage: "150Mi"},
-			}),
+			},
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      init1,
 				OffendingContainersUsageKey: "150Mi",
@@ -3504,9 +3521,9 @@ func TestEvictionMessage(t *testing.T) {
 				{name: restartableInit2, usage: "150Mi"},
 				{name: regular1, usage: "200Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: []memoryExceededContainer{
 				{name: restartableInit1, request: "200Mi", usage: "250Mi"},
-			}),
+			},
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      restartableInit1,
 				OffendingContainersUsageKey: "250Mi",
@@ -3528,9 +3545,9 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular1, usage: "250Mi"},
 				{name: regular2, usage: "250Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: []memoryExceededContainer{
 				{name: regular1, request: "200Mi", usage: "250Mi"},
-			}),
+			},
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      regular1,
 				OffendingContainersUsageKey: "250Mi",
@@ -3554,7 +3571,7 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular1, usage: "150Mi"},
 				{name: ephemeral1, usage: "250Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+			expectedContainerMessage: nil,
 		},
 		{
 			name: "Both regular and restartable init containers exceed memory usage due to missing memory requests",
@@ -3572,10 +3589,10 @@ func TestEvictionMessage(t *testing.T) {
 				{name: restartableInit2, usage: "250Mi"},
 				{name: regular1, usage: "200Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: []memoryExceededContainer{
 				{name: restartableInit1, request: "0", usage: "250Mi"},
 				{name: regular1, request: "0", usage: "200Mi"},
-			}),
+			},
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      strings.Join([]string{restartableInit1, regular1}, ","),
 				OffendingContainersUsageKey: "250Mi,200Mi",
@@ -3605,29 +3622,59 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular2, usage: "250Mi"},
 				{name: regular3, usage: "400Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: []memoryExceededContainer{
 				{name: restartableInit1, request: "100Mi", usage: "150Mi"},
 				{name: restartableInit2, request: "200Mi", usage: "250Mi"},
 				{name: regular2, request: "200Mi", usage: "250Mi"},
 				{name: regular3, request: "100Mi", usage: "400Mi"},
-			}),
+			},
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      strings.Join([]string{restartableInit1, restartableInit2, regular2, regular3}, ","),
 				OffendingContainersUsageKey: "150Mi,250Mi,250Mi,400Mi",
 			},
+		},
+		{
+			name: "Regular pod with pod level resources exceeds memory usage",
+			podResources: v1.ResourceRequirements{
+				Requests: newResourceList("", "250Mi", ""),
+				Limits:   newResourceList("", "1000Mi", ""),
+			},
+			podMemoryStats: "600Mi",
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", ""), newResourceList("", "", "")),
+				newContainer(regular2, newResourceList("", "", ""), newResourceList("", "", "")),
+			},
+			containerMemoryStats: []containerMemoryStat{
+				{name: regular1, usage: "250Mi"},
+				{name: regular2, usage: "350Mi"},
+			},
+			expectedContainerMessage: []memoryExceededContainer{
+				{name: regular1, request: "0", usage: "250Mi"},
+				{name: regular2, request: "0", usage: "350Mi"},
+			},
+			expectedAnnotations: map[string]string{
+				OffendingPodKey:             podName,
+				OffendingPodUsageKey:        "600Mi",
+				OffendingContainersKey:      strings.Join([]string{regular1, regular2}, ","),
+				OffendingContainersUsageKey: "250Mi,350Mi",
+			},
+			podLevelResourcesEnabled: true,
 		},
 	}
 
 	threshold := []evictionapi.Threshold{}
 	observations := signalObservations{}
 	for _, tc := range testcase {
-		pod := newPodWithInitContainers("pod", 1, tc.initContainers, tc.containers, nil)
+		pod := newPodWithInitContainers(podName, 1, tc.podResources, tc.initContainers, tc.containers, nil)
 		if len(tc.ephemeralContainers) > 0 {
 			pod.Spec.EphemeralContainers = tc.ephemeralContainers
 		}
 		// Create PodMemoryStats with dummy container memory
 		// and override container stats with the provided values.
 		dummyContainerMemory := resource.MustParse("1Mi")
+		if tc.podLevelResourcesEnabled {
+			dummyContainerMemory = resource.MustParse(tc.podMemoryStats)
+		}
 		podStats := newPodMemoryStats(pod, dummyContainerMemory)
 		podStats.Containers = make([]statsapi.ContainerStats, len(tc.containerMemoryStats))
 		for _, stat := range tc.containerMemoryStats {
@@ -3649,11 +3696,20 @@ func TestEvictionMessage(t *testing.T) {
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
+			podMessage := ""
+			annotationsKeys := []string{OffendingContainersKey, OffendingContainersUsageKey}
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				podMessage = fmt.Sprintf(podMessageFmt, pod.Name, tc.podMemoryStats, tc.podResources.Requests.Memory(), v1.ResourceMemory)
+				annotationsKeys = append(annotationsKeys, OffendingPodKey, OffendingPodUsageKey)
+			}
+
 			msg, annotations := evictionMessage(v1.ResourceMemory, pod, statsFn, threshold, observations)
-			if msg != tc.expectedContainerMessage {
+
+			if msg != memoryExceededEvictionMessage(podMessage, tc.expectedContainerMessage) {
 				t.Errorf("Unexpected memory exceeded eviction message found, got: %s, want : %s", msg, tc.expectedContainerMessage)
 			}
-			for _, key := range []string{OffendingContainersKey, OffendingContainersUsageKey} {
+			for _, key := range annotationsKeys {
 				val, ok := annotations[key]
 				if !ok {
 					t.Errorf("Expected annotation %s not found", key)

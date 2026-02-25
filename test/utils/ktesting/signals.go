@@ -19,18 +19,25 @@ package ktesting
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
+	"testing"
 )
 
 var (
-	interruptCtx context.Context
+	// defaultProgressReporter is inactive until init is called.
+	defaultProgressReporter = &progressReporter{}
 
-	defaultProgressReporter = new(progressReporter)
-	defaultSignalChannel    chan os.Signal
+	// interruptCtx tracks whether the process got interrupted via SIGINT.
+	// In that case, interrupted gets called to cancel interruptCtx with
+	// a suitable message.
+	//
+	// This gets set up once per process and never gets reset.
+	interruptCtx, interrupted = context.WithCancelCause(context.Background())
 )
 
 const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
@@ -39,16 +46,90 @@ type ginkgoReporter interface {
 	AttachProgressReporter(reporter func() string) func()
 }
 
-func init() {
-	// Setting up signals is intentionally done in an init function because
-	// then importing ktesting in a unit or integration test is sufficient
-	// to activate the signal behavior.
-	signalCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
-	cancelCtx, cancel := context.WithCancelCause(context.Background())
-	go func() {
-		<-signalCtx.Done()
-		cancel(errors.New("received interrupt signal"))
-	}()
+type progressReporter struct {
+	// initMutex protects initialization and finalization of the reporter.
+	initMutex sync.Mutex
+
+	usageCount      int64
+	wg              sync.WaitGroup
+	testCtx         context.Context
+	signalChannel   chan os.Signal
+	progressChannel chan os.Signal
+
+	// reportMutex protects report creation and settings.
+	reportMutex     sync.Mutex
+	reporterCounter int64
+	reporters       map[int64]func() string
+	out             io.Writer
+	closeOut        func() error
+}
+
+var _ ginkgoReporter = &progressReporter{}
+
+// init is invoked by Init. It returns the context to be used for the
+// new TContext.
+//
+// By default, that is just context.Background. In a Go unit test, it
+// is a context connected to os.Interrupt.
+//
+// Once activated like that in a Go unit test, the progressReporter implements
+// support for triggering a progress report in a running test when sending it a
+// USR1 signal, similar to the corresponding Ginkgo feature.
+//
+// This support is active until the last test terminates.
+func (p *progressReporter) init(tb TB) context.Context {
+	if _, ok := tb.(testing.TB); !ok {
+		// Not in a Go unit test.
+		return context.Background()
+	}
+
+	tb.Helper()
+
+	// If already interrupted, then don't start the new test.
+	// This is necessary because normally CTRL-C would exit
+	// the entire process immediately. Now we keep running
+	// to clean up.
+	if interruptCtx.Err() != nil {
+		tb.Fatalf("testing has been interrupted: %v", context.Cause(interruptCtx))
+	}
+
+	p.initMutex.Lock()
+	defer p.initMutex.Unlock()
+
+	p.usageCount++
+	tb.Cleanup(p.finalize)
+	if p.usageCount > 1 {
+		// Was already initialized.
+		return p.testCtx
+	}
+
+	// Might have been set for testing purposes.
+	if p.out == nil {
+		// os.Stderr gets redirected by "go test". "go test -v" has to be
+		// used to see that output while a test runs.
+		//
+		// Opening /dev/tty during init avoids the redirection.
+		// May fail, depending on the OS, in which case
+		// os.Stderr is used.
+		if console, err := os.OpenFile("/dev/tty", os.O_RDWR|os.O_APPEND, 0); err == nil {
+			p.out = console
+			p.closeOut = console.Close
+
+		} else {
+			p.out = os.Stdout
+			p.closeOut = nil
+		}
+	}
+
+	p.signalChannel = make(chan os.Signal)
+	signal.Notify(p.signalChannel, os.Interrupt)
+	p.wg.Go(func() {
+		_, ok := <-p.signalChannel
+		if ok {
+			_, _ = fmt.Fprint(p.out, "\n\nINFO: canceling test context: received interrupt signal\n\n")
+			interrupted(errors.New("received interrupt signal"))
+		}
+	})
 
 	// This reimplements the contract between Ginkgo and Gomega for progress reporting.
 	// When using Ginkgo contexts, Ginkgo will implement it. This here is for "go test".
@@ -56,41 +137,46 @@ func init() {
 	// nolint:staticcheck // It complains about using a plain string. This can only be fixed
 	// by Ginkgo and Gomega formalizing this interface and define a type (somewhere...
 	// probably cannot be in either Ginkgo or Gomega).
-	interruptCtx = context.WithValue(cancelCtx, ginkgoSpecContextKey, defaultProgressReporter)
+	p.testCtx = context.WithValue(interruptCtx, ginkgoSpecContextKey, defaultProgressReporter)
 
-	defaultSignalChannel = make(chan os.Signal, 1)
+	p.progressChannel = make(chan os.Signal, 1)
 	// progressSignals will be empty on Windows.
 	if len(progressSignals) > 0 {
-		signal.Notify(defaultSignalChannel, progressSignals...)
+		signal.Notify(p.progressChannel, progressSignals...)
 	}
 
-	// os.Stderr gets redirected by "go test". "go test -v" has to be
-	// used to see the output while a test runs.
-	defaultProgressReporter.setOutput(os.Stderr)
-	go defaultProgressReporter.run(interruptCtx, defaultSignalChannel)
+	p.wg.Go(p.run)
+
+	return p.testCtx
 }
 
-type progressReporter struct {
-	mutex           sync.Mutex
-	reporterCounter int64
-	reporters       map[int64]func() string
-	out             io.Writer
-}
+func (p *progressReporter) finalize() {
+	p.initMutex.Lock()
+	defer p.initMutex.Unlock()
 
-var _ ginkgoReporter = &progressReporter{}
+	p.usageCount--
+	if p.usageCount > 0 {
+		// Still in use.
+		return
+	}
 
-func (p *progressReporter) setOutput(out io.Writer) io.Writer {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	oldOut := p.out
-	p.out = out
-	return oldOut
+	signal.Stop(p.signalChannel)
+	close(p.signalChannel)
+	signal.Stop(p.progressChannel)
+	close(p.progressChannel)
+	p.wg.Wait()
+
+	// Now that all goroutines are stopped, we can clean up some more.
+	if p.closeOut != nil {
+		_ = p.closeOut()
+		p.out = nil
+	}
 }
 
 // AttachProgressReporter implements Gomega's contextWithAttachProgressReporter.
 func (p *progressReporter) AttachProgressReporter(reporter func() string) func() {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
 
 	// TODO (?): identify the caller and record that for dumpProgress.
 	p.reporterCounter++
@@ -105,20 +191,20 @@ func (p *progressReporter) AttachProgressReporter(reporter func() string) func()
 }
 
 func (p *progressReporter) detachProgressReporter(id int64) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
 
 	delete(p.reporters, id)
 }
 
-func (p *progressReporter) run(ctx context.Context, progressSignalChannel chan os.Signal) {
+func (p *progressReporter) run() {
 	for {
-		select {
-		case <-ctx.Done():
+		_, ok := <-p.progressChannel
+		if !ok {
+			// Shut down.
 			return
-		case <-progressSignalChannel:
-			p.dumpProgress()
 		}
+		p.dumpProgress()
 	}
 }
 
@@ -129,8 +215,8 @@ func (p *progressReporter) run(ctx context.Context, progressSignalChannel chan o
 // But perhaps dumping goroutines and their callstacks is useful anyway?  TODO:
 // look at how Ginkgo does it and replicate some of it.
 func (p *progressReporter) dumpProgress() {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
 
 	var buffer strings.Builder
 	buffer.WriteString("You requested a progress report.\n")

@@ -1,0 +1,13 @@
+version: "2"
+
+linters:
+  enable:
+    - unconvert
+    - unparam
+  exclusions:
+    presets:
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofumpt

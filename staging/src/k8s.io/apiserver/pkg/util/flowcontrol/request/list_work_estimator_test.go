@@ -33,6 +33,7 @@ func TestListWorkEstimator(t *testing.T) {
 		objectCount               int64
 		request                   metav1.ListOptions
 		isListFromCache           bool
+		matchesSingle             bool
 		expectObjectCountEstimate uint64
 		expectObjectSizeEstimate  uint64
 	}{
@@ -258,6 +259,23 @@ func TestListWorkEstimator(t *testing.T) {
 			expectObjectCountEstimate: 1,
 			expectObjectSizeEstimate:  10,
 		},
+		{
+			name:                      "1000MB resource, 1000 objects, store, matchesSingle",
+			totalSize:                 1_000_000_000 - 1,
+			objectCount:               1000,
+			matchesSingle:             true,
+			expectObjectCountEstimate: 1,
+			expectObjectSizeEstimate:  10,
+		},
+		{
+			name:                      "1000MB resource, 1000 objects, cache, matchesSingle",
+			totalSize:                 1_000_000_000 - 1,
+			objectCount:               1000,
+			isListFromCache:           true,
+			matchesSingle:             true,
+			expectObjectCountEstimate: 1,
+			expectObjectSizeEstimate:  10,
+		},
 	}
 
 	for _, test := range tests {
@@ -266,8 +284,8 @@ func TestListWorkEstimator(t *testing.T) {
 
 			stats := storage.Stats{ObjectCount: test.objectCount, EstimatedAverageObjectSizeBytes: test.totalSize / test.objectCount}
 
-			objectCountEstimate := estimator.seatsBasedOnObjectCount(stats, test.request, test.isListFromCache)
-			objectSizeEstimage := estimator.seatsBasedOnObjectSize(stats, test.request, test.isListFromCache)
+			objectCountEstimate := estimator.seatsBasedOnObjectCount(stats, test.request, test.isListFromCache, test.matchesSingle)
+			objectSizeEstimage := estimator.seatsBasedOnObjectSize(stats, test.request, test.isListFromCache, test.matchesSingle)
 
 			if objectCountEstimate != test.expectObjectCountEstimate {
 				t.Errorf("Expected object count work estimate to match, expected: %d, but got: %d", test.expectObjectCountEstimate, objectCountEstimate)

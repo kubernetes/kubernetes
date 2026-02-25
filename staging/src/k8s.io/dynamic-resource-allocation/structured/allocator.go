@@ -19,15 +19,34 @@ package structured
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
+	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
 	"k8s.io/dynamic-resource-allocation/structured/internal/incubating"
 	"k8s.io/dynamic-resource-allocation/structured/internal/stable"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 )
+
+// ErrFailedAllocationOnNode is the base error for errors returned by Allocate
+// which, in contrast to other errors, only affect the one node and not
+// the entire scheduling attempt.
+//
+// The scheduler is expected to check for this with
+//
+//	errors.Is(err, structured.ErrFailedAllocation)
+//
+// and then use the error string as explanation for
+// the unscheduable status.
+//
+// It has no text of its own and can be used with fmt.Errorf("%wsome other error", ErrFailedAllocationOnNode).
+var ErrFailedAllocationOnNode = internal.ErrFailedAllocationOnNode
 
 // To keep the code in different packages simple, type aliases are used everywhere.
 // Functions are wrappers instead of variables to enable compiler optimization.
@@ -36,10 +55,32 @@ import (
 
 type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
-type DeviceID = internal.DeviceID
+
+// Type aliases to schedulerapi package for types that are part of the
+// scheduler and autoscaler contract. This ensures that changes to these
+// types require autoscaler approval.
+type DeviceID = schedulerapi.DeviceID
+type AllocatedState = schedulerapi.AllocatedState
+type SharedDeviceID = schedulerapi.SharedDeviceID
+type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
+type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
+type ConsumedCapacity = schedulerapi.ConsumedCapacity
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
-	return internal.MakeDeviceID(driver, pool, device)
+	return schedulerapi.MakeDeviceID(driver, pool, device)
+}
+
+func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
+	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
+}
+
+func NewConsumedCapacityCollection() ConsumedCapacityCollection {
+	return schedulerapi.NewConsumedCapacityCollection()
+}
+
+func NewDeviceConsumedCapacity(deviceID DeviceID,
+	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
+	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use
@@ -49,9 +90,6 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator interface {
-	// ClaimsToAllocate returns the claims that the allocator was created for.
-	ClaimsToAllocate() []*resourceapi.ResourceClaim
-
 	// Allocate calculates the allocation(s) for one particular node.
 	//
 	// It returns an error only if some fatal problem occurred. These are errors
@@ -75,7 +113,11 @@ type Allocator interface {
 	// additional value. A name can also be useful because log messages do not
 	// have a common prefix. V(5) is used for one-time log entries, V(6) for important
 	// progress reports, and V(7) for detailed debug output.
-	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
+	//
+	//
+	// Context cancellation is supported. An error wrapping the context's error will
+	// be returned in case of cancellation.
+	Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -84,8 +126,7 @@ type Allocator interface {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	features Features,
-	claimsToAllocate []*resourceapi.ResourceClaim,
-	allocatedDevices sets.Set[DeviceID],
+	allocatedState AllocatedState,
 	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
@@ -113,52 +154,138 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
+	var enabledAllocators []string
 	for _, allocator := range availableAllocators {
+		// Disabled?
+		if !allocatorEnabled(allocator.name) {
+			continue
+		}
+		enabledAllocators = append(enabledAllocators, allocator.name)
+
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
-	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
+	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
+}
+
+// EnableAllocators, if passed a non-empty list, controls which allocators may get picked by NewAllocator.
+// The entries are the names of the implementing package ("stable", "incubating", "experimental").
+// Not thread-safe, meant for use during testing.
+func EnableAllocators(names ...string) {
+	explicitlyEnabledAllocators = sets.New(names...)
+}
+
+// explicitlyEnabledAllocators stores the result of EnableAllocators.
+// If empty (the default), all available allocators are enabled.
+var explicitlyEnabledAllocators sets.Set[string]
+
+func allocatorEnabled(name string) bool {
+	return len(explicitlyEnabledAllocators) == 0 || explicitlyEnabledAllocators.Has(name)
 }
 
 var availableAllocators = []struct {
+	name              string
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
-		claimsToAllocate []*resourceapi.ResourceClaim,
-		allocatedDevices sets.Set[DeviceID],
+		allocatedState AllocatedState,
 		classLister DeviceClassLister,
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
+	nodeMatches func(node *v1.Node,
+		nodeNameToMatch string,
+		allNodesMatch bool,
+		nodeSelector *v1.NodeSelector,
+	) (bool, error)
 }{
 	// Most stable first.
 	{
+		name:              "stable",
 		supportedFeatures: stable.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: stable.NodeMatches,
 	},
 	{
+		name:              "incubating",
 		supportedFeatures: incubating.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return incubating.NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		},
+		nodeMatches: incubating.NodeMatches,
 	},
+	{
+		name:              "experimental",
+		supportedFeatures: experimental.SupportedFeatures,
+		newAllocator: func(ctx context.Context,
+			features Features,
+			allocateState AllocatedState,
+			classLister DeviceClassLister,
+			slices []*resourceapi.ResourceSlice,
+			celCache *cel.Cache,
+		) (Allocator, error) {
+			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)
+		},
+		nodeMatches: experimental.NodeMatches,
+	},
+}
+
+// NodeMatches determines whether a given Kubernetes node matches the specified criteria.
+// It calls one of the available implementations(stable, incubating, experimental) based
+// on the provided DRA features.
+func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+	for _, allocator := range availableAllocators {
+		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
+			return allocator.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
+		}
+	}
+
+	return false, fmt.Errorf("internal error: no NodeMatches implementation available for feature set %v", features)
+}
+
+// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
+// and partially consumed devices when consumable capacity is enabled.
+func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
+	// Check if device is fully allocated (traditional case)
+	if allocatedState.AllocatedDevices.Has(deviceID) {
+		return true
+	}
+
+	// Check if device is partially consumed via shared allocations (consumable capacity case).
+	// We need to check if any shared device ID corresponds to our device.
+	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
+		// Extract the base device ID from the shared device ID by recreating it
+		baseDeviceID := MakeDeviceID(
+			sharedDeviceID.Driver.String(),
+			sharedDeviceID.Pool.String(),
+			sharedDeviceID.Device.String(),
+		)
+		if baseDeviceID == deviceID {
+			return true
+		}
+	}
+
+	// Check if device has consumed capacity tracked (consumable capacity case)
+	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
+		return true
+	}
+
+	return false
 }

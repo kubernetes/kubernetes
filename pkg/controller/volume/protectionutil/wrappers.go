@@ -18,7 +18,7 @@ package protectionutil
 
 import (
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -184,7 +184,7 @@ func (p *PersistentVolumeWrapper) VolumeAttributesClassName(s string) *Persisten
 
 // VolumeAttributesClassWrapper wraps a VolumeAttributesClass inside.
 type VolumeAttributesClassWrapper struct {
-	storagev1beta1.VolumeAttributesClass
+	storagev1.VolumeAttributesClass
 }
 
 // MakeVolumeAttributesClass creates a VolumeAttributesClass wrapper.
@@ -193,7 +193,7 @@ func MakeVolumeAttributesClass() *VolumeAttributesClassWrapper {
 }
 
 // Obj returns the inner VolumeAttributesClass.
-func (v *VolumeAttributesClassWrapper) Obj() *storagev1beta1.VolumeAttributesClass {
+func (v *VolumeAttributesClassWrapper) Obj() *storagev1.VolumeAttributesClass {
 	return &v.VolumeAttributesClass
 }
 

@@ -209,6 +209,7 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
+	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,req,name=status"`
 }
 
@@ -468,9 +469,6 @@ type JobSpec struct {
 	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
-	//
-	// This field is beta-level. The job controller accepts setting the field
-	// when the feature gate JobManagedBy is enabled (enabled by default).
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
 }
@@ -688,7 +686,7 @@ type CronJob struct {
 
 	// Specification of the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of a cron job.
@@ -717,6 +715,8 @@ type CronJobList struct {
 type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// +required
+	// +k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -34,51 +33,52 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestPullImage(t *testing.T) {
-	ctx := context.Background()
-	_, _, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	imageRef, creds, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imageRef)
 	assert.Nil(t, creds) // as this was an anonymous pull
 
-	images, err := fakeManager.ListImages(ctx)
+	images, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
 	assert.Equal(t, []string{"busybox"}, images[0].RepoTags)
 }
 
 func TestPullImageWithError(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
-	imageRef, creds, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
 	assert.Nil(t, creds)
 
-	images, err := fakeManager.ListImages(ctx)
+	images, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	assert.Empty(t, images)
 }
 
 func TestListImages(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	images := []string{"1111", "2222", "3333"}
 	expected := sets.New[string](images...)
 	fakeImageService.SetFakeImages(images)
 
-	actualImages, err := fakeManager.ListImages(ctx)
+	actualImages, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	actual := sets.New[string]()
 	for _, i := range actualImages {
@@ -89,8 +89,8 @@ func TestListImages(t *testing.T) {
 }
 
 func TestListImagesPinnedField(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	imagesPinned := map[string]bool{
@@ -105,7 +105,7 @@ func TestListImagesPinnedField(t *testing.T) {
 	}
 	fakeImageService.SetFakeImages(imageList)
 
-	actualImages, err := fakeManager.ListImages(ctx)
+	actualImages, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	for _, image := range actualImages {
 		assert.Equal(t, imagesPinned[image.ID], image.Pinned)
@@ -113,51 +113,82 @@ func TestListImagesPinnedField(t *testing.T) {
 }
 
 func TestListImagesWithError(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	fakeImageService.InjectError("ListImages", fmt.Errorf("test-failure"))
 
-	actualImages, err := fakeManager.ListImages(ctx)
+	actualImages, err := fakeManager.ListImages(tCtx)
 	assert.Error(t, err)
 	assert.Nil(t, actualImages)
 }
 
 func TestGetImageRef(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	image := "busybox"
 	fakeImageService.SetFakeImages([]string{image})
-	imageRef, err := fakeManager.GetImageRef(ctx, kubecontainer.ImageSpec{Image: image})
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 	assert.Equal(t, image, imageRef)
 }
 
+// TestGetImageRefReturnsImageIdNotRepoDigest verifies that GetImageRef returns
+// Image.Id instead of RepoDigests to ensure content-based deduplication.
+// This prevents the same image pulled from different registries from being
+// treated as different images in pull record lookups.
+func TestGetImageRefReturnsImageIdNotRepoDigest(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Simulate an image with both Id and RepoDigests set
+	// In a real scenario, the same image content pulled from different registries
+	// would have the same Id but different RepoDigests
+	imageID := "sha256:abcd1234"
+	repoDigest1 := "registry1.io/myimage@sha256:abcd1234"
+	repoDigest2 := "registry2.io/myimage@sha256:abcd1234"
+
+	fakeImageService.Lock()
+	fakeImageService.Images["myimage"] = &runtimeapi.Image{
+		Id:          imageID,
+		RepoDigests: []string{repoDigest1, repoDigest2},
+		RepoTags:    []string{"myimage:latest"},
+		Size:        1000,
+	}
+	fakeImageService.Unlock()
+
+	// GetImageRef should return the content-based Image.Id, not the location-based RepoDigest
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: "myimage"})
+	require.NoError(t, err)
+	assert.Equal(t, imageID, imageRef, "GetImageRef should return Image.Id for content-based deduplication")
+}
+
 func TestImageSize(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	const imageSize = uint64(64)
 	fakeImageService.SetFakeImageSize(imageSize)
 	image := "busybox"
 	fakeImageService.SetFakeImages([]string{image})
-	actualSize, err := fakeManager.GetImageSize(ctx, kubecontainer.ImageSpec{Image: image})
+	actualSize, err := fakeManager.GetImageSize(tCtx, kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 	assert.Equal(t, imageSize, actualSize)
 }
 
 func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
-	ctx := context.Background()
-	_, _, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	image := "busybox"
 
-	imageRef, err := fakeManager.GetImageRef(ctx, kubecontainer.ImageSpec{Image: image})
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 
 	imageNotAvailableLocallyRef := ""
@@ -165,61 +196,61 @@ func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
 }
 
 func TestGetImageRefWithError(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	image := "busybox"
 
 	fakeImageService.InjectError("ImageStatus", fmt.Errorf("test-error"))
 
-	imageRef, err := fakeManager.GetImageRef(ctx, kubecontainer.ImageSpec{Image: image})
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: image})
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
 }
 
 func TestRemoveImage(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	_, _, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeImageService.Images, 1)
 
-	err = fakeManager.RemoveImage(ctx, kubecontainer.ImageSpec{Image: "busybox"})
+	err = fakeManager.RemoveImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"})
 	assert.NoError(t, err)
 	assert.Empty(t, fakeImageService.Images)
 }
 
 func TestRemoveImageNoOpIfImageNotLocal(t *testing.T) {
-	ctx := context.Background()
-	_, _, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	err = fakeManager.RemoveImage(ctx, kubecontainer.ImageSpec{Image: "busybox"})
+	err = fakeManager.RemoveImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"})
 	assert.NoError(t, err)
 }
 
 func TestRemoveImageWithError(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	_, _, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeImageService.Images, 1)
 
 	fakeImageService.InjectError("RemoveImage", fmt.Errorf("test-failure"))
 
-	err = fakeManager.RemoveImage(ctx, kubecontainer.ImageSpec{Image: "busybox"})
+	err = fakeManager.RemoveImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"})
 	assert.Error(t, err)
 	assert.Len(t, fakeImageService.Images, 1)
 }
 
 func TestImageStats(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	const imageSize = 64
@@ -227,26 +258,26 @@ func TestImageStats(t *testing.T) {
 	images := []string{"1111", "2222", "3333"}
 	fakeImageService.SetFakeImages(images)
 
-	actualStats, err := fakeManager.ImageStats(ctx)
+	actualStats, err := fakeManager.ImageStats(tCtx)
 	assert.NoError(t, err)
 	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
 	assert.Equal(t, expectedStats, actualStats)
 }
 
 func TestImageStatsWithError(t *testing.T) {
-	ctx := context.Background()
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	fakeImageService.InjectError("ListImages", fmt.Errorf("test-failure"))
 
-	actualImageStats, err := fakeManager.ImageStats(ctx)
+	actualImageStats, err := fakeManager.ImageStats(tCtx)
 	assert.Error(t, err)
 	assert.Nil(t, actualImageStats)
 }
 
 func TestPullWithSecrets(t *testing.T) {
-	ctx := context.Background()
+	logger, tCtx := ktesting.NewTestContext(t)
 	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
 	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
@@ -258,6 +289,14 @@ func TestPullWithSecrets(t *testing.T) {
 	dockerConfigJSONContent, err := json.Marshal(dockerConfigJSON)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "testpod",
+			Namespace: "testpod-ns",
+			Uid:       "testpod-uid",
+		},
 	}
 
 	tests := map[string]struct {
@@ -309,15 +348,24 @@ func TestPullWithSecrets(t *testing.T) {
 		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
 		builtInKeyRing.Add(nil, test.builtInDockerConfig)
 
-		_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+		_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 		require.NoError(t, err)
 
-		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 		if err != nil {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
-		imagePullManager, err := imagepullmanager.NewImagePullManager(context.Background(), fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+			logger,
+			fsRecordAccessor,
+			intentsRecordsCacheSize,
+			pulledRecordsCacheSize,
+			stripedLocksSetSize,
+		)
+
+		imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 		if err != nil {
 			t.Fatal("failed to setup an image pull manager")
 		}
@@ -335,14 +383,14 @@ func TestPullWithSecrets(t *testing.T) {
 			&fakePodPullingTimeRecorder{},
 		)
 
-		_, _, err = fakeManager.imagePuller.EnsureImageExists(ctx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, nil, "", v1.PullAlways)
+		_, _, err = fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, podSandboxConfig, "", v1.PullAlways)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
 	}
 }
 
 func TestPullWithSecretsWithError(t *testing.T) {
-	ctx := context.Background()
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	dockerCfg := map[string]map[string]map[string]string{
 		"auths": {
@@ -356,6 +404,14 @@ func TestPullWithSecretsWithError(t *testing.T) {
 	dockerConfigJSON, err := json.Marshal(dockerCfg)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "testpod",
+			Namespace: "testpod-ns",
+			Uid:       "testpod-uid",
+		},
 	}
 
 	for _, test := range []struct {
@@ -379,19 +435,28 @@ func TestPullWithSecretsWithError(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+			_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 			assert.NoError(t, err)
 
 			if test.shouldInjectError {
 				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
 			}
 
-			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(t.TempDir())
+			fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(logger, t.TempDir())
 			if err != nil {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
-			imagePullManager, err := imagepullmanager.NewImagePullManager(context.Background(), fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+				logger,
+				fsRecordAccessor,
+				intentsRecordsCacheSize,
+				pulledRecordsCacheSize,
+				stripedLocksSetSize,
+			)
+
+			imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 			if err != nil {
 				t.Fatal("failed to setup an image pull manager")
 			}
@@ -409,11 +474,11 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				&fakePodPullingTimeRecorder{},
 			)
 
-			imageRef, _, err := fakeManager.imagePuller.EnsureImageExists(ctx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, nil, "", v1.PullAlways)
+			imageRef, _, err := fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, podSandboxConfig, "", v1.PullAlways)
 			assert.Error(t, err)
 			assert.Equal(t, "", imageRef)
 
-			images, err := fakeManager.ListImages(ctx)
+			images, err := fakeManager.ListImages(tCtx)
 			assert.NoError(t, err)
 			assert.Empty(t, images)
 		})
@@ -421,8 +486,8 @@ func TestPullWithSecretsWithError(t *testing.T) {
 }
 
 func TestPullThenListWithAnnotations(t *testing.T) {
-	ctx := context.Background()
-	_, _, fakeManager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	imageSpec := kubecontainer.ImageSpec{
@@ -432,10 +497,10 @@ func TestPullThenListWithAnnotations(t *testing.T) {
 		},
 	}
 
-	_, _, err = fakeManager.PullImage(ctx, imageSpec, nil, nil)
+	_, _, err = fakeManager.PullImage(tCtx, imageSpec, nil, nil)
 	assert.NoError(t, err)
 
-	images, err := fakeManager.ListImages(ctx)
+	images, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
 	assert.Equal(t, images[0].Spec, imageSpec)

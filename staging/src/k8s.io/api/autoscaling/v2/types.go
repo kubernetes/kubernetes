@@ -40,7 +40,7 @@ type HorizontalPodAutoscaler struct {
 
 	// spec is the specification for the behaviour of the autoscaler.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
-	// +optional
+	// +required
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the current information about the autoscaler.
@@ -59,10 +59,16 @@ type HorizontalPodAutoscalerSpec struct {
 	// metric is configured.  Scaling is active as long as at least one metric value is
 	// available.
 	// +optional
+	// +k8s:optional
+	// +k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
+	// +k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 
 	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
 	// It cannot be less that minReplicas.
+	// +required
+	// +k8s:required
+	// +k8s:minimum=1
 	MaxReplicas int32 `json:"maxReplicas" protobuf:"varint,3,opt,name=maxReplicas"`
 
 	// metrics contains the specifications for which to use to calculate the
@@ -182,7 +188,7 @@ const (
 //
 // The tolerance is applied to the metric values and prevents scaling too
 // eagerly for small metric variations. (Note that setting a tolerance requires
-// enabling the alpha HPAConfigurableTolerance feature gate.)
+// the beta HPAConfigurableTolerance feature gate to be enabled.)
 type HPAScalingRules struct {
 	// stabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -215,8 +221,8 @@ type HPAScalingRules struct {
 	// and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
 	// triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 	//
-	// This is an alpha field and requires enabling the HPAConfigurableTolerance
-	// feature gate.
+	// This is an beta field and requires the HPAConfigurableTolerance feature
+	// gate to be enabled.
 	//
 	// +featureGate=HPAConfigurableTolerance
 	// +optional

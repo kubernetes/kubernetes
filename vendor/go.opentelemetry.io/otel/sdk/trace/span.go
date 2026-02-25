@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 )
@@ -61,6 +61,7 @@ type ReadOnlySpan interface {
 	InstrumentationScope() instrumentation.Scope
 	// InstrumentationLibrary returns information about the instrumentation
 	// library that created the span.
+	//
 	// Deprecated: please use InstrumentationScope instead.
 	InstrumentationLibrary() instrumentation.Library //nolint:staticcheck // This method needs to be define for backwards compatibility
 	// Resource returns information about the entity that produced the span.
@@ -150,12 +151,22 @@ type recordingSpan struct {
 
 	// tracer is the SDK tracer that created this span.
 	tracer *tracer
+
+	// origCtx is the context used when starting this span that has the
+	// recordingSpan instance set as the active span. If not nil, it is used
+	// when ending the span to ensure any metrics are recorded with a context
+	// containing this span without requiring an additional allocation.
+	origCtx context.Context
 }
 
 var (
 	_ ReadWriteSpan = (*recordingSpan)(nil)
 	_ runtimeTracer = (*recordingSpan)(nil)
 )
+
+func (s *recordingSpan) setOrigCtx(ctx context.Context) {
+	s.origCtx = ctx
+}
 
 // SpanContext returns the SpanContext of this span.
 func (s *recordingSpan) SpanContext() trace.SpanContext {
@@ -165,7 +176,7 @@ func (s *recordingSpan) SpanContext() trace.SpanContext {
 	return s.spanContext
 }
 
-// IsRecording returns if this span is being recorded. If this span has ended
+// IsRecording reports whether this span is being recorded. If this span has ended
 // this will return false.
 func (s *recordingSpan) IsRecording() bool {
 	if s == nil {
@@ -177,7 +188,7 @@ func (s *recordingSpan) IsRecording() bool {
 	return s.isRecording()
 }
 
-// isRecording returns if this span is being recorded. If this span has ended
+// isRecording reports whether this span is being recorded. If this span has ended
 // this will return false.
 //
 // This method assumes s.mu.Lock is held by the caller.
@@ -495,6 +506,17 @@ func (s *recordingSpan) End(options ...trace.SpanEndOption) {
 	}
 	s.mu.Unlock()
 
+	if s.tracer.inst.Enabled() {
+		ctx := s.origCtx
+		if ctx == nil {
+			// This should not happen as the origCtx should be set, but
+			// ensure trace information is propagated in the case of an
+			// error.
+			ctx = trace.ContextWithSpan(context.Background(), s)
+		}
+		defer s.tracer.inst.SpanEnded(ctx, s)
+	}
+
 	sps := s.tracer.provider.getSpanProcessors()
 	if len(sps) == 0 {
 		return
@@ -545,7 +567,7 @@ func (s *recordingSpan) RecordError(err error, opts ...trace.EventOption) {
 	s.addEvent(semconv.ExceptionEventName, opts...)
 }
 
-func typeStr(i interface{}) string {
+func typeStr(i any) string {
 	t := reflect.TypeOf(i)
 	if t.PkgPath() == "" && t.Name() == "" {
 		// Likely a builtin type.

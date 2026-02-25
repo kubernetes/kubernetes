@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,6 +33,11 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
+
+// Some of these tests capture log output. Don't reduce the verbosity or they will fail!
+func init() {
+	ktesting.SetDefaultVerbosity(5)
+}
 
 // ClaimInfo test cases
 
@@ -92,8 +97,10 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								Name:            requestName,
-								DeviceClassName: className,
+								Name: requestName,
+								Exactly: &resourceapi.ExactDeviceRequest{
+									DeviceClassName: className,
+								},
 							},
 						},
 					},
@@ -438,8 +445,7 @@ func TestNewClaimInfoCache(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			result, err := newClaimInfoCache(tCtx.Logger(), test.stateDir, test.checkpointName)
+			result, err := newClaimInfoCache(test.stateDir, test.checkpointName)
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -498,10 +504,10 @@ func TestClaimInfoCacheWithLock(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), "test-checkpoint")
+			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			err = cache.withLock(test.funcGen(cache))
+			err = cache.withLock(tCtx.Logger(), test.funcGen(cache))
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -558,8 +564,7 @@ func TestClaimInfoCacheWithRLock(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), "test-checkpoint")
+			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
 			err = cache.withRLock(test.funcGen(cache))
@@ -612,7 +617,7 @@ dra_resource_claims_in_use{driver_name="<any>"} 1
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 1
 `,
-			expectLog: `INFO ResourceClaim usage changed claimsInUse=<
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
 	<any>: 1 (+1)
 	other-test-driver: 1 (+1)
 	test-driver: 1 (+1)
@@ -648,7 +653,7 @@ dra_resource_claims_in_use{driver_name="<any>"} 2
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 2
 `,
-			expectLog: `INFO ResourceClaim usage changed claimsInUse=<
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
 	<any>: 2 (+1)
 	other-test-driver: 1 (+1)
 	test-driver: 2 (+1)
@@ -658,13 +663,13 @@ dra_resource_claims_in_use{driver_name="test-driver"} 2
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), "test-checkpoint")
+			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
 			for _, claimInfo := range test.initialClaimInfo {
 				cache.add(claimInfo)
 			}
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			_ = cache.withLock(func() error {
+			_ = cache.withLock(tCtx.Logger(), func() error {
 				cache.add(test.claimInfo)
 				return nil
 			})
@@ -802,7 +807,7 @@ dra_resource_claims_in_use{driver_name="<any>"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 1
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 `,
-			expectLog: `INFO ResourceClaim usage changed claimsInUse=<
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
 	<any>: 1 (-1)
 	other-test-driver: 1 (+0)
 	test-driver: 1 (-1)
@@ -820,8 +825,7 @@ dra_resource_claims_in_use{driver_name="<any>"} 0
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			test.claimInfoCache.logger = tCtx.Logger()
-			_ = test.claimInfoCache.withLock(func() error {
+			_ = test.claimInfoCache.withLock(tCtx.Logger(), func() error {
 				test.claimInfoCache.delete(claimName, namespace)
 				return nil
 			})
@@ -879,8 +883,7 @@ func TestSyncToCheckpoint(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(tCtx.Logger(), test.stateDir, test.checkpointName)
+			cache, err := newClaimInfoCache(test.stateDir, test.checkpointName)
 			require.NoError(t, err)
 			err = cache.syncToCheckpoint()
 			if test.wantErr {

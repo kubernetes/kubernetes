@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -101,7 +102,9 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *flexVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *flexVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
 
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
@@ -295,12 +298,7 @@ func (plugin *flexVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 	plugin.Lock()
 	defer plugin.Unlock()
-	for _, unsupportedCommand := range plugin.unsupportedCommands {
-		if command == unsupportedCommand {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(plugin.unsupportedCommands, command)
 }
 
 func (plugin *flexVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {

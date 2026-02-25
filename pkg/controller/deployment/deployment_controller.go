@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -82,6 +83,8 @@ type DeploymentController struct {
 	rsLister appslisters.ReplicaSetLister
 	// podLister can list/get pods from the shared informer's store
 	podLister corelisters.PodLister
+	// podIndexer allows looking up pods by ControllerRef UID
+	podIndexer cache.Indexer
 
 	// dListerSynced returns true if the Deployment store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -155,6 +158,12 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 	dc.dListerSynced = dInformer.Informer().HasSynced
 	dc.rsListerSynced = rsInformer.Informer().HasSynced
 	dc.podListerSynced = podInformer.Informer().HasSynced
+
+	if err := controller.AddPodControllerIndexer(podInformer.Informer()); err != nil {
+		return nil, fmt.Errorf("adding Pod controller UID indexer: %w", err)
+	}
+	dc.podIndexer = podInformer.Informer().GetIndexer()
+
 	return dc, nil
 }
 
@@ -167,20 +176,25 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	dc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.client.CoreV1().Events("")})
 	defer dc.eventBroadcaster.Shutdown()
 
-	defer dc.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "controller", "deployment")
-	defer logger.Info("Shutting down controller", "controller", "deployment")
 
-	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "controller", "deployment")
+		dc.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, dc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -556,31 +570,16 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(ctx context.Context,
 // NOTE: The pod pointers returned by this method point the pod objects in the cache and thus
 // shouldn't be modified in any way.
 func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID][]*v1.Pod, error) {
-	// Get all Pods that potentially belong to this Deployment.
-	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := dc.podLister.Pods(d.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
 	// Group Pods by their controller (if it's in rsList).
 	podMap := make(map[types.UID][]*v1.Pod, len(rsList))
+
 	for _, rs := range rsList {
-		podMap[rs.UID] = []*v1.Pod{}
-	}
-	for _, pod := range pods {
-		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
-		// Pods from older versions are running before spinning up new Pods.
-		controllerRef := metav1.GetControllerOf(pod)
-		if controllerRef == nil {
-			continue
+		// list all pods managed by this ReplicaSet using the pod indexer
+		pods, err := controller.FilterPodsByOwner(dc.podIndexer, &rs.ObjectMeta, "ReplicaSet", false)
+		if err != nil {
+			return nil, err
 		}
-		// Only append if we care about this UID.
-		if _, ok := podMap[controllerRef.UID]; ok {
-			podMap[controllerRef.UID] = append(podMap[controllerRef.UID], pod)
-		}
+		podMap[rs.UID] = pods
 	}
 	return podMap, nil
 }

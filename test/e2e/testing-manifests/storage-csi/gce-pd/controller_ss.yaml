@@ -21,7 +21,7 @@ spec:
       serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"

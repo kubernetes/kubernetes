@@ -138,7 +138,7 @@ func ApplyStructuredMergeDiff(
 		return nil, fmt.Errorf("invalid ApplyConfiguration: %w", err)
 	}
 
-	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject)
+	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject, typed.AllowDuplicates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert original object to typed object: %w", err)
 	}

@@ -29,11 +29,18 @@ import (
 
 // DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
+//
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the Deployment.
+	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the Deployment.
+	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Deployment constructs a declarative configuration of the Deployment type for use with
@@ -47,29 +54,14 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 	return b
 }
 
-// ExtractDeployment extracts the applied configuration owned by fieldManager from
-// deployment. If no managedFields are found in deployment for fieldManager, a
-// DeploymentApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractDeploymentFrom extracts the applied configuration owned by fieldManager from
+// deployment for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // deployment must be a unmodified Deployment API object that was retrieved from the Kubernetes API.
-// ExtractDeployment provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractDeploymentFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractDeployment(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
-	return extractDeployment(deployment, fieldManager, "")
-}
-
-// ExtractDeploymentStatus is the same as ExtractDeployment except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDeploymentStatus(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
-	return extractDeployment(deployment, fieldManager, "status")
-}
-
-func extractDeployment(deployment *appsv1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
+func ExtractDeploymentFrom(deployment *appsv1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
 	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1beta1.Deployment"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +74,27 @@ func extractDeployment(deployment *appsv1beta1.Deployment, fieldManager string, 
 	b.WithAPIVersion("apps/v1beta1")
 	return b, nil
 }
+
+// ExtractDeployment extracts the applied configuration owned by fieldManager from
+// deployment. If no managedFields are found in deployment for fieldManager, a
+// DeploymentApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// deployment must be a unmodified Deployment API object that was retrieved from the Kubernetes API.
+// ExtractDeployment provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractDeployment(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+	return ExtractDeploymentFrom(deployment, fieldManager, "")
+}
+
+// ExtractDeploymentStatus extracts the applied configuration owned by fieldManager from
+// deployment for the status subresource.
+func ExtractDeploymentStatus(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+	return ExtractDeploymentFrom(deployment, fieldManager, "status")
+}
+
 func (b DeploymentApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

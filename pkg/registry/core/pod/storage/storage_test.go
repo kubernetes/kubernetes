@@ -59,7 +59,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.E
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage, err := NewStorage(restOptions, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -163,7 +163,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcd3testing.Etcd
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage, err := NewStorage(restOptions, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -621,6 +621,63 @@ func TestEtcdCreate(t *testing.T) {
 	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
+	}
+}
+
+func TestEtcdCreateClearsNominatedNodeName(t *testing.T) {
+	for _, featureGateEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("FeatureGate=%v", featureGateEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate,
+				kubefeatures.ClearingNominatedNodeNameAfterBinding, featureGateEnabled)
+
+			storage, bindingStorage, statusStorage, server := newStorage(t)
+			defer server.Terminate(t)
+			defer storage.DestroyFunc()
+			ctx := genericapirequest.NewDefaultContext()
+
+			pod := validNewPod()
+			created, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Set NominatedNodeName via status update
+			createdPod := created.(*api.Pod)
+			createdPod.Status.NominatedNodeName = "nominated-node"
+			_, _, err = statusStorage.Update(ctx, createdPod.Name, rest.DefaultUpdatedObjectInfo(createdPod),
+				rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error updating pod status: %v", err)
+			}
+
+			// Bind the pod
+			_, err = bindingStorage.Create(ctx, "foo", &api.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine"},
+			}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Verify NominatedNodeName
+			obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error %v", err)
+			}
+			boundPod := obj.(*api.Pod)
+
+			if featureGateEnabled {
+				if boundPod.Status.NominatedNodeName != "" {
+					t.Errorf("expected NominatedNodeName to be cleared, but got: %s",
+						boundPod.Status.NominatedNodeName)
+				}
+			} else {
+				if boundPod.Status.NominatedNodeName != "nominated-node" {
+					t.Errorf("expected NominatedNodeName to be preserved, but got: %s",
+						boundPod.Status.NominatedNodeName)
+				}
+			}
+		})
 	}
 }
 

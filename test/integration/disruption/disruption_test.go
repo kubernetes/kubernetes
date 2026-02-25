@@ -161,7 +161,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			Controller: &trueValue,
 		},
 	}
-	for i := 0; i < replicas; i++ {
+	for i := range replicas {
 		createPod(tCtx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
 	}
 
@@ -260,7 +260,7 @@ func TestEmptySelector(t *testing.T) {
 			replicas := 4
 			minAvailable := intstr.FromInt32(2)
 
-			for j := 0; j < replicas; j++ {
+			for j := range replicas {
 				createPod(tCtx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
 					clientSet, []metav1.OwnerReference{})
 			}
@@ -658,8 +658,9 @@ func TestStalePodDisruption(t *testing.T) {
 			podPhase: v1.PodRunning,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.DisruptionTarget,
-					Status: v1.ConditionFalse,
+					Type:               v1.DisruptionTarget,
+					Status:             v1.ConditionFalse,
+					ObservedGeneration: 1,
 				},
 			},
 		},

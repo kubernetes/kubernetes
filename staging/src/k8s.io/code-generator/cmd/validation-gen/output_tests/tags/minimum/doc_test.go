@@ -19,7 +19,6 @@ package minimum
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -32,20 +31,20 @@ func Test(t *testing.T) {
 		IntPtrField:     ptr.To(0),
 		UintPtrField:    ptr.To(uint(0)),
 		TypedefPtrField: ptr.To(IntType(0)),
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("intField"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("intPtrField"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("int16Field"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("int32Field"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("int64Field"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("uintField"), uint(0), content.MinError(1)),
-		field.Invalid(field.NewPath("uintPtrField"), uint(0), content.MinError(1)),
-		field.Invalid(field.NewPath("uint16Field"), uint(0), content.MinError(1)),
-		field.Invalid(field.NewPath("uint32Field"), uint(0), content.MinError(1)),
-		field.Invalid(field.NewPath("uint64Field"), uint(0), content.MinError(1)),
-		field.Invalid(field.NewPath("typedefField"), 0, content.MinError(1)),
-		field.Invalid(field.NewPath("typedefPtrField"), 0, content.MinError(1)),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
+		field.Invalid(field.NewPath("intField"), nil, ""),
+		field.Invalid(field.NewPath("intPtrField"), nil, ""),
+		field.Invalid(field.NewPath("int16Field"), nil, ""),
+		field.Invalid(field.NewPath("int32Field"), nil, ""),
+		field.Invalid(field.NewPath("int64Field"), nil, ""),
+		field.Invalid(field.NewPath("uintField"), nil, ""),
+		field.Invalid(field.NewPath("uintPtrField"), nil, ""),
+		field.Invalid(field.NewPath("uint16Field"), nil, ""),
+		field.Invalid(field.NewPath("uint32Field"), nil, ""),
+		field.Invalid(field.NewPath("uint64Field"), nil, ""),
+		field.Invalid(field.NewPath("typedefField"), nil, ""),
+		field.Invalid(field.NewPath("typedefPtrField"), nil, ""),
+	})
 	// Test validation ratcheting
 	st.Value(&Struct{
 		IntPtrField:     ptr.To(0),

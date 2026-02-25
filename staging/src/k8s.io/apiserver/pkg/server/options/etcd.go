@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
+	encryptionconfigmetrics "k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -298,6 +299,7 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 	if err != nil {
 		return err
 	}
+	encryptionconfigmetrics.RecordEncryptionConfigLastConfigInfo(c.APIServerID, encryptionConfiguration.EncryptionFileContentHash)
 
 	if s.EncryptionProviderConfigAutomaticReload {
 		// with reload=true we will always have 1 health check

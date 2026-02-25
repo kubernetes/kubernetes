@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -122,8 +122,12 @@ func (d *dispatcher) dispatchInvocations(
 	// if it is cluster scoped, namespaceName will be empty
 	// Otherwise, get the Namespace resource.
 	if namespaceName != "" {
-		namespace, err = d.matcher.GetNamespace(namespaceName)
+		namespace, err = d.matcher.GetNamespace(ctx, namespaceName)
 		if err != nil {
+			var statusError *k8serrors.StatusError
+			if errors.As(err, &statusError) {
+				return nil, statusError
+			}
 			return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespaceName)
 		}
 	}
@@ -133,8 +137,8 @@ func (d *dispatcher) dispatchInvocations(
 	// Should loop through invocations, handling possible error and invoking
 	// evaluator to apply patch, also should handle re-invocations
 	for _, invocation := range invocations {
-		if invocation.Evaluator.CompositionEnv != nil {
-			ctx = invocation.Evaluator.CompositionEnv.CreateContext(ctx)
+		if invocation.Evaluator.CompositedCompiler != nil {
+			ctx = invocation.Evaluator.CompositedCompiler.CreateContext(ctx)
 		}
 		if len(invocation.Evaluator.Mutators) != len(invocation.Policy.Spec.Mutations) {
 			// This would be a bug. The compiler should always return exactly as
@@ -206,7 +210,7 @@ func (d *dispatcher) dispatchInvocations(
 			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
-		if invocation.Policy.Spec.ReinvocationPolicy == v1alpha1.IfNeededReinvocationPolicy {
+		if invocation.Policy.Spec.ReinvocationPolicy == admissionregistrationv1.IfNeededReinvocationPolicy {
 			policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
 		}
 	}

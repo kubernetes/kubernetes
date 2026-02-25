@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-resizer/raw/v1.11.1/deploy/kubernetes//rbac.yaml
-# for csi-driver-host-path release-1.14
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-resizer/raw/v2.0.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path master
 # by ./update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external
@@ -46,7 +46,6 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  # only required if enabling the alpha volume modify feature
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattributesclasses"]
     verbs: ["get", "list", "watch"]

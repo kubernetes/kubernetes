@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -25,6 +24,8 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/klog/v2/ktesting"
 )
 
 const fakeAdapterName = "fake-adapter"
@@ -83,13 +84,14 @@ func TestNewNetworkCounters(t *testing.T) {
 }
 
 func TestNetworkGetData(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	netCounter := newFakedNetworkCounters(false)
 
 	// Add a net adapter that no longer exists in the adapterStats cache. It will
 	// have to be cleaned up after processing the data.
 	netCounter.adapterStats["other-fake-adapter"] = cadvisorapi.InterfaceStats{}
 
-	data, err := netCounter.getData()
+	data, err := netCounter.getData(logger)
 	assert.NoError(t, err)
 
 	// Make sure that we only have data from a single net adapter.
@@ -107,7 +109,7 @@ func TestNetworkGetData(t *testing.T) {
 	assert.Equal(t, []cadvisorapi.InterfaceStats{expectedStats}, data)
 
 	// The returned data is cumulative, so the resulting values should be double on a second call.
-	data, err = netCounter.getData()
+	data, err = netCounter.getData(logger)
 	assert.NoError(t, err)
 	expectedStats = cadvisorapi.InterfaceStats{
 		Name:      fakeAdapterName,
@@ -124,51 +126,52 @@ func TestNetworkGetData(t *testing.T) {
 }
 
 func TestNetworkGetDataFailures(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	netCounter := newFakedNetworkCounters(true)
 
-	_, err := netCounter.getData()
+	_, err := netCounter.getData(logger)
 	expectedMsg := "Expected getDataList error."
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.packetsReceivedPerSecondCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.packetsSentPerSecondCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.bytesReceivedPerSecondCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.bytesSentPerSecondCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.packetsReceivedDiscardedCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.packetsReceivedErrorsCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)
 	}
 
-	_, err = netCounter.getData()
+	_, err = netCounter.getData(logger)
 	netCounter.packetsOutboundDiscardedCounter.(*fakePerfCounterImpl).raiseError = false
 	if err == nil || err.Error() != expectedMsg {
 		t.Fatalf("expected error message `%s` but got `%v`", expectedMsg, err)

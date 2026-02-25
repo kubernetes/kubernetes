@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -80,7 +79,8 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService,
 	localStorageCapacityIsolation bool) error {
-	klog.V(2).InfoS("Starting Windows container manager")
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Starting Windows container manager")
 
 	cm.nodeInfo = node
 
@@ -97,20 +97,20 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+		err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
 
 		// Initialize memory manager
-		err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+		err = cm.memoryManager.Start(ctx, memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 		if err != nil {
 			return fmt.Errorf("start memory manager error: %v", err)
 		}
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
+	if err := cm.deviceManager.Start(logger, devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
 		return err
 	}
 
@@ -118,7 +118,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 }
 
 // NewContainerManager creates windows container manager.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -134,23 +134,26 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cadvisorInterface: cadvisorInterface,
 	}
 
+	logger := klog.FromContext(ctx)
+
 	cm.topologyManager = topologymanager.NewFakeManager()
-	cm.cpuManager = cpumanager.NewFakeManager()
-	cm.memoryManager = memorymanager.NewFakeManager()
+	cm.cpuManager = cpumanager.NewFakeManager(logger)
+	cm.memoryManager = memorymanager.NewFakeManager(logger)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		klog.InfoS("Creating topology manager")
+		logger.Info("Creating topology manager")
 		cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)
 		if err != nil {
-			klog.ErrorS(err, "Failed to initialize topology manager")
+			logger.Error(err, "Failed to initialize topology manager")
 			return nil, err
 		}
 
-		klog.InfoS("Creating cpu manager")
+		logger.Info("Creating cpu manager")
 		cm.cpuManager, err = cpumanager.NewManager(
+			logger,
 			nodeConfig.CPUManagerPolicy,
 			nodeConfig.CPUManagerPolicyOptions,
 			nodeConfig.CPUManagerReconcilePeriod,
@@ -161,13 +164,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			cm.topologyManager,
 		)
 		if err != nil {
-			klog.ErrorS(err, "Failed to initialize cpu manager")
+			logger.Error(err, "Failed to initialize cpu manager")
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.cpuManager)
+		cm.topologyManager.AddHintProvider(logger, cm.cpuManager)
 
-		klog.InfoS("Creating memory manager")
+		logger.Info("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
+			logger,
 			nodeConfig.MemoryManagerPolicy,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
@@ -176,18 +180,18 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			cm.topologyManager,
 		)
 		if err != nil {
-			klog.ErrorS(err, "Failed to initialize memory manager")
+			logger.Error(err, "Failed to initialize memory manager")
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.memoryManager)
+		cm.topologyManager.AddHintProvider(logger, cm.memoryManager)
 	}
 
-	klog.InfoS("Creating device plugin manager")
+	logger.Info("Creating device plugin manager")
 	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.deviceManager)
+	cm.topologyManager.AddHintProvider(logger, cm.deviceManager)
 
 	return cm, nil
 }
@@ -210,7 +214,7 @@ func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *containerManagerImpl) UpdateQOSCgroups() error {
+func (cm *containerManagerImpl) UpdateQOSCgroups(logger klog.Logger) error {
 	return nil
 }
 
@@ -264,7 +268,7 @@ func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, c
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
-	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
+	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(ctx, pod, container)
 	if err != nil {
 		return nil, err
 	} else if devOpts == nil {
@@ -371,9 +375,15 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 }
 
 func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
-	return podHasExclusiveCPUs(cm.cpuManager, pod)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	return podHasExclusiveCPUs(logger, cm.cpuManager, pod)
 }
 
 func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
-	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
 }

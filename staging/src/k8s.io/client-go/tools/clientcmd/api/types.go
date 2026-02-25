@@ -283,7 +283,56 @@ type ExecConfig struct {
 	// read user instructions might set this to "used by my-program to read user instructions".
 	// +k8s:conversion-gen=false
 	StdinUnavailableMessage string `json:"-"`
+
+	// PluginPolicy is the policy governing whether or not the configured
+	// `Command` may run.
+	// +k8s:conversion-gen=false
+	PluginPolicy PluginPolicy `json:"-"`
 }
+
+// AllowlistEntry is an entry in the allowlist. For each allowlist item, at
+// least one field must be nonempty. A struct with all empty fields is
+// considered a misconfiguration error. Each field is a criterion for
+// execution. If multiple fields are specified, then the criteria of all
+// specified fields must be met. That is, the result of an individual entry is
+// the logical AND of all checks corresponding to the specified fields within
+// the entry.
+type AllowlistEntry struct {
+	// Name matching is performed by first resolving the absolute path of both
+	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
+	// will be called on both, and the resulting strings must be equal. If
+	// either call to `exec.LookPath` results in an error, the `Name` check
+	// will be considered a failure.
+	Name string `json:"-"`
+}
+
+// PluginPolicy describes the policy type and allowlist (if any) for client-go
+// credential plugins.
+type PluginPolicy struct {
+	// PolicyType specifies the policy governing which, if any, client-go
+	// credential plugins may be executed. It MUST be one of { "", "AllowAll", "DenyAll", "Allowlist" }.
+	// If the policy is "", then it falls back to "AllowAll" (this is required
+	// to maintain backward compatibility). If the policy is DenyAll, no
+	// credential plugins may run. If the policy is Allowlist, only those
+	// plugins meeting the criteria specified in the `credentialPluginAllowlist`
+	// field may run. If the policy is not `Allowlist` but one is provided, it
+	// is considered a configuration error.
+	PolicyType PolicyType `json:"-"`
+
+	// Allowlist is a slice of allowlist entries. If any of them is a match,
+	// then the executable in question may execute. That is, the result is the
+	// logical OR of all entries in the allowlist. This list MUST be nil
+	// whenever the policy is not "Allowlist".
+	Allowlist []AllowlistEntry `json:"-"`
+}
+
+type PolicyType string
+
+const (
+	PluginPolicyAllowAll  PolicyType = "AllowAll"
+	PluginPolicyDenyAll   PolicyType = "DenyAll"
+	PluginPolicyAllowlist PolicyType = "Allowlist"
+)
 
 var _ fmt.Stringer = new(ExecConfig)
 var _ fmt.GoStringer = new(ExecConfig)

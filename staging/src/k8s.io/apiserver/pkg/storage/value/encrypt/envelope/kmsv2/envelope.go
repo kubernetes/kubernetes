@@ -24,12 +24,13 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 	"unsafe"
 
-	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/cryptobyte"
+	"google.golang.org/protobuf/proto"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -49,6 +50,29 @@ import (
 func init() {
 	value.RegisterMetrics()
 	metrics.RegisterMetrics()
+}
+
+// nowFuncPerKMS allows us to swap the NowFunc for KMS providers in tests
+// Note: it cannot be set by an end user
+var nowFuncPerKMS sync.Map // map[string]func() time.Time, KMS name -> NowFunc
+
+// SetNowFuncForTests should only be called in tests to swap the NowFunc for KMS providers
+// Caller must guarantee that all KMS providers have distinct names across all tests.
+func SetNowFuncForTests(kmsName string, fn func() time.Time) func() {
+	if len(kmsName) == 0 { // guarantee that GetNowFunc("") returns the default value
+		panic("empty KMS name used in test")
+	}
+	nowFuncPerKMS.Store(kmsName, fn)
+	return func() { nowFuncPerKMS.Delete(kmsName) }
+}
+
+// GetNowFunc returns the time function for the given KMS provider name
+func GetNowFunc(kmsName string) func() time.Time {
+	nowFunc, ok := nowFuncPerKMS.Load(kmsName)
+	if !ok {
+		return time.Now
+	}
+	return nowFunc.(func() time.Time)
 }
 
 const (
@@ -81,16 +105,16 @@ const (
 	errKeyIDTooLongCode ErrCodeKeyID = "too_long"
 )
 
-// NowFunc is exported so tests can override it.
-var NowFunc = time.Now
-
 type StateFunc func() (State, error)
 type ErrCodeKeyID string
 
 type State struct {
 	Transformer value.Transformer
 
-	EncryptedObject kmstypes.EncryptedObject
+	EncryptedObjectKeyID                  string
+	EncryptedObjectEncryptedDEKSource     []byte
+	EncryptedObjectAnnotations            map[string][]byte
+	EncryptedObjectEncryptedDEKSourceType kmstypes.EncryptedDEKSourceType
 
 	UID string
 
@@ -98,12 +122,16 @@ type State struct {
 
 	// CacheKey is the key used to cache the DEK/seed in envelopeTransformer.cache.
 	CacheKey []byte
+
+	// KMSProviderName is used to dynamically look up the time function for tests
+	KMSProviderName string
 }
 
 func (s *State) ValidateEncryptCapability() error {
-	if now := NowFunc(); now.After(s.ExpirationTimestamp) {
+	nowFunc := GetNowFunc(s.KMSProviderName)
+	if now := nowFunc(); now.After(s.ExpirationTimestamp) {
 		return fmt.Errorf("encryptedDEKSource with keyID hash %q expired at %s (current time is %s)",
-			GetHashIfNotEmpty(s.EncryptedObject.KeyID), s.ExpirationTimestamp.Format(time.RFC3339), now.Format(time.RFC3339))
+			GetHashIfNotEmpty(s.EncryptedObjectKeyID), s.ExpirationTimestamp.Format(time.RFC3339), now.Format(time.RFC3339))
 	}
 	return nil
 }
@@ -219,8 +247,8 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	// data is considered stale if the key ID does not match our current write transformer
 	return out,
 		stale ||
-			encryptedObject.KeyID != state.EncryptedObject.KeyID ||
-			encryptedObject.EncryptedDEKSourceType != state.EncryptedObject.EncryptedDEKSourceType,
+			encryptedObject.KeyID != state.EncryptedObjectKeyID ||
+			encryptedObject.EncryptedDEKSourceType != state.EncryptedObjectEncryptedDEKSourceType,
 		nil
 }
 
@@ -266,14 +294,19 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	}
 	span.AddEvent("Data encryption succeeded")
 
-	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, state.EncryptedObject.KeyID, t.apiServerID)
+	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, state.EncryptedObjectKeyID, t.apiServerID)
 
-	encObjectCopy := state.EncryptedObject
-	encObjectCopy.EncryptedData = result
+	encObjectCopy := &kmstypes.EncryptedObject{
+		KeyID:                  state.EncryptedObjectKeyID,
+		EncryptedDEKSource:     state.EncryptedObjectEncryptedDEKSource,
+		Annotations:            state.EncryptedObjectAnnotations,
+		EncryptedDEKSourceType: state.EncryptedObjectEncryptedDEKSourceType,
+		EncryptedData:          result,
+	}
 
 	span.AddEvent("About to encode encrypted object")
 	// Serialize the EncryptedObject to a byte array.
-	out, err := t.doEncode(&encObjectCopy)
+	out, err := t.doEncode(encObjectCopy)
 	if err != nil {
 		span.AddEvent("Encoding encrypted object failed")
 		span.RecordError(err)

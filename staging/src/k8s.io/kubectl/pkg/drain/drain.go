@@ -74,6 +74,9 @@ type Helper struct {
 	// won't drain otherwise
 	SkipWaitForDeleteTimeoutSeconds int
 
+	// EvictErrorRetryDelay is used to control the retry delay after a pod eviction error
+	EvictErrorRetryDelay time.Duration
+
 	// AdditionalFilters are applied sequentially after base drain filters to
 	// exclude pods using custom logic.  Any filter that returns PodDeleteStatus
 	// with Delete == false will immediately stop execution of further filters.
@@ -278,35 +281,25 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 	defer cancel()
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
-			refreshPod := false
+			activePod := pod
 			for {
 				switch d.DryRunStrategy {
 				case cmdutil.DryRunServer:
-					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", pod.Namespace, pod.Name)
+					//nolint:errcheck
+					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", activePod.Namespace, activePod.Name)
 				default:
 					if d.OnPodDeletionOrEvictionStarted != nil {
-						d.OnPodDeletionOrEvictionStarted(&pod, true)
+						d.OnPodDeletionOrEvictionStarted(&activePod, true)
 					}
-					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
+					//nolint:errcheck
+					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", activePod.Namespace, activePod.Name)
 				}
 				select {
 				case <-ctx.Done():
 					// return here or we'll leak a goroutine.
-					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: global timeout reached: %v", pod.Name, pod.Namespace, globalTimeout)
+					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: global timeout reached: %v", activePod.Name, activePod.Namespace, globalTimeout)
 					return
 				default:
-				}
-
-				// Create a temporary pod so we don't mutate the pod in the loop.
-				activePod := pod
-				if refreshPod {
-					freshPod, err := getPodFn(pod.Namespace, pod.Name)
-					// We ignore errors and let eviction sort it out with
-					// the original pod.
-					if err == nil {
-						activePod = *freshPod
-					}
-					refreshPod = false
 				}
 
 				err := d.EvictPod(activePod, evictionGroupVersion)
@@ -316,8 +309,9 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
-					time.Sleep(5 * time.Second)
+					//nolint:errcheck
+					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after %v): %v\n", activePod.Name, activePod.Namespace, d.EvictErrorRetryDelay, err)
+					time.Sleep(d.EvictErrorRetryDelay)
 				} else if !activePod.ObjectMeta.DeletionTimestamp.IsZero() && apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is already marked deleted, we can ignore this error, an eviction
@@ -326,11 +320,18 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				} else if apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is not marked deleted, we retry until it is.
-					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
-					time.Sleep(5 * time.Second)
+					//nolint:errcheck
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after %v): %v\n", activePod.Name, activePod.Namespace, d.EvictErrorRetryDelay, err)
+					time.Sleep(d.EvictErrorRetryDelay)
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", activePod.Name, activePod.Namespace, err)
 					return
+				}
+
+				freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
+				// we ignore errors and let eviction sort it out with the original pod.
+				if err == nil {
+					activePod = *freshPod
 				}
 			}
 			if d.DryRunStrategy == cmdutil.DryRunServer {
@@ -339,7 +340,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			}
 			params := waitForDeleteParams{
 				ctx:                             ctx,
-				pods:                            []corev1.Pod{pod},
+				pods:                            []corev1.Pod{activePod},
 				interval:                        1 * time.Second,
 				timeout:                         time.Duration(math.MaxInt64),
 				usingEviction:                   true,

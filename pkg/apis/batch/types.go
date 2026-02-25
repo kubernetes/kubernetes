@@ -212,6 +212,7 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
+	// +optional
 	Status api.ConditionStatus
 }
 
@@ -466,9 +467,6 @@ type JobSpec struct {
 	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
-	//
-	// This field is beta-level. The job controller accepts setting the field
-	// when the feature gate JobManagedBy is enabled (enabled by default).
 	// +optional
 	ManagedBy *string
 }

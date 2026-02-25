@@ -28,6 +28,7 @@ import (
 	"k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
@@ -46,6 +47,8 @@ type VersionGetter interface {
 	KubeletVersions() (map[string][]string, error)
 	// ComponentVersions should return a map with a version and a list of node names that describes how many a given control-plane components there are for that version
 	ComponentVersions(string) (map[string][]string, error)
+	// DNSAddonVersion returns, if deployed, the CoreDNS image tag
+	DNSAddonVersion() (string, error)
 }
 
 // KubeVersionGetter handles the version-fetching mechanism from external sources
@@ -128,6 +131,11 @@ func (g *KubeVersionGetter) KubeletVersions() (map[string][]string, error) {
 		kubeletVersions[kver] = append(kubeletVersions[kver], node.Name)
 	}
 	return kubeletVersions, nil
+}
+
+// DNSAddonVersion returns the CoreDNS image deployed in the cluster, or an error in case of multiple instances.
+func (g *KubeVersionGetter) DNSAddonVersion() (string, error) {
+	return dns.DeployedDNSAddon(g.client)
 }
 
 // ComponentVersions gets the versions of the control-plane components in the cluster.

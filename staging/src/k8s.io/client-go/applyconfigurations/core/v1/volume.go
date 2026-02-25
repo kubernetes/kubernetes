@@ -20,8 +20,16 @@ package v1
 
 // VolumeApplyConfiguration represents a declarative configuration of the Volume type for use
 // with apply.
+//
+// Volume represents a named volume in a pod that may be accessed by any container in the pod.
 type VolumeApplyConfiguration struct {
-	Name                           *string `json:"name,omitempty"`
+	// name of the volume.
+	// Must be a DNS_LABEL and unique within the pod.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	Name *string `json:"name,omitempty"`
+	// volumeSource represents the location and type of the mounted volume.
+	// If not specified, the Volume is implied to be an EmptyDir.
+	// This implied behavior is deprecated and will be removed in a future version.
 	VolumeSourceApplyConfiguration `json:",inline"`
 }
 

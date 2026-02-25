@@ -26,21 +26,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
 type testCase struct {
-	name          string
-	pod           v1.Pod
-	container     v1.Container
-	assignments   state.ContainerCPUAssignments
-	defaultCPUSet cpuset.CPUSet
-	expectedHints []topologymanager.TopologyHint
+	name                     string
+	pod                      v1.Pod
+	container                v1.Container
+	assignments              state.ContainerCPUAssignments
+	defaultCPUSet            cpuset.CPUSet
+	expectedHints            []topologymanager.TopologyHint
+	podLevelResourcesEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -72,6 +74,7 @@ type containerOptions struct {
 }
 
 func TestPodGuaranteedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	options := [][]*containerOptions{
 		{
 			{request: "0", limit: "0"},
@@ -199,7 +202,7 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			requestedCPU := p.podGuaranteedCPUs(tc.pod)
+			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
 				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
@@ -209,11 +212,13 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
-	tcases := returnTestCases()
 
-	for _, tc := range tcases {
-		topology, _ := topology.Discover(&machineInfo)
+	for _, tc := range returnTestCases() {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -258,10 +263,13 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestGetPodTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		topology, _ := topology.Discover(&machineInfo)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -442,7 +450,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerPolicyAlphaOptions, true)
 
 			var activePods []*v1.Pod
 			for p := range testCase.assignments {
@@ -494,6 +502,9 @@ func returnTestCases() []testCase {
 	testContainer3 := &testPod3.Spec.Containers[0]
 	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
+
+	testPod5 := makePodWithPodLevelResources("fakePod", "5", "5", "fakeContainer", "4", "4")
+	testContainer5 := &testPod5.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)
 	secondSocketMask, _ := bitmask.NewBitMask(1)
@@ -656,6 +667,14 @@ func returnTestCases() []testCase {
 			},
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{},
+		},
+		{
+			name:                     "Pod has pod level resources, no hint generation",
+			pod:                      *testPod5,
+			container:                *testContainer5,
+			defaultCPUSet:            cpuset.New(0, 1, 2, 3),
+			expectedHints:            nil,
+			podLevelResourcesEnabled: true,
 		},
 	}
 }

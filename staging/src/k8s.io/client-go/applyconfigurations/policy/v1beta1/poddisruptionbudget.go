@@ -29,11 +29,17 @@ import (
 
 // PodDisruptionBudgetApplyConfiguration represents a declarative configuration of the PodDisruptionBudget type for use
 // with apply.
+//
+// PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudgetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodDisruptionBudgetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the PodDisruptionBudget.
+	Spec *PodDisruptionBudgetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the PodDisruptionBudget.
+	Status *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodDisruptionBudget constructs a declarative configuration of the PodDisruptionBudget type for use with
@@ -47,29 +53,14 @@ func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfig
 	return b
 }
 
-// ExtractPodDisruptionBudget extracts the applied configuration owned by fieldManager from
-// podDisruptionBudget. If no managedFields are found in podDisruptionBudget for fieldManager, a
-// PodDisruptionBudgetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodDisruptionBudgetFrom extracts the applied configuration owned by fieldManager from
+// podDisruptionBudget for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // podDisruptionBudget must be a unmodified PodDisruptionBudget API object that was retrieved from the Kubernetes API.
-// ExtractPodDisruptionBudget provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodDisruptionBudgetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPodDisruptionBudget(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
-	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "")
-}
-
-// ExtractPodDisruptionBudgetStatus is the same as ExtractPodDisruptionBudget except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
-	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "status")
-}
-
-func extractPodDisruptionBudget(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func ExtractPodDisruptionBudgetFrom(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	b := &PodDisruptionBudgetApplyConfiguration{}
 	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1beta1.PodDisruptionBudget"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +73,27 @@ func extractPodDisruptionBudget(podDisruptionBudget *policyv1beta1.PodDisruption
 	b.WithAPIVersion("policy/v1beta1")
 	return b, nil
 }
+
+// ExtractPodDisruptionBudget extracts the applied configuration owned by fieldManager from
+// podDisruptionBudget. If no managedFields are found in podDisruptionBudget for fieldManager, a
+// PodDisruptionBudgetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// podDisruptionBudget must be a unmodified PodDisruptionBudget API object that was retrieved from the Kubernetes API.
+// ExtractPodDisruptionBudget provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPodDisruptionBudget(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+	return ExtractPodDisruptionBudgetFrom(podDisruptionBudget, fieldManager, "")
+}
+
+// ExtractPodDisruptionBudgetStatus extracts the applied configuration owned by fieldManager from
+// podDisruptionBudget for the status subresource.
+func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+	return ExtractPodDisruptionBudgetFrom(podDisruptionBudget, fieldManager, "status")
+}
+
 func (b PodDisruptionBudgetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

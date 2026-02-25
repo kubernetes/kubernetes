@@ -37,6 +37,7 @@ import (
 	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 )
 
@@ -265,6 +266,8 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -316,10 +319,10 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				clock:             clock,
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+			if test.expectSuccess != le.tryAcquireOrRenew(ctx) {
 				if test.retryAfter != 0 {
 					time.Sleep(test.retryAfter)
-					if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+					if test.expectSuccess != le.tryAcquireOrRenew(ctx) {
 						t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 					}
 				} else {
@@ -411,6 +414,8 @@ func TestTryCoordinatedRenew(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -457,10 +462,10 @@ func TestTryCoordinatedRenew(t *testing.T) {
 				clock:             clock,
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+			if test.expectSuccess != le.tryCoordinatedRenew(ctx) {
 				if test.retryAfter != 0 {
 					time.Sleep(test.retryAfter)
-					if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+					if test.expectSuccess != le.tryCoordinatedRenew(ctx) {
 						t.Errorf("unexpected result of tryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
 					}
 				} else {
@@ -557,7 +562,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 					verb:       "get",
 					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
 					},
 				},
 				{
@@ -574,6 +579,13 @@ func testReleaseLease(t *testing.T, objectType string) {
 						return true, action.(fakeclient.UpdateAction).GetObject(), nil
 					},
 				},
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
 			},
 			expectSuccess: true,
 			outHolder:     "",
@@ -583,6 +595,8 @@ func testReleaseLease(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -634,7 +648,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 				clock:             clock.RealClock{},
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if !le.tryAcquireOrRenew(context.Background()) {
+			if !le.tryAcquireOrRenew(ctx) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", true)
 			}
 
@@ -644,7 +658,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 			wg.Wait()
 			wg.Add(1)
 
-			if test.expectSuccess != le.release() {
+			if test.expectSuccess != le.release(logger) {
 				t.Errorf("unexpected result of release: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -675,6 +689,60 @@ func testReleaseLease(t *testing.T, objectType string) {
 // Will test leader election using endpoints as the resource
 func TestReleaseLeaseLeases(t *testing.T) {
 	testReleaseLease(t, "leases")
+}
+
+// TestReleaseMethodCallsGet test release method calls Get
+func TestReleaseMethodCallsGet(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	objectType := "leases"
+	getCalled := false
+
+	lockMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		// flag to check if Get is called
+		getCalled = true
+		return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+			HolderIdentity:       "baz",
+			LeaseDurationSeconds: 10,
+		}), nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		return true, action.(fakeclient.UpdateAction).GetObject(), nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  lockMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 10 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader: func(l string) {},
+		},
+	}
+	observedRawRecord := GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"})
+	le := &LeaderElector{
+		config:            lec,
+		observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
+		observedRawRecord: observedRawRecord,
+		observedTime:      time.Now(),
+		clock:             clock.RealClock{},
+		metrics:           globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	le.release(logger)
+
+	if !getCalled {
+		t.Errorf("release method does not call Get")
+	}
 }
 
 func TestReleaseOnCancellation_Leases(t *testing.T) {
@@ -791,9 +859,11 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 						if lockObj != nil {
 							// Third and more get (first create, second renew) should return our canceled error
 							// FakeClient doesn't do anything with the context so we're doing this ourselves
-							if gets >= 3 {
-								close(onRenewCalled)
-								<-onRenewResume
+							if gets >= 4 {
+								if gets == 4 {
+									close(onRenewCalled)
+									<-onRenewResume
+								}
 								return true, nil, context.Canceled
 							}
 							return true, lockObj, nil
@@ -841,6 +911,8 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			wg.Add(1)
 			resetVars()
 
@@ -868,7 +940,7 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 				t.Fatal("Failed to create leader elector: ", err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(ctx)
 
 			go elector.Run(ctx)
 
@@ -1082,6 +1154,8 @@ func TestFastPathLeaderElection(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			resetVars()
 
 			recorder := record.NewFakeRecorder(100)
@@ -1108,11 +1182,87 @@ func TestFastPathLeaderElection(t *testing.T) {
 				t.Fatal("Failed to create leader elector: ", err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(ctx)
 			cancelFunc = cancel
 
 			elector.Run(ctx)
 			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
 		})
+	}
+}
+
+func TestCheckMethodRace(t *testing.T) {
+	objectType := "leases"
+	objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+
+	var lockMu sync.Mutex
+	var lockObj runtime.Object
+
+	c := &fake.Clientset{}
+
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		if lockObj != nil {
+			return true, lockObj, nil
+		}
+		return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+	})
+
+	c.AddReactor("create", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		lockObj = action.(fakeclient.CreateAction).GetObject()
+		return true, lockObj, nil
+	})
+
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		lockObj = action.(fakeclient.UpdateAction).GetObject()
+		return true, lockObj, nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  objectMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+
+	// aggressive timing to provoke the race
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 2 * time.Second,
+		RenewDeadline: 1 * time.Second,
+		RetryPeriod:   5 * time.Millisecond,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStartedLeading: func(context.Context) {},
+			OnStoppedLeading: func() {},
+		},
+	}
+
+	le, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatalf("Failed to create leader elector: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go le.Run(ctx)
+
+	start := time.Now()
+	for time.Since(start) < 2*time.Second {
+		// If Check() does not lock observedRecordLock, this read will race with the
+		// write in le.Run()'s setObservedRecord.
+		_ = le.Check(time.Second)
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }

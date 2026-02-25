@@ -74,19 +74,22 @@ var BaseSuites = []func() storageframework.TestSuite{
 	},
 }
 
-// CSISuites is a list of storage test suites that work only for CSI drivers
+// CSISuites is a list of storage test suites that work only for CSI drivers.
 var CSISuites = append(BaseSuites,
+	// The following tests suites must not be already in BaseSuites,
+	// otherwise the same configuration gets tested multiple times.
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(CSIEphemeralTestPatterns())
 	},
 	InitSnapshottableTestSuite,
-	InitVolumeGroupSnapshottableTestSuite,
+	InitSnapshotMetadataTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
 	InitPvcDeletionPerformanceTestSuite,
 	InitReadWriteOncePodTestSuite,
 	InitVolumeModifyTestSuite,
 	InitVolumeModifyStressTestSuite,
+	InitSELinuxMountTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {

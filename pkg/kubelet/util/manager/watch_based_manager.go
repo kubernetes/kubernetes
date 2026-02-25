@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -42,6 +43,8 @@ type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
 type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
 type newObjectFunc func() runtime.Object
 type isImmutableFunc func(runtime.Object) bool
+
+type listWatcherWithWatchListSemanticsWrapperFunc func(lw *cache.ListWatch) cache.ListerWatcher
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
@@ -157,13 +160,14 @@ func (c *cacheStore) unsetInitialized() {
 // objectCache is a local cache of objects propagated via
 // individual watches.
 type objectCache struct {
-	listObject    listObjectFunc
-	watchObject   watchObjectFunc
-	newObject     newObjectFunc
-	isImmutable   isImmutableFunc
-	groupResource schema.GroupResource
-	clock         clock.Clock
-	maxIdleTime   time.Duration
+	listObject                               listObjectFunc
+	watchObject                              watchObjectFunc
+	newObject                                newObjectFunc
+	isImmutable                              isImmutableFunc
+	listWatcherWithWatchListSemanticsWrapper listWatcherWithWatchListSemanticsWrapperFunc
+	groupResource                            schema.GroupResource
+	clock                                    clock.Clock
+	maxIdleTime                              time.Duration
 
 	lock    sync.RWMutex
 	items   map[objectKey]*objectCacheItem
@@ -178,6 +182,7 @@ func NewObjectCache(
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
 	isImmutable isImmutableFunc,
+	listWatcherWithWatchListSemanticsWrapper listWatcherWithWatchListSemanticsWrapperFunc,
 	groupResource schema.GroupResource,
 	clock clock.Clock,
 	maxIdleTime time.Duration,
@@ -188,14 +193,15 @@ func NewObjectCache(
 	}
 
 	store := &objectCache{
-		listObject:    listObject,
-		watchObject:   watchObject,
-		newObject:     newObject,
-		isImmutable:   isImmutable,
-		groupResource: groupResource,
-		clock:         clock,
-		maxIdleTime:   maxIdleTime,
-		items:         make(map[objectKey]*objectCacheItem),
+		listObject:                               listObject,
+		watchObject:                              watchObject,
+		newObject:                                newObject,
+		isImmutable:                              isImmutable,
+		listWatcherWithWatchListSemanticsWrapper: listWatcherWithWatchListSemanticsWrapper,
+		groupResource:                            groupResource,
+		clock:                                    clock,
+		maxIdleTime:                              maxIdleTime,
+		items:                                    make(map[objectKey]*objectCacheItem),
 	}
 
 	go wait.Until(store.startRecycleIdleWatch, time.Minute, stopCh)
@@ -225,7 +231,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 	}
 	store := c.newStore()
 	reflector := cache.NewReflectorWithOptions(
-		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
+		c.listWatcherWithWatchListSemanticsWrapper(&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}),
 		c.newObject(),
 		store,
 		cache.ReflectorOptions{
@@ -343,7 +349,10 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		if c.isImmutable(object) {
 			item.setImmutable()
 			if item.stop() {
-				klog.V(4).InfoS("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
+				// TODO: it needs to be replaced by a proper context in the future
+				ctx := context.TODO()
+				logger := klog.FromContext(ctx)
+				logger.V(4).Info("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
 			}
 		}
 		return object, nil
@@ -352,12 +361,15 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 }
 
 func (c *objectCache) startRecycleIdleWatch() {
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	for key, item := range c.items {
 		if item.stopIfIdle(c.clock.Now(), c.maxIdleTime) {
-			klog.V(4).InfoS("Not acquired for long time, Stopped watching for changes", "objectKey", key, "maxIdleTime", c.maxIdleTime)
+			logger.V(4).Info("Not acquired for long time, Stopped watching for changes", "objectKey", key, "maxIdleTime", c.maxIdleTime)
 		}
 	}
 }
@@ -385,6 +397,7 @@ func NewWatchBasedManager(
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
 	isImmutable isImmutableFunc,
+	listWatcherWithWatchListSemanticsWrapper listWatcherWithWatchListSemanticsWrapperFunc,
 	groupResource schema.GroupResource,
 	resyncInterval time.Duration,
 	getReferencedObjects func(*v1.Pod) sets.Set[string]) Manager {
@@ -396,6 +409,6 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	// TODO propagate stopCh from the higher level.
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
+	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, listWatcherWithWatchListSemanticsWrapper, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

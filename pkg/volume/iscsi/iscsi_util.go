@@ -34,7 +34,7 @@ import (
 	utilexec "k8s.io/utils/exec"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -939,7 +939,7 @@ func getVolCount(dir, portal, iqn string) (int, error) {
 	// portal + iqn, e.g., 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
 	var counter int
 	for _, c := range contents {
-		if !c.IsDir() || c.Name() == config.DefaultKubeletVolumeDevicesDirName {
+		if !c.IsDir() || c.Name() == kubeletconfig.DefaultKubeletVolumeDevicesDirName {
 			continue
 		}
 

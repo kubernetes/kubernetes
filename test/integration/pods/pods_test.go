@@ -36,6 +36,7 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -49,52 +50,52 @@ func TestPodTopologyLabels(t *testing.T) {
 		{
 			name: "zone and region topology labels copied from assigned Node",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
-			name: "subdomains of topology.k8s.io are not copied",
+			name: "subdomains of topology.kubernetes.io are not copied",
 			targetNodeLabels: map[string]string{
-				"sub.topology.k8s.io/zone": "zone",
-				"topology.k8s.io/region":   "region",
+				"sub.topology.kubernetes.io/zone": "zone",
+				"topology.kubernetes.io/region":   "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
-			name: "custom topology.k8s.io labels are not copied",
+			name: "custom topology.kubernetes.io labels are not copied",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/custom": "thing",
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/custom": "thing",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
 			name: "labels from Bindings overwriting existing labels on Pod",
 			existingPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "bad-zone",
-				"topology.k8s.io/region": "bad-region",
-				"topology.k8s.io/abc":    "123",
+				"topology.kubernetes.io/zone":   "bad-zone",
+				"topology.kubernetes.io/region": "bad-region",
+				"topology.kubernetes.io/abc":    "123",
 			},
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
-				"topology.k8s.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
-				"topology.k8s.io/abc":    "123",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "123",
 			},
 		},
 	}
@@ -110,10 +111,10 @@ func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
 		{
 			name: "does nothing when the feature is not enabled",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":     "zone",
-				"topology.k8s.io/region":   "region",
-				"topology.k8s.io/custom":   "thing",
-				"sub.topology.k8s.io/zone": "zone",
+				"topology.kubernetes.io/zone":     "zone",
+				"topology.kubernetes.io/region":   "region",
+				"topology.kubernetes.io/custom":   "thing",
+				"sub.topology.kubernetes.io/zone": "zone",
 			},
 			expectedPodLabels: map[string]string{},
 		},
@@ -869,6 +870,11 @@ func TestPodResizeRBAC(t *testing.T) {
 					{
 						Name:  "fake-name",
 						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("100m"),
+							},
+						},
 					},
 				},
 			},
@@ -929,7 +935,7 @@ func TestPodResizeRBAC(t *testing.T) {
 			}
 			resp.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+					v1.ResourceCPU: resource.MustParse("200m"),
 				},
 			}
 			_, err = saClient.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
@@ -1492,5 +1498,144 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 		if tc.valid {
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 		}
+	}
+}
+
+func TestNodeDeclaredFeatureAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.NodeDeclaredFeatures:      true,
+		features.InPlacePodVerticalScaling: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-feature-admission", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	nodeName := "test-node"
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:  "test-container",
+					Ready: true,
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		nodeVersion          string
+		podUpdateFn          func(pod *v1.Pod)
+		expectError          string
+	}{
+		{
+			name:                 "admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "pod update requires features GuaranteedQoSPodCPUResize which are not available on node",
+		},
+
+		{
+			name:                 "admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.GuaranteedQoSPodCPUResize},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "admission succeeds when pod update does not require any declared feature",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+			},
+			expectError: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					NodeInfo:         v1.NodeSystemInfo{KubeletVersion: tc.nodeVersion},
+					DeclaredFeatures: tc.nodeDeclaredFeatures,
+				},
+			}
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Nodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			podToUpdate := createdPod.DeepCopy()
+			tc.podUpdateFn(podToUpdate)
+
+			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
+
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("Expected no error, but got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error containing %q, but got no error", tc.expectError)
+				} else if !strings.Contains(err.Error(), tc.expectError) {
+					t.Errorf("Expected error containing %q, but got: %v", tc.expectError, err)
+				}
+			}
+		})
 	}
 }

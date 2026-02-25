@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,10 +36,9 @@ func testDeviceTaintRule(name string, spec resourceapi.DeviceTaintRuleSpec) *res
 
 var validDeviceTaintRuleSpec = resourceapi.DeviceTaintRuleSpec{
 	DeviceSelector: &resourceapi.DeviceTaintSelector{
-		DeviceClassName: ptr.To(goodName),
-		Driver:          ptr.To("test.example.com"),
-		Pool:            ptr.To(goodName),
-		Device:          ptr.To(goodName),
+		Driver: ptr.To("test.example.com"),
+		Pool:   ptr.To(goodName),
+		Device: ptr.To(goodName),
 	},
 	Taint: resourceapi.DeviceTaint{
 		Key:    "example.com/taint",
@@ -187,14 +185,6 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return taintRule
 			}(),
 		},
-		"bad-class": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "deviceSelector", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			taintRule: func() *resourceapi.DeviceTaintRule {
-				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
-				taintRule.Spec.DeviceSelector.DeviceClassName = ptr.To(badName)
-				return taintRule
-			}(),
-		},
 		"bad-driver": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "deviceSelector", "driver"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			taintRule: func() *resourceapi.DeviceTaintRule {
@@ -219,70 +209,7 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return taintRule
 			}(),
 		},
-		"CEL-compile-errors": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "deviceSelector", "selectors").Index(1).Child("cel", "expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
-			},
-			taintRule: func() *resourceapi.DeviceTaintRule {
-				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
-				taintRule.Spec.DeviceSelector.Selectors = []resourceapi.DeviceSelector{
-					{
-						// Good selector.
-						CEL: &resourceapi.CELDeviceSelector{
-							Expression: `device.driver == "dra.example.com"`,
-						},
-					},
-					{
-						// Bad selector.
-						CEL: &resourceapi.CELDeviceSelector{
-							Expression: `device.attributes[true].someBoolean`,
-						},
-					},
-				}
-				return taintRule
-			}(),
-		},
-		"CEL-length": {
-			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "deviceSelector", "selectors").Index(1).Child("cel", "expression"), "" /*unused*/, resourceapi.CELSelectorExpressionMaxLength),
-			},
-			taintRule: func() *resourceapi.DeviceTaintRule {
-				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
-				expression := `device.driver == ""`
-				taintRule.Spec.DeviceSelector.Selectors = []resourceapi.DeviceSelector{
-					{
-						// Good selector.
-						CEL: &resourceapi.CELDeviceSelector{
-							Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resourceapi.CELSelectorExpressionMaxLength-len(expression))+`"`),
-						},
-					},
-					{
-						// Too long by one selector.
-						CEL: &resourceapi.CELDeviceSelector{
-							Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resourceapi.CELSelectorExpressionMaxLength-len(expression)+1)+`"`),
-						},
-					},
-				}
-				return taintRule
-			}(),
-		},
-		"CEL-cost": {
-			wantFailures: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "deviceSelector", "selectors").Index(0).Child("cel", "expression"), "too complex, exceeds cost limit"),
-			},
-			taintRule: func() *resourceapi.DeviceTaintRule {
-				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
-				claim.Spec.DeviceSelector.Selectors = []resourceapi.DeviceSelector{
-					{
-						CEL: &resourceapi.CELDeviceSelector{
-							// From https://github.com/kubernetes/kubernetes/blob/50fc400f178d2078d0ca46aee955ee26375fc437/test/integration/apiserver/cel/validatingadmissionpolicy_test.go#L2150.
-							Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))`,
-						},
-					},
-				}
-				return claim
-			}(),
-		},
+		// Minimal tests for DeviceTaint. Full coverage of validateDeviceTaint is in ResourceSlice test.
 		"valid-taint": {
 			taintRule: func() *resourceapi.DeviceTaintRule {
 				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
@@ -294,16 +221,29 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return claim
 			}(),
 		},
-		"invalid-taint": {
+		"required-taint": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), ""),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkCoveredByDeclarative(),
 			},
 			taintRule: func() *resourceapi.DeviceTaintRule {
 				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
 				claim.Spec.Taint = resourceapi.DeviceTaint{
-					// Minimal test. Full coverage of validateDeviceTaint is in ResourceSlice test.
 					Key:   goodName,
 					Value: goodName,
+				}
+				return claim
+			}(),
+		},
+		"invalid-taint": {
+			wantFailures: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}).MarkCoveredByDeclarative(),
+			},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				claim.Spec.Taint = resourceapi.DeviceTaint{
+					Effect: "some-other-effect",
+					Key:    goodName,
+					Value:  goodName,
 				}
 				return claim
 			}(),
@@ -321,6 +261,8 @@ func TestValidateDeviceTaint(t *testing.T) {
 func TestValidateDeviceTaintUpdate(t *testing.T) {
 	name := "valid"
 	validTaintRule := testDeviceTaintRule(name, validDeviceTaintRuleSpec)
+	invalidTaintEffectRule := validTaintRule.DeepCopy()
+	invalidTaintEffectRule.Spec.Taint.Effect = "some-other-effect"
 
 	scenarios := map[string]struct {
 		old          *resourceapi.DeviceTaintRule
@@ -336,6 +278,21 @@ func TestValidateDeviceTaintUpdate(t *testing.T) {
 			old:          validTaintRule,
 			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
 				taintRule.Name += "-update"
+				return taintRule
+			},
+		},
+		"valid-existing-unknown-effect": {
+			old: invalidTaintEffectRule,
+			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
+				taintRule.Labels = map[string]string{"a": "b"}
+				return taintRule
+			},
+		},
+		"invalid-new-unknown-effect": {
+			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "taint", "effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			old:          validTaintRule,
+			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
+				taintRule.Spec.Taint.Effect = "some-other-effect"
 				return taintRule
 			},
 		},

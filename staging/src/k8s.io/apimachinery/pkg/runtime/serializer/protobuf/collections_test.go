@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 
@@ -313,7 +312,6 @@ type countingSizer struct {
 	count int
 }
 
-var _ proto.Sizer = (*countingSizer)(nil)
 var _ runtime.ProtobufMarshaller = (*countingSizer)(nil)
 
 func (s *countingSizer) MarshalTo(data []byte) (int, error) {

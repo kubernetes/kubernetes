@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +45,9 @@ type FakeContainerManager struct {
 	CalledFunctions                     []string
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
+	nodeConfig                          NodeConfig
+	cpuManager                          cpumanager.Manager
+	memoryManager                       memorymanager.Manager
 }
 
 var _ ContainerManager = &FakeContainerManager{}
@@ -51,6 +55,17 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+		cpuManager:    cpumanager.NewFakeManager(klog.TODO()),
+		memoryManager: memorymanager.NewFakeManager(klog.TODO()),
+	}
+}
+
+func NewFakeContainerManagerWithNodeConfig(nodeConfig NodeConfig) *FakeContainerManager {
+	return &FakeContainerManager{
+		PodContainerManager: NewFakePodContainerManager(),
+		nodeConfig:          nodeConfig,
 	}
 }
 
@@ -72,7 +87,7 @@ func (cm *FakeContainerManager) GetNodeConfig() NodeConfig {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetNodeConfig")
-	return NodeConfig{}
+	return cm.nodeConfig
 }
 
 func (cm *FakeContainerManager) GetMountedSubsystems() *CgroupSubsystems {
@@ -89,7 +104,7 @@ func (cm *FakeContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *FakeContainerManager) UpdateQOSCgroups() error {
+func (cm *FakeContainerManager) UpdateQOSCgroups(logger klog.Logger) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateQOSCgroups")
@@ -171,7 +186,7 @@ func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLi
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager()}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {

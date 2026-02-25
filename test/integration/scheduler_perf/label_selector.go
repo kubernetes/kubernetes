@@ -16,7 +16,7 @@ limitations under the License.
 
 package benchmark
 
-// enabled checks a a label filter that works as in GitHub:
+// enabled checks a label filter that works as in GitHub:
 // - empty string means enabled
 // - individual labels are comma-separated
 // - [+]<label> means the workload must have that label

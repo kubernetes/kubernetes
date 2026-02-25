@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -56,7 +57,7 @@ func doTestStore(t *testing.T, store Store) {
 	store.Add(mkObj("c", "d"))
 	store.Add(mkObj("e", "e"))
 	{
-		found := sets.String{}
+		found := sets.Set[string]{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -75,7 +76,7 @@ func doTestStore(t *testing.T, store Store) {
 	}, "0")
 
 	{
-		found := sets.String{}
+		found := sets.Set[string]{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -95,17 +96,17 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 	}
 
 	// Test Index
-	expected := map[string]sets.String{}
-	expected["b"] = sets.NewString("a", "c")
-	expected["f"] = sets.NewString("e")
-	expected["h"] = sets.NewString("g")
+	expected := map[string]sets.Set[string]{}
+	expected["b"] = sets.New("a", "c")
+	expected["f"] = sets.New("e")
+	expected["h"] = sets.New("g")
 	indexer.Add(mkObj("a", "b"))
 	indexer.Add(mkObj("c", "b"))
 	indexer.Add(mkObj("e", "f"))
 	indexer.Add(mkObj("g", "h"))
 	{
 		for k, v := range expected {
-			found := sets.String{}
+			found := sets.Set[string]{}
 			indexResults, err := indexer.Index("by_val", mkObj("", k))
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
@@ -113,9 +114,9 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 			for _, item := range indexResults {
 				found.Insert(item.(testStoreObject).id)
 			}
-			items := v.List()
+			items := sets.List(v)
 			if !found.HasAll(items...) {
-				t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
+				t.Errorf("missing items, index %s, expected %v but found %v", k, items, sets.List(found))
 			}
 		}
 	}
@@ -184,5 +185,64 @@ func TestKeyError(t *testing.T) {
 	nestedKeyErr := KeyError{obj, keyErr}
 	if !errors.Is(keyErr, err) || !errors.Is(nestedKeyErr, err) {
 		t.Errorf("not match target error: %v", err)
+	}
+}
+
+func TestCacheTransactionShouldIndexErrors(t *testing.T) {
+	successObj1 := 1
+	successObj2 := 2
+	failObj1 := 3
+	failObj2 := 4
+	testTxnType := TransactionTypeAdd
+	testCases := []struct {
+		name        string
+		objs        []interface{}
+		assertError func(*TransactionError) bool
+	}{
+		{
+			name: "txn all success objects should work",
+			objs: []interface{}{successObj1, successObj2},
+		},
+		{
+			name: "txn all fail objects should work",
+			objs: []interface{}{failObj1, failObj2},
+			assertError: func(err *TransactionError) bool {
+				return assert.Equal(t, []int{}, err.SuccessfulIndices)
+			},
+		},
+		{
+			name: "txn mix success and fail objects should work",
+			objs: []interface{}{successObj1, failObj1, successObj2, failObj2},
+			assertError: func(err *TransactionError) bool {
+				return assert.Equal(t, []int{0, 2}, err.SuccessfulIndices)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKeyFunc := func(obj interface{}) (string, error) {
+				if obj == successObj1 || obj == successObj2 {
+					return "", nil
+				}
+				return "", errors.New("test error")
+			}
+			testStore := NewStore(testKeyFunc)
+			txnStore := testStore.(TransactionStore)
+			txns := make([]Transaction, len(tc.objs))
+			for i := range tc.objs {
+				txns[i] = Transaction{
+					Object: tc.objs[i],
+					Type:   testTxnType,
+				}
+			}
+			txnErr := txnStore.Transaction(txns...)
+			if tc.assertError != nil {
+				tc.assertError(txnErr)
+				return
+			}
+			if txnErr != nil {
+				t.Errorf("unexpected error: %v", txnErr)
+			}
+		})
 	}
 }

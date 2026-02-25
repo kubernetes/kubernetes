@@ -274,7 +274,7 @@ type DeploymentStatus struct {
 	// Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
 	// .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
 	//
-	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	// +optional
 	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,9,opt,name=terminatingReplicas"`
 
@@ -1006,7 +1006,7 @@ type ReplicaSetStatus struct {
 	// The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
 	// and have not yet reached the Failed or Succeeded .status.phase.
 	//
-	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	// +optional
 	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,7,opt,name=terminatingReplicas"`
 
@@ -1209,6 +1209,8 @@ type NetworkPolicyPort struct {
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+	// +required
+	// +k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
@@ -1241,6 +1243,7 @@ type NetworkPolicyPeer struct {
 	// IPBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
+	// +k8s:optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 

@@ -50,6 +50,7 @@ type remoteRuntimeService struct {
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
 	logger       *klog.Logger
+	conn         *grpc.ClientConn
 }
 
 const (
@@ -127,6 +128,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		timeout:      connectionTimeout,
 		logReduction: logreduction.NewLogReduction(identicalErrorDelay),
 		logger:       logger,
+		conn:         conn,
 	}
 
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
@@ -134,6 +136,12 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	}
 
 	return service, nil
+}
+
+// Close will shutdown the internal gRPC client connection.
+func (r *remoteRuntimeService) Close() error {
+	r.log(3, "Closing runtime service connection")
+	return r.conn.Close()
 }
 
 func (r *remoteRuntimeService) log(level int, msg string, keyAndValues ...any) {

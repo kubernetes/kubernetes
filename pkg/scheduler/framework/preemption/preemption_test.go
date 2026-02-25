@@ -21,31 +21,24 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/events"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -74,8 +67,8 @@ type FakePostFilterPlugin struct {
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
 	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), pl.numViolatingVictim, nil
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), pl.numViolatingVictim, nil
 }
 
 func (pl *FakePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -94,25 +87,12 @@ func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVi
 	return nil
 }
 
-type fakePodActivator struct {
-	activatedPods map[string]*v1.Pod
-	mu            *sync.RWMutex
-}
-
-func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for name, pod := range pods {
-		f.activatedPods[name] = pod
-	}
-}
-
 type FakePreemptionScorePostFilterPlugin struct{}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
 	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), 1, nil
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), 1, nil
 }
 
 func (pl *FakePreemptionScorePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -383,440 +363,6 @@ func TestSelectCandidate(t *testing.T) {
 	}
 }
 
-type fakeCandidate struct {
-	victims *extenderv1.Victims
-	name    string
-}
-
-// Victims returns s.victims.
-func (s *fakeCandidate) Victims() *extenderv1.Victims {
-	return s.victims
-}
-
-// Name returns s.name.
-func (s *fakeCandidate) Name() string {
-	return s.name
-}
-
-func TestPrepareCandidate(t *testing.T) {
-	var (
-		node1Name            = "node1"
-		defaultSchedulerName = "default-scheduler"
-	)
-	condition := v1.PodCondition{
-		Type:    v1.DisruptionTarget,
-		Status:  v1.ConditionTrue,
-		Reason:  v1.PodReasonPreemptionByScheduler,
-		Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", defaultSchedulerName),
-	}
-
-	var (
-		victim1 = st.MakePod().Name("victim1").UID("victim1").
-			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
-			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-			Obj()
-
-		failVictim = st.MakePod().Name("fail-victim").UID("victim1").
-				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
-				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-				Obj()
-
-		victim2 = st.MakePod().Name("victim2").UID("victim2").
-			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(50000).
-			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-			Obj()
-
-		victim1WithMatchingCondition = st.MakePod().Name("victim1").UID("victim1").
-						Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
-						Conditions([]v1.PodCondition{condition}).
-						Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-						Obj()
-
-		failVictim1WithMatchingCondition = st.MakePod().Name("fail-victim").UID("victim1").
-							Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
-							Conditions([]v1.PodCondition{condition}).
-							Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-							Obj()
-
-		preemptor = st.MakePod().Name("preemptor").UID("preemptor").
-				SchedulerName(defaultSchedulerName).Priority(highPriority).
-				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-				Obj()
-	)
-
-	tests := []struct {
-		name      string
-		nodeNames []string
-		candidate *fakeCandidate
-		preemptor *v1.Pod
-		testPods  []*v1.Pod
-		// expectedDeletedPod is the pod name that is expected to be deleted.
-		//
-		// You can set multiple pod name if there're multiple possibilities.
-		// Both empty and "" means no pod is expected to be deleted.
-		expectedDeletedPod    []string
-		expectedDeletionError bool
-		expectedPatchError    bool
-		// Only compared when async preemption is disabled.
-		expectedStatus *fwk.Status
-		// Only compared when async preemption is enabled.
-		expectedPreemptingMap sets.Set[types.UID]
-		expectedActivatedPods map[string]*v1.Pod
-	}{
-		{
-			name: "no victims",
-			candidate: &fakeCandidate{
-				victims: &extenderv1.Victims{},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victim1,
-			},
-			nodeNames:             []string{node1Name},
-			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim without condition",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1,
-					},
-				},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victim1,
-			},
-			nodeNames:             []string{node1Name},
-			expectedDeletedPod:    []string{"victim1"},
-			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim with same condition",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1WithMatchingCondition,
-					},
-				},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victim1WithMatchingCondition,
-			},
-			nodeNames:             []string{node1Name},
-			expectedDeletedPod:    []string{"victim1"},
-			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim, not-found victim error is ignored when patching",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1WithMatchingCondition,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			nodeNames:             []string{node1Name},
-			expectedDeletedPod:    []string{"victim1"},
-			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim, but pod deletion failed",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						failVictim1WithMatchingCondition,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			expectedDeletionError: true,
-			nodeNames:             []string{node1Name},
-			expectedStatus:        fwk.AsStatus(errors.New("delete pod failed")),
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
-		},
-		{
-			name: "one victim, not-found victim error is ignored when deleting",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victim1,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			nodeNames:             []string{node1Name},
-			expectedDeletedPod:    []string{"victim1"},
-			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim, but patch pod failed",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						failVictim,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			expectedPatchError:    true,
-			nodeNames:             []string{node1Name},
-			expectedStatus:        fwk.AsStatus(errors.New("patch pod status failed")),
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
-		},
-		{
-			name: "two victims without condition, one passes successfully and the second fails",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						failVictim,
-						victim2,
-					},
-				},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victim1,
-			},
-			nodeNames:          []string{node1Name},
-			expectedPatchError: true,
-			expectedDeletedPod: []string{
-				"victim2",
-				// The first victim could fail before the deletion of the second victim happens,
-				// which results in the second victim not being deleted.
-				"",
-			},
-			expectedStatus:        fwk.AsStatus(errors.New("patch pod status failed")),
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
-		},
-	}
-
-	for _, asyncPreemptionEnabled := range []bool{true, false} {
-		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%v (Async preemption enabled: %v)", tt.name, asyncPreemptionEnabled), func(t *testing.T) {
-				metrics.Register()
-				logger, ctx := ktesting.NewTestContext(t)
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
-
-				nodes := make([]*v1.Node, len(tt.nodeNames))
-				for i, nodeName := range tt.nodeNames {
-					nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
-				}
-				registeredPlugins := append([]tf.RegisterPluginFunc{
-					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
-					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				)
-				var objs []runtime.Object
-				for _, pod := range tt.testPods {
-					objs = append(objs, pod)
-				}
-
-				mu := &sync.RWMutex{}
-				deletedPods := sets.New[string]()
-				deletionFailure := false // whether any request to delete pod failed
-				patchFailure := false    // whether any request to patch pod status failed
-
-				cs := clientsetfake.NewClientset(objs...)
-				cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-					mu.Lock()
-					defer mu.Unlock()
-					name := action.(clienttesting.DeleteAction).GetName()
-					if name == "fail-victim" {
-						deletionFailure = true
-						return true, nil, fmt.Errorf("delete pod failed")
-					}
-
-					deletedPods.Insert(name)
-					return true, nil, nil
-				})
-
-				cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-					mu.Lock()
-					defer mu.Unlock()
-					if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
-						patchFailure = true
-						return true, nil, fmt.Errorf("patch pod status failed")
-					}
-					return true, nil, nil
-				})
-
-				informerFactory := informers.NewSharedInformerFactory(cs, 0)
-				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
-				fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
-
-				// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
-				// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
-				// which allows us to test the preempting map before the goroutine does nothing yet.
-				requestStopper := make(chan struct{})
-				nominator := &fakePodNominator{
-					SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
-					requestStopper:  requestStopper,
-				}
-				fwk, err := tf.NewFramework(
-					ctx,
-					registeredPlugins, "",
-					frameworkruntime.WithClientSet(cs),
-					frameworkruntime.WithLogger(logger),
-					frameworkruntime.WithInformerFactory(informerFactory),
-					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
-					frameworkruntime.WithPodNominator(nominator),
-					frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
-					frameworkruntime.WithPodActivator(fakeActivator),
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				informerFactory.Start(ctx.Done())
-				informerFactory.WaitForCacheSync(ctx.Done())
-				fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
-				pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, fakePreemptionScorePostFilterPlugin, asyncPreemptionEnabled)
-
-				if asyncPreemptionEnabled {
-					pe.prepareCandidateAsync(tt.candidate, tt.preemptor, "test-plugin")
-					pe.mu.Lock()
-					// The preempting map should be registered synchronously
-					// so we don't need wait.Poll.
-					if !tt.expectedPreemptingMap.Equal(pe.preempting) {
-						t.Errorf("expected preempting map %v, got %v", tt.expectedPreemptingMap, pe.preempting)
-						close(requestStopper)
-						pe.mu.Unlock()
-						return
-					}
-					pe.mu.Unlock()
-					// make the requests complete
-					close(requestStopper)
-				} else {
-					close(requestStopper) // no need to stop requests
-					status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
-					if tt.expectedStatus == nil {
-						if status != nil {
-							t.Errorf("expect nil status, but got %v", status)
-						}
-					} else {
-						if status == nil {
-							t.Errorf("expect status %v, but got nil", tt.expectedStatus)
-						} else if status.Code() != tt.expectedStatus.Code() {
-							t.Errorf("expect status code %v, but got %v", tt.expectedStatus.Code(), status.Code())
-						} else if status.Message() != tt.expectedStatus.Message() {
-							t.Errorf("expect status message %v, but got %v", tt.expectedStatus.Message(), status.Message())
-						}
-					}
-				}
-
-				var lastErrMsg string
-				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-					mu.RLock()
-					defer mu.RUnlock()
-
-					pe.mu.Lock()
-					defer pe.mu.Unlock()
-					if len(pe.preempting) != 0 {
-						// The preempting map should be empty after the goroutine in all test cases.
-						lastErrMsg = fmt.Sprintf("expected no preempting pods, got %v", pe.preempting)
-						return false, nil
-					}
-
-					if tt.expectedDeletionError != deletionFailure {
-						lastErrMsg = fmt.Sprintf("expected deletion error %v, got %v", tt.expectedDeletionError, deletionFailure)
-						return false, nil
-					}
-					if tt.expectedPatchError != patchFailure {
-						lastErrMsg = fmt.Sprintf("expected patch error %v, got %v", tt.expectedPatchError, patchFailure)
-						return false, nil
-					}
-
-					if asyncPreemptionEnabled {
-						if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); tt.expectedActivatedPods != nil && diff != "" {
-							lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
-							return false, nil
-						}
-						if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
-							lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
-							return false, nil
-						}
-					}
-
-					if deletedPods.Len() > 1 {
-						// For now, we only expect at most one pod to be deleted in all test cases.
-						// If we need to test multiple pods deletion, we need to update the test table definition.
-						return false, fmt.Errorf("expected at most one pod to be deleted, got %v", deletedPods.UnsortedList())
-					}
-
-					if len(tt.expectedDeletedPod) == 0 {
-						if deletedPods.Len() != 0 {
-							// When tt.expectedDeletedPod is empty, we expect no pod to be deleted.
-							return false, fmt.Errorf("expected no pod to be deleted, got %v", deletedPods.UnsortedList())
-						}
-						// nothing further to check.
-						return true, nil
-					}
-
-					found := false
-					for _, podName := range tt.expectedDeletedPod {
-						if deletedPods.Has(podName) ||
-							// If podName is empty, we expect no pod to be deleted.
-							(deletedPods.Len() == 0 && podName == "") {
-							found = true
-						}
-					}
-					if !found {
-						lastErrMsg = fmt.Sprintf("expected pod %v to be deleted, but %v is deleted", strings.Join(tt.expectedDeletedPod, " or "), deletedPods.UnsortedList())
-						return false, nil
-					}
-
-					return true, nil
-				}); err != nil {
-					t.Fatal(lastErrMsg)
-				}
-			})
-		}
-	}
-}
-
-type fakePodNominator struct {
-	// embed it so that we can only override NominatedPodsForNode
-	internalqueue.SchedulingQueue
-
-	// fakePodNominator doesn't respond to NominatedPodsForNode() until the channel is closed.
-	requestStopper chan struct{}
-}
-
-func (f *fakePodNominator) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
-	<-f.requestStopper
-	return nil
-}
-
 type fakeExtender struct {
 	ignorable            bool
 	errProcessPreemption bool
@@ -859,7 +405,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	_ *v1.Pod,
 	victims map[string]*extenderv1.Victims,
-	_ framework.NodeInfoLister,
+	_ fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	if f.supportsPreemption {
 		if f.errProcessPreemption {
@@ -881,13 +427,13 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 	return pod != nil
 }
 
-func (f *fakeExtender) Filter(_ *v1.Pod, _ []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+func (f *fakeExtender) Filter(_ *v1.Pod, _ []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
 	return nil, nil, nil, nil
 }
 
 func (f *fakeExtender) Prioritize(
 	_ *v1.Pod,
-	_ []*framework.NodeInfo,
+	_ []fwk.NodeInfo,
 ) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
@@ -922,7 +468,7 @@ func TestCallExtenders(t *testing.T) {
 			Obj()
 		makeCandidates = func(nodeName string, pods ...*v1.Pod) []Candidate {
 			return []Candidate{
-				&fakeCandidate{
+				&candidate{
 					name: nodeName,
 					victims: &extenderv1.Victims{
 						Pods: pods,
@@ -933,21 +479,21 @@ func TestCallExtenders(t *testing.T) {
 	)
 	tests := []struct {
 		name           string
-		extenders      []framework.Extender
+		extenders      []fwk.Extender
 		candidates     []Candidate
 		wantStatus     *fwk.Status
 		wantCandidates []Candidate
 	}{
 		{
 			name:           "no extenders",
-			extenders:      []framework.Extender{},
+			extenders:      []fwk.Extender{},
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     nil,
 			wantCandidates: makeCandidates(node1Name, victim),
 		},
 		{
 			name: "one extender supports preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -956,7 +502,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with return no victims",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).WithReturnNoVictims(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -965,7 +511,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender does not support preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(false),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -974,7 +520,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with no return victims and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).
 					WithReturnNoVictims(true).WithIgnorable(true),
 			},
@@ -984,7 +530,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithIgnorable(true).
 					WithSupportsPreemption(true).WithErrProcessPreemption(true),
 			},
@@ -994,7 +540,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is not ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithErrProcessPreemption(true).
 					WithSupportsPreemption(true),
 			},
@@ -1004,7 +550,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with empty victims input",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     []Candidate{},
@@ -1032,10 +578,15 @@ func TestCallExtenders(t *testing.T) {
 			objs = append(objs, preemptor)
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithAPIDispatcher(apiDispatcher),
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithExtenders(tt.extenders),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -1047,6 +598,8 @@ func TestCallExtenders(t *testing.T) {
 			}
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
+			cache := internalcache.New(ctx, apiDispatcher)
+			fwk.SetAPICacher(apicache.New(nil, cache))
 
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 			pe := Evaluator{

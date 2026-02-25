@@ -50,7 +50,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 				// Don't let a container trick us into creating directories outside of its rootfs
 				return fmt.Errorf("invalid container mount point %v", myMountPoint)
 			}
-			myMPSlash := myMountPoint + string(os.PathSeparator)
+			myMountPointWithSlash := myMountPoint + string(os.PathSeparator)
 			// The previously found nested mountpoints.
 			// NOTE: We can't simply rely on sort.Strings to have all the mountpoints sorted and
 			// grouped. For example, the following strings are sorted in this exact order:
@@ -64,7 +64,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 			// For example, if this volume is mounted as /dir and other volumes are mounted
 			//              as /dir/nested and /dir/nested/other, only create /dir/nested.
 			for _, mp := range allMountPoints {
-				if !strings.HasPrefix(mp, myMPSlash) {
+				if !strings.HasPrefix(mp, myMountPointWithSlash) {
 					continue // skip -- not nested beneath myMountPoint
 				}
 
@@ -80,7 +80,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 				}
 				// since this mount point is nested, remember it so that we can check that following ones aren't nested beneath this one
 				prevNestedMPs = append(prevNestedMPs, mp+string(os.PathSeparator))
-				retval = append(retval, mp[len(myMPSlash):])
+				retval = append(retval, mp[len(myMountPointWithSlash):])
 			}
 		}
 		return nil

@@ -130,6 +130,19 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
 		}
 	}
+	if obj.Etcd.External != nil {
+		SetDefaults_ExternalEtcd(obj.Etcd.External)
+	}
+}
+
+// SetDefaults_ExternalEtcd assigns default values for the external etcd
+func SetDefaults_ExternalEtcd(obj *ExternalEtcd) {
+	// If HTTPEndpoints is not set, default it to Endpoints
+	// This allows HTTP traffic (metrics, health checks) to use the same endpoints as gRPC traffic
+	if len(obj.HTTPEndpoints) == 0 && len(obj.Endpoints) > 0 {
+		obj.HTTPEndpoints = make([]string, len(obj.Endpoints))
+		copy(obj.HTTPEndpoints, obj.Endpoints)
+	}
 }
 
 // SetDefaults_JoinConfiguration assigns default values to a regular node

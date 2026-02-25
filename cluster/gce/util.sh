@@ -54,54 +54,36 @@ if [[ ${NODE_LOCAL_SSDS:-} -ge 1 ]] && [[ -n ${NODE_LOCAL_SSDS_EXT:-} ]] ; then
   exit 2
 fi
 
-if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
-    DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${MASTER_IMAGE_FAMILY}" == "cos"* ]]; then
-        DEFAULT_GCI_PROJECT=cos-cloud
-    fi
-    export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
-
-    # If the master image is not set, we use the latest image based on image
-    # family.
-    kube_master_image="${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}"
-    if [[ -z "${kube_master_image}" ]]; then
-      kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY}" --format 'value(name)')
-    fi
-
-    echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
-    export MASTER_IMAGE="${kube_master_image}"
+# If the master image is not set, we use the latest image based on image
+# family.
+kube_master_image="${KUBE_GCE_MASTER_IMAGE:-}"
+if [[ -z "${kube_master_image}" ]]; then
+  # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
+  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
 fi
+
+echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
+export MASTER_IMAGE="${kube_master_image}"
+
 
 # Sets node image based on the specified os distro. Currently this function only
 # supports gci and debian.
 #
-# Requires:
-#   NODE_OS_DISTRIBUTION
 # Sets:
-#   DEFAULT_GCI_PROJECT
 #   NODE_IMAGE
-#   NODE_IMAGE_PROJECT
 function set-linux-node-image() {
-  if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-    DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${NODE_IMAGE_FAMILY}" == "cos"* ]]; then
-      DEFAULT_GCI_PROJECT=cos-cloud
-    fi
 
-    # If the node image is not set, we use the latest image based on image
-    # family.
-    # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    local kube_node_image
+  # If the node image is not set, we use the latest image based on image
+  # family.
 
-    kube_node_image="${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}"
-    if [[ -z "${kube_node_image}" ]]; then
-      kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY}" --format 'value(name)')
-    fi
-
-    echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
-    export NODE_IMAGE="${kube_node_image}"
+  kube_node_image="${KUBE_GCE_NODE_IMAGE:-}"
+  if [[ -z "${kube_node_image}" ]]; then
+    # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
+    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
   fi
+
+  echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
+  export NODE_IMAGE="${kube_node_image}"
 }
 
 # Requires:
@@ -645,11 +627,6 @@ function write-windows-node-env {
 function build-linux-node-labels {
   local node_type=$1
   local node_labels=""
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${node_type}" != "master" ]]; then
-    # Add kube-proxy daemonset label to node to avoid situation during cluster
-    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="node.kubernetes.io/kube-proxy-ds-ready=true"
-  fi
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
   fi
@@ -1171,7 +1148,6 @@ LOCAL_DNS_IP: $(yaml-quote "${LOCAL_DNS_IP:-}")
 DNS_DOMAIN: $(yaml-quote "${DNS_DOMAIN:-}")
 DNS_MEMORY_LIMIT: $(yaml-quote "${DNS_MEMORY_LIMIT:-}")
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}")
-KUBE_PROXY_DAEMONSET: $(yaml-quote "${KUBE_PROXY_DAEMONSET:-false}")
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
@@ -1835,7 +1811,7 @@ function generate-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
     mv "kubelet-key.pem" "pki/private/kubelet.key"
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
@@ -1900,7 +1876,7 @@ function generate-aggregator-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the aggregator client cert with the correct groups
-    echo '{"CN":"aggregator","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
+    echo '{"CN":"aggregator","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
     mv "proxy-client-key.pem" "pki/private/proxy-client.key"
     mv "proxy-client.pem" "pki/issued/proxy-client.crt"
     rm -f "proxy-client.csr"
@@ -1961,7 +1937,7 @@ function generate-konnectivity-server-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"konnectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
+    echo '{"CN":"konnectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
     rm -f "konnectivity-server.csr"
 
     # Make the agent <-> konnectivity server side certificates.
@@ -1977,7 +1953,7 @@ function generate-konnectivity-server-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"koonectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    echo '{"CN":"koonectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
     rm -f "konnectivity-agent.csr"
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
@@ -2039,7 +2015,7 @@ function generate-cloud-pvl-admission-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
+    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
     rm -f "cloud-pvl-admission.csr"
 
     # Make the cloud-pvl-admission server side certificates.
@@ -2055,7 +2031,7 @@ function generate-cloud-pvl-admission-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission server cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
     rm -f "konnectivity-agent.csr"
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
@@ -3719,28 +3695,6 @@ function kube-down() {
       } &
     done
 
-    # Wait for last batch of jobs
-    kube::util::wait-for-jobs || {
-      echo -e "Failed to delete instance group(s)." >&2
-    }
-
-    # Deliberately do not quote, do not change unless a bug is found
-    # shellcheck disable=SC2068
-    for template in ${templates[@]:-}; do
-      {
-        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-          gcloud compute instance-templates delete \
-            --project "${PROJECT}" \
-            --quiet \
-            "${template}"
-        fi
-      } &
-    done
-
-    # Wait for last batch of jobs
-    kube::util::wait-for-jobs || {
-      echo -e "Failed to delete instance template(s)." >&2
-    }
 
     # Delete the special heapster node (if it exists).
     if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
@@ -3753,6 +3707,10 @@ function kube-down() {
           --delete-disks all \
           --zone "${ZONE}" \
           "${heapster_machine_name}"
+        # ^^^ The invocation above continues to be blocking.
+        # It may be worth it for some scalability jobs to
+        # also make it non-blocking, but that is left to
+        # owners of those jobs.
       fi
     fi
   fi
@@ -3784,7 +3742,27 @@ function kube-down() {
       --quiet \
       --delete-disks all \
       --zone "${ZONE}" \
-      "${REPLICA_NAME}"
+      "${REPLICA_NAME}" &
+  fi
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance group(s) and replica(s)." >&2
+  }
+
+  if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
+    # Deliberately do not quote, do not change unless a bug is found
+    # shellcheck disable=SC2068
+    for template in ${templates[@]:-}; do
+      {
+        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+          gcloud compute instance-templates delete \
+            --project "${PROJECT}" \
+            --quiet \
+            "${template}" &
+        fi
+      } &
+    done
   fi
 
   # Delete the master replica pd (possibly leaked by kube-up if master create failed).
@@ -3795,8 +3773,14 @@ function kube-down() {
       --project "${PROJECT}" \
       --quiet \
       --zone "${ZONE}" \
-      "${replica_pd}"
+      "${replica_pd}" &&
+    echo "Deleted ${replica_pd}" & # "gcloud compute disks delete --quiet" does not print anything, in contrast to other sub-commands.
   fi
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance templates and/or replica pd." >&2
+  }
 
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT
@@ -3904,7 +3888,7 @@ function kube-down() {
         --project "${PROJECT}" \
         --quiet \
         --zone "${ZONE}" \
-        "${INSTANCE_PREFIX}"-influxdb-pd
+        "${INSTANCE_PREFIX}"-influxdb-pd && echo "Deleted ${INSTANCE_PREFIX}-influxdb-pd."
     fi
 
     # Delete all remaining firewall rules and network.

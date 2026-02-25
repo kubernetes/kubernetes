@@ -278,7 +278,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 
 			var wg sync.WaitGroup
 			concurrency := 5
-			for i := 0; i < concurrency; i++ {
+			for range concurrency {
 				wg.Add(1)
 				go func() {
 					doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
@@ -406,8 +406,9 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	go tokenController.Run(ctx, 1)
-
+	logger := klog.FromContext(ctx)
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
+		logger,
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
 		rootClientset,

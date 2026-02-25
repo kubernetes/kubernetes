@@ -34,6 +34,11 @@ type CycleState struct {
 	skipFilterPlugins sets.Set[string]
 	// skipScorePlugins are plugins that will be skipped in the Score extension point.
 	skipScorePlugins sets.Set[string]
+	// skipPreBindPlugins are plugins that will be skipped in the PreBind extension point.
+	skipPreBindPlugins sets.Set[string]
+	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
+	// in the PreBind extension point.
+	parallelPreBindPlugins sets.Set[string]
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -73,6 +78,22 @@ func (c *CycleState) GetSkipScorePlugins() sets.Set[string] {
 	return c.skipScorePlugins
 }
 
+func (c *CycleState) SetSkipPreBindPlugins(plugins sets.Set[string]) {
+	c.skipPreBindPlugins = plugins
+}
+
+func (c *CycleState) GetSkipPreBindPlugins() sets.Set[string] {
+	return c.skipPreBindPlugins
+}
+
+func (c *CycleState) SetParallelPreBindPlugins(plugins sets.Set[string]) {
+	c.parallelPreBindPlugins = plugins
+}
+
+func (c *CycleState) GetParallelPreBindPlugins() sets.Set[string] {
+	return c.parallelPreBindPlugins
+}
+
 // Clone creates a copy of CycleState and returns its pointer. Clone returns
 // nil if the context being cloned is nil.
 func (c *CycleState) Clone() fwk.CycleState {
@@ -89,6 +110,8 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.recordPluginMetrics = c.recordPluginMetrics
 	copy.skipFilterPlugins = c.skipFilterPlugins
 	copy.skipScorePlugins = c.skipScorePlugins
+	copy.skipPreBindPlugins = c.skipPreBindPlugins
+	copy.parallelPreBindPlugins = c.parallelPreBindPlugins
 
 	return copy
 }

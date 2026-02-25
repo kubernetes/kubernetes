@@ -18,5 +18,5 @@ limitations under the License.
 // unique strings are faster to compare and more efficient when used as key in
 // a map.
 //
-// +k8s:conversion-gen=k8s.io/api/resource/v1beta1
+// +k8s:conversion-gen=k8s.io/api/resource/v1
 package api

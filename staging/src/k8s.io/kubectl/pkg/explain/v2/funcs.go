@@ -64,9 +64,7 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 			}
 			return buf.String(), nil
 		},
-		"split": func(s string, sep string) []string {
-			return strings.Split(s, sep)
-		},
+		"split": strings.Split,
 		"join": func(sep string, strs ...string) string {
 			return strings.Join(strs, sep)
 		},

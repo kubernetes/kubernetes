@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -290,21 +291,21 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
+		// Update actual state of world
+		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
+			logger, volumeToAttach.VolumeName, volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+		if addVolumeNodeErr != nil {
+			// On failure, return error. Caller will log and retry.
+			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
 		// Successful attach event is useful for user debugging
 		simpleMsg, _ := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
 		for _, pod := range volumeToAttach.ScheduledPods {
 			og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, simpleMsg)
 		}
 		klog.Info(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
-
-		// Update actual state of world
-		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			logger, v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
-		if addVolumeNodeErr != nil {
-			// On failure, return error. Caller will log and retry.
-			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
 
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
@@ -586,6 +587,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FSGroupChangePolicy: fsGroupChangePolicy,
 			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
+			ReconstructedVolume: actualStateOfWorld.IsVolumeReconstructed(volumeToMount.VolumeName, volumeToMount.PodName),
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
@@ -593,7 +595,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,
 			Mounter:             volumeMounter,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
 			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    VolumeMounted,
@@ -759,13 +760,12 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		if unmountErr != nil {
 			// Mark the volume as uncertain, so SetUp is called for new pods. Teardown may be already in progress.
 			opts := MarkVolumeOpts{
-				PodName:             volumeToUnmount.PodName,
-				PodUID:              volumeToUnmount.PodUID,
-				VolumeName:          volumeToUnmount.VolumeName,
-				OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-				VolumeGIDVolume:     volumeToUnmount.VolumeGIDValue,
-				VolumeSpec:          volumeToUnmount.VolumeSpec,
-				VolumeMountState:    VolumeMountUncertain,
+				PodName:          volumeToUnmount.PodName,
+				PodUID:           volumeToUnmount.PodUID,
+				VolumeName:       volumeToUnmount.VolumeName,
+				VolumeGIDVolume:  volumeToUnmount.VolumeGIDValue,
+				VolumeSpec:       volumeToUnmount.VolumeSpec,
+				VolumeMountState: VolumeMountUncertain,
 			}
 			markMountUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
 			if markMountUncertainErr != nil {
@@ -779,9 +779,8 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
+			"UnmountVolume.TearDown succeeded for volume %q pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
@@ -1025,14 +1024,13 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 
 		markVolumeOpts := MarkVolumeOpts{
-			PodName:             volumeToMount.PodName,
-			PodUID:              volumeToMount.Pod.UID,
-			VolumeName:          volumeToMount.VolumeName,
-			BlockVolumeMapper:   blockVolumeMapper,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
-			VolumeSpec:          volumeToMount.VolumeSpec,
-			VolumeMountState:    VolumeMounted,
+			PodName:           volumeToMount.PodName,
+			PodUID:            volumeToMount.Pod.UID,
+			VolumeName:        volumeToMount.VolumeName,
+			BlockVolumeMapper: blockVolumeMapper,
+			VolumeGIDVolume:   volumeToMount.VolumeGIDValue,
+			VolumeSpec:        volumeToMount.VolumeSpec,
+			VolumeMountState:  VolumeMounted,
 		}
 
 		// Call MapPodDevice if blockVolumeMapper implements CustomBlockVolumeMapper
@@ -1199,13 +1197,12 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
 		// succeeds.
 		markVolumeOpts := MarkVolumeOpts{
-			PodName:             volumeToUnmount.PodName,
-			PodUID:              volumeToUnmount.PodUID,
-			VolumeName:          volumeToUnmount.VolumeName,
-			OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-			VolumeGIDVolume:     volumeToUnmount.VolumeGIDValue,
-			VolumeSpec:          volumeToUnmount.VolumeSpec,
-			VolumeMountState:    VolumeMountUncertain,
+			PodName:          volumeToUnmount.PodName,
+			PodUID:           volumeToUnmount.PodUID,
+			VolumeName:       volumeToUnmount.VolumeName,
+			VolumeGIDVolume:  volumeToUnmount.VolumeGIDValue,
+			VolumeSpec:       volumeToUnmount.VolumeSpec,
+			VolumeMountState: VolumeMountUncertain,
 		}
 		markVolumeUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts)
 		if markVolumeUncertainErr != nil {
@@ -1234,9 +1231,8 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
+			"UnmapVolume succeeded for volume %q pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
@@ -1477,13 +1473,6 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			}
 		}
 
-		// Volume is not attached - check if this is due to resource exhaustion before returning the error
-		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
-			if attachablePlugin, pluginErr := og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec); pluginErr == nil && attachablePlugin != nil {
-				attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec, nodeName)
-			}
-		}
-
 		// Volume not attached, return error. Caller will log and retry.
 		eventErr, detailedErr := volumeToMount.GenerateError("Volume not attached according to node status", nil)
 		return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -1512,12 +1501,10 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 		return volumeToDetach.GenerateErrorDetailed("DetachVolume failed fetching node from API server", fetchErr)
 	}
 
-	for _, inUseVolume := range node.Status.VolumesInUse {
-		if inUseVolume == volumeToDetach.VolumeName {
-			return volumeToDetach.GenerateErrorDetailed(
-				"DetachVolume failed",
-				fmt.Errorf("volume is still in use by node, according to Node status"))
-		}
+	if slices.Contains(node.Status.VolumesInUse, volumeToDetach.VolumeName) {
+		return volumeToDetach.GenerateErrorDetailed(
+			"DetachVolume failed",
+			fmt.Errorf("volume is still in use by node, according to Node status"))
 	}
 
 	// Volume is not marked as in use by node
@@ -2195,7 +2182,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 	if !isDevicePath && devicePathErr == nil ||
 		(devicePathErr != nil && strings.Contains(devicePathErr.Error(), "does not exist")) {
 		// not a device path or path doesn't exist
-		//TODO: refer to #36092
+		// TODO: refer to #36092
 		klog.V(3).Infof("The path isn't device path or doesn't exist. Skip checking device path: %s", deviceToDetach.DevicePath)
 		deviceOpened = false
 	} else if devicePathErr != nil {

@@ -22,15 +22,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-kube::golang::setup_gomaxprocs
 kube::util::require-jq
+
+set -x
 
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
-# panic the server on watch decode errors since they are considered coder mistakes
-KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+# default set to "false" to avoid panic on decode errors.
+# integration tests intentionally insert data that cannot be decoded.
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-false}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
@@ -46,6 +48,8 @@ LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
+
+set +x
 
 kube::test::find_integration_test_pkgs() {
   (

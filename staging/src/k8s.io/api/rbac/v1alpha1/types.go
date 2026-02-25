@@ -49,6 +49,8 @@ const (
 type PolicyRule struct {
 	// Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
 	// +listType=atomic
+	// +required
+	// +k8s:required
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
@@ -78,6 +80,7 @@ type PolicyRule struct {
 type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
+	// +required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// APIVersion holds the API group and version of the referenced subject.
 	// Defaults to "v1" for ServiceAccount subjects.
@@ -86,6 +89,8 @@ type Subject struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 	// Name of the object being referenced.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
 	// the Authorizer should report an error.
@@ -96,10 +101,14 @@ type Subject struct {
 // RoleRef contains information that points to the role being used
 type RoleRef struct {
 	// APIGroup is the group for the resource being referenced
+	// +optional
 	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced
+	// +required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
@@ -140,6 +149,7 @@ type RoleBinding struct {
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// +required
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
 
@@ -224,6 +234,7 @@ type ClusterRoleBinding struct {
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// +required
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
 

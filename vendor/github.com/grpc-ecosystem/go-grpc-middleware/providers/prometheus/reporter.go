@@ -18,6 +18,7 @@ type reporter struct {
 	service, method string
 	kind            Kind
 	exemplar        prometheus.Labels
+	contextLabels   []string
 }
 
 func (r *reporter) PostCall(err error, rpcDuration time.Duration) {
@@ -28,9 +29,13 @@ func (r *reporter) PostCall(err error, rpcDuration time.Duration) {
 	// perform handling of metrics from code
 	switch r.kind {
 	case KindServer:
-		r.incrementWithExemplar(r.serverMetrics.serverHandledCounter, string(r.typ), r.service, r.method, code.String())
+		baseLabels := []string{string(r.typ), r.service, r.method, code.String()}
+		allLabels := append(baseLabels, r.contextLabels...)
+		r.incrementWithExemplar(r.serverMetrics.serverHandledCounter, allLabels...)
 		if r.serverMetrics.serverHandledHistogram != nil {
-			r.observeWithExemplar(r.serverMetrics.serverHandledHistogram, rpcDuration.Seconds(), string(r.typ), r.service, r.method)
+			histLabels := []string{string(r.typ), r.service, r.method}
+			allHistLabels := append(histLabels, r.contextLabels...)
+			r.observeWithExemplar(r.serverMetrics.serverHandledHistogram, rpcDuration.Seconds(), allHistLabels...)
 		}
 
 	case KindClient:
@@ -44,7 +49,9 @@ func (r *reporter) PostCall(err error, rpcDuration time.Duration) {
 func (r *reporter) PostMsgSend(_ any, _ error, sendDuration time.Duration) {
 	switch r.kind {
 	case KindServer:
-		r.incrementWithExemplar(r.serverMetrics.serverStreamMsgSent, string(r.typ), r.service, r.method)
+		baseLabels := []string{string(r.typ), r.service, r.method}
+		allLabels := append(baseLabels, r.contextLabels...)
+		r.incrementWithExemplar(r.serverMetrics.serverStreamMsgSent, allLabels...)
 	case KindClient:
 		r.incrementWithExemplar(r.clientMetrics.clientStreamMsgSent, string(r.typ), r.service, r.method)
 		if r.clientMetrics.clientStreamSendHistogram != nil {
@@ -56,7 +63,9 @@ func (r *reporter) PostMsgSend(_ any, _ error, sendDuration time.Duration) {
 func (r *reporter) PostMsgReceive(_ any, _ error, recvDuration time.Duration) {
 	switch r.kind {
 	case KindServer:
-		r.incrementWithExemplar(r.serverMetrics.serverStreamMsgReceived, string(r.typ), r.service, r.method)
+		baseLabels := []string{string(r.typ), r.service, r.method}
+		allLabels := append(baseLabels, r.contextLabels...)
+		r.incrementWithExemplar(r.serverMetrics.serverStreamMsgReceived, allLabels...)
 	case KindClient:
 		r.incrementWithExemplar(r.clientMetrics.clientStreamMsgReceived, string(r.typ), r.service, r.method)
 		if r.clientMetrics.clientStreamRecvHistogram != nil {
@@ -95,11 +104,28 @@ func (rep *reportable) reporter(ctx context.Context, sm *ServerMetrics, cm *Clie
 		r.exemplar = c.exemplarFn(ctx)
 	}
 
+	// Extract context labels if labelsFn is configured and we're on server side
+	if c.labelsFn != nil && kind == KindServer && sm != nil {
+		contextLabelMap := c.labelsFn(ctx)
+		// Extract context label values in the order defined by the server metrics
+		r.contextLabels = make([]string, len(sm.contextLabelNames))
+		for i, labelName := range sm.contextLabelNames {
+			if value, exists := contextLabelMap[labelName]; exists {
+				r.contextLabels[i] = value
+			} else {
+				// Use empty string if label not found in context
+				r.contextLabels[i] = ""
+			}
+		}
+	}
+
 	switch kind {
 	case KindClient:
 		r.incrementWithExemplar(r.clientMetrics.clientStartedCounter, string(r.typ), r.service, r.method)
 	case KindServer:
-		r.incrementWithExemplar(r.serverMetrics.serverStartedCounter, string(r.typ), r.service, r.method)
+		baseLabels := []string{string(r.typ), r.service, r.method}
+		allLabels := append(baseLabels, r.contextLabels...)
+		r.incrementWithExemplar(r.serverMetrics.serverStartedCounter, allLabels...)
 	}
 	return r, ctx
 }

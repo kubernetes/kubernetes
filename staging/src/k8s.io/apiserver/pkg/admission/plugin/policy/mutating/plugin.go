@@ -18,10 +18,11 @@ package mutating
 
 import (
 	"context"
-	celgo "github.com/google/cel-go/cel"
 	"io"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	celgo "github.com/google/cel-go/cel"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,9 +54,9 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-type Policy = v1alpha1.MutatingAdmissionPolicy
-type PolicyBinding = v1alpha1.MutatingAdmissionPolicyBinding
-type PolicyMutation = v1alpha1.Mutation
+type Policy = v1.MutatingAdmissionPolicy
+type PolicyBinding = v1.MutatingAdmissionPolicyBinding
+
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
 
 type Mutator struct {
@@ -73,10 +74,10 @@ type MutationEvaluationFunc func(
 ) (runtime.Object, error)
 
 type PolicyEvaluator struct {
-	Matcher        matchconditions.Matcher
-	Mutators       []patch.Patcher
-	CompositionEnv *cel.CompositionEnv
-	Error          error
+	Matcher            matchconditions.Matcher
+	Mutators           []patch.Patcher
+	CompositedCompiler *cel.CompositedCompiler
+	Error              error
 }
 
 // Plugin is an implementation of admission.Interface.
@@ -96,8 +97,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 		handler,
 		func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
 			return generic.NewPolicySource(
-				f.Admissionregistration().V1alpha1().MutatingAdmissionPolicies().Informer(),
-				f.Admissionregistration().V1alpha1().MutatingAdmissionPolicyBindings().Informer(),
+				f.Admissionregistration().V1().MutatingAdmissionPolicies().Informer(),
+				f.Admissionregistration().V1().MutatingAdmissionPolicyBindings().Informer(),
 				NewMutatingAdmissionPolicyAccessor,
 				NewMutatingAdmissionPolicyBindingAccessor,
 				compilePolicy,
@@ -140,12 +141,4 @@ func (v *Variable) ReturnTypes() []*celgo.Type {
 
 func (v *Variable) GetName() string {
 	return v.Name
-}
-
-func convertv1alpha1Variables(variables []v1alpha1.Variable) []cel.NamedExpressionAccessor {
-	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
-	for i, variable := range variables {
-		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
-	}
-	return namedExpressions
 }

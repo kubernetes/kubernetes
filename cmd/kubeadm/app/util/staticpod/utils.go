@@ -18,9 +18,9 @@ package staticpod
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"io"
 	"math"
 	"net/url"
@@ -34,9 +34,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/dump"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -373,7 +373,7 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 		return false, "", err
 	}
 
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	DeepHashObject(hasher, pod1)
 	hash1 := hasher.Sum(nil)[0:]
 	DeepHashObject(hasher, pod2)
@@ -435,4 +435,19 @@ func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
+}
+
+// IsControlPlaneNode returns true if the kube-apiserver static pod manifest is present
+// on the host.
+func IsControlPlaneNode() bool {
+	isControlPlaneNode := true
+
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.GetStaticPodDirectory())
+
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		isControlPlaneNode = false
+	}
+
+	return isControlPlaneNode
 }

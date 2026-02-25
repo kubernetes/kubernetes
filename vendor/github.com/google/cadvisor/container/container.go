@@ -34,7 +34,6 @@ const (
 	ContainerTypeDocker
 	ContainerTypeCrio
 	ContainerTypeContainerd
-	ContainerTypeMesos
 	ContainerTypePodman
 )
 
@@ -63,6 +62,11 @@ type ContainerHandler interface {
 
 	// Returns the container's ip address, if available
 	GetContainerIPAddress() string
+
+	// GetExitCode returns the container's exit code if available.
+	// Returns an error if the container has not exited, exit codes are not supported
+	// for this handler type, or the container information is unavailable.
+	GetExitCode() (int, error)
 
 	// Returns whether the container still exists.
 	Exists() bool

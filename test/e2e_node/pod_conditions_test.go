@@ -50,9 +50,10 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 
 	f.Context("including PodReadyToStartContainers condition", f.WithSerial(), feature.PodReadyToStartContainersCondition, func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.PodReadyToStartContainersCondition): true,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.PodReadyToStartContainersCondition)] = true
 		})
 		ginkgo.It("a pod without init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, false, true))
 		ginkgo.It("a pod with init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, true, true))

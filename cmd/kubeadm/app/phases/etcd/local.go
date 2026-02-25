@@ -204,8 +204,8 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	return staticpodutil.ComponentPod(
 		v1.Container{
 			Name:            kubeadmconstants.Etcd,
-			Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster),
-			Image:           images.GetEtcdImage(cfg),
+			Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster, kubeadmconstants.SupportedEtcdVersion),
+			Image:           images.GetEtcdImage(cfg, kubeadmconstants.SupportedEtcdVersion),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 			VolumeMounts: []v1.VolumeMount{
@@ -239,7 +239,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
-func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) []string {
+func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, supportedEtcdVersion map[uint8]string) []string {
 	// localhost IP family should be the same that the AdvertiseAddress
 	etcdLocalhostAddress := "127.0.0.1"
 	if utilsnet.IsIPv6String(endpoint.AdvertiseAddress) {
@@ -247,9 +247,6 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	}
 	defaultArguments := []kubeadmapi.Arg{
 		{Name: "name", Value: nodeName},
-		// TODO: start using --initial-corrupt-check once the graduated flag is available,
-		// https://github.com/kubernetes/kubeadm/issues/2676
-		{Name: "experimental-initial-corrupt-check", Value: "true"},
 		{Name: "listen-client-urls", Value: fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint))},
 		{Name: "advertise-client-urls", Value: etcdutil.GetClientURL(endpoint)},
 		{Name: "listen-peer-urls", Value: etcdutil.GetPeerURL(endpoint)},
@@ -265,7 +262,8 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		{Name: "peer-client-cert-auth", Value: "true"},
 		{Name: "snapshot-count", Value: "10000"},
 		{Name: "listen-metrics-urls", Value: fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort)))},
-		{Name: "experimental-watch-progress-notify-interval", Value: "5s"},
+		{Name: "feature-gates", Value: "InitialCorruptCheck=true"},
+		{Name: "watch-progress-notify-interval", Value: "5s"},
 	}
 
 	if len(initialCluster) == 0 {

@@ -388,7 +388,8 @@ type ScopeSpans struct {
 	// is recorded in. Notably, the last part of the URL path is the version number of the
 	// schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
 	// https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
-	// This schema_url applies to all spans and span events in the "spans" field.
+	// This schema_url applies to the data in the "scope" field and all spans and span
+	// events in the "spans" field.
 	SchemaUrl string `protobuf:"bytes,3,opt,name=schema_url,json=schemaUrl,proto3" json:"schema_url,omitempty"`
 }
 
@@ -512,21 +513,21 @@ type Span struct {
 	// two spans with the same name may be distinguished using `CLIENT` (caller)
 	// and `SERVER` (callee) to identify queueing latency associated with the span.
 	Kind Span_SpanKind `protobuf:"varint,6,opt,name=kind,proto3,enum=opentelemetry.proto.trace.v1.Span_SpanKind" json:"kind,omitempty"`
-	// start_time_unix_nano is the start time of the span. On the client side, this is the time
+	// The start time of the span. On the client side, this is the time
 	// kept by the local machine where the span execution starts. On the server side, this
 	// is the time when the server's application handler starts running.
 	// Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
 	//
 	// This field is semantically required and it is expected that end_time >= start_time.
 	StartTimeUnixNano uint64 `protobuf:"fixed64,7,opt,name=start_time_unix_nano,json=startTimeUnixNano,proto3" json:"start_time_unix_nano,omitempty"`
-	// end_time_unix_nano is the end time of the span. On the client side, this is the time
+	// The end time of the span. On the client side, this is the time
 	// kept by the local machine where the span execution ends. On the server side, this
 	// is the time when the server application handler stops running.
 	// Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
 	//
 	// This field is semantically required and it is expected that end_time >= start_time.
 	EndTimeUnixNano uint64 `protobuf:"fixed64,8,opt,name=end_time_unix_nano,json=endTimeUnixNano,proto3" json:"end_time_unix_nano,omitempty"`
-	// attributes is a collection of key/value pairs. Note, global attributes
+	// A collection of key/value pairs. Note, global attributes
 	// like server name can be set using the resource API. Examples of attributes:
 	//
 	//     "/http/user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
@@ -534,24 +535,23 @@ type Span struct {
 	//     "example.com/myattribute": true
 	//     "example.com/score": 10.239
 	//
-	// The OpenTelemetry API specification further restricts the allowed value types:
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/common/README.md#attribute
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	// The behavior of software that receives duplicated keys can be unpredictable.
 	Attributes []*v11.KeyValue `protobuf:"bytes,9,rep,name=attributes,proto3" json:"attributes,omitempty"`
-	// dropped_attributes_count is the number of attributes that were discarded. Attributes
+	// The number of attributes that were discarded. Attributes
 	// can be discarded because their keys are too long or because there are too many
 	// attributes. If this value is 0, then no attributes were dropped.
 	DroppedAttributesCount uint32 `protobuf:"varint,10,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
-	// events is a collection of Event items.
+	// A collection of Event items.
 	Events []*Span_Event `protobuf:"bytes,11,rep,name=events,proto3" json:"events,omitempty"`
-	// dropped_events_count is the number of dropped events. If the value is 0, then no
+	// The number of dropped events. If the value is 0, then no
 	// events were dropped.
 	DroppedEventsCount uint32 `protobuf:"varint,12,opt,name=dropped_events_count,json=droppedEventsCount,proto3" json:"dropped_events_count,omitempty"`
-	// links is a collection of Links, which are references from this span to a span
+	// A collection of Links, which are references from this span to a span
 	// in the same or different trace.
 	Links []*Span_Link `protobuf:"bytes,13,rep,name=links,proto3" json:"links,omitempty"`
-	// dropped_links_count is the number of dropped links after the maximum size was
+	// The number of dropped links after the maximum size was
 	// enforced. If this value is 0, then no links were dropped.
 	DroppedLinksCount uint32 `protobuf:"varint,14,opt,name=dropped_links_count,json=droppedLinksCount,proto3" json:"dropped_links_count,omitempty"`
 	// An optional final status for this span. Semantically when Status isn't set, it means
@@ -769,16 +769,17 @@ type Span_Event struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// time_unix_nano is the time the event occurred.
+	// The time the event occurred.
 	TimeUnixNano uint64 `protobuf:"fixed64,1,opt,name=time_unix_nano,json=timeUnixNano,proto3" json:"time_unix_nano,omitempty"`
-	// name of the event.
+	// The name of the event.
 	// This field is semantically required to be set to non-empty string.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// attributes is a collection of attribute key/value pairs on the event.
+	// A collection of attribute key/value pairs on the event.
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	// The behavior of software that receives duplicated keys can be unpredictable.
 	Attributes []*v11.KeyValue `protobuf:"bytes,3,rep,name=attributes,proto3" json:"attributes,omitempty"`
-	// dropped_attributes_count is the number of dropped attributes. If the value is 0,
+	// The number of dropped attributes. If the value is 0,
 	// then no attributes were dropped.
 	DroppedAttributesCount uint32 `protobuf:"varint,4,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
 }
@@ -859,11 +860,12 @@ type Span_Link struct {
 	SpanId []byte `protobuf:"bytes,2,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
 	// The trace_state associated with the link.
 	TraceState string `protobuf:"bytes,3,opt,name=trace_state,json=traceState,proto3" json:"trace_state,omitempty"`
-	// attributes is a collection of attribute key/value pairs on the link.
+	// A collection of attribute key/value pairs on the link.
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	// The behavior of software that receives duplicated keys can be unpredictable.
 	Attributes []*v11.KeyValue `protobuf:"bytes,4,rep,name=attributes,proto3" json:"attributes,omitempty"`
-	// dropped_attributes_count is the number of dropped attributes. If the value is 0,
+	// The number of dropped attributes. If the value is 0,
 	// then no attributes were dropped.
 	DroppedAttributesCount uint32 `protobuf:"varint,5,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
 	// Flags, a bit field.

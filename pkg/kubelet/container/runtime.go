@@ -100,7 +100,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -128,7 +128,7 @@ type Runtime interface {
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
 	// Generate pod status from the CRI event
-	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*PodStatus, error)
+	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 	// This list should be static at startup: either the client and server restart together when
 	// adding or removing metrics descriptors, or they should not change.
@@ -138,10 +138,15 @@ type Runtime interface {
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
-	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	GetContainerStatus(ctx context.Context, podUID types.UID, id ContainerID) (*Status, error)
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
+	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -235,7 +240,10 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.ErrorS(err, "Parsing containerID failed")
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+		logger := klog.TODO()
+		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
 }

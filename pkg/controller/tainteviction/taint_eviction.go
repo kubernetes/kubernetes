@@ -278,25 +278,27 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 // Run starts the controller which will run in loop until `stopCh` is closed.
 func (tc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)
-	defer logger.Info("Shutting down controller", "controller", tc.name)
 
 	// Start events processing pipeline.
 	tc.broadcaster.StartStructuredLogging(3)
-	if tc.client != nil {
-		logger.Info("Sending events to api server")
-		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
-	} else {
-		logger.Error(nil, "kubeClient is nil", "controller", tc.name)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
+	logger.Info("Sending events to API server")
 	defer tc.broadcaster.Shutdown()
-	defer tc.nodeUpdateQueue.ShutDown()
-	defer tc.podUpdateQueue.ShutDown()
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "controller", tc.name)
+		tc.nodeUpdateQueue.ShutDown()
+		tc.podUpdateQueue.ShutDown()
+		tc.taintEvictionQueue.CancelAndWait()
+		wg.Wait()
+	}()
 
 	// wait for the cache to be synced
-	if !cache.WaitForNamedCacheSync(tc.name, ctx.Done(), tc.podListerSynced, tc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.podListerSynced, tc.nodeListerSynced) {
 		return
 	}
 
@@ -305,9 +307,8 @@ func (tc *Controller) Run(ctx context.Context) {
 		tc.podUpdateChannels = append(tc.podUpdateChannels, make(chan podUpdateItem, podUpdateChannelSize))
 	}
 
-	// Functions that are responsible for taking work items out of the workqueues and putting them
-	// into channels.
-	go func(stopCh <-chan struct{}) {
+	// Functions that are responsible for taking work items out of the workqueues and putting them into channels.
+	wg.Go(func() {
 		for {
 			nodeUpdate, shutdown := tc.nodeUpdateQueue.Get()
 			if shutdown {
@@ -315,16 +316,16 @@ func (tc *Controller) Run(ctx context.Context) {
 			}
 			hash := hash(nodeUpdate.nodeName, UpdateWorkerSize)
 			select {
-			case <-stopCh:
+			case <-ctx.Done():
 				tc.nodeUpdateQueue.Done(nodeUpdate)
 				return
 			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 				// tc.nodeUpdateQueue.Done is called by the nodeUpdateChannels worker
 			}
 		}
-	}(ctx.Done())
+	})
 
-	go func(stopCh <-chan struct{}) {
+	wg.Go(func() {
 		for {
 			podUpdate, shutdown := tc.podUpdateQueue.Get()
 			if shutdown {
@@ -336,33 +337,31 @@ func (tc *Controller) Run(ctx context.Context) {
 			// It's possible that even without this assumption this code is still correct.
 			hash := hash(podUpdate.nodeName, UpdateWorkerSize)
 			select {
-			case <-stopCh:
+			case <-ctx.Done():
 				tc.podUpdateQueue.Done(podUpdate)
 				return
 			case tc.podUpdateChannels[hash] <- podUpdate:
 				// tc.podUpdateQueue.Done is called by the podUpdateChannels worker
 			}
 		}
-	}(ctx.Done())
+	})
 
-	wg := sync.WaitGroup{}
-	wg.Add(UpdateWorkerSize)
 	for i := 0; i < UpdateWorkerSize; i++ {
-		go tc.worker(ctx, i, wg.Done, ctx.Done())
+		wg.Go(func() {
+			tc.worker(ctx, i)
+		})
 	}
-	wg.Wait()
+	<-ctx.Done()
 }
 
-func (tc *Controller) worker(ctx context.Context, worker int, done func(), stopCh <-chan struct{}) {
-	defer done()
-
+func (tc *Controller) worker(ctx context.Context, worker int) {
 	// When processing events we want to prioritize Node updates over Pod updates,
 	// as NodeUpdates that interest the controller should be handled as soon as possible -
 	// we don't want user (or system) to wait until PodUpdate queue is drained before it can
 	// start evicting Pods from tainted Nodes.
 	for {
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			return
 		case nodeUpdate := <-tc.nodeUpdateChannels[worker]:
 			tc.handleNodeUpdate(ctx, nodeUpdate)
@@ -461,7 +460,7 @@ func (tc *Controller) processPodOnNode(
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
-	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(logger, taints, tolerations)
 	if !allTolerated {
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.

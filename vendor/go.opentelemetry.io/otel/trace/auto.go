@@ -20,7 +20,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/internal/telemetry"
 )
@@ -39,7 +39,7 @@ type autoTracerProvider struct{ embedded.TracerProvider }
 
 var _ TracerProvider = autoTracerProvider{}
 
-func (p autoTracerProvider) Tracer(name string, opts ...TracerOption) Tracer {
+func (autoTracerProvider) Tracer(name string, opts ...TracerOption) Tracer {
 	cfg := NewTracerConfig(opts...)
 	return autoTracer{
 		name:      name,
@@ -57,14 +57,15 @@ type autoTracer struct {
 var _ Tracer = autoTracer{}
 
 func (t autoTracer) Start(ctx context.Context, name string, opts ...SpanStartOption) (context.Context, Span) {
-	var psc SpanContext
+	var psc, sc SpanContext
 	sampled := true
 	span := new(autoSpan)
 
 	// Ask eBPF for sampling decision and span context info.
-	t.start(ctx, span, &psc, &sampled, &span.spanContext)
+	t.start(ctx, span, &psc, &sampled, &sc)
 
 	span.sampled.Store(sampled)
+	span.spanContext = sc
 
 	ctx = ContextWithSpan(ctx, span)
 
@@ -80,7 +81,7 @@ func (t autoTracer) Start(ctx context.Context, name string, opts ...SpanStartOpt
 // Expected to be implemented in eBPF.
 //
 //go:noinline
-func (t *autoTracer) start(
+func (*autoTracer) start(
 	ctx context.Context,
 	spanPtr *autoSpan,
 	psc *SpanContext,

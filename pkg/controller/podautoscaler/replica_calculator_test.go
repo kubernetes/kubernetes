@@ -31,13 +31,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -284,7 +288,7 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 				Metric: cmapi.MetricIdentifier{
 					Name: tc.metric.name,
 				},
-				Value: *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
+				Value: *resource.NewMilliQuantity(tc.metric.levels[0], resource.DecimalSI),
 			},
 		}
 
@@ -338,6 +342,9 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 }
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
+	// Create the special test-aware context.
+	tCtx := ktesting.Init(t)
+
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
 	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
@@ -346,11 +353,15 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
-	stop := make(chan struct{})
-	defer close(stop)
-	informerFactory.Start(stop)
-	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
-		return
+	// Use the test context's Done() channel to manage the informer's lifecycle.
+	informerFactory.Start(tCtx.Done())
+
+	// Create a new context specifically for the cache sync operation with a timeout.
+	syncCtx, cancel := context.WithTimeout(tCtx, 10*time.Second)
+	defer cancel()
+
+	if !cache.WaitForNamedCacheSyncWithContext(syncCtx, informer.Informer().HasSynced) {
+		tCtx.Fatal("Failed to sync informer cache within the 10s timeout")
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
@@ -365,7 +376,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tCtx, tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -501,6 +512,26 @@ func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 			targetUtilization:   30,
 			expectedUtilization: 60,
 			expectedValue:       numContainersPerPod * 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: math.MaxInt32,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{math.MaxInt64}, // Use MaxInt64 to ensure a very large value
+			targetUsage:   1,                      // Set a very low target to force high scaling
+			metricType:    objectMetric,
+			expectedUsage: math.MaxInt64,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
 		},
 	}
 	tc.runTest(t)
@@ -2225,17 +2256,18 @@ func TestGroupPods(t *testing.T) {
 	}
 }
 
-func TestCalculatePodRequests(t *testing.T) {
+func TestCalculateRequests(t *testing.T) {
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	testPod := "test-pod"
 
 	tests := []struct {
-		name             string
-		pods             []*v1.Pod
-		container        string
-		resource         v1.ResourceName
-		expectedRequests map[string]int64
-		expectedError    error
+		name                    string
+		pods                    []*v1.Pod
+		container               string
+		resource                v1.ResourceName
+		enablePodLevelResources bool
+		expectedRequests        map[string]int64
+		expectedError           error
 	}{
 		{
 			name:             "void",
@@ -2246,7 +2278,7 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "pod with regular containers",
+			name: "Sum container requests if pod-level feature is disabled",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2265,7 +2297,93 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "calculate requests with special container",
+			name:                    "Pod-level resources are enabled, but not set: fallback to sum container requests",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 150},
+			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level resources override container requests when feature enabled and pod resources specified",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name: "Fail if at least one of the containers is missing requests and pod-level feature/requests are not set",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                    "Pod-level resources override missing container requests when feature enabled and pod resources specified",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name: "Container: if a container name is specified, calculate requests only for that container",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2284,22 +2402,27 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "container missing requests",
+			name:                    "Container: if a container name is specified, calculate requests only for that container and ignore pod-level requests",
+			enablePodLevelResources: true,
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
 					Namespace: testNamespace,
 				},
 				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
 					Containers: []v1.Container{
-						{Name: "container1"},
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
 					},
 				},
 			}},
-			container:        "",
+			container:        "container1",
 			resource:         v1.ResourceCPU,
-			expectedRequests: nil,
-			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
 		},
 		{
 			name: "pod with restartable init containers",
@@ -2327,9 +2450,56 @@ func TestCalculatePodRequests(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			requests, err := calculatePodRequests(tc.pods, tc.container, tc.resource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.enablePodLevelResources)
+
+			requests, err := calculateRequests(tc.pods, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
 			assert.Equal(t, tc.expectedError, err, "error should be as expected")
 		})
 	}
+}
+func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU)
+
+	require.Error(t, err, "expected error for non-existent container")
+	expectedErr := "container non-existent-container not found in Pod test-pod"
+	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
+	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
+}
+
+func TestReplicaCalcExternalMetricUsageOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name: "qps",
+			// Two values that when added together will overflow int64
+			levels:        []int64{math.MaxInt64/2 + 1, math.MaxInt64/2 + 1},
+			targetUsage:   math.MaxInt64, // Set high target
+			metricType:    externalMetric,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			expectedUsage: math.MaxInt64, // expect capped value
+
+		},
+	}
+	tc.runTest(t)
 }

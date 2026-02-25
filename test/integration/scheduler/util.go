@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -84,14 +84,14 @@ func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 }
 
 // NewPlugin returns a plugin factory with specified Plugin.
-func NewPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func NewPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return plugin, nil
 	}
 }
 
 // InitRegistryAndConfig returns registry and plugins config based on give plugins.
-func InitRegistryAndConfig(t *testing.T, factory func(plugin framework.Plugin) frameworkruntime.PluginFactory, plugins ...framework.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
+func InitRegistryAndConfig(t *testing.T, factory func(plugin fwk.Plugin) frameworkruntime.PluginFactory, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
 	if len(plugins) == 0 {
 		return frameworkruntime.Registry{}, schedulerconfig.KubeSchedulerProfile{}
 	}
@@ -108,32 +108,32 @@ func InitRegistryAndConfig(t *testing.T, factory func(plugin framework.Plugin) f
 		plugin := configv1.Plugin{Name: p.Name()}
 
 		switch p.(type) {
-		case framework.QueueSortPlugin:
+		case fwk.QueueSortPlugin:
 			pls.QueueSort.Enabled = append(pls.QueueSort.Enabled, plugin)
 			// It's intentional to disable the PrioritySort plugin.
 			pls.QueueSort.Disabled = []configv1.Plugin{{Name: queuesort.Name}}
-		case framework.PreEnqueuePlugin:
+		case fwk.PreEnqueuePlugin:
 			pls.PreEnqueue.Enabled = append(pls.PreEnqueue.Enabled, plugin)
-		case framework.PreFilterPlugin:
+		case fwk.PreFilterPlugin:
 			pls.PreFilter.Enabled = append(pls.PreFilter.Enabled, plugin)
-		case framework.FilterPlugin:
+		case fwk.FilterPlugin:
 			pls.Filter.Enabled = append(pls.Filter.Enabled, plugin)
-		case framework.PreScorePlugin:
+		case fwk.PreScorePlugin:
 			pls.PreScore.Enabled = append(pls.PreScore.Enabled, plugin)
-		case framework.ScorePlugin:
+		case fwk.ScorePlugin:
 			pls.Score.Enabled = append(pls.Score.Enabled, plugin)
-		case framework.ReservePlugin:
+		case fwk.ReservePlugin:
 			pls.Reserve.Enabled = append(pls.Reserve.Enabled, plugin)
-		case framework.PreBindPlugin:
+		case fwk.PreBindPlugin:
 			pls.PreBind.Enabled = append(pls.PreBind.Enabled, plugin)
-		case framework.BindPlugin:
+		case fwk.BindPlugin:
 			pls.Bind.Enabled = append(pls.Bind.Enabled, plugin)
 			// It's intentional to disable the DefaultBind plugin. Otherwise, DefaultBinder's failure would fail
 			// a pod's scheduling, as well as the test BindPlugin's execution.
 			pls.Bind.Disabled = []configv1.Plugin{{Name: defaultbinder.Name}}
-		case framework.PostBindPlugin:
+		case fwk.PostBindPlugin:
 			pls.PostBind.Enabled = append(pls.PostBind.Enabled, plugin)
-		case framework.PermitPlugin:
+		case fwk.PermitPlugin:
 			pls.Permit.Enabled = append(pls.Permit.Enabled, plugin)
 		}
 	}

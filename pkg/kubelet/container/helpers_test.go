@@ -28,7 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -394,6 +397,7 @@ func TestGetContainerSpec(t *testing.T) {
 }
 
 func TestShouldContainerBeRestarted(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -463,7 +467,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		for i, policy := range policies {
 			pod.Spec.RestartPolicy = policy
 			e := expected[c.Name][i]
-			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			r := ShouldContainerBeRestarted(logger, &c, pod, podStatus)
 			if r != e {
 				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
 					c.Name, policy, e, r)
@@ -484,7 +488,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		for i, policy := range policies {
 			pod.Spec.RestartPolicy = policy
 			e := expected[c.Name][i]
-			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			r := ShouldContainerBeRestarted(logger, &c, pod, podStatus)
 			if r != e {
 				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
 					c.Name, policy, e, r)
@@ -546,6 +550,7 @@ func TestHasPrivilegedContainer(t *testing.T) {
 }
 
 func TestMakePortMappings(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	port := func(name string, protocol v1.Protocol, containerPort, hostPort int32, ip string) v1.ContainerPort {
 		return v1.ContainerPort{
 			Name:          name,
@@ -635,7 +640,7 @@ func TestMakePortMappings(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		actual := MakePortMappings(tt.container)
+		actual := MakePortMappings(logger, tt.container)
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
 	}
 }
@@ -1175,6 +1180,10 @@ type fakeRecorder struct {
 	aEvents []string
 }
 
+func (f *fakeRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return f
+}
+
 func (f *fakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
 	f.events = append(f.events, eventtype+":"+reason+":"+message)
 }
@@ -1510,6 +1519,161 @@ func TestHasAnyRegularContainerStarted(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := HasAnyRegularContainerStarted(tc.spec, tc.statuses)
 			assert.Equal(t, tc.expectStarted, actual, "HasAnyRegularContainerStarted(%v, %v)", tc.spec, tc.statuses)
+		})
+	}
+}
+
+func TestShouldAllContainersRestart(t *testing.T) {
+	restartPolicyNever := v1.ContainerRestartPolicyNever
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	restartRuleRestartAllContainers := v1.ContainerRestartRule{
+		Action: v1.ContainerRestartRuleActionRestartAllContainers,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{42},
+		},
+	}
+	RestartAllContainersCondition := v1.PodCondition{
+		Type:   v1.AllContainersRestarting,
+		Status: v1.ConditionTrue,
+	}
+
+	testcases := []struct {
+		name         string
+		pod          *v1.Pod
+		podStatus    *PodStatus
+		apiPodStatus *v1.PodStatus
+		expected     bool
+	}{
+		{
+			"pod marked with condition",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:          "regular",
+							RestartPolicy: &restartPolicyNever,
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:  "regular",
+						State: ContainerStateRunning,
+					},
+				},
+			},
+			&v1.PodStatus{
+				Conditions: []v1.PodCondition{RestartAllContainersCondition},
+			},
+			true,
+		},
+		{
+			"regular container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:               "regular",
+							RestartPolicy:      &restartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartAllContainers},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "regular",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			nil,
+			true,
+		},
+		{
+			"init container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:               "init",
+							RestartPolicy:      &restartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartAllContainers},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "init",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			nil,
+			true,
+		},
+		{
+			"sidecar container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:               "init",
+							RestartPolicy:      &restartPolicyAlways,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartAllContainers},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "init",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			nil,
+			true,
+		},
+		{
+			"container exited without rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "regular",
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "regular",
+						State:    ContainerStateExited,
+						ExitCode: 1,
+					},
+				},
+			},
+			nil,
+			false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ShouldAllContainersRestart(tc.pod, tc.podStatus, tc.apiPodStatus)
+			assert.Equal(t, tc.expected, actual, "ShouldAllContainersRestart(%v, %v)", tc.pod, tc.podStatus)
 		})
 	}
 }

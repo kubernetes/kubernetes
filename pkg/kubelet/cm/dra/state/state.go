@@ -17,6 +17,8 @@ limitations under the License.
 package state
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -49,11 +51,54 @@ type DriverState struct {
 }
 
 // Device is how a DRA driver described an allocated device in a claim
-// to kubelet. RequestName and CDI device IDs are optional.
+// to kubelet. RequestName, ShareID, and CDI device IDs are optional.
 // +k8s:deepcopy-gen=true
 type Device struct {
 	PoolName     string
 	DeviceName   string
+	ShareID      *types.UID
 	RequestNames []string
 	CDIDeviceIDs []string
+}
+
+// DevicesHealthMap is a map between driver names and the list of the device's health.
+type DevicesHealthMap map[string]DriverHealthState
+
+// DriverHealthState is used to store health information of all devices of a driver.
+type DriverHealthState struct {
+	// Devices maps a device's unique key ("<pool>/<device>") to its health state.
+	Devices map[string]DeviceHealth
+}
+
+type DeviceHealthStatus string
+
+const (
+	// DeviceHealthStatusHealthy represents a healthy device.
+	DeviceHealthStatusHealthy DeviceHealthStatus = "Healthy"
+	// DeviceHealthStatusUnhealthy represents an unhealthy device.
+	DeviceHealthStatusUnhealthy DeviceHealthStatus = "Unhealthy"
+	// DeviceHealthStatusUnknown represents a device with unknown health status.
+	DeviceHealthStatusUnknown DeviceHealthStatus = "Unknown"
+)
+
+// DeviceHealth is used to store health information of a device.
+type DeviceHealth struct {
+	// PoolName is the name of the pool where the device is allocated.
+	PoolName string
+
+	// DeviceName is the name of the device.
+	// The full identifier is '<driver name>/<pool name>/<device name>' across the system.
+	DeviceName string
+
+	// Health is the health status of the device.
+	// Statuses: "Healthy", "Unhealthy", "Unknown".
+	Health DeviceHealthStatus
+
+	// LastUpdated keeps track of the last health status update of this device.
+	LastUpdated time.Time
+
+	// HealthCheckTimeout is the timeout for the health check of the device.
+	// Zero value means use the default timeout (DefaultHealthTimeout).
+	// This ensures backward compatibility with existing data.
+	HealthCheckTimeout time.Duration
 }

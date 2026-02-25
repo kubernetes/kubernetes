@@ -88,7 +88,7 @@ body of a {{bold}}Describe{{/}}, {{bold}}Context{{/}}, or {{bold}}When{{/}}.`, n
 	}
 }
 
-func (g ginkgoErrors) CaughtPanicDuringABuildPhase(caughtPanic interface{}, cl CodeLocation) error {
+func (g ginkgoErrors) CaughtPanicDuringABuildPhase(caughtPanic any, cl CodeLocation) error {
 	return GinkgoError{
 		Heading: "Assertion or Panic detected during tree construction",
 		Message: formatter.F(
@@ -189,7 +189,7 @@ func (g ginkgoErrors) InvalidDeclarationOfFlakeAttemptsAndMustPassRepeatedly(cl 
 	}
 }
 
-func (g ginkgoErrors) UnknownDecorator(cl CodeLocation, nodeType NodeType, decorator interface{}) error {
+func (g ginkgoErrors) UnknownDecorator(cl CodeLocation, nodeType NodeType, decorator any) error {
 	return GinkgoError{
 		Heading:      "Unknown Decorator",
 		Message:      formatter.F(`[%s] node was passed an unknown decorator: '%#v'`, nodeType, decorator),
@@ -345,7 +345,7 @@ func (g ginkgoErrors) PushingCleanupInCleanupNode(cl CodeLocation) error {
 }
 
 /* ReportEntry errors */
-func (g ginkgoErrors) TooManyReportEntryValues(cl CodeLocation, arg interface{}) error {
+func (g ginkgoErrors) TooManyReportEntryValues(cl CodeLocation, arg any) error {
 	return GinkgoError{
 		Heading:      "Too Many ReportEntry Values",
 		Message:      formatter.F(`{{bold}}AddGinkgoReport{{/}} can only be given one value. Got unexpected value: %#v`, arg),
@@ -429,6 +429,24 @@ func (g ginkgoErrors) InvalidEmptyLabel(cl CodeLocation) error {
 		Message:      "Labels cannot be empty",
 		CodeLocation: cl,
 		DocLink:      "spec-labels",
+	}
+}
+
+func (g ginkgoErrors) InvalidSemVerConstraint(semVerConstraint, errMsg string, cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid SemVerConstraint",
+		Message:      fmt.Sprintf("'%s' is an invalid SemVerConstraint: %s", semVerConstraint, errMsg),
+		CodeLocation: cl,
+		DocLink:      "spec-semantic-version-filtering",
+	}
+}
+
+func (g ginkgoErrors) InvalidEmptySemVerConstraint(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid Empty SemVerConstraint",
+		Message:      "SemVerConstraint cannot be empty",
+		CodeLocation: cl,
+		DocLink:      "spec-semantic-version-filtering",
 	}
 }
 
@@ -539,7 +557,7 @@ func (g ginkgoErrors) SynchronizedBeforeSuiteDisappearedOnProc1() error {
 
 /* Configuration errors */
 
-func (g ginkgoErrors) UnknownTypePassedToRunSpecs(value interface{}) error {
+func (g ginkgoErrors) UnknownTypePassedToRunSpecs(value any) error {
 	return GinkgoError{
 		Heading: "Unknown Type passed to RunSpecs",
 		Message: fmt.Sprintf("RunSpecs() accepts labels, and configuration of type types.SuiteConfig and/or types.ReporterConfig.\n You passed in: %v", value),
@@ -626,6 +644,20 @@ func (g ginkgoErrors) BothRepeatAndUntilItFails() error {
 	return GinkgoError{
 		Heading: "--repeat and --until-it-fails are both set",
 		Message: "--until-it-fails directs Ginkgo to rerun specs indefinitely until they fail.  --repeat directs Ginkgo to rerun specs a set number of times.  You can't set both... which would you like?",
+	}
+}
+
+func (g ginkgoErrors) ExpectFilenameNotPath(flag string, path string) error {
+	return GinkgoError{
+		Heading: fmt.Sprintf("%s expects a filename but was given a path: %s", flag, path),
+		Message: fmt.Sprintf("%s takes a filename, not a path.  Use --output-dir to specify a directory to collect all test outputs.", flag),
+	}
+}
+
+func (g ginkgoErrors) FlagAfterPositionalParameter() error {
+	return GinkgoError{
+		Heading: "Malformed arguments - detected a flag after the package liste",
+		Message: "Make sure all flags appear {{bold}}after{{/}} the Ginkgo subcommand and {{bold}}before{{/}} your list of packages (or './...').\n{{gray}}e.g. 'ginkgo run -p my_package' is valid but `ginkgo -p run my_package` is not.\n{{gray}}e.g. 'ginkgo -p -vet=\"\" ./...' is valid but 'ginkgo -p ./... -vet=\"\"' is not{{/}}",
 	}
 }
 

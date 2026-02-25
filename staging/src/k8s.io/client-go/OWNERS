@@ -9,6 +9,7 @@ approvers:
   - sttts
   - yliaog
   - jpbetz
+  - enj
 reviewers:
   - aojea
   - apelisse
@@ -21,6 +22,8 @@ reviewers:
   - sttts
   - yliaog
   - jpbetz
+  - jefftree
+  - enj
 labels:
   - sig/api-machinery
 emeritus_approvers:

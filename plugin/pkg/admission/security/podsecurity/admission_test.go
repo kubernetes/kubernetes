@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -40,7 +42,6 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 )
 
 func TestConvert(t *testing.T) {
@@ -81,7 +82,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	p.InspectEffectiveVersion(compatibility.DefaultBuildEffectiveVersion())
 
 	enforceImplicitPrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-implicit", Labels: map[string]string{}}}
 	enforcePrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-privileged", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "privileged"}}}
@@ -189,7 +190,7 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	p.InspectEffectiveVersion(compatibility.DefaultBuildEffectiveVersion())
 
 	namespace := "enforce"
 	enforceNamespaceBaselineV1 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}}

@@ -45,3 +45,38 @@ type TestTypeList struct {
 type TestTypeStatus struct {
 	Blah string
 }
+
+type Conversion struct {
+	Identical MemoryIdentical
+	Different MemoryDifferent
+}
+type MemoryIdentical struct {
+	Items      *MemoryIdentical
+	Properties map[string]MemoryIdentical
+	AllOf      []MemoryIdentical
+	Bool       bool
+}
+type MemoryDifferent struct {
+	Items      *MemoryDifferent
+	Properties map[string]MemoryDifferent
+	AllOf      []MemoryDifferent
+	Bool       bool // differs from external representation
+}
+
+type ConversionPrivate struct {
+	PublicField  string
+	privateField string
+}
+
+type ConversionCustomContainer struct {
+	Slice   []ConversionCustom
+	SliceP  []*ConversionCustom
+	Map     map[string]ConversionCustom
+	MapP    map[string]*ConversionCustom
+	Struct  ConversionCustom
+	StructP *ConversionCustom
+}
+type ConversionCustom struct {
+	PublicField  string
+	privateField string
+}

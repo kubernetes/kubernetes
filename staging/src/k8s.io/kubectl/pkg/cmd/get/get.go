@@ -629,9 +629,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 		}
 		return err
 	}
-	if multipleGVKsRequested(infos) {
-		return i18n.Errorf("watch is only supported on individual resources and resource collections - more than 1 resource was found")
-	}
 
 	info := infos[0]
 	mapping := info.ResourceMapping()

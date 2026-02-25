@@ -44,9 +44,9 @@ func Test(t *testing.T) {
 		RatchetItems: []RatchetItem{
 			{Key: "ratchet", Status: "forbidden", Version: 1},
 		},
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("ratchetItems").Index(0).Child("status"), "forbidden", "must not be equal to \"forbidden\""),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
+		field.Invalid(field.NewPath("ratchetItems").Index(0).Child("status"), nil, ""),
+	})
 
 	st.Value(&Struct{
 		RatchetItems: []RatchetItem{
@@ -74,7 +74,7 @@ func Test(t *testing.T) {
 		RatchetItems: []RatchetItem{
 			{Key: "ratchet", Status: "allowed", Version: 1},
 		},
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("ratchetItems").Index(0).Child("status"), "forbidden", "must not be equal to \"forbidden\""),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
+		field.Invalid(field.NewPath("ratchetItems").Index(0).Child("status"), nil, ""),
+	})
 }

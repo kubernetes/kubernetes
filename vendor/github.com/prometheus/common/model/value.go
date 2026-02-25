@@ -191,7 +191,8 @@ func (ss SampleStream) String() string {
 }
 
 func (ss SampleStream) MarshalJSON() ([]byte, error) {
-	if len(ss.Histograms) > 0 && len(ss.Values) > 0 {
+	switch {
+	case len(ss.Histograms) > 0 && len(ss.Values) > 0:
 		v := struct {
 			Metric     Metric                `json:"metric"`
 			Values     []SamplePair          `json:"values"`
@@ -202,7 +203,7 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 			Histograms: ss.Histograms,
 		}
 		return json.Marshal(&v)
-	} else if len(ss.Histograms) > 0 {
+	case len(ss.Histograms) > 0:
 		v := struct {
 			Metric     Metric                `json:"metric"`
 			Histograms []SampleHistogramPair `json:"histograms"`
@@ -211,7 +212,7 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 			Histograms: ss.Histograms,
 		}
 		return json.Marshal(&v)
-	} else {
+	default:
 		v := struct {
 			Metric Metric       `json:"metric"`
 			Values []SamplePair `json:"values"`
@@ -258,7 +259,7 @@ func (s Scalar) String() string {
 // MarshalJSON implements json.Marshaler.
 func (s Scalar) MarshalJSON() ([]byte, error) {
 	v := strconv.FormatFloat(float64(s.Value), 'f', -1, 64)
-	return json.Marshal([...]interface{}{s.Timestamp, string(v)})
+	return json.Marshal([...]interface{}{s.Timestamp, v})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -349,9 +350,9 @@ func (m Matrix) Len() int           { return len(m) }
 func (m Matrix) Less(i, j int) bool { return m[i].Metric.Before(m[j].Metric) }
 func (m Matrix) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 
-func (mat Matrix) String() string {
-	matCp := make(Matrix, len(mat))
-	copy(matCp, mat)
+func (m Matrix) String() string {
+	matCp := make(Matrix, len(m))
+	copy(matCp, m)
 	sort.Sort(matCp)
 
 	strs := make([]string, len(matCp))

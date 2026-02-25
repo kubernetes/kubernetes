@@ -27,7 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
@@ -77,7 +76,7 @@ type Controller struct {
 	cancel         func(cause error)
 	driverName     string
 	owner          *Owner
-	resourceClient cgoresource.ResourceV1beta2Interface
+	resourceClient *draclient.Client
 	coreClient     cgocore.CoreV1Interface
 	wg             sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
@@ -195,6 +194,8 @@ func StartController(ctx context.Context, options Options) (*Controller, error) 
 // Options contains various optional settings for [StartController].
 type Options struct {
 	// DriverName is the required name of the DRA driver.
+	// Must be a DNS subdomain and should end with a DNS domain
+	// owned by the vendor of the driver. It should use only lower case characters.
 	DriverName string
 
 	// KubeClient is used to read Node objects (if necessary) and to access
@@ -280,10 +281,36 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		}
 	}
 
-	// Dropped fields for partitionable devices can be detected without looking at the devices themselves.
+	// Dropped fields for partitionable devices can be found either directly on the ResourceSlice spec
+	// or within devices.
 	if ptr.Deref(err.DesiredSlice.Spec.PerDeviceNodeSelection, false) && !ptr.Deref(err.ActualSlice.Spec.PerDeviceNodeSelection, false) ||
 		len(err.DesiredSlice.Spec.SharedCounters) > len(err.ActualSlice.Spec.SharedCounters) {
 		disabled = append(disabled, "DRAPartitionableDevices")
+	} else {
+		for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+			if len(err.DesiredSlice.Spec.Devices[i].ConsumesCounters) != len(err.ActualSlice.Spec.Devices[i].ConsumesCounters) {
+				disabled = append(disabled, "DRAPartitionableDevices")
+				break
+			}
+		}
+	}
+
+	// The number of binding conditions for both slices should be the same. If they differ,
+	// it indicates that the DRADeviceBindingConditions feature is disabled.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if len(err.DesiredSlice.Spec.Devices[i].BindingConditions) != len(err.ActualSlice.Spec.Devices[i].BindingConditions) ||
+			len(err.DesiredSlice.Spec.Devices[i].BindingFailureConditions) != len(err.ActualSlice.Spec.Devices[i].BindingFailureConditions) {
+			disabled = append(disabled, "DRADeviceBindingConditions")
+			break
+		}
+	}
+
+	// Dropped fields for consumable capacity can be detected with allowMultipleAllocations flag without looking at individual device capacity.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if err.DesiredSlice.Spec.Devices[i].AllowMultipleAllocations != nil && err.ActualSlice.Spec.Devices[i].AllowMultipleAllocations == nil {
+			disabled = append(disabled, "DRAConsumableCapacity")
+			break
+		}
 	}
 
 	return disabled
@@ -433,16 +460,24 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		},
 	}
 	informer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptions(&options)
-				return c.resourceClient.ResourceSlices().List(ctx, options)
+				slices, err := c.resourceClient.ResourceSlices().List(ctx, options)
+				if err == nil {
+					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "numSlices", len(slices.Items), "listMeta", slices.ListMeta)
+				} else {
+					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
+				}
+				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptions(&options)
-				return c.resourceClient.ResourceSlices().Watch(ctx, options)
+				w, err := c.resourceClient.ResourceSlices().Watch(ctx, options)
+				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
+				return w, err
 			},
-		},
+		}, c.resourceClient),
 		&resourceapi.ResourceSlice{},
 		// No resync because all it would do is periodically trigger syncing pools
 		// again by reporting all slices as updated with the object as old/new.
@@ -452,7 +487,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		indexers,
 	)
 	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
-	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	handler, err := informer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -495,7 +530,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return fmt.Errorf("registering event handler on the ResourceSlice informer: %w", err)
 	}
@@ -506,7 +541,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		defer c.wg.Done()
 		defer logger.V(3).Info("ResourceSlice informer has stopped")
 		defer c.queue.ShutDown() // Once we get here, we must have been asked to stop.
-		informer.Run(ctx.Done())
+		informer.RunWithContext(ctx)
 	}()
 	for !handler.HasSynced() {
 		select {
@@ -542,7 +577,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// It will be retried.
 		return true
 	}
-
 	c.queue.Forget(poolName)
 	return true
 }
@@ -569,6 +603,12 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
+	if err := validateDriverResources(resources); err != nil {
+		c.errorHandler(ctx, err, "pool validation failed")
+		// We only report the error through the error handler to prevent
+		// the controller from retrying.
+		return nil
+	}
 
 	pool, ok := resources.Pools[poolName]
 	if !ok {

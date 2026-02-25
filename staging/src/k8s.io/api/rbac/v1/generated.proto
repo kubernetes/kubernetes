@@ -70,6 +70,7 @@ message ClusterRoleBinding {
   // RoleRef can only reference a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
   // This field is immutable.
+  // +required
   optional RoleRef roleRef = 3;
 }
 
@@ -98,6 +99,8 @@ message ClusterRoleList {
 message PolicyRule {
   // Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
   // +listType=atomic
+  // +required
+  // +k8s:required
   repeated string verbs = 1;
 
   // APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
@@ -152,6 +155,7 @@ message RoleBinding {
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
   // This field is immutable.
+  // +required
   optional RoleRef roleRef = 3;
 }
 
@@ -179,12 +183,16 @@ message RoleList {
 // +structType=atomic
 message RoleRef {
   // APIGroup is the group for the resource being referenced
+  // +optional
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +required
   optional string kind = 2;
 
   // Name is the name of resource being referenced
+  // +required
+  // +k8s:required
   optional string name = 3;
 }
 
@@ -194,6 +202,7 @@ message RoleRef {
 message Subject {
   // Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
+  // +required
   optional string kind = 1;
 
   // APIGroup holds the API group of the referenced subject.
@@ -203,6 +212,8 @@ message Subject {
   optional string apiGroup = 2;
 
   // Name of the object being referenced.
+  // +required
+  // +k8s:required
   optional string name = 3;
 
   // Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty

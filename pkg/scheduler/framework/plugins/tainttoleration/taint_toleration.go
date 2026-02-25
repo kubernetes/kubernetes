@@ -25,7 +25,6 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -34,14 +33,16 @@ import (
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
-	handle                    framework.Handle
-	enableSchedulingQueueHint bool
+	handle                                   fwk.Handle
+	enableSchedulingQueueHint                bool
+	enableTaintTolerationComparisonOperators bool
 }
 
-var _ framework.FilterPlugin = &TaintToleration{}
-var _ framework.PreScorePlugin = &TaintToleration{}
-var _ framework.ScorePlugin = &TaintToleration{}
-var _ framework.EnqueueExtensions = &TaintToleration{}
+var _ fwk.FilterPlugin = &TaintToleration{}
+var _ fwk.PreScorePlugin = &TaintToleration{}
+var _ fwk.ScorePlugin = &TaintToleration{}
+var _ fwk.EnqueueExtensions = &TaintToleration{}
+var _ fwk.SignPlugin = &TaintToleration{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -55,6 +56,13 @@ const (
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *TaintToleration) Name() string {
 	return Name
+}
+
+// Feasibility and scoring based on the pod's tolerations.
+func (pl *TaintToleration) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
+	}, nil
 }
 
 // EventsToRegister returns the possible events that may make a Pod
@@ -93,10 +101,10 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	wasUntolerated := true
 	if originalNode != nil {
-		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
 	}
 
-	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -108,16 +116,19 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 }
 
 // Filter invoked at the filter extension point.
-func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
+		helper.DoNotScheduleTaintsFilterFunc(),
+		pl.enableTaintTolerationComparisonOperators)
 	if !isUntolerated {
 		return nil
 	}
 
-	errReason := fmt.Sprintf("node(s) had untolerated taint {%s: %s}", taint.Key, taint.Value)
-	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReason)
+	klog.FromContext(ctx).V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)")
 }
 
 // preScoreState computed at PreScore and used at Score.
@@ -143,7 +154,7 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *TaintToleration) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (pl *TaintToleration) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
 	state := &preScoreState{
 		tolerationsPreferNoSchedule: tolerationsPreferNoSchedule,
@@ -166,14 +177,14 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 }
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
+func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
 	for _, taint := range taints {
 		// check only on taints that have effect PreferNoSchedule
 		if taint.Effect != v1.TaintEffectPreferNoSchedule {
 			continue
 		}
 
-		if !v1helper.TolerationsTolerateTaint(tolerations, &taint) {
+		if !v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators) {
 			intolerableTaints++
 		}
 	}
@@ -181,7 +192,9 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 }
 
 // Score invoked at the Score extension point.
-func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	logger := klog.FromContext(ctx)
+
 	node := nodeInfo.Node()
 
 	s, err := getPreScoreState(state)
@@ -189,25 +202,26 @@ func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod 
 		return 0, fwk.AsStatus(err)
 	}
 
-	score := int64(countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, s.tolerationsPreferNoSchedule))
+	score := int64(pl.countIntolerableTaintsPreferNoSchedule(logger, node.Spec.Taints, s.tolerationsPreferNoSchedule))
 	return score, nil
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
-	return helper.DefaultNormalizeScore(framework.MaxNodeScore, true, scores)
+func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, true, scores)
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
+func (pl *TaintToleration) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &TaintToleration{
-		handle:                    h,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		handle:                                   h,
+		enableSchedulingQueueHint:                fts.EnableSchedulingQueueHint,
+		enableTaintTolerationComparisonOperators: fts.EnableTaintTolerationComparisonOperators,
 	}, nil
 }
 

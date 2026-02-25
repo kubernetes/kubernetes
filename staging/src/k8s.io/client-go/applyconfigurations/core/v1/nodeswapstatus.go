@@ -20,7 +20,10 @@ package v1
 
 // NodeSwapStatusApplyConfiguration represents a declarative configuration of the NodeSwapStatus type for use
 // with apply.
+//
+// NodeSwapStatus represents swap memory information.
 type NodeSwapStatusApplyConfiguration struct {
+	// Total amount of swap memory in bytes.
 	Capacity *int64 `json:"capacity,omitempty"`
 }
 

@@ -49,6 +49,12 @@ const (
 	// (rather than the kernel's). The actual value is architecture and platform dependent.
 	CPUCoreID = "core_id"
 
+	// On some architecture there exists additional level of book and drawer id
+	// CPUBookID is the book ID of cpu#. Typically corresponds to a physical book number.
+	CPUBookID = "book_id"
+	// CPUDrawerID is the drawer ID of cpu#. Typically corresponds to a physical drawer number.
+	CPUDrawerID = "drawer_id"
+
 	coreIDFilePath    = "/" + sysFsCPUTopology + "/core_id"
 	packageIDFilePath = "/" + sysFsCPUTopology + "/physical_package_id"
 	bookIDFilePath    = "/" + sysFsCPUTopology + "/book_id"

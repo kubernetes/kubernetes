@@ -13,14 +13,13 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-const (
-	defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
-)
+const defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
 
 // tracerProviderConfig.
 type tracerProviderConfig struct {
@@ -45,7 +44,7 @@ type tracerProviderConfig struct {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Provider.
-func (cfg tracerProviderConfig) MarshalLog() interface{} {
+func (cfg tracerProviderConfig) MarshalLog() any {
 	return struct {
 		SpanProcessors  []SpanProcessor
 		SamplerType     string
@@ -159,6 +158,13 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 				provider:             p,
 				instrumentationScope: is,
 			}
+
+			var err error
+			t.inst, err = observ.NewTracer()
+			if err != nil {
+				otel.Handle(err)
+			}
+
 			p.namedTracer[is] = t
 		}
 		return t, ok
@@ -169,7 +175,17 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		//   slowing down all tracing consumers.
 		// - Logging code may be instrumented with tracing and deadlock because it could try
 		//   acquiring the same non-reentrant mutex.
-		global.Info("Tracer created", "name", name, "version", is.Version, "schemaURL", is.SchemaURL, "attributes", is.Attributes)
+		global.Info(
+			"Tracer created",
+			"name",
+			name,
+			"version",
+			is.Version,
+			"schemaURL",
+			is.SchemaURL,
+			"attributes",
+			is.Attributes,
+		)
 	}
 	return t
 }

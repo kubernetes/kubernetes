@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"reflect"
 	"testing"
 
+	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -363,6 +365,114 @@ func TestGetLeafTypeAndPrefixes(t *testing.T) {
 		}
 		if got, want := exprPfx, tc.expectedExprPfx; got != want {
 			t.Errorf("%q: wrong expr prefix: expected %q, got %q", tc.in, want, got)
+		}
+	}
+}
+
+func TestSortIntoCohorts(t *testing.T) {
+	cases := []struct {
+		in       []validators.FunctionGen
+		expected [][]validators.FunctionGen
+	}{{
+		// empty
+		in:       []validators.FunctionGen{},
+		expected: [][]validators.FunctionGen{},
+	}, {
+		// default cohort
+		in: []validators.FunctionGen{
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		}},
+	}, {
+		// default cohort, not already sorted by name
+		in: []validators.FunctionGen{
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+		}},
+	}, {
+		// default cohort, with a short-circuit
+		in: []validators.FunctionGen{
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "b", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		}},
+	}, {
+		// default cohort, with 2 short-circuits
+		in: []validators.FunctionGen{
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "d", Cohort: "", Flags: validators.ShortCircuit},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "b", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "d", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "a", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		}},
+	}, {
+		// default and non-default cohorts
+		in: []validators.FunctionGen{
+			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "d", Cohort: "foo", Flags: validators.DefaultFlags},
+			{TagName: "e", Cohort: "bar", Flags: validators.DefaultFlags},
+			{TagName: "f", Cohort: "", Flags: validators.DefaultFlags},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "f", Cohort: "", Flags: validators.DefaultFlags},
+		}, {
+			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
+			{TagName: "d", Cohort: "foo", Flags: validators.DefaultFlags},
+		}, {
+			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
+			{TagName: "e", Cohort: "bar", Flags: validators.DefaultFlags},
+		}},
+	}, {
+		// default and non-default cohorts with short-circuit
+		in: []validators.FunctionGen{
+			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
+			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "d", Cohort: "foo", Flags: validators.ShortCircuit},
+			{TagName: "e", Cohort: "bar", Flags: validators.ShortCircuit},
+			{TagName: "f", Cohort: "", Flags: validators.ShortCircuit},
+		},
+		expected: [][]validators.FunctionGen{{
+			{TagName: "f", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+		}, {
+			{TagName: "d", Cohort: "foo", Flags: validators.ShortCircuit},
+			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
+		}, {
+			{TagName: "e", Cohort: "bar", Flags: validators.ShortCircuit},
+			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
+		}},
+	}}
+
+	for _, tc := range cases {
+		out := sortIntoCohorts(tc.in)
+		if !reflect.DeepEqual(out, tc.expected) {
+			t.Errorf("expected %v, got %v", tc.expected, out)
 		}
 	}
 }

@@ -22,8 +22,6 @@ package eachkey
 
 import (
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test_Struct(t *testing.T) {
@@ -42,11 +40,12 @@ func Test_Struct(t *testing.T) {
 		}
 	}
 	st := localSchemeBuilder.Test(t)
-	st.Value(mkTest()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("mapField"), "", ""),
-		field.Invalid(field.NewPath("mapTypedefField"), "", ""),
-		field.Invalid(field.NewPath("mapValidatedTypedefField"), "", ""),
-		field.Invalid(field.NewPath("validatedMapTypeField"), "", ""),
+	st.Value(mkTest()).ExpectValidateFalseByPath(map[string][]string{
+		"mapField":                 {"field Struct.MapField(keys)"},
+		"mapTypedefField":          {"field Struct.MapTypedefField(keys)"},
+		"mapValidatedTypedefField": {"ValidatedStringType", "field Struct.MapValidatedTypedefField(keys)"},
+		"validatedMapTypeField":    {"field Struct.ValidatedMapTypeField(keys)", "type ValidatedMapType(keys)"},
 	})
+
 	st.Value(mkTest()).OldValue(mkTest()).ExpectValid()
 }

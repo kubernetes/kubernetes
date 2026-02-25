@@ -132,6 +132,20 @@ func (e *MarshalerError) Unwrap() error {
 	return e.err
 }
 
+type TranscodeError struct {
+	err                        error
+	rtype                      reflect.Type
+	sourceFormat, targetFormat string
+}
+
+func (e TranscodeError) Error() string {
+	return "cbor: cannot transcode from " + e.sourceFormat + " to " + e.targetFormat + ": " + e.err.Error()
+}
+
+func (e TranscodeError) Unwrap() error {
+	return e.err
+}
+
 // UnsupportedTypeError is returned by Marshal when attempting to encode value
 // of an unsupported type.
 type UnsupportedTypeError struct {
@@ -293,24 +307,51 @@ func (icm InfConvertMode) valid() bool {
 	return icm >= 0 && icm < maxInfConvert
 }
 
-// TimeMode specifies how to encode time.Time values.
+// TimeMode specifies how to encode time.Time values in compliance with RFC 8949 (CBOR):
+// - Section 3.4.1: Standard Date/Time String
+// - Section 3.4.2: Epoch-Based Date/Time
+// For more info, see:
+// - https://www.rfc-editor.org/rfc/rfc8949.html
+// NOTE: User applications that prefer to encode time with fractional seconds to an integer
+// (instead of floating point or text string) can use a CBOR tag number not assigned by IANA:
+//  1. Define a user-defined type in Go with just a time.Time or int64 as its data.
+//  2. Implement the cbor.Marshaler and cbor.Unmarshaler interface for that user-defined type
+//     to encode or decode the tagged data item with an enclosed integer content.
 type TimeMode int
 
 const (
-	// TimeUnix causes time.Time to be encoded as epoch time in integer with second precision.
+	// TimeUnix causes time.Time to encode to a CBOR time (tag 1) with an integer content
+	// representing seconds elapsed (with 1-second precision) since UNIX Epoch UTC.
+	// The TimeUnix option is location independent and has a clear precision guarantee.
 	TimeUnix TimeMode = iota
 
-	// TimeUnixMicro causes time.Time to be encoded as epoch time in float-point rounded to microsecond precision.
+	// TimeUnixMicro causes time.Time to encode to a CBOR time (tag 1) with a floating point content
+	// representing seconds elapsed (with up to 1-microsecond precision) since UNIX Epoch UTC.
+	// NOTE: The floating point content is encoded to the shortest floating-point encoding that preserves
+	// the 64-bit floating point value. I.e., the floating point encoding can be IEEE 764:
+	// binary64, binary32, or binary16 depending on the content's value.
 	TimeUnixMicro
 
-	// TimeUnixDynamic causes time.Time to be encoded as integer if time.Time doesn't have fractional seconds,
-	// otherwise float-point rounded to microsecond precision.
+	// TimeUnixDynamic causes time.Time to encode to a CBOR time (tag 1) with either an integer content or
+	// a floating point content, depending on the content's value.  This option is equivalent to dynamically
+	// choosing TimeUnix if time.Time doesn't have fractional seconds, and using TimeUnixMicro if time.Time
+	// has fractional seconds.
 	TimeUnixDynamic
 
-	// TimeRFC3339 causes time.Time to be encoded as RFC3339 formatted string with second precision.
+	// TimeRFC3339 causes time.Time to encode to a CBOR time (tag 0) with a text string content
+	// representing the time using 1-second precision in RFC3339 format.  If the time.Time has a
+	// non-UTC timezone then a "localtime - UTC" numeric offset will be included as specified in RFC3339.
+	// NOTE: User applications can avoid including the RFC3339 numeric offset by:
+	// - providing a time.Time value set to UTC, or
+	// - using the TimeUnix, TimeUnixMicro, or TimeUnixDynamic option instead of TimeRFC3339.
 	TimeRFC3339
 
-	// TimeRFC3339Nano causes time.Time to be encoded as RFC3339 formatted string with nanosecond precision.
+	// TimeRFC3339Nano causes time.Time to encode to a CBOR time (tag 0) with a text string content
+	// representing the time using 1-nanosecond precision in RFC3339 format.  If the time.Time has a
+	// non-UTC timezone then a "localtime - UTC" numeric offset will be included as specified in RFC3339.
+	// NOTE: User applications can avoid including the RFC3339 numeric offset by:
+	// - providing a time.Time value set to UTC, or
+	// - using the TimeUnix, TimeUnixMicro, or TimeUnixDynamic option instead of TimeRFC3339Nano.
 	TimeRFC3339Nano
 
 	maxTimeMode
@@ -483,6 +524,24 @@ func (bmm BinaryMarshalerMode) valid() bool {
 	return bmm >= 0 && bmm < maxBinaryMarshalerMode
 }
 
+// TextMarshalerMode specifies how to encode types that implement encoding.TextMarshaler.
+type TextMarshalerMode int
+
+const (
+	// TextMarshalerNone does not recognize TextMarshaler implementations during encode.
+	// This is the default behavior.
+	TextMarshalerNone TextMarshalerMode = iota
+
+	// TextMarshalerTextString encodes the output of MarshalText to a CBOR text string.
+	TextMarshalerTextString
+
+	maxTextMarshalerMode
+)
+
+func (tmm TextMarshalerMode) valid() bool {
+	return tmm >= 0 && tmm < maxTextMarshalerMode
+}
+
 // EncOptions specifies encoding options.
 type EncOptions struct {
 	// Sort specifies sorting order.
@@ -540,6 +599,14 @@ type EncOptions struct {
 
 	// BinaryMarshaler specifies how to encode types that implement encoding.BinaryMarshaler.
 	BinaryMarshaler BinaryMarshalerMode
+
+	// TextMarshaler specifies how to encode types that implement encoding.TextMarshaler.
+	TextMarshaler TextMarshalerMode
+
+	// JSONMarshalerTranscoder sets the transcoding scheme used to marshal types that implement
+	// json.Marshaler but do not also implement cbor.Marshaler. If nil, encoding behavior is not
+	// influenced by whether or not a type implements json.Marshaler.
+	JSONMarshalerTranscoder Transcoder
 }
 
 // CanonicalEncOptions returns EncOptions for "Canonical CBOR" encoding,
@@ -750,6 +817,9 @@ func (opts EncOptions) encMode() (*encMode, error) { //nolint:gocritic // ignore
 	if !opts.BinaryMarshaler.valid() {
 		return nil, errors.New("cbor: invalid BinaryMarshaler " + strconv.Itoa(int(opts.BinaryMarshaler)))
 	}
+	if !opts.TextMarshaler.valid() {
+		return nil, errors.New("cbor: invalid TextMarshaler " + strconv.Itoa(int(opts.TextMarshaler)))
+	}
 	em := encMode{
 		sort:                      opts.Sort,
 		shortestFloat:             opts.ShortestFloat,
@@ -769,6 +839,8 @@ func (opts EncOptions) encMode() (*encMode, error) { //nolint:gocritic // ignore
 		byteSliceLaterEncodingTag: byteSliceLaterEncodingTag,
 		byteArray:                 opts.ByteArray,
 		binaryMarshaler:           opts.BinaryMarshaler,
+		textMarshaler:             opts.TextMarshaler,
+		jsonMarshalerTranscoder:   opts.JSONMarshalerTranscoder,
 	}
 	return &em, nil
 }
@@ -814,6 +886,8 @@ type encMode struct {
 	byteSliceLaterEncodingTag uint64
 	byteArray                 ByteArrayMode
 	binaryMarshaler           BinaryMarshalerMode
+	textMarshaler             TextMarshalerMode
+	jsonMarshalerTranscoder   Transcoder
 }
 
 var defaultEncMode, _ = EncOptions{}.encMode()
@@ -890,22 +964,24 @@ func getMarshalerDecMode(indefLength IndefLengthMode, tagsMd TagsMode) *decMode 
 // EncOptions returns user specified options used to create this EncMode.
 func (em *encMode) EncOptions() EncOptions {
 	return EncOptions{
-		Sort:                 em.sort,
-		ShortestFloat:        em.shortestFloat,
-		NaNConvert:           em.nanConvert,
-		InfConvert:           em.infConvert,
-		BigIntConvert:        em.bigIntConvert,
-		Time:                 em.time,
-		TimeTag:              em.timeTag,
-		IndefLength:          em.indefLength,
-		NilContainers:        em.nilContainers,
-		TagsMd:               em.tagsMd,
-		OmitEmpty:            em.omitEmpty,
-		String:               em.stringType,
-		FieldName:            em.fieldName,
-		ByteSliceLaterFormat: em.byteSliceLaterFormat,
-		ByteArray:            em.byteArray,
-		BinaryMarshaler:      em.binaryMarshaler,
+		Sort:                    em.sort,
+		ShortestFloat:           em.shortestFloat,
+		NaNConvert:              em.nanConvert,
+		InfConvert:              em.infConvert,
+		BigIntConvert:           em.bigIntConvert,
+		Time:                    em.time,
+		TimeTag:                 em.timeTag,
+		IndefLength:             em.indefLength,
+		NilContainers:           em.nilContainers,
+		TagsMd:                  em.tagsMd,
+		OmitEmpty:               em.omitEmpty,
+		String:                  em.stringType,
+		FieldName:               em.fieldName,
+		ByteSliceLaterFormat:    em.byteSliceLaterFormat,
+		ByteArray:               em.byteArray,
+		BinaryMarshaler:         em.binaryMarshaler,
+		TextMarshaler:           em.textMarshaler,
+		JSONMarshalerTranscoder: em.jsonMarshalerTranscoder,
 	}
 }
 
@@ -1677,6 +1753,107 @@ func (bme binaryMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, e
 	return len(data) == 0, nil
 }
 
+type textMarshalerEncoder struct {
+	alternateEncode  encodeFunc
+	alternateIsEmpty isEmptyFunc
+}
+
+func (tme textMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
+	if em.textMarshaler == TextMarshalerNone {
+		return tme.alternateEncode(e, em, v)
+	}
+
+	vt := v.Type()
+	m, ok := v.Interface().(encoding.TextMarshaler)
+	if !ok {
+		pv := reflect.New(vt)
+		pv.Elem().Set(v)
+		m = pv.Interface().(encoding.TextMarshaler)
+	}
+	data, err := m.MarshalText()
+	if err != nil {
+		return fmt.Errorf("cbor: cannot marshal text for %s: %w", vt, err)
+	}
+	if b := em.encTagBytes(vt); b != nil {
+		e.Write(b)
+	}
+
+	encodeHead(e, byte(cborTypeTextString), uint64(len(data)))
+	e.Write(data)
+	return nil
+}
+
+func (tme textMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, error) {
+	if em.textMarshaler == TextMarshalerNone {
+		return tme.alternateIsEmpty(em, v)
+	}
+
+	m, ok := v.Interface().(encoding.TextMarshaler)
+	if !ok {
+		pv := reflect.New(v.Type())
+		pv.Elem().Set(v)
+		m = pv.Interface().(encoding.TextMarshaler)
+	}
+	data, err := m.MarshalText()
+	if err != nil {
+		return false, fmt.Errorf("cbor: cannot marshal text for %s: %w", v.Type(), err)
+	}
+	return len(data) == 0, nil
+}
+
+type jsonMarshalerEncoder struct {
+	alternateEncode  encodeFunc
+	alternateIsEmpty isEmptyFunc
+}
+
+func (jme jsonMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
+	if em.jsonMarshalerTranscoder == nil {
+		return jme.alternateEncode(e, em, v)
+	}
+
+	vt := v.Type()
+	m, ok := v.Interface().(jsonMarshaler)
+	if !ok {
+		pv := reflect.New(vt)
+		pv.Elem().Set(v)
+		m = pv.Interface().(jsonMarshaler)
+	}
+
+	json, err := m.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	offset := e.Len()
+
+	if b := em.encTagBytes(vt); b != nil {
+		e.Write(b)
+	}
+
+	if err := em.jsonMarshalerTranscoder.Transcode(e, bytes.NewReader(json)); err != nil {
+		return &TranscodeError{err: err, rtype: vt, sourceFormat: "json", targetFormat: "cbor"}
+	}
+
+	// Validate that the transcode function has written exactly one well-formed data item.
+	d := decoder{data: e.Bytes()[offset:], dm: getMarshalerDecMode(em.indefLength, em.tagsMd)}
+	if err := d.wellformed(false, true); err != nil {
+		e.Truncate(offset)
+		return &TranscodeError{err: err, rtype: vt, sourceFormat: "json", targetFormat: "cbor"}
+	}
+
+	return nil
+}
+
+func (jme jsonMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, error) {
+	if em.jsonMarshalerTranscoder == nil {
+		return jme.alternateIsEmpty(em, v)
+	}
+
+	// As with types implementing cbor.Marshaler, transcoded json.Marshaler values always encode
+	// as exactly one complete CBOR data item.
+	return false, nil
+}
+
 func encodeMarshalerType(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if em.tagsMd == TagsForbidden && v.Type() == typeRawTag {
 		return errors.New("cbor: cannot encode cbor.RawTag when TagsMd is TagsForbidden")
@@ -1780,9 +1957,13 @@ func encodeHead(e *bytes.Buffer, t byte, n uint64) int {
 	return headSize
 }
 
+type jsonMarshaler interface{ MarshalJSON() ([]byte, error) }
+
 var (
 	typeMarshaler       = reflect.TypeOf((*Marshaler)(nil)).Elem()
 	typeBinaryMarshaler = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
+	typeTextMarshaler   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	typeJSONMarshaler   = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
 	typeRawMessage      = reflect.TypeOf(RawMessage(nil))
 	typeByteString      = reflect.TypeOf(ByteString(""))
 )
@@ -1825,6 +2006,30 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf 
 			ief = bme.isEmpty
 		}()
 	}
+	if reflect.PointerTo(t).Implements(typeTextMarshaler) {
+		defer func() {
+			// capture encoding method used for modes that disable TextMarshaler
+			tme := textMarshalerEncoder{
+				alternateEncode:  ef,
+				alternateIsEmpty: ief,
+			}
+			ef = tme.encode
+			ief = tme.isEmpty
+		}()
+	}
+	if reflect.PointerTo(t).Implements(typeJSONMarshaler) {
+		defer func() {
+			// capture encoding method used for modes that don't support transcoding
+			// from types that implement json.Marshaler.
+			jme := jsonMarshalerEncoder{
+				alternateEncode:  ef,
+				alternateIsEmpty: ief,
+			}
+			ef = jme.encode
+			ief = jme.isEmpty
+		}()
+	}
+
 	switch k {
 	case reflect.Bool:
 		return encodeBool, isEmptyBool, getIsZeroFunc(t)

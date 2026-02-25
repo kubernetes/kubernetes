@@ -165,11 +165,22 @@ func statIo(dirPath string, stats *cgroups.Stats) error {
 			case "wios":
 				op = "Write"
 				targetTable = &parsedStats.IoServicedRecursive
+
+			case "cost.usage":
+				op = "Count"
+				targetTable = &parsedStats.IoCostUsage
+			case "cost.wait":
+				op = "Count"
+				targetTable = &parsedStats.IoCostWait
+			case "cost.indebt":
+				op = "Count"
+				targetTable = &parsedStats.IoCostIndebt
+			case "cost.indelay":
+				op = "Count"
+				targetTable = &parsedStats.IoCostIndelay
+
 			default:
-				// Skip over entries we cannot map to cgroupv1 stats for now.
-				// In the future we should expand the stats struct to include
-				// them.
-				logrus.Debugf("cgroupv2 io stats: skipping over unmappable %s entry", item)
+				logrus.Debugf("cgroupv2 io stats: unknown entry %s", item)
 				continue
 			}
 

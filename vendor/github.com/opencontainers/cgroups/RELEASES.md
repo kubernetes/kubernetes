@@ -23,7 +23,7 @@ However, specification releases have special restrictions in the [OCI charter][c
 * They are the target of backwards compatibility (§7.g), and
 * They are subject to the OFWa patent grant (§8.d and e).
 
-To avoid unfortunate side effects (onerous backwards compatibity requirements or Member resignations), the following additional procedures apply to specification releases:
+To avoid unfortunate side effects (onerous backwards compatibility requirements or Member resignations), the following additional procedures apply to specification releases:
 
 ### Planning a release
 

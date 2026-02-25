@@ -54,10 +54,6 @@ import (
 	fakeautoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1/fake"
 	autoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	fakeautoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2/fake"
-	autoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
-	fakeautoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1/fake"
-	autoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
-	fakeautoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2/fake"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	fakebatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1/fake"
 	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
@@ -114,6 +110,8 @@ import (
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
+	resourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
+	fakeresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1/fake"
 	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	fakeresourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3/fake"
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
@@ -132,8 +130,8 @@ import (
 	fakestoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
-	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
-	fakestoragemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1/fake"
+	storagemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
+	fakestoragemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1/fake"
 	"k8s.io/client-go/testing"
 )
 
@@ -141,10 +139,6 @@ import (
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-//
-// DEPRECATED: NewClientset replaces this with support for field management, which significantly improves
-// server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
-// via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -158,8 +152,8 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			opts = watchAction.ListOptions
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
@@ -190,10 +184,25 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
+// IsWatchListSemanticsUnSupported informs the reflector that this client
+// doesn't support WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can NOT be used.
+// No additional logic is implemented here.
+func (c *Clientset) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // NewClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
+//
+// Compared to NewSimpleClientset, the Clientset returned here supports field tracking and thus
+// server-side apply. Beware though that support in that for CRDs is missing
+// (https://github.com/kubernetes/kubernetes/issues/126850).
 func NewClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewFieldManagedObjectTracker(
 		scheme,
@@ -211,8 +220,8 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			opts = watchAction.ListOptions
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
@@ -299,16 +308,6 @@ func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
 // AutoscalingV2 retrieves the AutoscalingV2Client
 func (c *Clientset) AutoscalingV2() autoscalingv2.AutoscalingV2Interface {
 	return &fakeautoscalingv2.FakeAutoscalingV2{Fake: &c.Fake}
-}
-
-// AutoscalingV2beta1 retrieves the AutoscalingV2beta1Client
-func (c *Clientset) AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface {
-	return &fakeautoscalingv2beta1.FakeAutoscalingV2beta1{Fake: &c.Fake}
-}
-
-// AutoscalingV2beta2 retrieves the AutoscalingV2beta2Client
-func (c *Clientset) AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface {
-	return &fakeautoscalingv2beta2.FakeAutoscalingV2beta2{Fake: &c.Fake}
 }
 
 // BatchV1 retrieves the BatchV1Client
@@ -451,6 +450,11 @@ func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return &fakerbacv1alpha1.FakeRbacV1alpha1{Fake: &c.Fake}
 }
 
+// ResourceV1 retrieves the ResourceV1Client
+func (c *Clientset) ResourceV1() resourcev1.ResourceV1Interface {
+	return &fakeresourcev1.FakeResourceV1{Fake: &c.Fake}
+}
+
 // ResourceV1beta2 retrieves the ResourceV1beta2Client
 func (c *Clientset) ResourceV1beta2() resourcev1beta2.ResourceV1beta2Interface {
 	return &fakeresourcev1beta2.FakeResourceV1beta2{Fake: &c.Fake}
@@ -496,7 +500,7 @@ func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
 }
 
-// StoragemigrationV1alpha1 retrieves the StoragemigrationV1alpha1Client
-func (c *Clientset) StoragemigrationV1alpha1() storagemigrationv1alpha1.StoragemigrationV1alpha1Interface {
-	return &fakestoragemigrationv1alpha1.FakeStoragemigrationV1alpha1{Fake: &c.Fake}
+// StoragemigrationV1beta1 retrieves the StoragemigrationV1beta1Client
+func (c *Clientset) StoragemigrationV1beta1() storagemigrationv1beta1.StoragemigrationV1beta1Interface {
+	return &fakestoragemigrationv1beta1.FakeStoragemigrationV1beta1{Fake: &c.Fake}
 }

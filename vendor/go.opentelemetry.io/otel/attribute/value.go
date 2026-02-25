@@ -9,8 +9,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"go.opentelemetry.io/otel/internal"
-	"go.opentelemetry.io/otel/internal/attribute"
+	attribute "go.opentelemetry.io/otel/attribute/internal"
 )
 
 //go:generate stringer -type=Type
@@ -23,7 +22,7 @@ type Value struct {
 	vtype    Type
 	numeric  uint64
 	stringly string
-	slice    interface{}
+	slice    any
 }
 
 const (
@@ -51,7 +50,7 @@ const (
 func BoolValue(v bool) Value {
 	return Value{
 		vtype:   BOOL,
-		numeric: internal.BoolToRaw(v),
+		numeric: boolToRaw(v),
 	}
 }
 
@@ -67,8 +66,7 @@ func IntValue(v int) Value {
 
 // IntSliceValue creates an INTSLICE Value.
 func IntSliceValue(v []int) Value {
-	var int64Val int64
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(int64Val)))
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[int64]()))
 	for i, val := range v {
 		cp.Elem().Index(i).SetInt(int64(val))
 	}
@@ -82,7 +80,7 @@ func IntSliceValue(v []int) Value {
 func Int64Value(v int64) Value {
 	return Value{
 		vtype:   INT64,
-		numeric: internal.Int64ToRaw(v),
+		numeric: int64ToRaw(v),
 	}
 }
 
@@ -95,7 +93,7 @@ func Int64SliceValue(v []int64) Value {
 func Float64Value(v float64) Value {
 	return Value{
 		vtype:   FLOAT64,
-		numeric: internal.Float64ToRaw(v),
+		numeric: float64ToRaw(v),
 	}
 }
 
@@ -125,7 +123,7 @@ func (v Value) Type() Type {
 // AsBool returns the bool value. Make sure that the Value's type is
 // BOOL.
 func (v Value) AsBool() bool {
-	return internal.RawToBool(v.numeric)
+	return rawToBool(v.numeric)
 }
 
 // AsBoolSlice returns the []bool value. Make sure that the Value's type is
@@ -144,7 +142,7 @@ func (v Value) asBoolSlice() []bool {
 // AsInt64 returns the int64 value. Make sure that the Value's type is
 // INT64.
 func (v Value) AsInt64() int64 {
-	return internal.RawToInt64(v.numeric)
+	return rawToInt64(v.numeric)
 }
 
 // AsInt64Slice returns the []int64 value. Make sure that the Value's type is
@@ -163,7 +161,7 @@ func (v Value) asInt64Slice() []int64 {
 // AsFloat64 returns the float64 value. Make sure that the Value's
 // type is FLOAT64.
 func (v Value) AsFloat64() float64 {
-	return internal.RawToFloat64(v.numeric)
+	return rawToFloat64(v.numeric)
 }
 
 // AsFloat64Slice returns the []float64 value. Make sure that the Value's type is
@@ -200,8 +198,8 @@ func (v Value) asStringSlice() []string {
 
 type unknownValueType struct{}
 
-// AsInterface returns Value's data as interface{}.
-func (v Value) AsInterface() interface{} {
+// AsInterface returns Value's data as any.
+func (v Value) AsInterface() any {
 	switch v.Type() {
 	case BOOL:
 		return v.AsBool()
@@ -263,7 +261,7 @@ func (v Value) Emit() string {
 func (v Value) MarshalJSON() ([]byte, error) {
 	var jsonVal struct {
 		Type  string
-		Value interface{}
+		Value any
 	}
 	jsonVal.Type = v.Type().String()
 	jsonVal.Value = v.AsInterface()

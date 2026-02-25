@@ -23,13 +23,27 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var obj = &resource.DeviceClass{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:       "valid-class",
 		Generation: 1,
+	},
+}
+
+var objWithExtendedResourceName = &resource.DeviceClass{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-class",
+		Generation: 1,
+	},
+	Spec: resource.DeviceClassSpec{
+		ExtendedResourceName: ptr.To("example.com/gpu"),
 	},
 }
 
@@ -47,6 +61,7 @@ func TestStrategyCreate(t *testing.T) {
 
 	testcases := map[string]struct {
 		obj                   *resource.DeviceClass
+		draExtendedResource   bool
 		expectValidationError bool
 		expectObj             *resource.DeviceClass
 	}{
@@ -62,11 +77,24 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
+		"drop-extended-resource-name": {
+			obj:                 objWithExtendedResourceName,
+			draExtendedResource: false,
+			expectObj:           obj,
+		},
+		"keep-extended-resource-name": {
+			obj:                 objWithExtendedResourceName,
+			draExtendedResource: true,
+			expectObj:           objWithExtendedResourceName,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			obj := tc.obj.DeepCopy()
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
+
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
 				if !tc.expectValidationError {
@@ -91,6 +119,7 @@ func TestStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                *resource.DeviceClass
 		newObj                *resource.DeviceClass
+		draExtendedResource   bool
 		expectValidationError bool
 		expectObj             *resource.DeviceClass
 	}{
@@ -108,6 +137,34 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
+		"drop-extended-resource-name": {
+			oldObj:              obj,
+			newObj:              objWithExtendedResourceName,
+			draExtendedResource: false,
+			expectObj:           obj,
+		},
+		"keep-extended-resource-name": {
+			oldObj:              obj,
+			newObj:              objWithExtendedResourceName,
+			draExtendedResource: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithExtendedResourceName.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"keep-existing-extended-resource-name": {
+			oldObj:              objWithExtendedResourceName,
+			newObj:              objWithExtendedResourceName,
+			draExtendedResource: true,
+			expectObj:           objWithExtendedResourceName,
+		},
+		"keep-existing-extended-resource-name-disabled-feature": {
+			oldObj:              objWithExtendedResourceName,
+			newObj:              objWithExtendedResourceName,
+			draExtendedResource: false,
+			expectObj:           objWithExtendedResourceName,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -115,6 +172,8 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
 
 			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {

@@ -29,10 +29,22 @@ import (
 
 // IPAddressApplyConfiguration represents a declarative configuration of the IPAddress type for use
 // with apply.
+//
+// IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs
+// that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses.
+// An IP address can be represented in different formats, to guarantee the uniqueness of the IP,
+// the name of the object is the IP address in canonical format, four decimal digits separated
+// by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6.
+// Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
+// Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
 type IPAddressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *IPAddressSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the desired state of the IPAddress.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IPAddressSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // IPAddress constructs a declarative configuration of the IPAddress type for use with
@@ -45,29 +57,14 @@ func IPAddress(name string) *IPAddressApplyConfiguration {
 	return b
 }
 
-// ExtractIPAddress extracts the applied configuration owned by fieldManager from
-// iPAddress. If no managedFields are found in iPAddress for fieldManager, a
-// IPAddressApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractIPAddressFrom extracts the applied configuration owned by fieldManager from
+// iPAddress for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // iPAddress must be a unmodified IPAddress API object that was retrieved from the Kubernetes API.
-// ExtractIPAddress provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractIPAddressFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
-	return extractIPAddress(iPAddress, fieldManager, "")
-}
-
-// ExtractIPAddressStatus is the same as ExtractIPAddress except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractIPAddressStatus(iPAddress *networkingv1beta1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
-	return extractIPAddress(iPAddress, fieldManager, "status")
-}
-
-func extractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
+func ExtractIPAddressFrom(iPAddress *networkingv1beta1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
 	b := &IPAddressApplyConfiguration{}
 	err := managedfields.ExtractInto(iPAddress, internal.Parser().Type("io.k8s.api.networking.v1beta1.IPAddress"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +76,21 @@ func extractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager strin
 	b.WithAPIVersion("networking.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractIPAddress extracts the applied configuration owned by fieldManager from
+// iPAddress. If no managedFields are found in iPAddress for fieldManager, a
+// IPAddressApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// iPAddress must be a unmodified IPAddress API object that was retrieved from the Kubernetes API.
+// ExtractIPAddress provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
+	return ExtractIPAddressFrom(iPAddress, fieldManager, "")
+}
+
 func (b IPAddressApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

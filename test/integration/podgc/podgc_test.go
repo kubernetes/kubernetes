@@ -49,10 +49,11 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			phase:     v1.PodPending,
 			wantPhase: v1.PodFailed,
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 		"succeeded pod": {
@@ -302,10 +303,11 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 				},
 			},
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 		"Orphan pod with duplicated ports; scenario from https://issues.k8s.io/113482": {
@@ -335,10 +337,11 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 				},
 			},
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 	}

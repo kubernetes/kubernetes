@@ -142,9 +142,7 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldReplicaSet := old.(*apps.ReplicaSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
-	allErrs := appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
-
-	return allErrs
+	return appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

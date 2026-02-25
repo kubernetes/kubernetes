@@ -37,10 +37,6 @@ import (
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-//
-// DEPRECATED: NewClientset replaces this with support for field management, which significantly improves
-// server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
-// via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -54,8 +50,8 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			opts = watchAction.ListOptions
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
@@ -86,10 +82,25 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
+// IsWatchListSemanticsUnSupported informs the reflector that this client
+// doesn't support WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can NOT be used.
+// No additional logic is implemented here.
+func (c *Clientset) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // NewClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
+//
+// Compared to NewSimpleClientset, the Clientset returned here supports field tracking and thus
+// server-side apply. Beware though that support in that for CRDs is missing
+// (https://github.com/kubernetes/kubernetes/issues/126850).
 func NewClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewFieldManagedObjectTracker(
 		scheme,
@@ -107,8 +118,8 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			opts = watchAction.ListOptions
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -45,6 +46,7 @@ import (
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -119,6 +121,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			return pdb
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
 		gomega.Expect(updatedPDB.Spec.MinAvailable.String()).To(gomega.Equal("2%"))
+		gomega.Expect(updatedPDB).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("patching the pdb")
 		patchedPDB := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
@@ -131,6 +134,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			return newBytes, nil
 		})
 		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
+		gomega.Expect(resourceversion.CompareResourceVersion(updatedPDB.ResourceVersion, patchedPDB.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		deletePDBOrDie(ctx, cs, ns, defaultName)
 	})
@@ -470,8 +474,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			ginkgo.By("Creating a replica set")
 			rsName := "test-rs-with-delayed-ready"
 			replicas := int32(3)
-			rs := newRS(rsName, replicas, defaultLabels, WebserverImageName, WebserverImage, nil)
+			rs := newRS(rsName, replicas, defaultLabels, AgnhostImageName, AgnhostImage, nil)
 			rs.Labels["name"] = rsName
+			rs.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80"}
 			initialDelaySeconds := framework.PodStartTimeout.Seconds() + 30
 			if tc.podsShouldBecomeReadyFirst {
 				initialDelaySeconds = 20
@@ -479,7 +484,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			rs.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/index.html",
+						Path: "/",
 						Port: intstr.IntOrString{IntVal: 80},
 					},
 				},

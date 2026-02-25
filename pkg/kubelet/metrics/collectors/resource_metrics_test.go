@@ -33,7 +33,9 @@ import (
 func TestCollectResourceMetrics(t *testing.T) {
 	// a static timestamp: 2021-06-23 05:11:18.302091597 +0800
 	staticTimestamp := time.Unix(0, 1624396278302091597)
+	swapTimestamp := staticTimestamp.Add(10 * time.Second)
 	testTime := metav1.NewTime(staticTimestamp)
+	swapTestTime := metav1.NewTime(swapTimestamp)
 	interestedMetrics := []string{
 		"scrape_error",
 		"resource_scrape_error",
@@ -43,6 +45,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 		"container_swap_usage_bytes",
+		"container_swap_limit_bytes",
 		"container_start_time_seconds",
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
@@ -106,6 +109,43 @@ func TestCollectResourceMetrics(t *testing.T) {
 			`,
 		},
 		{
+			name: "node metrics with different timestamps",
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					CPU: &statsapi.CPUStats{
+						Time:                 testTime,
+						UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
+					},
+					Memory: &statsapi.MemoryStats{
+						Time:            testTime,
+						WorkingSetBytes: ptr.To[uint64](1000),
+					},
+					Swap: &statsapi.SwapStats{
+						Time:           swapTestTime,
+						SwapUsageBytes: ptr.To[uint64](500),
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP node_cpu_usage_seconds_total [STABLE] Cumulative cpu time consumed by the node in core-seconds
+				# TYPE node_cpu_usage_seconds_total counter
+				node_cpu_usage_seconds_total 10 1624396278302
+				# HELP node_memory_working_set_bytes [STABLE] Current working set of the node in bytes
+				# TYPE node_memory_working_set_bytes gauge
+				node_memory_working_set_bytes 1000 1624396278302
+				# HELP node_swap_usage_bytes [ALPHA] Current swap usage of the node in bytes. Reported only on non-windows systems
+				# TYPE node_swap_usage_bytes gauge
+				node_swap_usage_bytes 500 1624396288302
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP resource_scrape_error [STABLE] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE resource_scrape_error gauge
+				resource_scrape_error 0
+			`,
+		},
+		{
 			name: "nil node metrics",
 			summary: &statsapi.Summary{
 				Node: statsapi.NodeStats{
@@ -151,8 +191,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 								Swap: &statsapi.SwapStats{
-									Time:           testTime,
-									SwapUsageBytes: ptr.To[uint64](1000),
+									Time:               testTime,
+									SwapUsageBytes:     ptr.To[uint64](1000),
+									SwapAvailableBytes: ptr.To[uint64](9000),
 								},
 							},
 							{
@@ -214,6 +255,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_start_time_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 1.6243962483020916e+09
 				container_start_time_seconds{container="container_a",namespace="namespace_b",pod="pod_b"} 1.6243956783020916e+09
 				container_start_time_seconds{container="container_b",namespace="namespace_a",pod="pod_a"} 1.6243961583020916e+09
+				# HELP container_swap_limit_bytes [ALPHA] Current amount of the container swap limit in bytes. Reported only on non-windows systems
+				# TYPE container_swap_limit_bytes gauge
+				container_swap_limit_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 10000 1624396278302
         		# HELP container_swap_usage_bytes [ALPHA] Current amount of the container swap usage in bytes. Reported only on non-windows systems
         		# TYPE container_swap_usage_bytes gauge
         		container_swap_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
@@ -405,7 +449,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := context.TODO()
 			provider := summaryprovidertest.NewMockSummaryProvider(t)
 			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)

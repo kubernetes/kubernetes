@@ -414,12 +414,14 @@ func (t *testEnv) fetchOpenAPIOrDie() *spec.Swagger {
 }
 
 func (t *testEnv) expectPath(swagger *spec.Swagger, path string) {
+	t.t.Helper()
 	if _, ok := swagger.Paths.Paths[path]; !ok {
 		t.t.Errorf("Expected path %s to exist in OpenAPI", path)
 	}
 }
 
 func (t *testEnv) expectNoPath(swagger *spec.Swagger, path string) {
+	t.t.Helper()
 	if _, ok := swagger.Paths.Paths[path]; ok {
 		t.t.Errorf("Expected path %s to not exist in OpenAPI", path)
 	}

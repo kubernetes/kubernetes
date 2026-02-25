@@ -187,9 +187,6 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			eventsRule(),
-
-			// volume plugin - portworx
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 
@@ -216,21 +213,31 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+			rules := []rbacv1.PolicyRule{
+				// Deletes pods to evict them.
+				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				// Sets pod conditions.
+				rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+				// The rest is read-only.
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
+				eventsRule(),
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+				rules = append(rules,
+					// Sets DeviceTaintRule conditions.
+					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
+					// Read-only for spec.
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
+				)
+			}
+
 			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
 				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "device-taint-eviction-controller"},
-				Rules: []rbacv1.PolicyRule{
-					// Deletes pods to evict them.
-					rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-					// Sets pod conditions.
-					rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-					// The rest is read-only.
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
-					eventsRule(),
-				},
+				Rules:      rules,
 			})
 		}
 	}
@@ -303,9 +310,6 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 
 			// recyclerClient.WatchPod
 			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-
-			// volume plugin - portworx
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
@@ -396,13 +400,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch", "list", "watch").Groups(appsGroup).Resources("controllerrevisions").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 				eventsRule(),
 			},
-		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie())
 		}
 
 		return role
@@ -430,6 +431,14 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcertificaterequestcleaner"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
+			},
+		})
+	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 		Rules: []rbacv1.PolicyRule{
@@ -525,7 +534,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// need list to get current RV for any resource
 				// need patch for SSA of any resource
 				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
-				rbacv1helpers.NewRule("list", "watch", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
 			},
 		})

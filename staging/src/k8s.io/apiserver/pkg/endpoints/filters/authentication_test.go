@@ -704,3 +704,35 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthenticationLatencyTracked(t *testing.T) {
+	successHandlerCalled := false
+	handler := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			// latency annotations should be added by the time the success handler is called
+			annotations := genericapirequest.AuditAnnotationsFromLatencyTrackers(req.Context())
+			if annotations["apiserver.latency.k8s.io/authentication"] == "" {
+				t.Errorf("missing authentication latency annotation: %v", annotations)
+			}
+			successHandlerCalled = true
+		}),
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			t.Error("unexpected call to error handler")
+		}),
+		nil,
+		nil,
+	)
+	handler = WithLatencyTrackers(handler)
+	handler = WithRequestInfo(handler, &fakeRequestResolver{})
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if !successHandlerCalled {
+		t.Fatal("no call to success handler")
+	}
+}

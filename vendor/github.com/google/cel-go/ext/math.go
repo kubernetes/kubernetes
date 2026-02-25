@@ -325,6 +325,23 @@ import (
 //
 //	math.isFinite(0.0/0.0)  // returns false
 //	math.isFinite(1.2)      // returns true
+//
+// # Math.Sqrt
+//
+// Introduced at version: 2
+//
+// Returns the square root of the given input as double
+// Throws error for negative or non-numeric inputs
+//
+//	math.sqrt(<double>) -> <double>
+//	math.sqrt(<int>) -> <double>
+//	math.sqrt(<uint>) -> <double>
+//
+// Examples:
+//
+//	math.sqrt(81) // returns 9.0
+//	math.sqrt(985.25)   // returns 31.388692231439016
+//      math.sqrt(-15)  // returns NaN
 func Math(options ...MathOption) cel.EnvOption {
 	m := &mathLib{version: math.MaxUint32}
 	for _, o := range options {
@@ -356,6 +373,9 @@ const (
 	// Signedness functions
 	absFunc  = "math.abs"
 	signFunc = "math.sign"
+
+	// SquareRoot function
+	sqrtFunc = "math.sqrt"
 
 	// Bitwise functions
 	bitAndFunc        = "math.bitAnd"
@@ -548,6 +568,18 @@ func (lib *mathLib) CompileOptions() []cel.EnvOption {
 			),
 		)
 	}
+	if lib.version >= 2 {
+		opts = append(opts,
+			cel.Function(sqrtFunc,
+				cel.Overload("math_sqrt_double", []*cel.Type{cel.DoubleType}, cel.DoubleType,
+					cel.UnaryBinding(sqrt)),
+				cel.Overload("math_sqrt_int", []*cel.Type{cel.IntType}, cel.DoubleType,
+					cel.UnaryBinding(sqrt)),
+				cel.Overload("math_sqrt_uint", []*cel.Type{cel.UintType}, cel.DoubleType,
+					cel.UnaryBinding(sqrt)),
+			),
+		)
+	}
 	return opts
 }
 
@@ -690,6 +722,21 @@ func sign(val ref.Val) ref.Val {
 		return maybeSuffixError(val, "math.sign")
 	}
 }
+
+
+func sqrt(val ref.Val) ref.Val {
+	switch v := val.(type) {
+	case types.Double:
+	  return types.Double(math.Sqrt(float64(v)))
+	case types.Int:
+	  return types.Double(math.Sqrt(float64(v)))
+	case types.Uint:
+	  return types.Double(math.Sqrt(float64(v)))
+	default:
+	  return types.NewErr("no such overload: sqrt")
+	}
+}
+
 
 func bitAndPairInt(first, second ref.Val) ref.Val {
 	l := first.(types.Int)

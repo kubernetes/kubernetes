@@ -18,7 +18,6 @@ package legacytokentracking
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -112,40 +111,49 @@ func (c *Controller) enqueue() {
 }
 
 // Run starts the controller sync loop.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *Controller) Run(stopCh <-chan struct{}) {
+	c.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext starts the controller sync loop with a context.
+func (c *Controller) RunWithContext(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Info("Starting legacy_token_tracking_controller")
-	defer klog.Infof("Shutting down legacy_token_tracking_controller")
+	logger := klog.FromContext(ctx)
 
-	go c.configMapInformer.Run(stopCh)
-	if !cache.WaitForNamedCacheSync("configmaps", stopCh, c.configMapSynced) {
+	logger.Info("Starting legacy_token_tracking_controller")
+	defer logger.Info("Shutting down legacy_token_tracking_controller")
+
+	go c.configMapInformer.Run(ctx.Done())
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.configMapSynced) {
 		return
 	}
 
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	c.queue.Add(queueKey)
 
-	<-stopCh
-	klog.Info("Ending legacy_token_tracking_controller")
+	<-ctx.Done()
+	logger.Info("Ending legacy_token_tracking_controller")
 }
 
-func (c *Controller) runWorker() {
-	for c.processNext() {
+func (c *Controller) runWorker(ctx context.Context) {
+	for c.processNext(ctx) {
 	}
 }
 
-func (c *Controller) processNext() bool {
+func (c *Controller) processNext(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	if err := c.syncConfigMap(); err != nil {
-		utilruntime.HandleError(fmt.Errorf("while syncing ConfigMap %q, err: %w", key, err))
+	if err := c.syncConfigMap(ctx); err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Error while syncing ConfigMap", "configmap", key)
 		c.queue.AddRateLimited(key)
 		return true
 	}
@@ -153,7 +161,7 @@ func (c *Controller) processNext() bool {
 	return true
 }
 
-func (c *Controller) syncConfigMap() error {
+func (c *Controller) syncConfigMap(ctx context.Context) error {
 	obj, exists, err := c.configMapCache.GetByKey(queueKey)
 	if err != nil {
 		return err
@@ -168,7 +176,7 @@ func (c *Controller) syncConfigMap() error {
 			return nil
 		}
 
-		if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &corev1.ConfigMap{
+		if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Create(ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
 			Data:       map[string]string{ConfigMapDataKey: now.UTC().Format(dateFormat)},
 		}, metav1.CreateOptions{}); err != nil {
@@ -187,7 +195,7 @@ func (c *Controller) syncConfigMap() error {
 				configMap.Data = map[string]string{}
 			}
 			configMap.Data[ConfigMapDataKey] = now.UTC().Format(dateFormat)
-			if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap, metav1.UpdateOptions{}); err != nil {
+			if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Update(ctx, configMap, metav1.UpdateOptions{}); err != nil {
 				if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 					return nil
 				}

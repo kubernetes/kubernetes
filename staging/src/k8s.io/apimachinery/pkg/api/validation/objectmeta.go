@@ -46,7 +46,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	for k := range annotations {
 		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg)).WithOrigin("format=k8s-label-key")
 		}
 	}
 	if err := ValidateAnnotationsSize(annotations); err != nil {
@@ -138,7 +138,6 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
-// It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	metadata, err := meta.Accessor(objMeta)
 	if err != nil {
@@ -149,9 +148,37 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 	return ValidateObjectMetaAccessor(metadata, requiresNamespace, nameFn, fldPath)
 }
 
+// objectMetaValidationOptions defines behavioral modifications for validating
+// an ObjectMeta.
+type objectMetaValidationOptions struct {
+	/* nothing here yet */
+}
+
+// ObjectMetaValidationOption specifies a behavioral modifier for
+// ValidateObjectMetaWithOpts and ValidateObjectMetaAccessorWithOpts.
+type ObjectMetaValidationOption func(opts *objectMetaValidationOptions)
+
+// ValidateObjectMetaWithOpts validates an object's metadata on creation. It
+// expects that name generation has already been performed, so name validation
+// is always executed.
+//
+// This is similar to ValidateObjectMeta, but uses options to buy future-safety
+// and uses different signature for the name validation function.  It also does
+// not directly validate the generateName field, because name generation
+// should have already been performed and it is the result of that generastion
+// that must conform to the nameFn.
+func ValidateObjectMetaWithOpts(objMeta *metav1.ObjectMeta, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *field.Path, options ...ObjectMetaValidationOption) field.ErrorList {
+	metadata, err := meta.Accessor(objMeta)
+	if err != nil {
+		var allErrs field.ErrorList
+		allErrs = append(allErrs, field.InternalError(fldPath, err))
+		return allErrs
+	}
+	return ValidateObjectMetaAccessorWithOpts(metadata, isNamespaced, nameFn, fldPath, options...)
+}
+
 // ValidateObjectMetaAccessor validates an object's metadata on creation. It expects that name generation has already
 // been performed.
-// It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -170,7 +197,57 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.GetName(), msg))
 		}
 	}
-	if requiresNamespace {
+
+	return append(allErrs, validateObjectMetaAccessorWithOptsCommon(meta, requiresNamespace, fldPath, nil)...)
+}
+
+// ValidateObjectMetaAccessorWithOpts validates an object's metadata on
+// creation. It expects that name generation has already been performed, so
+// name validation is always executed.
+//
+// This is similar to ValidateObjectMetaAccessor, but uses options to buy
+// future-safety and uses different signature for the name validation function.
+// It also does not directly validate the generateName field, because name
+// generation should have already been performed and it is the result of that
+// generastion that must conform to the nameFn.
+func ValidateObjectMetaAccessorWithOpts(meta metav1.Object, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *field.Path, options ...ObjectMetaValidationOption) field.ErrorList {
+	opts := objectMetaValidationOptions{}
+	for _, opt := range options {
+		opt(&opts)
+	}
+
+	var allErrs field.ErrorList
+
+	// generateName is not directly validated here. Types can have
+	// different rules for name generation, and the nameFn is for validating
+	// the post-generation data, not the input. In the past we assumed that
+	// name generation was always "append 5 random characters", but that's not
+	// NECESSARILY true. Also, the nameFn should always be considering the max
+	// length of the name, and it doesn't know enough about the name generation
+	// to do that. Also, given a bad generateName, the user will get errors
+	// for both the generateName and name fields. We will focus validation on
+	// the name field, which should give a better UX overall.
+	// TODO(thockin): should we do a max-length check here? e.g. 1K or 4K?
+
+	if len(meta.GetGenerateName()) != 0 && len(meta.GetName()) == 0 {
+		allErrs = append(allErrs,
+			field.InternalError(fldPath.Child("name"), fmt.Errorf("generateName was specified (%q), but no name was generated", meta.GetGenerateName())))
+	}
+	if len(meta.GetName()) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name or generateName is required"))
+	} else {
+		allErrs = append(allErrs, nameFn(fldPath.Child("name"), meta.GetName())...)
+	}
+
+	return append(allErrs, validateObjectMetaAccessorWithOptsCommon(meta, isNamespaced, fldPath, &opts)...)
+}
+
+// validateObjectMetaAccessorWithOptsCommon is a shared function for validating
+// the parts of an ObjectMeta with are handled the same in both paths..
+func validateObjectMetaAccessorWithOptsCommon(meta metav1.Object, isNamespaced bool, fldPath *field.Path, _ *objectMetaValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if isNamespaced {
 		if len(meta.GetNamespace()) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		} else {
@@ -180,6 +257,7 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 		}
 	} else {
 		if len(meta.GetNamespace()) != 0 {
+			// TODO(thockin): change to "may not be specified on this type" or something
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type"))
 		}
 	}

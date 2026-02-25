@@ -120,7 +120,7 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 		return cmdutil.TypeMismatchErr("allowExperimentalUpgrades", "bool")
 	}
 
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -234,7 +234,7 @@ func genAvailableUpgrade(up *upgrade.Upgrade, etcdUpgrade bool) outputapiv1alpha
 
 // sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
 func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
-	strSlice := []string{}
+	strSlice := make([]string, 0, len(strMap))
 	for k := range strMap {
 		strSlice = append(strSlice, k)
 	}

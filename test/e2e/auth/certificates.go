@@ -33,6 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -306,6 +308,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenCSR.UID).To(gomega.Equal(createdCSR.UID))
 		gomega.Expect(gottenCSR.Spec.ExpirationSeconds).To(gomega.Equal(csr.DurationToExpirationSeconds(time.Hour)))
+		gomega.Expect(gottenCSR).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		csrs, err := csrClient.List(ctx, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
@@ -321,6 +324,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		patchedCSR, err := csrClient.Patch(ctx, createdCSR.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedCSR.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(gottenCSR.ResourceVersion, patchedCSR.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSR.DeepCopy()

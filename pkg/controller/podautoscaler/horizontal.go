@@ -199,20 +199,26 @@ func NewHorizontalController(
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer a.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")
-	defer logger.Info("Shutting down HPA controller")
 
-	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down HPA controller")
+		a.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, a.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, a.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -241,6 +247,8 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	defer a.hpaSelectorsMux.Unlock()
 	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
 		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+		// Observe HPA addition - only when it's a new HPA
+		a.monitor.ObserveHPAAddition()
 	}
 }
 
@@ -258,6 +266,8 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.hpaSelectorsMux.Lock()
 	defer a.hpaSelectorsMux.Unlock()
 	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
+	// Observe HPA deletion
+	a.monitor.ObserveHPADeletion()
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {
@@ -936,14 +946,21 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			actionLabel = monitor.ActionLabelScaleDown
 		}
 	} else {
+		lastScaleTime := ""
+		if hpa.Status.LastScaleTime != nil {
+			lastScaleTime = hpa.Status.LastScaleTime.String()
+		}
 		logger.V(4).Info("Decided not to scale",
 			"scaleTarget", reference,
 			"desiredReplicas", desiredReplicas,
-			"lastScaleTime", hpa.Status.LastScaleTime)
+			"lastScaleTime", lastScaleTime)
 		desiredReplicas = currentReplicas
 	}
 
 	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
+
+	// Monitor the desired replicas
+	a.monitor.ObserveDesiredReplicas(hpa.Namespace, hpa.Name, desiredReplicas)
 
 	err = a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 	if err != nil {

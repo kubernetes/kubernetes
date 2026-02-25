@@ -1,6 +1,8 @@
 package ginkgo
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2/internal/testingtproxy"
@@ -48,6 +50,8 @@ The portion of the interface returned by GinkgoT() that maps onto methods in the
 */
 type GinkgoTInterface interface {
 	Cleanup(func())
+	Chdir(dir string)
+	Context() context.Context
 	Setenv(kev, value string)
 	Error(args ...any)
 	Errorf(format string, args ...any)
@@ -66,6 +70,8 @@ type GinkgoTInterface interface {
 	Skipf(format string, args ...any)
 	Skipped() bool
 	TempDir() string
+	Attr(key, value string)
+	Output() io.Writer
 }
 
 /*
@@ -127,6 +133,12 @@ type GinkgoTBWrapper struct {
 func (g *GinkgoTBWrapper) Cleanup(f func()) {
 	g.GinkgoT.Cleanup(f)
 }
+func (g *GinkgoTBWrapper) Chdir(dir string) {
+	g.GinkgoT.Chdir(dir)
+}
+func (g *GinkgoTBWrapper) Context() context.Context {
+	return g.GinkgoT.Context()
+}
 func (g *GinkgoTBWrapper) Error(args ...any) {
 	g.GinkgoT.Error(args...)
 }
@@ -177,4 +189,10 @@ func (g *GinkgoTBWrapper) Skipped() bool {
 }
 func (g *GinkgoTBWrapper) TempDir() string {
 	return g.GinkgoT.TempDir()
+}
+func (g *GinkgoTBWrapper) Attr(key, value string) {
+	g.GinkgoT.Attr(key, value)
+}
+func (g *GinkgoTBWrapper) Output() io.Writer {
+	return g.GinkgoT.Output()
 }

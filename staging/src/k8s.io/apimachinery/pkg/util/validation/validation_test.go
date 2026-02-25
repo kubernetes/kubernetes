@@ -116,31 +116,6 @@ func TestIsDNS1035Label(t *testing.T) {
 	}
 }
 
-func TestIsCIdentifier(t *testing.T) {
-	goodValues := []string{
-		"a", "ab", "abc", "a1", "_a", "a_", "a_b", "a_1", "a__1__2__b", "__abc_123",
-		"A", "AB", "AbC", "A1", "_A", "A_", "A_B", "A_1", "A__1__2__B", "__123_ABC",
-	}
-	for _, val := range goodValues {
-		if msgs := IsCIdentifier(val); len(msgs) != 0 {
-			t.Errorf("expected true for '%s': %v", val, msgs)
-		}
-	}
-
-	badValues := []string{
-		"", "1", "123", "1a",
-		"-", "a-", "-a", "1-", "-1", "1_", "1_2",
-		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
-		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		"#a#",
-	}
-	for _, val := range badValues {
-		if msgs := IsCIdentifier(val); len(msgs) == 0 {
-			t.Errorf("expected false for '%s'", val)
-		}
-	}
-}
-
 func TestIsValidPortNum(t *testing.T) {
 	goodValues := []int{1, 2, 1000, 16384, 32768, 65535}
 	for _, val := range goodValues {
@@ -715,6 +690,74 @@ func TestIsDNS1123SubdomainWithUnderscore(t *testing.T) {
 			result := IsDNS1123SubdomainWithUnderscore(tt.value)
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("IsDNS1123SubdomainWithUnderscore(%q) = %v; want %v", tt.value, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsDomainPrefixedKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected field.ErrorList
+	}{
+		{
+			name:     "valid domain-prefixed key 1",
+			value:    "example.com/foo",
+			expected: nil,
+		},
+		{
+			name:     "valid domain-prefixed key  2",
+			value:    "example/com",
+			expected: nil,
+		},
+		{
+			name:     "invalid key 1",
+			value:    "example",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example", "must be a domain-prefixed key (such as \"acme.io/foo\")")},
+		},
+		{
+			name:     "invalid key 2",
+			value:    "example/foo/bar",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example/foo/bar", "a valid label key must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")},
+		},
+		{
+			name:     "invalid key 3",
+			value:    "/example/foo",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "/example/foo", "a valid label key must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")},
+		},
+		{
+			name:     "invalid key 4",
+			value:    "",
+			expected: field.ErrorList{field.Required(field.NewPath("test"), "")},
+		},
+		{
+			name:     "invalid key 5",
+			value:    "example.com/_e",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/_e", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 6",
+			value:    "example.com/e_",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e_", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 7",
+			value:    "example.com/e?",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e?", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 8",
+			value:    "example.com/e_$",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e_$", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDomainPrefixedKey(field.NewPath("test"), tt.value)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("IsDomainPrefixedKey(%q) = %v; want %v", tt.value, result, tt.expected)
 			}
 		})
 	}

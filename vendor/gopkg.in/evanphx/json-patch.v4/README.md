@@ -4,7 +4,7 @@
 well as for calculating & applying [RFC7396 JSON merge patches](https://tools.ietf.org/html/rfc7396).
 
 [![GoDoc](https://godoc.org/github.com/evanphx/json-patch?status.svg)](http://godoc.org/github.com/evanphx/json-patch)
-[![Build Status](https://travis-ci.org/evanphx/json-patch.svg?branch=master)](https://travis-ci.org/evanphx/json-patch)
+[![Build Status](https://github.com/evanphx/json-patch/actions/workflows/go.yml/badge.svg)](https://github.com/evanphx/json-patch/actions/workflows/go.yml)
 [![Report Card](https://goreportcard.com/badge/github.com/evanphx/json-patch)](https://goreportcard.com/report/github.com/evanphx/json-patch)
 
 # Get It!
@@ -14,9 +14,7 @@ well as for calculating & applying [RFC7396 JSON merge patches](https://tools.ie
 go get -u github.com/evanphx/json-patch/v5
 ```
 
-**Stable Versions**:
-* Version 5: `go get -u gopkg.in/evanphx/json-patch.v5`
-* Version 4: `go get -u gopkg.in/evanphx/json-patch.v4`
+If you need version 4, use `go get -u gopkg.in/evanphx/json-patch.v4`
 
 (previous versions below `v3` are unavailable)
 
@@ -314,4 +312,4 @@ go test -cover ./...
 ```
 
 Builds for pull requests are tested automatically 
-using [TravisCI](https://travis-ci.org/evanphx/json-patch).
+using [GitHub Actions](https://github.com/evanphx/json-patch/actions/workflows/go.yml).

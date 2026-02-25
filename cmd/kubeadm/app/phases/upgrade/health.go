@@ -106,7 +106,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 	const (
 		fieldSelector = "spec.unschedulable=false"
 		ns            = metav1.NamespaceSystem
-		timeout       = 15 * time.Second
+		timeout       = 60 * time.Second
 		timeoutMargin = 5 * time.Second
 	)
 	var (

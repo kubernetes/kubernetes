@@ -65,7 +65,7 @@ func newMutationAdmissionMetrics() *MutatingAdmissionPolicyMetrics {
 			Help:           "Mutation admission policy check total, labeled by policy and further identified by binding.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"policy", "policy_binding", "error_type", "mutation_action"},
+		[]string{"policy", "policy_binding", "error_type"},
 	)
 	latency := metrics.NewHistogramVec(&metrics.HistogramOpts{
 		Namespace: metricsNamespace,
@@ -83,7 +83,7 @@ func newMutationAdmissionMetrics() *MutatingAdmissionPolicyMetrics {
 		Buckets:        []float64{0.0000005, 0.001, 0.01, 0.1, 1.0},
 		StabilityLevel: metrics.ALPHA,
 	},
-		[]string{"policy", "policy_binding", "error_type", "mutation_action"},
+		[]string{"policy", "policy_binding", "error_type"},
 	)
 
 	legacyregistry.MustRegister(check)
@@ -99,12 +99,12 @@ func (m *MutatingAdmissionPolicyMetrics) Reset() {
 
 // ObserveAdmission observes a policy mutation, with an optional error to indicate the error that may occur but ignored.
 func (m *MutatingAdmissionPolicyMetrics) ObserveAdmission(ctx context.Context, elapsed time.Duration, policy, binding string, errorType MutationErrorType) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "pass").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "pass").Observe(elapsed.Seconds())
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType)).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType)).Observe(elapsed.Seconds())
 }
 
 // ObserveRejection observes a policy mutation error that was at least one of the reasons for a deny.
 func (m *MutatingAdmissionPolicyMetrics) ObserveRejection(ctx context.Context, elapsed time.Duration, policy, binding string, errorType MutationErrorType) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "error").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "error").Observe(elapsed.Seconds())
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType)).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType)).Observe(elapsed.Seconds())
 }

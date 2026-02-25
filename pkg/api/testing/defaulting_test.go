@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
@@ -93,6 +94,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}:                                                     {},
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJobList"}:                                                 {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                                 {},
+		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "PodCertificateRequest"}:                          {},
+		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "PodCertificateRequestList"}:                      {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:                      {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}:                  {},
 		{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}:                                          {},
@@ -155,6 +158,12 @@ func TestDefaulting(t *testing.T) {
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaimTemplateList"}:                          {},
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSlice"}:                                      {},
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSliceList"}:                                  {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaim"}:                                           {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaimList"}:                                       {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaimTemplate"}:                                   {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaimTemplateList"}:                               {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceSlice"}:                                           {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceSliceList"}:                                       {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicy"}:            {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicyList"}:        {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicyBinding"}:     {},
@@ -171,6 +180,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicyList"}:         {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicyBinding"}:      {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicyBindingList"}:  {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingAdmissionPolicy"}:               {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingAdmissionPolicyList"}:           {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingAdmissionPolicyBinding"}:        {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingAdmissionPolicyBindingList"}:    {},
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingAdmissionPolicy"}:                  {},
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingAdmissionPolicyList"}:              {},
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingAdmissionPolicyBinding"}:           {},
@@ -179,6 +192,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfigurationList"}:         {},
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}:               {},
 		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfigurationList"}:           {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingAdmissionPolicy"}:                    {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingAdmissionPolicyBinding"}:             {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingAdmissionPolicyBindingList"}:         {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingAdmissionPolicyList"}:                {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                         {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                     {},
 		{Group: "networking.k8s.io", Version: "v1beta1", Kind: "Ingress"}:                                          {},
@@ -246,6 +263,26 @@ func TestDefaulting(t *testing.T) {
 				func(s *extensionsv1beta1.ScaleStatus, c randfill.Continue) {
 					c.FillNoCustom(s)
 					s.TargetSelector = "" // need to fuzz requirement strings specially
+				},
+				// Custom fuzzer functions for admissionregistration.k8s.io/v1 types
+				func(s *admissionregistrationv1.MutatingAdmissionPolicySpec, c randfill.Continue) {
+					c.FillNoCustom(s)
+					s.FailurePolicy = nil     // Ensure FailurePolicy is nil to trigger defaulting
+					s.ReinvocationPolicy = "" // Ensure ReinvocationPolicy is empty to trigger defaulting
+				},
+				func(s *admissionregistrationv1.ValidatingAdmissionPolicySpec, c randfill.Continue) {
+					c.FillNoCustom(s)
+					s.FailurePolicy = nil // Ensure FailurePolicy is nil to trigger defaulting
+				},
+				func(s *admissionregistrationv1.MatchResources, c randfill.Continue) {
+					c.FillNoCustom(s)
+					s.MatchPolicy = nil       // Ensure MatchPolicy is nil to trigger defaulting
+					s.NamespaceSelector = nil // Ensure NamespaceSelector is nil to trigger defaulting
+					s.ObjectSelector = nil    // Ensure ObjectSelector is nil to trigger defaulting
+				},
+				func(s *admissionregistrationv1.Rule, c randfill.Continue) {
+					c.FillNoCustom(s)
+					s.Scope = nil // Ensure Scope is nil to trigger defaulting
 				},
 			)
 

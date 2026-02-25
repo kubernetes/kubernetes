@@ -19,8 +19,10 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -55,12 +57,6 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 		"autoscaling/v2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
-		"autoscaling/v2beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
-		"autoscaling/v2beta2": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
 	}
 
 	return fields
@@ -80,7 +76,12 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(autoscaler, nil)
-	return validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+	allErrs := validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+	var options []string
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+		options = append(options, "HPAScaleToZero")
+	}
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, autoscaler, nil, allErrs, operation.Create, rest.WithOptions(options))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -112,7 +113,13 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA)
-	return validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
+	errs := validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
+	var options []string
+	oldHasZeroMinReplicas := oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
+		options = append(options, "HPAScaleToZero")
+	}
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, errs, operation.Update, rest.WithOptions(options))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -141,12 +148,6 @@ func (autoscalerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 		"autoscaling/v2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
-		"autoscaling/v2beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"autoscaling/v2beta2": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-		),
 	}
 
 	return fields
@@ -170,12 +171,37 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
-		MinReplicasLowerBound: 1,
+		MinReplicasLowerBound:           1,
+		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false},
+		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
+			AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+		},
 	}
 
 	oldHasZeroMinReplicas := oldHPA != nil && (oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0)
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
 		opts.MinReplicasLowerBound = 0
+	}
+
+	switch {
+	case oldHPA != nil && oldHPA.Spec.ScaleTargetRef.APIVersion == newHPA.Spec.ScaleTargetRef.APIVersion && oldHPA.Spec.ScaleTargetRef.Kind == newHPA.Spec.ScaleTargetRef.Kind:
+		// skip apiVersion validation on updates that don't change the kind/apiVersion.
+		opts.ScaleTargetRefValidationOptions.AllowInvalidAPIVersion = true
+	case newHPA.Spec.ScaleTargetRef.Kind == "ReplicationController":
+		// allow empty apiVersion for the only scalable type that exists in the core v1 API.
+		opts.ScaleTargetRefValidationOptions.AllowEmptyAPIGroup = true
+	}
+
+	if oldHPA != nil {
+		for _, metric := range oldHPA.Spec.Metrics {
+			if metric.Type == autoscaling.ObjectMetricSourceType && metric.Object != nil {
+				if err := validation.ValidateAPIVersion(metric.Object.DescribedObject, opts.ObjectMetricsValidationOptions); err != nil {
+					// metrics are already invalid.
+					opts.ObjectMetricsValidationOptions.AllowInvalidAPIVersion = true
+					break
+				}
+			}
+		}
 	}
 	return opts
 }

@@ -287,6 +287,7 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) { result.handleChangeNode(obj) },
 			UpdateFunc: func(_, newObj interface{}) { result.handleChangeNode(newObj) },
 			DeleteFunc: result.handleDeleteNode,
 		},
@@ -320,15 +321,8 @@ func (c *NodeConfig) Run(stopCh <-chan struct{}) {
 func (c *NodeConfig) handleChangeNode(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		if node, ok = tombstone.Obj.(*v1.Node); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		return
 	}
 	for i := range c.eventHandlers {
 		c.logger.V(4).Info("Calling handler.OnNodeChange")
