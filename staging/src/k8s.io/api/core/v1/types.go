@@ -846,6 +846,13 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
+	// UnusedSince is the timestamp that represents when the PVC last transitioned
+	// to not being in use. When the PVC is currently in use, this field is nil.
+	// It is updated when the last Pod referencing this PVC is deleted or reaches a
+	// terminal state, and cleared when a new Pod starts referencing the PVC.
+	// +featureGate=PersistentVolumeClaimUnusedSinceTime +optional
+	// +optional
+	UnusedSince *metav1.Time `json:"unusedSince,omitempty" protobuf:"bytes,10,opt,name=unusedSince"`
 }
 
 // +enum
@@ -1446,7 +1453,7 @@ type SecretVolumeSource struct {
 }
 
 const (
-	SecretVolumeSourceDefaultMode int32 = 0644
+	SecretVolumeSourceDefaultMode int32 = 0o644
 )
 
 // Adapts a secret into a projected volume.
@@ -1892,7 +1899,7 @@ type ConfigMapVolumeSource struct {
 }
 
 const (
-	ConfigMapVolumeSourceDefaultMode int32 = 0644
+	ConfigMapVolumeSourceDefaultMode int32 = 0o644
 )
 
 // Adapts a ConfigMap into a projected volume.
@@ -2157,7 +2164,7 @@ type VolumeProjection struct {
 }
 
 const (
-	ProjectedVolumeSourceDefaultMode int32 = 0644
+	ProjectedVolumeSourceDefaultMode int32 = 0o644
 )
 
 // Maps a string key to a path within a volume.
@@ -8162,7 +8169,7 @@ type DownwardAPIVolumeSource struct {
 }
 
 const (
-	DownwardAPIVolumeSourceDefaultMode int32 = 0644
+	DownwardAPIVolumeSourceDefaultMode int32 = 0o644
 )
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
