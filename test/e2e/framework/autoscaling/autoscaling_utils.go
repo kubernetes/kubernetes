@@ -165,7 +165,8 @@ func (cpf *customPortForwarder) ForwardPorts(method string, url *url.URL, opts k
 		return err
 	}
 	cpf.forwarder = forwarder
-	return forwarder.ForwardPorts()
+	go forwarder.ForwardPorts() //nolint:errcheck
+	return nil
 }
 
 func (cpf *customPortForwarder) GetPorts() ([]string, error) {
