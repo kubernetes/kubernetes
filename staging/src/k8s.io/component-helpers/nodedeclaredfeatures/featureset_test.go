@@ -117,8 +117,11 @@ func TestFeatureMapper(t *testing.T) {
 				}
 			}
 
-			// Test Unmap
-			unmapped := mapper.Unmap(fs)
+			// Test Unmap and UnmapSparse
+			unmapped, err := mapper.Unmap(fs)
+			if err != nil {
+				t.Fatalf("unexpected Unmap error: %v", err)
+			}
 			if len(unmapped) != tt.expectedSet.Len() {
 				t.Errorf("len(unmapped) = %d, want %d", len(unmapped), tt.expectedSet.Len())
 			}

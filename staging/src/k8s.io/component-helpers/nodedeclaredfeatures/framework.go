@@ -143,6 +143,9 @@ func (f *Framework) MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeature
 	}
 
 	diff, _ := requiredFeatures.Difference(nodeFeatures) // Difference will error IFF IsSubset also does, so we can ignore the error here.
-	unsatisfiedRequirements := f.Unmap(diff)
+	unsatisfiedRequirements, err := f.Unmap(diff)
+	if err != nil {
+		return nil, err
+	}
 	return &MatchResult{IsMatch: false, UnsatisfiedRequirements: unsatisfiedRequirements}, nil
 }

@@ -297,7 +297,10 @@ func TestInferForPodScheduling(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error %v", err)
 				}
-				unmappedReqs := framework.Unmap(reqs)
+				unmappedReqs, err := framework.Unmap(reqs)
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
 				if !reflect.DeepEqual(tc.expectedReqs, unmappedReqs) {
 					t.Errorf("expected %#v, got %#v", tc.expectedReqs, unmappedReqs)
 				}
@@ -434,7 +437,10 @@ func TestInferForPodUpdate(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error %v", err)
 				}
-				unmappedReqs := framework.Unmap(reqs)
+				unmappedReqs, err := framework.Unmap(reqs)
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
 				if !reflect.DeepEqual(tc.expectedReqs, unmappedReqs) {
 					t.Errorf("expected %#v, got %#v", tc.expectedReqs, unmappedReqs)
 				}

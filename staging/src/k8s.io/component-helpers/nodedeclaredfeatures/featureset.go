@@ -18,6 +18,7 @@ package nodedeclaredfeatures
 
 import (
 	"fmt"
+	"math/bits"
 	"slices"
 )
 
@@ -91,16 +92,19 @@ func (m *FeatureMapper) mapSorted(sortedFeatures []string, ignoreUnknown bool) (
 }
 
 // Unmap returns the names of the features set in the FeatureSet (sorted).
-func (m *FeatureMapper) Unmap(s FeatureSet) []string {
-	if s.IsEmpty() {
-		return nil
+func (m *FeatureMapper) Unmap(s FeatureSet) ([]string, error) {
+	if s.size != len(m.registeredFeatures) {
+		return nil, fmt.Errorf("feature size mismatch! s.size=%d; len(m.registeredFeatures)=%d", s.size, len(m.registeredFeatures))
 	}
 
 	var keys []string
-	for i, k := range m.registeredFeatures {
-		if s.Get(i) {
-			keys = append(keys, k)
+	for i, w := range s.words {
+		for w != 0 {
+			t := bits.TrailingZeros64(w) // Find the index of the least significant bit.
+			index := i*64 + t
+			keys = append(keys, m.registeredFeatures[index])
+			w &^= 1 << uint(t) // Clear the least significant bit.
 		}
 	}
-	return keys
+	return keys, nil
 }
