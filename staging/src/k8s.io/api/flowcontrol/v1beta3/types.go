@@ -154,7 +154,6 @@ type FlowSchemaList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// `items` is a list of FlowSchemas.
-	// +required
 	Items []FlowSchema `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -395,7 +394,7 @@ type FlowSchemaStatus struct {
 type FlowSchemaCondition struct {
 	// `type` is the type of the condition.
 	// Required.
-	// +optional
+	// +required
 	Type FlowSchemaConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 	// `status` is the status of the condition.
 	// Can be True, False, Unknown.
@@ -451,7 +450,6 @@ type PriorityLevelConfigurationList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `items` is a list of request-priorities.
-	// +required
 	Items []PriorityLevelConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -674,7 +672,7 @@ type PriorityLevelConfigurationStatus struct {
 type PriorityLevelConfigurationCondition struct {
 	// `type` is the type of the condition.
 	// Required.
-	// +optional
+	// +required
 	Type PriorityLevelConfigurationConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 	// `status` is the status of the condition.
 	// Can be True, False, Unknown.

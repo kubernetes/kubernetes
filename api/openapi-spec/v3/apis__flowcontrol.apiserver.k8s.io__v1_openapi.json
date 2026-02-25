@@ -70,6 +70,9 @@
             "description": "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -107,6 +110,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "type"
+        ],
         "type": "object"
       },
       "io.k8s.api.flowcontrol.v1.FlowSchemaList": {
@@ -295,6 +301,9 @@
             "type": "integer"
           }
         },
+        "required": [
+          "limitResponse"
+        ],
         "type": "object"
       },
       "io.k8s.api.flowcontrol.v1.NonResourcePolicyRule": {
@@ -412,6 +421,9 @@
             "description": "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -449,6 +461,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "type"
+        ],
         "type": "object"
       },
       "io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationList": {
