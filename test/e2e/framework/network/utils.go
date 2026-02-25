@@ -47,7 +47,6 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -838,14 +837,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
 	}
 
-	// Obtain the primary IP family of the Cluster based on the first ClusterIP
-	// TODO: Eventually we should just be getting these from Spec.IPFamilies
-	// but for now that would only if the feature gate is enabled.
-	family := v1.IPv4Protocol
-	secondaryFamily := v1.IPv6Protocol
-	if netutils.IsIPv6String(config.ClusterIP) {
-		family = v1.IPv6Protocol
-		secondaryFamily = v1.IPv4Protocol
+	var family, secondaryFamily v1.IPFamily
+	family = config.NodePortService.Spec.IPFamilies[0]
+	if len(config.NodePortService.Spec.IPFamilies) == 2 {
+		secondaryFamily = config.NodePortService.Spec.IPFamilies[1]
 	}
 	if config.PreferExternalAddresses {
 		// Get Node IPs from the cluster, ExternalIPs take precedence

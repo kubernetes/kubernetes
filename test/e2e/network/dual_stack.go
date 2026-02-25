@@ -58,20 +58,35 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	ginkgo.It("should have ipv4 and ipv6 internal node ip", func(ctx context.Context) {
-		// TODO (aramase) can switch to new function to get all nodes
+	// A dual-stack cluster should have at least one dual-stack node (though it may
+	// also have some single-stack IPv4 or single-stack IPv6 nodes for some use
+	// cases).
+	ginkgo.It("should have at least one dual-stack node", func(ctx context.Context) {
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 
+		var found bool
 		for _, node := range nodeList.Items {
-			// get all internal ips for node
-			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
-
-			gomega.Expect(internalIPs).To(gomega.HaveLen(2))
-			// assert 2 ips belong to different families
-			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
-				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
+			ginkgo.By(fmt.Sprintf("examining %s", node.Name))
+			var hasIPv4, hasIPv6 bool
+			for _, addr := range node.Status.Addresses {
+				if addr.Type != v1.NodeInternalIP && addr.Type != v1.NodeExternalIP {
+					continue
+				}
+				if netutils.IsIPv4String(addr.Address) {
+					hasIPv4 = true
+				} else if netutils.IsIPv6String(addr.Address) {
+					hasIPv6 = true
+				}
 			}
+			if hasIPv4 && hasIPv6 {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			framework.Failf("Could not find any schedulable node with both an IPv4 IP and an IPv6 IP")
 		}
 	})
 
