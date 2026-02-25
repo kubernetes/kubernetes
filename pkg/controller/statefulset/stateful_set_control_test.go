@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -3407,10 +3408,8 @@ func isOrHasInternalError(err error) bool {
 	}
 	var agg utilerrors.Aggregate
 	if errors.As(err, &agg) {
-		for _, e := range agg.Errors() {
-			if apierrors.IsInternalError(e) {
-				return true
-			}
+		if slices.ContainsFunc(agg.Errors(), apierrors.IsInternalError) {
+			return true
 		}
 	}
 	return apierrors.IsInternalError(err)

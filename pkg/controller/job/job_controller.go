@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -2018,10 +2019,8 @@ func getCompletionMode(job *batch.Job) string {
 }
 
 func appendJobCompletionFinalizerIfNotFound(finalizers []string) []string {
-	for _, fin := range finalizers {
-		if fin == batch.JobTrackingFinalizer {
-			return finalizers
-		}
+	if slices.Contains(finalizers, batch.JobTrackingFinalizer) {
+		return finalizers
 	}
 	return append(finalizers, batch.JobTrackingFinalizer)
 }

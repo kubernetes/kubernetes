@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"testing"
@@ -8026,10 +8027,8 @@ func (pb podBuilder) phase(p v1.PodPhase) podBuilder {
 }
 
 func (pb podBuilder) trackingFinalizer() podBuilder {
-	for _, f := range pb.Finalizers {
-		if f == batch.JobTrackingFinalizer {
-			return pb
-		}
+	if slices.Contains(pb.Finalizers, batch.JobTrackingFinalizer) {
+		return pb
 	}
 	pb.Finalizers = append(pb.Finalizers, batch.JobTrackingFinalizer)
 	return pb
