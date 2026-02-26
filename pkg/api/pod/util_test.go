@@ -923,10 +923,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, podGroupClaim)
 		pod.Spec.InitContainers[0].Resources.Claims = append(pod.Spec.InitContainers[0].Resources.Claims, podGroupClaim)
 		pod.Spec.EphemeralContainers[0].Resources.Claims = append(pod.Spec.EphemeralContainers[0].Resources.Claims, podGroupClaim)
-		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, api.PodResourceClaimStatus{
-			Name:              podGroupClaim.Name,
-			ResourceClaimName: ptr.To("claim-for-podgroup"),
-		})
 	}
 	podWithPodGroupClaims := func() *api.Pod {
 		pod := podWithClaims.DeepCopy()
@@ -1276,7 +1272,7 @@ func TestDropDisabledPodStatusFields_HostIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{}, &api.PodSpec{})
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
 
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
@@ -1369,7 +1365,7 @@ func TestDropDisabledPodStatusFields_ObservedGeneration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{}, &api.PodSpec{})
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
 			}
@@ -3096,9 +3092,8 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
-						podSpecBeforeDropping := newPod.Spec.DeepCopy()
 						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -4169,9 +4164,8 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
-						podSpecBeforeDropping := newPod.Spec.DeepCopy()
 						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -6801,8 +6795,7 @@ func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
-						podSpecBeforeDropping := newPod.Spec.DeepCopy()
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {

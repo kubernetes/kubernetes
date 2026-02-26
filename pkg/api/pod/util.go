@@ -716,12 +716,8 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 		oldPodStatus = &oldPod.Status
 		oldPodAnnotations = oldPod.Annotations
 	}
-	// When dropping fields from the status, we need to know exactly which
-	// resource claims referred to a PodGroup claim. When those claims are
-	// already dropped from podSpec, that information is lost.
-	podSpecBeforeDropping := podSpec.DeepCopy()
 	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
-	dropDisabledPodStatusFields(podStatus, oldPodStatus, podSpec, oldPodSpec, podSpecBeforeDropping)
+	dropDisabledPodStatusFields(podStatus, oldPodStatus, podSpec, oldPodSpec)
 }
 
 // dropDisabledFields removes disabled fields from the pod metadata and spec.
@@ -1009,7 +1005,7 @@ func podLifecycleSleepActionZeroValueInUse(podSpec *api.PodSpec) bool {
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status
-func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec, oldPodSpec, podSpecBeforeDropping *api.PodSpec) {
+func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec, oldPodSpec *api.PodSpec) {
 	// the new status is always be non-nil
 	if podStatus == nil {
 		podStatus = &api.PodStatus{}
@@ -1049,10 +1045,6 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
 		podStatus.ExtendedResourceClaimStatus = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		dropPodGroupResourceClaimStatuses(podStatus, podSpecBeforeDropping, oldPodSpec)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
@@ -1288,17 +1280,6 @@ func dropEphemeralPodGroupResourceClaimRequests(containers []api.EphemeralContai
 		}
 		containers[i].Resources.Claims = keepRequests
 	}
-}
-
-func dropPodGroupResourceClaimStatuses(podStatus *api.PodStatus, podSpec, oldPodSpec *api.PodSpec) {
-	droppedClaims := podGroupResourceClaimsToDrop(podSpec, oldPodSpec)
-	var keepClaims []api.PodResourceClaimStatus
-	for _, claim := range podStatus.ResourceClaimStatuses {
-		if !droppedClaims.Has(claim.Name) {
-			keepClaims = append(keepClaims, claim)
-		}
-	}
-	podStatus.ResourceClaimStatuses = keepClaims
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related

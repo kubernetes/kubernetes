@@ -154,13 +154,17 @@ func (*podGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old ru
 
 func dropDisabledFields(podGroup, oldPodGroup *scheduling.PodGroup) {
 	var podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec
+	var podGroupStatus, oldPodGroupStatus *scheduling.PodGroupStatus
 	if podGroup != nil {
 		podGroupSpec = &podGroup.Spec
+		podGroupStatus = &podGroup.Status
 	}
 	if oldPodGroup != nil {
 		oldPodGroupSpec = &oldPodGroup.Spec
+		oldPodGroupStatus = &oldPodGroup.Status
 	}
 	dropDisabledSpecFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledStatusFields(podGroupStatus, oldPodGroupStatus, podGroupSpec, oldPodGroupSpec)
 }
 
 func dropDisabledSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
@@ -177,4 +181,15 @@ func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *
 
 func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
+}
+
+func dropDisabledStatusFields(podGroupStatus, _ *scheduling.PodGroupStatus, _, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	// the new status is always be non-nil
+	if podGroupStatus == nil {
+		podGroupStatus = &scheduling.PodGroupStatus{}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) && !draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		podGroupStatus.ResourceClaimStatuses = nil
+	}
 }

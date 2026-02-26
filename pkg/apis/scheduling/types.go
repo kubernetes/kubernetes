@@ -377,6 +377,15 @@ type PodGroupStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition
+
+	// Status of resource claims.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAWorkloadResourceClaims
+	ResourceClaimStatuses []PodGroupResourceClaimStatus
 }
 
 // Well-known condition types for PodGroups.
@@ -400,6 +409,26 @@ const (
 	// to make room for higher-priority PodGroups or Pods.
 	PodGroupReasonPreemptionByScheduler string = "PreemptionByScheduler"
 )
+
+// PodGroupResourceClaimStatus is stored in the PodGroupStatus for each
+// PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
+// generated name for the corresponding ResourceClaim.
+type PodGroupResourceClaimStatus struct {
+	// Name uniquely identifies this resource claim inside the PodGroup. This
+	// must match the name of an entry in podgroup.spec.resourceClaims, which
+	// implies that the string must be a DNS_LABEL.
+	//
+	// +required
+	Name string
+
+	// ResourceClaimName is the name of the ResourceClaim that was generated for
+	// the PodGroup in the namespace of the PodGroup. If this is unset, then
+	// generating a ResourceClaim was not necessary. The
+	// podgroup.spec.resourceClaims entry can be ignored in this case.
+	//
+	// +optional
+	ResourceClaimName *string
+}
 
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
 // Exactly one reference must be set.

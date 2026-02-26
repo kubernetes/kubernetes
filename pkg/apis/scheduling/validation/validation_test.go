@@ -638,6 +638,24 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 				})
 			}),
 		},
+		"ok resource claim status": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+			}),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: new("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				}
+			}),
+		},
 	}
 	for name, tc := range successCases {
 		tc.old.ResourceVersion = "0"
@@ -749,6 +767,14 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 					},
 				}
 				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"non-existent resource claim in status": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: new("my-claim")},
+				}
 			}),
 		},
 	}

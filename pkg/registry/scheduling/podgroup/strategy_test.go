@@ -357,6 +357,12 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 				ResourceClaimName: new("resource-claim"),
 			},
 		}
+		w.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+			{
+				Name:              "my-claim",
+				ResourceClaimName: new("generated-claim"),
+			},
+		}
 		return w
 	}()
 
