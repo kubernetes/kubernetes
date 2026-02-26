@@ -19,6 +19,7 @@ package certificate
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/certificate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
@@ -404,5 +408,60 @@ func TestNewCertificateManagerConfigGetTemplate(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestNewKubeletClientCertificateManager_ParseRotateCertFail(t *testing.T) {
+	certDir := t.TempDir()
+	nodeName := types.NodeName("test-node")
+
+	// Generate valid bootstrap cert and key
+	bootstrapCert, bootstrapKey, err := cert.GenerateSelfSignedCertKey("k8s.io", nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to generate bootstrap cert/key: %v", err)
+	}
+
+	// Create an invalid current cert file that will cause parse failure
+	// The file store looks for <pairNamePrefix>-current.pem first
+	currentCertFileName := filepath.Join(certDir, "kubelet-client-current.pem")
+	invalidCertData := []byte("invalid-certificate-data-that-will-cause-parse-failure")
+	if err := os.WriteFile(currentCertFileName, invalidCertData, 0644); err != nil {
+		t.Fatalf("Failed to write invalid current cert file: %v", err)
+	}
+
+	// Verify the current cert file exists before calling NewKubeletClientCertificateManager
+	if _, err := os.Stat(currentCertFileName); err != nil {
+		t.Fatalf("Current cert file should exist before test: %v", err)
+	}
+
+	// Call NewKubeletClientCertificateManager with bootstrap data
+	// This should trigger the parse rotate cert failure and cleanup
+	clientsetFn := func(current *tls.Certificate) (clientset.Interface, error) {
+		return nil, nil
+	}
+
+	_, err = NewKubeletClientCertificateManager(
+		certDir,
+		nodeName,
+		bootstrapCert,
+		bootstrapKey,
+		"", // certFile - empty, will use store
+		"", // keyFile - empty, will use store
+		clientsetFn,
+	)
+
+	// We expect an error containing ParserotatCertFailMsg
+	if err == nil {
+		t.Fatal("Expected error from NewKubeletClientCertificateManager, got nil")
+	}
+
+	// Verify the error contains the ParserotatCertFailMsg
+	if !strings.Contains(err.Error(), certificate.ParserotateCertFailMsg) {
+		t.Errorf("Expected error to contain %q, got: %v", certificate.ParserotateCertFailMsg, err)
+	}
+
+	// Verify the current cert file was cleaned up by removeRotateFile
+	if _, err := os.Stat(currentCertFileName); !os.IsNotExist(err) {
+		t.Errorf("Expected current cert file to be removed after parse failure, but it still exists")
 	}
 }

@@ -35,6 +35,8 @@ const (
 	pemExtension  = ".pem"
 	currentPair   = "current"
 	updatedPair   = "updated"
+
+	ParserotateCertFailMsg = "parse rotate cert failed"
 )
 
 type fileStore struct {
@@ -191,11 +193,11 @@ func loadFile(pairFile string) (*tls.Certificate, error) {
 	// the same file.
 	cert, err := tls.LoadX509KeyPair(pairFile, pairFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert data from %q into cert/key pair: %v", pairFile, err)
+		return nil, fmt.Errorf("%s, could not convert data from %q into cert/key pair: %w", ParserotateCertFailMsg, pairFile, err)
 	}
 	certs, err := x509.ParseCertificates(cert.Certificate[0])
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse certificate data: %v", err)
+		return nil, fmt.Errorf("%s, unable to parse certificate data: %w", ParserotateCertFailMsg, err)
 	}
 	cert.Leaf = certs[0]
 	return &cert, nil

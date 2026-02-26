@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -43,6 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
 )
+
+const pairNamePrefix = "kubelet-client"
 
 func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddress) func() *x509.CertificateRequest {
 	return func() *x509.CertificateRequest {
@@ -207,7 +211,7 @@ func NewKubeletClientCertificateManager(
 ) (certificate.Manager, error) {
 
 	certificateStore, err := certificate.NewFileStore(
-		"kubelet-client",
+		pairNamePrefix,
 		certDirectory,
 		certDirectory,
 		certFile,
@@ -247,6 +251,9 @@ func NewKubeletClientCertificateManager(
 		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
+		if isParseRotateErr(err) {
+			removeRotateFile(certDirectory, pairNamePrefix)
+		}
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
 	}
 
@@ -319,4 +326,32 @@ func (m *kubeletServerCertificateDynamicFileManager) Stop() {
 // ServerHealthy always returns true since the file manager doesn't communicate with any server
 func (m *kubeletServerCertificateDynamicFileManager) ServerHealthy() bool {
 	return true
+}
+
+func isParseRotateErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err.Error() == "" {
+		return false
+	}
+	if strings.Contains(err.Error(), certificate.ParserotateCertFailMsg) {
+		return true
+	}
+	return false
+}
+
+func removeRotateFile(certDirectory, certNamePrefix string) {
+	logger := klog.TODO()
+	store, err := certificate.NewFileStore(certNamePrefix, certDirectory, certDirectory, "", "")
+	if err != nil || store == nil {
+		logger.Info("Skip to delete residual rotation certificate file", "err", err)
+		return
+	}
+	fileName := store.CurrentPath()
+	logger.Info("Delete residual rotation certificate file", "path", fileName)
+	err = os.Remove(fileName)
+	if err != nil {
+		logger.Info("Delete residual rotation certificate file failed", "err", err)
+	}
 }
