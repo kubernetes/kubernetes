@@ -928,6 +928,9 @@ func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, o
 		resp.Kvs = rangeResp.Kvs
 		resp.Count = rangeResp.Count
 		resp.Revision = rangeResp.Header.Revision
+	} else if recursive {
+		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
+		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
 	} else {
 		var getResp kubernetes.GetResponse
 		getResp, err = s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
