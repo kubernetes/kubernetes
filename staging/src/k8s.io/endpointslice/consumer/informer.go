@@ -18,7 +18,6 @@ package consumer
 
 import (
 	"context"
-	"time"
 
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,9 +40,8 @@ type EndpointSliceInformer struct {
 // NewEndpointSliceInformer creates a new EndpointSliceInformer.
 func NewEndpointSliceInformer(
 	informerFactory informers.SharedInformerFactory,
-	nodeName string,
 ) *EndpointSliceInformer {
-	consumer := NewEndpointSliceConsumer(nodeName)
+	consumer := NewEndpointSliceConsumer()
 	informer := informerFactory.Discovery().V1().EndpointSlices()
 
 	return &EndpointSliceInformer{
@@ -110,12 +108,6 @@ func (i *EndpointSliceInformer) GetEndpointSlices(serviceNN types.NamespacedName
 	return i.consumer.GetEndpointSlices(serviceNN)
 }
 
-// GetEndpoints returns all endpoints for a service, merging and deduplicating
-// endpoints from all EndpointSlices for the service.
-func (i *EndpointSliceInformer) GetEndpoints(serviceNN types.NamespacedName) []discovery.Endpoint {
-	return i.consumer.GetEndpoints(serviceNN)
-}
-
 // HasSynced returns true if the underlying informer has synced.
 func (i *EndpointSliceInformer) HasSynced() bool {
 	return i.informer.Informer().HasSynced()
@@ -135,9 +127,4 @@ func (i *EndpointSliceInformer) SetTransform(transform cache.TransformFunc) erro
 // SetWatchErrorHandler sets a watch error handler for the underlying informer.
 func (i *EndpointSliceInformer) SetWatchErrorHandler(handler cache.WatchErrorHandler) error {
 	return i.informer.Informer().SetWatchErrorHandler(handler)
-}
-
-// SetRelistDuration sets the relist duration for the underlying informer.
-func (i *EndpointSliceInformer) SetRelistDuration(duration time.Duration) {
-	i.informer.Informer().SetRelistDuration(duration)
 }

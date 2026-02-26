@@ -8,36 +8,36 @@ The EndpointSlice API is the mechanism that Kubernetes uses to let Services scal
 
 This package provides helper functions that make it easier to consume EndpointSlices by:
 
-1. Providing a unified view of all endpoints for a service across multiple EndpointSlice objects
-2. Handling the complexity of tracking, merging, and deduplicating endpoints from multiple slices
+1. Providing a unified view of all EndpointSlices for a service across multiple EndpointSlice objects
+2. Handling the complexity of tracking EndpointSlice additions, updates, and deletions
 3. Offering informer-like and lister-like interfaces that are familiar to Kubernetes developers
 
 ## Components
 
 ### EndpointSliceConsumer
 
-The `EndpointSliceConsumer` is the core component that tracks EndpointSlices and provides a unified view of endpoints for a service.
+The `EndpointSliceConsumer` is the core component that tracks EndpointSlices and provides a unified view for a service. It is kept up-to-date via `OnEndpointSliceAdd`, `OnEndpointSliceUpdate`, and `OnEndpointSliceDelete` callbacks (typically wired up via an informer).
 
 ```go
 // Create a new consumer
-consumer := consumer.NewEndpointSliceConsumer("node1")
+c := consumer.NewEndpointSliceConsumer()
 
 // Add an event handler
-consumer.AddEventHandler(consumer.EndpointChangeHandlerFunc(func(serviceNN types.NamespacedName, slices []*discovery.EndpointSlice) {
+c.AddEventHandler(consumer.EndpointChangeHandlerFunc(func(serviceNN types.NamespacedName, slices []*discovery.EndpointSlice) {
     fmt.Printf("Service %s/%s has %d slices\n", serviceNN.Namespace, serviceNN.Name, len(slices))
 }))
 
-// Get all endpoints for a service
-endpoints := consumer.GetEndpoints(types.NamespacedName{Namespace: "default", Name: "my-service"})
+// Get all EndpointSlices for a service
+slices := c.GetEndpointSlices(types.NamespacedName{Namespace: "default", Name: "my-service"})
 ```
 
 ### EndpointSliceInformer
 
-The `EndpointSliceInformer` provides an informer-like interface for EndpointSlices that handles merging multiple slices for the same service.
+The `EndpointSliceInformer` provides an informer-like interface for EndpointSlices that handles tracking multiple slices for the same service.
 
 ```go
 // Create a new informer
-informer := consumer.NewEndpointSliceInformer(informerFactory, "node1")
+informer := consumer.NewEndpointSliceInformer(informerFactory)
 
 // Add an event handler
 informer.AddEventHandler(consumer.EndpointChangeHandlerFunc(func(serviceNN types.NamespacedName, slices []*discovery.EndpointSlice) {
@@ -50,22 +50,22 @@ if err := informer.Run(ctx); err != nil {
     return
 }
 
-// Get endpoints for a service
-endpoints := informer.GetEndpoints(types.NamespacedName{Namespace: "default", Name: "my-service"})
+// Get all EndpointSlices for a service
+slices := informer.GetEndpointSlices(types.NamespacedName{Namespace: "default", Name: "my-service"})
 ```
 
 ### EndpointSliceLister
 
-The `EndpointSliceLister` provides a lister-like interface for EndpointSlices that handles merging multiple slices for the same service.
+The `EndpointSliceLister` provides a lister-like interface for EndpointSlices that allows listing slices for a given service by label.
 
 ```go
 // Create a new lister
-lister := consumer.NewEndpointSliceLister(endpointSliceLister, "node1")
+lister := consumer.NewEndpointSliceLister(endpointSliceLister)
 
-// Get all endpoints for a service
-endpoints, err := lister.EndpointSlices("default").GetEndpoints("my-service")
+// Get all EndpointSlices for a service
+slices, err := lister.EndpointSlices("default").Get("my-service")
 if err != nil {
-    klog.ErrorS(err, "Failed to get endpoints")
+    klog.ErrorS(err, "Failed to get EndpointSlices")
     return
 }
 ```
@@ -78,8 +78,5 @@ When migrating from Endpoints to EndpointSlices, consider the following:
 
 1. EndpointSlices are more scalable than Endpoints, especially for services with a large number of backends
 2. EndpointSlices provide more information about endpoints, such as topology hints and node names
-3. EndpointSlices are the preferred way to access endpoint information in Kubernetes
-
-## Example
-
-See the [example_test.go](example_test.go) file for complete examples of how to use this package.
+3. Each EndpointSlice carries its own `Ports` field; consumers that need to associate ports with endpoints should iterate over `GetEndpointSlices` rather than flattening all endpoints into a single list
+4. EndpointSlices are the preferred way to access endpoint information in Kubernetes

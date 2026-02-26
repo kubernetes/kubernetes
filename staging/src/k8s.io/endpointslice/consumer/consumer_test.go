@@ -29,15 +29,12 @@ import (
 func TestEndpointSliceConsumer(t *testing.T) {
 	testCases := []struct {
 		name           string
-		nodeName       string
 		endpointSlices []*discovery.EndpointSlice
 		serviceNN      types.NamespacedName
 		expectedSlices int
-		expectedEps    int
 	}{
 		{
-			name:     "single slice",
-			nodeName: "node1",
+			name: "single slice",
 			endpointSlices: []*discovery.EndpointSlice{
 				createTestEndpointSlice("svc1", "ns1", "slice1", []discovery.Endpoint{
 					createTestEndpoint([]string{"10.0.0.1"}, ptr.To("node1"), ptr.To(true)),
@@ -46,11 +43,9 @@ func TestEndpointSliceConsumer(t *testing.T) {
 			},
 			serviceNN:      types.NamespacedName{Namespace: "ns1", Name: "svc1"},
 			expectedSlices: 1,
-			expectedEps:    2,
 		},
 		{
-			name:     "multiple slices",
-			nodeName: "node1",
+			name: "multiple slices",
 			endpointSlices: []*discovery.EndpointSlice{
 				createTestEndpointSlice("svc1", "ns1", "slice1", []discovery.Endpoint{
 					createTestEndpoint([]string{"10.0.0.1"}, ptr.To("node1"), ptr.To(true)),
@@ -63,11 +58,9 @@ func TestEndpointSliceConsumer(t *testing.T) {
 			},
 			serviceNN:      types.NamespacedName{Namespace: "ns1", Name: "svc1"},
 			expectedSlices: 2,
-			expectedEps:    4,
 		},
 		{
-			name:     "duplicate endpoints",
-			nodeName: "node1",
+			name: "duplicate endpoints across slices",
 			endpointSlices: []*discovery.EndpointSlice{
 				createTestEndpointSlice("svc1", "ns1", "slice1", []discovery.Endpoint{
 					createTestEndpoint([]string{"10.0.0.1"}, ptr.To("node1"), ptr.To(true)),
@@ -80,28 +73,12 @@ func TestEndpointSliceConsumer(t *testing.T) {
 			},
 			serviceNN:      types.NamespacedName{Namespace: "ns1", Name: "svc1"},
 			expectedSlices: 2,
-			expectedEps:    3, // Should deduplicate 10.0.0.1
-		},
-		{
-			name:     "local vs non-local duplicate",
-			nodeName: "node1",
-			endpointSlices: []*discovery.EndpointSlice{
-				createTestEndpointSlice("svc1", "ns1", "slice1", []discovery.Endpoint{
-					createTestEndpoint([]string{"10.0.0.1"}, ptr.To("node2"), ptr.To(true)), // Non-local
-				}),
-				createTestEndpointSlice("svc1", "ns1", "slice2", []discovery.Endpoint{
-					createTestEndpoint([]string{"10.0.0.1"}, ptr.To("node1"), ptr.To(true)), // Local
-				}),
-			},
-			serviceNN:      types.NamespacedName{Namespace: "ns1", Name: "svc1"},
-			expectedSlices: 2,
-			expectedEps:    1, // Should prefer the local endpoint
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			consumer := NewEndpointSliceConsumer(tc.nodeName)
+			consumer := NewEndpointSliceConsumer()
 
 			// Add all slices
 			for _, slice := range tc.endpointSlices {
@@ -112,12 +89,6 @@ func TestEndpointSliceConsumer(t *testing.T) {
 			slices := consumer.GetEndpointSlices(tc.serviceNN)
 			if len(slices) != tc.expectedSlices {
 				t.Errorf("Expected %d slices, got %d", tc.expectedSlices, len(slices))
-			}
-
-			// Check GetEndpoints
-			endpoints := consumer.GetEndpoints(tc.serviceNN)
-			if len(endpoints) != tc.expectedEps {
-				t.Errorf("Expected %d endpoints, got %d", tc.expectedEps, len(endpoints))
 			}
 
 			// Test event handler
@@ -161,7 +132,7 @@ func TestEndpointSliceCacheKeys(t *testing.T) {
 	testCases := []struct {
 		name          string
 		endpointSlice *discovery.EndpointSlice
-		expectError   bool
+		expectValid   bool
 		expectedNN    types.NamespacedName
 		expectedKey   string
 	}{
@@ -176,7 +147,7 @@ func TestEndpointSliceCacheKeys(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
+			expectValid: true,
 			expectedNN:  types.NamespacedName{Namespace: "ns1", Name: "svc1"},
 			expectedKey: "slice1",
 		},
@@ -188,7 +159,7 @@ func TestEndpointSliceCacheKeys(t *testing.T) {
 					Namespace: "ns1",
 				},
 			},
-			expectError: true,
+			expectValid: false,
 		},
 		{
 			name: "empty service name label",
@@ -201,44 +172,17 @@ func TestEndpointSliceCacheKeys(t *testing.T) {
 					},
 				},
 			},
-			expectError: true,
-		},
-		{
-			name: "missing namespace",
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "slice1",
-					Labels: map[string]string{
-						discovery.LabelServiceName: "svc1",
-					},
-				},
-			},
-			expectError: true,
-		},
-		{
-			name: "missing name",
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns1",
-					Labels: map[string]string{
-						discovery.LabelServiceName: "svc1",
-					},
-				},
-			},
-			expectError: true,
+			expectValid: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			nn, key, err := endpointSliceCacheKeys(tc.endpointSlice)
-			if tc.expectError && err == nil {
-				t.Error("Expected error but got none")
+			nn, key, ok := endpointSliceCacheKeys(tc.endpointSlice)
+			if ok != tc.expectValid {
+				t.Errorf("Expected valid=%v, got valid=%v", tc.expectValid, ok)
 			}
-			if !tc.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if !tc.expectError {
+			if tc.expectValid {
 				if !reflect.DeepEqual(nn, tc.expectedNN) {
 					t.Errorf("Expected NamespacedName %v, got %v", tc.expectedNN, nn)
 				}

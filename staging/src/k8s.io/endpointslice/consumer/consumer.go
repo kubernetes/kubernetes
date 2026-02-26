@@ -17,14 +17,12 @@ limitations under the License.
 package consumer
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 	"sync"
 
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 )
 
 // EndpointSliceConsumer provides a unified view of endpoints for services
@@ -39,10 +37,6 @@ type EndpointSliceConsumer struct {
 
 	// handlers for endpoint changes
 	handlers []EndpointChangeHandler
-
-	// nodeName is the name of the node this consumer is running on.
-	// Used to determine if an endpoint is local.
-	nodeName string
 }
 
 // EndpointChangeHandler is called when endpoints for a service change.
@@ -60,10 +54,9 @@ func (f EndpointChangeHandlerFunc) OnEndpointsChange(serviceNN types.NamespacedN
 }
 
 // NewEndpointSliceConsumer creates a new EndpointSliceConsumer.
-func NewEndpointSliceConsumer(nodeName string) *EndpointSliceConsumer {
+func NewEndpointSliceConsumer() *EndpointSliceConsumer {
 	return &EndpointSliceConsumer{
 		slicesByService: make(map[types.NamespacedName]map[string]*discovery.EndpointSlice),
-		nodeName:        nodeName,
 	}
 }
 
@@ -76,9 +69,8 @@ func (c *EndpointSliceConsumer) AddEventHandler(handler EndpointChangeHandler) {
 
 // OnEndpointSliceAdd is called when an EndpointSlice is added.
 func (c *EndpointSliceConsumer) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
-	serviceNN, sliceName, err := endpointSliceCacheKeys(endpointSlice)
-	if err != nil {
-		klog.ErrorS(err, "Error getting endpoint slice cache keys")
+	serviceNN, sliceName, ok := endpointSliceCacheKeys(endpointSlice)
+	if !ok {
 		return
 	}
 
@@ -108,9 +100,8 @@ func (c *EndpointSliceConsumer) OnEndpointSliceUpdate(_, newEndpointSlice *disco
 
 // OnEndpointSliceDelete is called when an EndpointSlice is deleted.
 func (c *EndpointSliceConsumer) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
-	serviceNN, sliceName, err := endpointSliceCacheKeys(endpointSlice)
-	if err != nil {
-		klog.ErrorS(err, "Error getting endpoint slice cache keys")
+	serviceNN, sliceName, ok := endpointSliceCacheKeys(endpointSlice)
+	if !ok {
 		return
 	}
 
@@ -154,55 +145,6 @@ func (c *EndpointSliceConsumer) GetEndpointSlices(serviceNN types.NamespacedName
 	return result
 }
 
-// GetEndpoints returns all endpoints for a service, merging and deduplicating
-// endpoints from all EndpointSlices for the service.
-func (c *EndpointSliceConsumer) GetEndpoints(serviceNN types.NamespacedName) []discovery.Endpoint {
-	slices := c.GetEndpointSlices(serviceNN)
-	if len(slices) == 0 {
-		return nil
-	}
-
-	// Use a map to deduplicate endpoints by address
-	endpointMap := make(map[string]discovery.Endpoint)
-
-	for _, slice := range slices {
-		for _, endpoint := range slice.Endpoints {
-			if len(endpoint.Addresses) == 0 {
-				continue
-			}
-
-			// Use the first address as the key for deduplication
-			key := endpoint.Addresses[0]
-			
-			// If we already have this endpoint, only replace it if the existing one
-			// is not local but the new one is
-			existingEp, exists := endpointMap[key]
-			isLocal := endpoint.NodeName != nil && *endpoint.NodeName == c.nodeName
-			existingIsLocal := exists && existingEp.NodeName != nil && *existingEp.NodeName == c.nodeName
-			
-			if !exists || (isLocal && !existingIsLocal) {
-				endpointMap[key] = *endpoint.DeepCopy()
-			}
-		}
-	}
-
-	// Convert map to slice
-	result := make([]discovery.Endpoint, 0, len(endpointMap))
-	for _, endpoint := range endpointMap {
-		result = append(result, endpoint)
-	}
-
-	// Sort endpoints by address for consistent results
-	sort.Slice(result, func(i, j int) bool {
-		if len(result[i].Addresses) == 0 || len(result[j].Addresses) == 0 {
-			return len(result[i].Addresses) > len(result[j].Addresses)
-		}
-		return result[i].Addresses[0] < result[j].Addresses[0]
-	})
-
-	return result
-}
-
 // notifyHandlersLocked notifies all handlers of an endpoint change.
 // The caller must hold the lock.
 func (c *EndpointSliceConsumer) notifyHandlersLocked(serviceNN types.NamespacedName) {
@@ -237,13 +179,11 @@ func (c *EndpointSliceConsumer) notifyHandlersLocked(serviceNN types.NamespacedN
 }
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
-func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, error) {
-	var err error
+// Returns false if the EndpointSlice does not correspond to a Service.
+func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, bool) {
 	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
 	if !ok || serviceName == "" {
-		err = fmt.Errorf("no %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
-	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
-		err = fmt.Errorf("expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+		return types.NamespacedName{}, "", false
 	}
-	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
+	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, true
 }
