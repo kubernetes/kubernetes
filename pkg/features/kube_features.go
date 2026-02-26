@@ -767,6 +767,12 @@ const (
 	// Enables PreferSameZone and PreferSameNode values for trafficDistribution
 	PreferSameTrafficDistribution featuregate.Feature = "PreferSameTrafficDistribution"
 
+	// owner: @ArvindParekh
+	// kep: https://kep.k8s.io/5541
+	//
+	// Adds a new `UnusedSince` status field to `PersistentVolumeClaim` that indicates the time since the PVC was last used by a pod.
+	PersistentVolumeClaimUnusedSinceTime featuregate.Feature = "PersistentVolumeClaimUnusedSinceTime"
+
 	// owner: @sreeram-venkitesh
 	//
 	// Denies pod admission if static pods reference other API objects.
@@ -1708,6 +1714,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	PersistentVolumeClaimUnusedSinceTime: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PreventStaticPodAPIReferences: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2458,6 +2468,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PortForwardWebsockets: {},
 
 	PreferSameTrafficDistribution: {},
+
+	PersistentVolumeClaimUnusedSinceTime: {},
 
 	PreventStaticPodAPIReferences: {},
 
