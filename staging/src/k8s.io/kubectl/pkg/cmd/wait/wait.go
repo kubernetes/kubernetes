@@ -134,7 +134,6 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.RunWaitContext(cmd.Context()))
 		},
-		SuggestFor: []string{"list", "ps"},
 	}
 
 	flags.AddFlags(cmd)
