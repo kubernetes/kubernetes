@@ -1,0 +1,29 @@
+pkg k8s.io/apimachinery/pkg/api/validate, func Discriminated[Tfield any, Tdisc comparable, Tstruct any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, structPath *k8s.io/apimachinery/pkg/util/validation/field.Path, obj *Tstruct, oldObj *Tstruct, fieldName string, getMemberValue func(*Tstruct) Tfield, getDiscriminator func(*Tstruct) Tdisc, equiv MatchFunc[Tfield], defaultValidation ValidateFunc[Tfield], rules []DiscriminatedRule[Tfield, Tdisc]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func PathSegmentName[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, type DiscriminatedRule struct{Value Tdisc; Validation ValidateFunc[Tfield]}
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsPathSegmentName(name string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsPathSegmentPrefix(name string) []string
+pkg k8s.io/apimachinery/pkg/api/validation/path, var IsValidPathSegmentName func(name string) []string
+pkg k8s.io/apimachinery/pkg/api/validation/path, var IsValidPathSegmentPrefix func(name string) []string
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunUpdateValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options []string, unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options []string, unversioned k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string)
+pkg k8s.io/apimachinery/pkg/util/httpstream/wsstream, func IgnoreReceivesWithLogger(logger k8s.io/klog/v2.Logger, ws *golang.org/x/net/websocket.Conn, timeout time.Duration)
+pkg k8s.io/apimachinery/pkg/util/httpstream/wsstream, func NewReaderWithLogger(logger k8s.io/klog/v2.Logger, r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader
+pkg k8s.io/apimachinery/pkg/util/httpstream/wsstream, type Reader struct{logger k8s.io/klog/v2.Logger; err chan error; r io.Reader; ping bool; timeout time.Duration; protocols map[string]ReaderProtocolConfig; selectedProtocol string; handleCrash func(ctx context.Context, additionalHandlers ...func(context.Context, interface{}))}
+pkg k8s.io/apimachinery/pkg/util/net, func ChooseBindAddressForInterfaceWithLogger(logger k8s.io/klog/v2.Logger, intfName string) (net.IP, error)
+pkg k8s.io/apimachinery/pkg/util/net, func ChooseHostInterfaceWithLogger(logger k8s.io/klog/v2.Logger) (net.IP, error)
+pkg k8s.io/apimachinery/pkg/util/net, func ResolveBindAddressWithLogger(logger k8s.io/klog/v2.Logger, bindAddress net.IP) (net.IP, error)
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) IsAlpha() bool
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) IsBeta() bool
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) MarkAlpha() *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) MarkBeta() *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) MarkFromImperative() *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) MarkAlpha() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) MarkBeta() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) MarkFromImperative() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) BySource() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByValidationStabilityLevel() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ValidationStabilityLevel) String() string
+pkg k8s.io/apimachinery/pkg/util/validation/field, type Error struct{Type ErrorType; Field string; BadValue interface{}; Detail string; Origin string; CoveredByDeclarative bool; FromImperative bool; ValidationStabilityLevel ValidationStabilityLevel}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ErrorMatcher struct{matchType bool; matchField bool; matchValue bool; matchOrigin bool; matchDetail func(want string, got string) bool; requireOriginWhenInvalid bool; matchValidationStabilityLevel bool; matchSource bool; normalizationRules []NormalizationRule}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ValidationStabilityLevel int
