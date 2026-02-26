@@ -60,29 +60,6 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
-	startScheduler(tCtx)
-
-	// Create slice without binding conditions first so it gets allocated first
-	sliceWithoutBinding := &resourceapi.ResourceSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: namespace + "-without-binding-",
-		},
-		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: &nodeName,
-			Pool: resourceapi.ResourcePool{
-				Name:               poolWithoutBinding,
-				ResourceSliceCount: 1,
-			},
-			Driver: driverName,
-			Devices: []resourceapi.Device{
-				{
-					Name: "without-binding",
-				},
-			},
-		},
-	}
-	_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{FieldValidation: "Strict"})
-	tCtx.ExpectNoError(err, "create slice without binding conditions")
 
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -104,7 +81,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 			},
 		},
 	}
-	slice, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{FieldValidation: "Strict"})
+	slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create slice")
 
 	haveBindingConditionFields := len(slice.Spec.Devices[0].BindingConditions) > 0 || len(slice.Spec.Devices[0].BindingFailureConditions) > 0
@@ -118,6 +95,28 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 		tCtx.Fatalf("Expected device binding condition fields to be stored, got instead:\n%s", format.Object(slice, 1))
 	}
 
+	sliceWithoutBinding := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: namespace + "-without-binding-",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Pool: resourceapi.ResourcePool{
+				Name:               poolWithoutBinding,
+				ResourceSliceCount: 1,
+			},
+			Driver: driverName,
+			Devices: []resourceapi.Device{
+				{
+					Name: "without-binding",
+				},
+			},
+		},
+	}
+	_, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{FieldValidation: "Strict"})
+	tCtx.ExpectNoError(err, "create slice without binding conditions")
+
+	startScheduler(tCtx)
 	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
 	start := time.Now()
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
