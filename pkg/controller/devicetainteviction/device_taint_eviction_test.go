@@ -2603,18 +2603,13 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx)
 
-	var mutex sync.Mutex
 	podEvicting := false
 	controller.evictPodHook = func(podRef tainteviction.NamespacedObject, eviction evictionAndReason) {
 		tCtx.Assert(podRef).Should(gomega.Equal(newObject(pod)))
-		mutex.Lock()
-		defer mutex.Unlock()
 		podEvicting = true
 	}
 	controller.cancelEvictHook = func(podRef tainteviction.NamespacedObject) bool {
 		tCtx.Assert(podRef).Should(gomega.Equal(newObject(pod)))
-		mutex.Lock()
-		defer mutex.Unlock()
 		podEvicting = false
 		return false
 	}
@@ -2632,11 +2627,8 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}()
 
 	// Eventually the pod gets scheduled for eviction.
-	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return podEvicting
-	}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod pending eviction"))
+	tCtx.Wait()
+	tCtx.Expect(podEvicting).To(gomega.BeTrueBecause("pod pending eviction"))
 
 	// Now we can delete the pod or slice.
 	if deletePod {
@@ -2646,18 +2638,13 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	// Shortly after deletion we should also see the cancellation.
-	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return podEvicting
-	}).WithTimeout(30 * time.Second).Should(gomega.BeFalseBecause("pod no longer pending eviction"))
+	tCtx.Wait()
+	tCtx.Expect(podEvicting).To(gomega.BeFalseBecause("pod no longer pending eviction"))
 
 	// Whether we get an event depends on whether the pod still exists.
-	// If we expect an event, we need to wait for it.
 	if !deletePod {
-		tCtx.Eventually(listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
+		tCtx.Expect(listEvents(tCtx)).Should(matchCancellationEvent())
 	}
-	tCtx.Wait()
 
 	matchEvents := matchCancellationEvent()
 	if deletePod {
@@ -2705,13 +2692,10 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "get pod before eviction")
 	tCtx.Assert(pod).Should(gomega.Equal(podWithClaimName), "test pod")
 
-	var mutex sync.Mutex
 	var podGets int
 	var podDeletions int
 
 	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
 		podGets++
 		podName := action.(core.GetAction).GetName()
 		tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of patched pod")
@@ -2722,8 +2706,6 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
 	})
 	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		mutex.Lock()
-		defer mutex.Unlock()
 		podDeletions++
 		podName := action.(core.DeleteAction).GetName()
 		tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of deleted pod")
@@ -2742,13 +2724,6 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		defer wg.Done()
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	}()
-
-	// Eventually the pod gets deleted, in this test by us.
-	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return podGets >= 1
-	}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
 
 	// We don't want any events.
 	tCtx.Wait()
