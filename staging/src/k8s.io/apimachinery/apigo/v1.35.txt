@@ -1,0 +1,138 @@
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/api/validate, const NoModify UpdateConstraint
+pkg k8s.io/apimachinery/pkg/api/validate, const NoSet UpdateConstraint
+pkg k8s.io/apimachinery/pkg/api/validate, const NoUnset UpdateConstraint
+pkg k8s.io/apimachinery/pkg/api/validate, func DirectEqualPtr[T comparable](a *T, b *T) bool
+pkg k8s.io/apimachinery/pkg/api/validate, func Enum[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T, validValues k8s.io/apimachinery/pkg/util/sets.Set[T], exclusions []EnumExclusion[T]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ExtendedResourceName[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func IfOption[T any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T, optionName string, enabled bool, validator func(context.Context, k8s.io/apimachinery/pkg/api/operation.Operation, *k8s.io/apimachinery/pkg/util/validation/field.Path, *T, *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Immutable[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, _ T, _ T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func LabelKey[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func LabelValue[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func LongNameCaseless[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func LongName[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func MaxItems[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value []T, _ []T, max int) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func MaxLength[T ~string](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T, max int) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func NewDiscriminatedUnionMember(fieldName string, discriminatorValue string) UnionMember
+pkg k8s.io/apimachinery/pkg/api/validate, func NewDiscriminatedUnionMembership(discriminatorFieldName string, members ...UnionMember) *UnionMembership
+pkg k8s.io/apimachinery/pkg/api/validate, func NewUnionMember(fieldName string) UnionMember
+pkg k8s.io/apimachinery/pkg/api/validate, func NewUnionMembership(member ...UnionMember) *UnionMembership
+pkg k8s.io/apimachinery/pkg/api/validate, func ResourceFullyQualifiedName[T ~string](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ResourcePoolName[T ~string](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ShortName[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Subfield[Tstruct, Tfield any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newStruct *Tstruct, oldStruct *Tstruct, fldName string, getField GetFieldFunc[Tstruct, Tfield], equiv MatchFunc[Tfield], validator ValidateFunc[Tfield]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func UUID[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func UpdatePointer[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T, constraints ...UpdateConstraint) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func UpdateStruct[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T, constraints ...UpdateConstraint) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func UpdateValueByCompare[T comparable](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T, constraints ...UpdateConstraint) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func UpdateValueByReflect[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T, constraints ...UpdateConstraint) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, type EnumExclusion struct{Value T; ExcludeWhen bool; Option string}
+pkg k8s.io/apimachinery/pkg/api/validate, type UnionMember struct{fieldName string; discriminatorValue string}
+pkg k8s.io/apimachinery/pkg/api/validate, type UnionMembership struct{discriminatorName string; members []UnionMember}
+pkg k8s.io/apimachinery/pkg/api/validate, type UpdateConstraint int
+pkg k8s.io/apimachinery/pkg/api/validate/content, const DNS1123LabelMaxLength int
+pkg k8s.io/apimachinery/pkg/api/validate/content, const DNS1123SubdomainMaxLength int
+pkg k8s.io/apimachinery/pkg/api/validate/content, const LabelValueMaxLength int
+pkg k8s.io/apimachinery/pkg/api/validate/content, func EmptyError() string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsCIdentifier(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsDNS1123Label(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsDNS1123Subdomain(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsDNS1123SubdomainCaseless(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsDecimalInteger(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsLabelKey(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func IsLabelValue(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func MaxLenError(length int) string
+pkg k8s.io/apimachinery/pkg/api/validate/content, func RegexError(msg string, re string, examples ...string) string
+pkg k8s.io/apimachinery/pkg/api/validate/content, var IsQualifiedName func(value string) []string
+pkg k8s.io/apimachinery/pkg/api/validation, func ValidateObjectMetaAccessorWithOpts(meta k8s.io/apimachinery/pkg/apis/meta/v1.Object, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, options ...ObjectMetaValidationOption) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validation, func ValidateObjectMetaWithOpts(objMeta *k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, options ...ObjectMetaValidationOption) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validation, type ObjectMetaValidationOption func(opts *objectMetaValidationOptions)
+pkg k8s.io/apimachinery/pkg/api/validation, type ValidateNameFuncWithErrors func(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, name string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (InternalEvent) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Table) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableColumnDefinition) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableRow) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableRowCondition) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (Allocator) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (NegotiateError) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (NoopDecoder) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (NoopEncoder) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (Pair) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (SerializerInfo) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (SimpleAllocator) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (StreamSerializerInfo) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (WithVersionEncoder) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, method (WithoutVersionDecoder) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/runtime, type ProtobufMarshaller interface{MarshalTo(data []byte) (int, error); Size() int}
+pkg k8s.io/apimachinery/pkg/runtime, type ProtobufReverseMarshaller interface{MarshalToSizedBuffer(data []byte) (int, error); Size() int}
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) OpenAPIModelName() string
+pkg k8s.io/apimachinery/pkg/util/resourceversion, func CompareResourceVersion(a string, b string) (int, error)
+pkg k8s.io/apimachinery/pkg/util/resourceversion, method (InvalidResourceVersion) Error() string
+pkg k8s.io/apimachinery/pkg/util/resourceversion, type InvalidResourceVersion struct{rv string}
+pkg k8s.io/apimachinery/pkg/util/sort, func MergePreservingRelativeOrder(inputLists [][]string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, func IsDomainPrefixedKey(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, key string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation, var IsCIdentifier func(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, var IsQualifiedName func(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, var IsValidLabelValue func(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) PrefixDetail(prefix string) ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByFieldNormalized(rules []NormalizationRule) ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ErrorMatcher struct{matchType bool; matchField bool; matchValue bool; matchOrigin bool; matchDetail func(want string, got string) bool; requireOriginWhenInvalid bool; normalizationRules []NormalizationRule}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type NormalizationRule struct{Regexp *regexp.Regexp; Replacement string}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type TestIntf interface{Errorf(format string, args ...any); Helper()}
+pkg k8s.io/apimachinery/pkg/version, method (Info) OpenAPIModelName() string
