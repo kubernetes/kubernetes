@@ -22,11 +22,20 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func BenchmarkWatchCacheInitialization(b *testing.B) {
-	// 1. Setup Data (Once)
-	sharedPrefix := path.Join("/", uuid.New().String(), "registry")
-	tCtx := ktesting.Init(b)
+func BenchmarkWatchCacheInitializationRangeStream(b *testing.B) {
+	runWatchCacheInitBenchmark(b, true)
+}
 
+func BenchmarkWatchCacheInitializationPaginated(b *testing.B) {
+	runWatchCacheInitBenchmark(b, false)
+}
+
+func runWatchCacheInitBenchmark(b *testing.B, rangeStreamEnabled bool) {
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.RangeStream, rangeStreamEnabled)
+	tCtx := ktesting.Init(b)
+	sharedPrefix := path.Join("/", uuid.New().String(), "registry")
+
+	// 1. Setup data
 	setupClientSet, _, setupTearDownFn := framework.StartTestServer(tCtx, b, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.Etcd.StorageConfig.Prefix = sharedPrefix
@@ -52,31 +61,9 @@ func BenchmarkWatchCacheInitialization(b *testing.B) {
 	}
 	setupTearDownFn()
 
-	// 2. Run Benchmarks
 	b.ResetTimer()
 
-	state := &benchmarkState{}
-
-	b.Run("RangeStream=true", func(b *testing.B) {
-		runWatchCacheBenchmark(b, sharedPrefix, true, state)
-	})
-
-	b.Run("RangeStream=false", func(b *testing.B) {
-		runWatchCacheBenchmark(b, sharedPrefix, false, state)
-	})
-}
-
-type benchmarkState struct {
-	lastCount int
-	lastSum   float64
-}
-
-func runWatchCacheBenchmark(b *testing.B, sharedPrefix string, rangeStreamEnabled bool, state *benchmarkState) {
-	// User requested to run only once, ignoring b.N loop.
-	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.RangeStream, rangeStreamEnabled)
-	tCtx := ktesting.Init(b)
-
-	// Restart Server
+	// 2. Restart server and measure watch cache initialization
 	clientSet, _, tearDownFn := framework.StartTestServer(tCtx, b, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.Etcd.StorageConfig.Prefix = sharedPrefix
@@ -86,61 +73,58 @@ func runWatchCacheBenchmark(b *testing.B, sharedPrefix string, rangeStreamEnable
 	})
 	defer tearDownFn()
 
-	// Verify/Measure
-	// We want to capture the initialization duration.
-	// We can get it from the metric `etcd_watch_cache_initialization_duration_seconds`.
-
-	duration, err := getWatchCacheInitDuration(tCtx, clientSet, "secrets", state)
+	duration, _, _, err := getWatchCacheInitDuration(tCtx, clientSet, "secrets", 0, 0)
 	if err != nil {
 		b.Errorf("Failed to get watch cache init duration: %v", err)
 		return
 	}
-
 	b.ReportMetric(duration, "s/init")
 }
 
-func getWatchCacheInitDuration(ctx context.Context, client clientset.Interface, resource string, state *benchmarkState) (float64, error) {
+// getWatchCacheInitDuration waits for the watch cache initialization metric to
+// exceed prevCount and returns the incremental duration and new count/sum.
+func getWatchCacheInitDuration(ctx context.Context, client clientset.Interface, resource string, prevCount int, prevSum float64) (float64, int, float64, error) {
 	var duration float64
+	var newCount int
+	var newSum float64
 	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+		count, sum, err := readWatchCacheInitMetric(ctx, client, resource)
 		if err != nil {
-			return false, err
+			return false, nil
 		}
-
-		// Look for etcd_watch_cache_initialization_duration_seconds_sum and count
-		var sum float64
-		var count int
-
-		lines := strings.Split(string(body), "\n")
-		for _, line := range lines {
-			if strings.HasPrefix(line, "etcd_watch_cache_initialization_duration_seconds_sum") && strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
-				parts := strings.Split(line, " ")
-				if len(parts) == 2 {
-					if s, err := strconv.ParseFloat(parts[1], 64); err == nil {
-						sum = s
-					}
-				}
-			}
-			if strings.HasPrefix(line, "etcd_watch_cache_initialization_duration_seconds_count") && strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
-				parts := strings.Split(line, " ")
-				if len(parts) == 2 {
-					if c, err := strconv.ParseFloat(parts[1], 64); err == nil {
-						count = int(c)
-					}
-				}
-			}
-		}
-
-		if count > state.lastCount {
-			// Found new measurement(s)
-			// Assuming single measurement added or we take the delta
-			duration = sum - state.lastSum
-			// Update state
-			state.lastCount = count
-			state.lastSum = sum
+		if count > prevCount {
+			newCount = count
+			newSum = sum
+			duration = (sum - prevSum) / float64(count-prevCount)
 			return true, nil
 		}
 		return false, nil
 	})
-	return duration, err
+	return duration, newCount, newSum, err
+}
+
+func readWatchCacheInitMetric(ctx context.Context, client clientset.Interface, resource string) (count int, sum float64, err error) {
+	body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		if !strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		val, parseErr := strconv.ParseFloat(parts[1], 64)
+		if parseErr != nil {
+			continue
+		}
+		if strings.HasPrefix(line, "etcd_watch_cache_initialization_duration_seconds_count") {
+			count = int(val)
+		} else if strings.HasPrefix(line, "etcd_watch_cache_initialization_duration_seconds_sum") {
+			sum = val
+		}
+	}
+	return count, sum, nil
 }

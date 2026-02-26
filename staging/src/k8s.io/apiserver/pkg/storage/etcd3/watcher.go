@@ -304,7 +304,6 @@ func (wc *watchChan) sync() error {
 			// In RangeStream, we receive a stream of GetResponse.
 			// We need to iterate over them.
 			var streamRev int64
-			var fetchedCount int
 			for r := range streamResp {
 				if r.Err != nil {
 					return interpretListError(r.Err, true, preparedKey, wc.key)
@@ -312,7 +311,6 @@ func (wc *watchChan) sync() error {
 
 				rangeResp := r.RangeStreamResponse.RangeResponse
 				for i, kv := range rangeResp.Kvs {
-					fetchedCount++
 					lastKey = kv.Key
 					wc.queueEvent(parseKV(kv))
 					rangeResp.Kvs[i] = nil
@@ -330,7 +328,6 @@ func (wc *watchChan) sync() error {
 				wc.initialRev = streamRev
 			}
 			metrics.RecordWatchCacheInitialization(wc.watcher.groupResource, syncStartTime)
-			metrics.RecordRangeStreamFetchedObjects(wc.watcher.groupResource, fetchedCount)
 			return nil
 
 		} else {

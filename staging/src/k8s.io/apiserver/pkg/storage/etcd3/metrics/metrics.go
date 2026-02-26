@@ -134,14 +134,6 @@ var (
 		},
 		[]string{},
 	)
-	etcdRangeStreamFetchedObjectsTotal = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "etcd_range_stream_fetched_objects_total",
-			Help:           "Number of objects fetched via RangeStream.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
 	listStorageCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_storage_list_total",
@@ -183,7 +175,7 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
-	WatchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
+	watchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "etcd_watch_cache_initialization_duration_seconds",
 			Help:           "Histogram of watch cache initialization duration in seconds.",
@@ -201,7 +193,6 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
-
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
@@ -212,13 +203,12 @@ func Register() {
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
-		legacyregistry.MustRegister(etcdRangeStreamFetchedObjectsTotal)
 		legacyregistry.MustRegister(listStorageCount)
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
-		legacyregistry.MustRegister(WatchCacheInitializationDuration)
+		legacyregistry.MustRegister(watchCacheInitializationDuration)
 	})
 }
 
@@ -262,8 +252,6 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 	}
 }
 
-
-
 // RecordEtcdEvent updated the etcd_events_received_total metric.
 func RecordEtcdEvent(groupResource schema.GroupResource) {
 	etcdEventsReceivedCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
@@ -272,11 +260,6 @@ func RecordEtcdEvent(groupResource schema.GroupResource) {
 // RecordEtcdBookmark updates the etcd_bookmark_counts metric.
 func RecordEtcdBookmark(groupResource schema.GroupResource) {
 	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
-// RecordRangeStreamFetchedObjects updates the etcd_range_stream_fetched_objects_total metric.
-func RecordRangeStreamFetchedObjects(groupResource schema.GroupResource, count int) {
-	etcdRangeStreamFetchedObjectsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(count))
 }
 
 // RecordDecodeError sets the storage_decode_errors metrics.
@@ -324,7 +307,7 @@ func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, nu
 
 // RecordWatchCacheInitialization sets the metrics for watch cache initialization duration.
 func RecordWatchCacheInitialization(groupResource schema.GroupResource, startTime time.Time) {
-	WatchCacheInitializationDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+	watchCacheInitializationDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 type Monitor interface {
