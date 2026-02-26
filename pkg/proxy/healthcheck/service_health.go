@@ -57,10 +57,24 @@ type proxyHealthChecker interface {
 	Health() ProxyHealth
 }
 
-func newServiceHealthServer(nodeName string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
-	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
-	// treats them all the same.
-	nodeIPs := []net.IP{net.IPv4zero}
+func newServiceHealthServer(nodeName string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker, serviceFamily v1.IPFamily) ServiceHealthServer {
+	// Set listen addresses and network based on IP family; if unknown,
+	// let the system choose
+	var nodeIPs []net.IP
+	var network string
+
+	switch serviceFamily {
+	case v1.IPv4Protocol:
+		nodeIPs = []net.IP{net.IPv4zero}
+		network = "tcp4"
+	case v1.IPv6Protocol:
+		nodeIPs = []net.IP{net.IPv6zero}
+		network = "tcp6"
+	default:
+		// Let the system choose
+		nodeIPs = []net.IP{net.IPv4zero}
+		network = "tcp"
+	}
 
 	if !nodePortAddresses.MatchAll() {
 		ips, err := nodePortAddresses.GetNodeIPs(proxyutil.RealNetwork{})
@@ -79,12 +93,13 @@ func newServiceHealthServer(nodeName string, recorder events.EventRecorder, list
 		healthzServer: healthzServer,
 		services:      map[types.NamespacedName]*hcInstance{},
 		nodeIPs:       nodeIPs,
+		network:       network,
 	}
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(nodeName string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
-	return newServiceHealthServer(nodeName, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
+func NewServiceHealthServer(nodeName string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker, serviceFamily v1.IPFamily) ServiceHealthServer {
+	return newServiceHealthServer(nodeName, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer, serviceFamily)
 }
 
 type server struct {
@@ -99,6 +114,9 @@ type server struct {
 
 	lock     sync.RWMutex
 	services map[types.NamespacedName]*hcInstance
+
+	// network type of the socket when listening for health checks
+	network string
 }
 
 func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) error {
@@ -172,7 +190,7 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 		// create http server
 		httpSrv := hcs.httpFactory.New(hcHandler{name: hcI.nsn, hcs: hcs})
 		// start listener
-		listener, err = hcs.listener.Listen(context.TODO(), addr)
+		listener, err = hcs.listener.Listen(context.TODO(), hcs.network, addr)
 		if err != nil {
 			// must close whatever have been previously opened
 			// to allow a retry/or port ownership change as needed

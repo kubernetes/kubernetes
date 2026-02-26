@@ -263,7 +263,7 @@ func NewProxier(ctx context.Context,
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using iptables mark for masquerade", "mark", masqueradeMark)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
 	nfacctRunner, err := nfacct.New()
 	if err != nil {
 		logger.Error(err, "Failed to create nfacct runner, nfacct based metrics won't be available")
