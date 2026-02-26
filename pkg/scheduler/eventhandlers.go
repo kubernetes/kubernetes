@@ -136,7 +136,6 @@ func (sched *Scheduler) addPod(obj interface{}) {
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
-		sched.Cache.AddPodInGroup(pod)
 		sched.addPodToSchedulingQueue(pod)
 	}
 }
@@ -168,7 +167,6 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 			sched.deletePodFromSchedulingQueue(oldPod, true)
 		}
 	} else if responsibleForPod(oldPod, sched.Profiles) {
-		sched.Cache.UpdatePodInGroup(oldPod, newPod)
 		sched.updatePodInSchedulingQueue(oldPod, newPod)
 	}
 }
@@ -184,7 +182,6 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		} else if responsibleForPod(pod, sched.Profiles) {
 			// Passing "false" means that removal from the scheduling queue is caused by
 			// removal of the pod from the cluster, not by a binding event.
-			sched.Cache.RemovePodFromGroup(pod)
 			sched.deletePodFromSchedulingQueue(pod, false)
 		}
 		return
@@ -201,7 +198,6 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		if responsibleForPod(pod, sched.Profiles) {
 			// Passing "false" means that removal from the scheduling queue is caused by
 			// removal of the pod from the cluster, not by a binding event.
-			sched.Cache.RemovePodFromGroup(pod)
 			sched.deletePodFromSchedulingQueue(pod, false)
 		}
 		return
@@ -216,6 +212,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	sched.Cache.AddPodInGroup(pod)
 	sched.SchedulingQueue.Add(logger, pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
@@ -301,6 +298,8 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		_ = sched.syncPodWithDispatcher(newPod)
 	}
 
+	sched.Cache.UpdatePodInGroup(logger, oldPod, newPod)
+
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))
@@ -342,6 +341,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
+	sched.Cache.RemovePodFromGroup(pod)
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))

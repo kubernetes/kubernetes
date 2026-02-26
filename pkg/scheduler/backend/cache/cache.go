@@ -77,8 +77,8 @@ type cacheImpl struct {
 	// A map from image name to its ImageStateSummary.
 	imageStates map[string]*fwk.ImageStateSummary
 	// podGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
-	podGroupStates map[PodGroupKey]*PodGroupState
-	// genericWorkloadEnabled stores the GenericWorkload feature gate value at construction time.
+	podGroupStates map[PodGroupKey]*podGroupState
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
 	genericWorkloadEnabled bool
 	// apiDispatcher is used for the methods that are expected to send API calls.
 	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
@@ -100,7 +100,7 @@ func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDi
 		assumedPods:            sets.New[string](),
 		podStates:              make(map[string]*podState),
 		imageStates:            make(map[string]*fwk.ImageStateSummary),
-		podGroupStates:         make(map[PodGroupKey]*PodGroupState),
+		podGroupStates:         make(map[PodGroupKey]*podGroupState),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		apiDispatcher:          apiDispatcher,
 	}
@@ -469,7 +469,7 @@ func (cache *cacheImpl) updatePod(logger klog.Logger, oldPod, newPod *v1.Pod) er
 // Removes a pod from the cached node info. If the node information was already
 // removed and there are no more pods left in the node, cleans up the node from
 // the cache.
-func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, isForget bool) error {
+func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, forgetPod bool) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
@@ -492,7 +492,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, isForget bool
 	delete(cache.podStates, key)
 	delete(cache.assumedPods, key)
 
-	if isForget {
+	if forgetPod {
 		cache.forgetPodInGroup(pod)
 	} else {
 		cache.removePodFromGroup(pod)
@@ -757,11 +757,11 @@ func (cache *cacheImpl) AddPodInGroup(pod *v1.Pod) {
 	cache.addPodInGroup(pod)
 }
 
-func (cache *cacheImpl) UpdatePodInGroup(oldPod, newPod *v1.Pod) {
+func (cache *cacheImpl) UpdatePodInGroup(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	cache.updatePodInGroup(oldPod, newPod)
+	cache.updatePodInGroup(logger, oldPod, newPod)
 }
 
 func (cache *cacheImpl) RemovePodFromGroup(pod *v1.Pod) {
@@ -779,14 +779,14 @@ func (cache *cacheImpl) addPodInGroup(pod *v1.Pod) {
 	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
-		podGroupState = NewPodGroupState()
+		podGroupState = newPodGroupState()
 		cache.podGroupStates[key] = podGroupState
 	}
 
-	podGroupState.AddPod(pod)
+	podGroupState.addPod(pod)
 }
 
-func (cache *cacheImpl) updatePodInGroup(oldPod, newPod *v1.Pod) {
+func (cache *cacheImpl) updatePodInGroup(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	if !cache.genericWorkloadEnabled || newPod.Spec.WorkloadRef == nil {
 		return
 	}
@@ -795,11 +795,11 @@ func (cache *cacheImpl) updatePodInGroup(oldPod, newPod *v1.Pod) {
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been created by a prior addPodInGroup call.
-		utilruntime.HandleError(fmt.Errorf("pod group state not found for update, this indicates a missed add event: pod %v, podGroupKey %v", klog.KObj(newPod), key))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "podGroupKey", key)
 		return
 	}
 
-	podGroupState.UpdatePod(oldPod, newPod)
+	podGroupState.updatePod(oldPod, newPod)
 }
 
 func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
@@ -812,7 +812,7 @@ func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
 	if !exists {
 		return
 	}
-	podGroupState.DeletePod(pod.UID)
+	podGroupState.deletePod(pod.UID)
 	if podGroupState.Empty() {
 		delete(cache.podGroupStates, key)
 	}
@@ -840,7 +840,7 @@ func (cache *cacheImpl) forgetPodInGroup(pod *v1.Pod) {
 	}
 }
 
-func (cache *cacheImpl) GetLivePodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+func (cache *cacheImpl) GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 

@@ -64,11 +64,11 @@ func NewPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) PodGrou
 	}
 }
 
-// PodGroupState holds the runtime state of a pod group.
-type PodGroupState struct {
+// podGroupState holds the runtime state of a pod group.
+type podGroupState struct {
 	lock sync.RWMutex
-	// generation gets bumped whenever a PodGroupState is changed.
-	// used to detect PodGroupState changes and avoid unnecessary cloning.
+	// generation gets bumped whenever a podGroupState is changed.
+	// It's used to detect podGroupState changes and avoid unnecessary cloning when taking a snapshot.
 	generation int64
 	// allPods tracks all pods belonging to the group that are known to the scheduler.
 	allPods map[types.UID]*v1.Pod
@@ -85,10 +85,8 @@ type PodGroupState struct {
 	schedulingDeadline *time.Time
 }
 
-var _ fwk.PodGroupState = &PodGroupState{}
-
-func NewPodGroupState() *PodGroupState {
-	return &PodGroupState{
+func newPodGroupState() *podGroupState {
+	return &podGroupState{
 		allPods:         make(map[types.UID]*v1.Pod),
 		unscheduledPods: sets.New[types.UID](),
 		assumedPods:     sets.New[types.UID](),
@@ -99,7 +97,7 @@ func NewPodGroupState() *PodGroupState {
 // AddPod adds the pod to this group.
 // Depending on the NodeName, it can insert the pod to assignedPods set.
 // It is called under the cache lock.
-func (pgs *PodGroupState) AddPod(pod *v1.Pod) {
+func (pgs *podGroupState) addPod(pod *v1.Pod) {
 	pgs.generation++
 	pgs.allPods[pod.UID] = pod
 	if pod.Spec.NodeName != "" {
@@ -112,7 +110,7 @@ func (pgs *PodGroupState) AddPod(pod *v1.Pod) {
 // UpdatePod updates the pod in this group.
 // In case of binding, it moves the pod to assignedPods.
 // It is called under the cache lock.
-func (pgs *PodGroupState) UpdatePod(oldPod, newPod *v1.Pod) {
+func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 	pgs.generation++
 	pgs.allPods[newPod.UID] = newPod
 	if oldPod.Spec.NodeName == "" && newPod.Spec.NodeName != "" {
@@ -125,13 +123,13 @@ func (pgs *PodGroupState) UpdatePod(oldPod, newPod *v1.Pod) {
 
 // Clone returns a deep copy of the live pod group state.
 // It is called under the cache lock.
-func (pgs *PodGroupState) Clone() *PodGroupStateSnapshot {
+func (pgs *podGroupState) Clone() *podGroupStateSnapshot {
 	var deadline *time.Time
 	if pgs.schedulingDeadline != nil {
 		deadline = ptr.To(*pgs.schedulingDeadline)
 	}
 
-	return &PodGroupStateSnapshot{
+	return &podGroupStateSnapshot{
 		generation:         pgs.generation,
 		allPods:            maps.Clone(pgs.allPods),
 		unscheduledPods:    pgs.unscheduledPods.Clone(),
@@ -143,7 +141,7 @@ func (pgs *PodGroupState) Clone() *PodGroupStateSnapshot {
 
 // DeletePod completely deletes the pod from this group.
 // It is called under the cache lock.
-func (pgs *PodGroupState) DeletePod(podUID types.UID) {
+func (pgs *podGroupState) deletePod(podUID types.UID) {
 	pgs.generation++
 	delete(pgs.allPods, podUID)
 	pgs.unscheduledPods.Delete(podUID)
@@ -153,12 +151,12 @@ func (pgs *PodGroupState) DeletePod(podUID types.UID) {
 
 // Empty returns true when the group is empty.
 // It is called under the cache lock.
-func (pgs *PodGroupState) Empty() bool {
+func (pgs *podGroupState) Empty() bool {
 	return len(pgs.allPods) == 0
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
-func (pgs *PodGroupState) AllPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -168,7 +166,7 @@ func (pgs *PodGroupState) AllPods() sets.Set[types.UID] {
 // UnscheduledPods returns all pods that are unscheduled for this group,
 // i.e., are neither assumed nor assigned.
 // The returned map type corresponds to the argument of the PodActivator.Activate method.
-func (pgs *PodGroupState) UnscheduledPods() map[string]*v1.Pod {
+func (pgs *podGroupState) UnscheduledPods() map[string]*v1.Pod {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -182,7 +180,7 @@ func (pgs *PodGroupState) UnscheduledPods() map[string]*v1.Pod {
 
 // AssumedPods returns the UIDs of all pods for this group in the assumed state,
 // i.e., passed the Reserve gate.
-func (pgs *PodGroupState) AssumedPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -190,7 +188,7 @@ func (pgs *PodGroupState) AssumedPods() sets.Set[types.UID] {
 }
 
 // AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
-func (pgs *PodGroupState) AssignedPods() sets.Set[types.UID] {
+func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -199,7 +197,7 @@ func (pgs *PodGroupState) AssignedPods() sets.Set[types.UID] {
 
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 // A new deadline is created if one doesn't exist, or if the previous one has expired.
-func (pgs *PodGroupState) SchedulingTimeout() time.Duration {
+func (pgs *podGroupState) SchedulingTimeout() time.Duration {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -214,7 +212,7 @@ func (pgs *PodGroupState) SchedulingTimeout() time.Duration {
 
 // AssumePod marks a pod as having reached the Reserve stage.
 // It is called under the cache lock.
-func (pgs *PodGroupState) AssumePod(podUID types.UID) {
+func (pgs *podGroupState) AssumePod(podUID types.UID) {
 	pgs.generation++
 	pgs.assumedPods.Insert(podUID)
 	pgs.unscheduledPods.Delete(podUID)
@@ -222,16 +220,16 @@ func (pgs *PodGroupState) AssumePod(podUID types.UID) {
 
 // ForgetPod removes a pod from the assumed state.
 // It is called under the cache lock.
-func (pgs *PodGroupState) ForgetPod(podUID types.UID) {
+func (pgs *podGroupState) ForgetPod(podUID types.UID) {
 	pgs.generation++
 	pgs.unscheduledPods.Insert(podUID)
 	pgs.assumedPods.Delete(podUID)
 }
 
-var _ fwk.PodGroupState = &PodGroupStateSnapshot{}
+var _ fwk.PodGroupState = &podGroupStateSnapshot{}
 
-// PodGroupStateSnapshot is an immutable, point-in-time copy of a PodGroupState.
-type PodGroupStateSnapshot struct {
+// podGroupStateSnapshot is an immutable, point-in-time copy of a podGroupState.
+type podGroupStateSnapshot struct {
 	generation         int64
 	allPods            map[types.UID]*v1.Pod
 	unscheduledPods    sets.Set[types.UID]
@@ -241,12 +239,12 @@ type PodGroupStateSnapshot struct {
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
-func (s *PodGroupStateSnapshot) AllPods() sets.Set[types.UID] {
+func (s *podGroupStateSnapshot) AllPods() sets.Set[types.UID] {
 	return sets.KeySet(s.allPods)
 }
 
 // UnscheduledPods returns all pods that are unscheduled for this group.
-func (s *PodGroupStateSnapshot) UnscheduledPods() map[string]*v1.Pod {
+func (s *podGroupStateSnapshot) UnscheduledPods() map[string]*v1.Pod {
 	unscheduledPods := make(map[string]*v1.Pod, len(s.unscheduledPods))
 	for podUID := range s.unscheduledPods {
 		pod := s.allPods[podUID]
@@ -256,19 +254,19 @@ func (s *PodGroupStateSnapshot) UnscheduledPods() map[string]*v1.Pod {
 }
 
 // AssumedPods returns the UIDs of all assumed pods for this group.
-func (s *PodGroupStateSnapshot) AssumedPods() sets.Set[types.UID] {
+func (s *podGroupStateSnapshot) AssumedPods() sets.Set[types.UID] {
 	return s.assumedPods
 }
 
 // AssignedPods returns the UIDs of all assigned (bound) pods for this group.
-func (s *PodGroupStateSnapshot) AssignedPods() sets.Set[types.UID] {
+func (s *podGroupStateSnapshot) AssignedPods() sets.Set[types.UID] {
 	return s.assignedPods
 }
 
 // TODO: look into it.
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
-// Unlike the live PodGroupState, this does not create a new deadline.
-func (s *PodGroupStateSnapshot) SchedulingTimeout() time.Duration {
+// Unlike the live podGroupState, this does not create a new deadline.
+func (s *podGroupStateSnapshot) SchedulingTimeout() time.Duration {
 	if s.schedulingDeadline == nil {
 		return DefaultSchedulingTimeoutDuration
 	}
@@ -277,4 +275,20 @@ func (s *PodGroupStateSnapshot) SchedulingTimeout() time.Duration {
 		return 0
 	}
 	return remaining
+}
+
+// AssumePod marks a pod as having reached the Reserve stage.
+// It is called under the cache lock.
+func (s *podGroupStateSnapshot) assumePod(podUID types.UID) {
+	s.generation++
+	s.assumedPods.Insert(podUID)
+	s.unscheduledPods.Delete(podUID)
+}
+
+// ForgetPod removes a pod from the assumed state.
+// It is called under the cache lock.
+func (s *podGroupStateSnapshot) forgetPod(podUID types.UID) {
+	s.generation++
+	s.unscheduledPods.Insert(podUID)
+	s.assumedPods.Delete(podUID)
 }

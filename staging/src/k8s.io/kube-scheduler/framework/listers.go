@@ -50,11 +50,11 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
-	PodGroupStatesInfo() PodGroupStateLister
+	PodGroupStatesInfos() PodGroupStateLister
 }
 
 type PodGroupStateLister interface {
-	// Get returns the PodGroupState of the given workload.
+	// GetPodGroupState returns the PodGroupState of the given workload.
 	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
@@ -154,7 +154,7 @@ type CSIManager interface {
 
 // PodGroupManager provides an interface for accessing the state of pod groups.
 type PodGroupManager interface {
-	GetLivePodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
 // PodGroupState provides an interface to view and modify the state of a single pod group.

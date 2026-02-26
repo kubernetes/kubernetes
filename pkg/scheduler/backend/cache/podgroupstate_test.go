@@ -26,11 +26,11 @@ import (
 )
 
 func TestPodGroupState_AssumeForget(t *testing.T) {
-	pgs := NewPodGroupState()
+	pgs := newPodGroupState()
 	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
 		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
 
-	pgs.AddPod(pod)
+	pgs.addPod(pod)
 	if pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("AssumedPods should be initially empty")
 	}
@@ -56,7 +56,7 @@ func TestPodGroupState_AssumeForget(t *testing.T) {
 }
 
 func TestPodGroupState_SchedulingTimeout(t *testing.T) {
-	pgs := NewPodGroupState()
+	pgs := newPodGroupState()
 
 	timeout := pgs.SchedulingTimeout()
 	if pgs.schedulingDeadline == nil {
@@ -90,5 +90,84 @@ func TestPodGroupState_SchedulingTimeout(t *testing.T) {
 	}
 	if newTimeout <= 0 {
 		t.Errorf("Expected positive timeout duration after reset, got %v", timeout)
+	}
+}
+
+func TestPodGroupState_GenerationTracking(t *testing.T) {
+	pgs := newPodGroupState()
+	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	assignedPod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").Node("node1").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+
+	if pgs.generation != 0 {
+		t.Errorf("expected generation 0 at initial state, got %d", pgs.generation)
+	}
+
+	tests := []struct {
+		name   string
+		action func()
+		want   int64
+	}{
+		{"addPod", func() { pgs.addPod(pod) }, 1},
+		{"updatePod", func() { pgs.updatePod(pod, assignedPod) }, 2},
+		{"AssumePod", func() { pgs.AssumePod(pod.UID) }, 3},
+		{"ForgetPod", func() { pgs.ForgetPod(pod.UID) }, 4},
+		{"deletePod", func() { pgs.deletePod(pod.UID) }, 5},
+	}
+	for _, tc := range tests {
+		tc.action()
+		if pgs.generation != tc.want {
+			t.Errorf("after %s: expected generation %d, got %d", tc.name, tc.want, pgs.generation)
+		}
+	}
+}
+
+func TestPodGroupState_Clone(t *testing.T) {
+	pgs := newPodGroupState()
+
+	pod1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pod2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+
+	pgs.addPod(pod1)
+	pgs.addPod(pod2)
+	pgs.AssumePod(pod2.UID)
+
+	snap := pgs.Clone()
+
+	// Clone has the same generation.
+	if snap.generation != pgs.generation {
+		t.Errorf("expected clone generation %d, got %d", pgs.generation, snap.generation)
+	}
+
+	// Clone contains both pods.
+	if !snap.AllPods().Has(pod1.UID) || !snap.AllPods().Has(pod2.UID) {
+		t.Error("expected both pods in clone's AllPods")
+	}
+
+	// Clone preserves pod1 as unscheduled.
+	if _, ok := snap.UnscheduledPods()[pod1.Name]; !ok {
+		t.Error("expected pod1 in clone's UnscheduledPods")
+	}
+
+	// Clone preserves pod2 as assumed.
+	if !snap.AssumedPods().Has(pod2.UID) {
+		t.Error("expected pod2 in clone's AssumedPods")
+	}
+
+	// Mutating the clone does not affect the original.
+	snap.assumePod(pod1.UID)
+	if pgs.assumedPods.Has(pod1.UID) {
+		t.Error("mutation to clone should not affect original's assumedPods")
+	}
+
+	// Mutating the original does not affect the clone.
+	pod3 := st.MakePod().Namespace("ns1").Name("p3").UID("p3").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pgs.addPod(pod3)
+	if snap.AllPods().Has(pod3.UID) {
+		t.Error("mutation to original should not affect clone's AllPods")
 	}
 }

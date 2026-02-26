@@ -748,7 +748,7 @@ func Test_AddPodInGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetLivePodGroupState(tt.pod.Namespace, tt.pod.Spec.WorkloadRef)
+			podGroupState, err := cache.GetPodGroupState(tt.pod.Namespace, tt.pod.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -874,7 +874,7 @@ func Test_UpdatePodInGroup(t *testing.T) {
 			if newPod == nil {
 				newPod = tt.oldPod
 			}
-			cache.UpdatePodInGroup(tt.oldPod, newPod)
+			cache.UpdatePodInGroup(logger, tt.oldPod, newPod)
 
 			podGroupCount := len(cache.podGroupStates)
 			if podGroupCount == 0 {
@@ -889,7 +889,7 @@ func Test_UpdatePodInGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetLivePodGroupState(newPod.Namespace, newPod.Spec.WorkloadRef)
+			podGroupState, err := cache.GetPodGroupState(newPod.Namespace, newPod.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -982,7 +982,7 @@ func Test_RemovePodFromGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetLivePodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
+			podGroupState, err := cache.GetPodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -1489,6 +1489,15 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			PVC(fmt.Sprintf("test-pvc%v", pvcID)).Node(fmt.Sprintf("test-node%v", node)).Obj()
 	}
 
+	// Add a few pods with a workload reference
+	var podsWithWorkloadRef []*v1.Pod
+	for i := range 20 {
+		pod := st.MakePod().Name(fmt.Sprintf("p-workloadref-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-workloadref-%v", i)).
+			WorkloadRef(&v1.WorkloadReference{Name: fmt.Sprintf("workload-%v", i), PodGroup: fmt.Sprintf("pg-%v", i)}).
+			Node(fmt.Sprintf("test-node%v", i)).Obj()
+		podsWithWorkloadRef = append(podsWithWorkloadRef, pod)
+	}
+
 	var cache *cacheImpl
 	var snapshot *Snapshot
 	type operation = func(t *testing.T)
@@ -1532,6 +1541,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
+	addPodWithWorkloadRef := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AddPod(logger, podsWithWorkloadRef[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
 	removePod := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.RemovePod(logger, pods[i]); err != nil {
@@ -1554,9 +1570,23 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
+	removePodWithWorkloadRef := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.RemovePod(logger, podsWithWorkloadRef[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
 	updatePod := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.UpdatePod(logger, pods[i], updatedPods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	updatePodWithWorkloadRef := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.UpdatePod(logger, podsWithWorkloadRef[i], podsWithWorkloadRef[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1662,11 +1692,12 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                         string
-		operations                   []operation
-		expected                     []*v1.Node
-		expectedHavePodsWithAffinity int
-		expectedUsedPVCSet           sets.Set[string]
+		name                           string
+		operations                     []operation
+		expected                       []*v1.Node
+		expectedHavePodsWithAffinity   int
+		expectedPodGroupStatesSnapshot map[PodGroupKey]*podGroupStateSnapshot
+		expectedUsedPVCSet             sets.Set[string]
 	}{
 		{
 			name:               "Empty cache",
@@ -1862,6 +1893,29 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc2", "test-ns/test-pvc3"),
 		},
 		{
+			name: "Add, Update and Remove multiple pods with WorkloadRef",
+			operations: []operation{
+				addNode(0), addNode(1), addNode(2), addPodWithWorkloadRef(0), addPodWithWorkloadRef(1),
+				addPodWithWorkloadRef(2), updateSnapshot(),
+				updatePodWithWorkloadRef(0), removePodWithWorkloadRef(1), updateSnapshot(),
+			},
+			expected: []*v1.Node{nodes[1], nodes[0], nodes[2]},
+			expectedPodGroupStatesSnapshot: map[PodGroupKey]*podGroupStateSnapshot{
+				NewPodGroupKey("test-ns", &v1.WorkloadReference{Name: "workload-0", PodGroup: "pg-0"}): {
+					allPods:         map[types.UID]*v1.Pod{"puid-workloadref-0": podsWithWorkloadRef[0]},
+					assignedPods:    sets.New[types.UID]("puid-workloadref-0"),
+					unscheduledPods: sets.New[types.UID](),
+					assumedPods:     sets.New[types.UID](),
+				},
+				NewPodGroupKey("test-ns", &v1.WorkloadReference{Name: "workload-2", PodGroup: "pg-2"}): {
+					allPods:         map[types.UID]*v1.Pod{"puid-workloadref-2": podsWithWorkloadRef[2]},
+					assignedPods:    sets.New[types.UID]("puid-workloadref-2"),
+					unscheduledPods: sets.New[types.UID](),
+					assumedPods:     sets.New[types.UID](),
+				},
+			},
+		},
+		{
 			name: "Add and Remove multiple pods with PVC",
 			operations: []operation{
 				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), addPodWithPVC(2, 0, 2), updateSnapshot(),
@@ -1911,6 +1965,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			cache = newCache(ctx, time.Second, nil)
+			cache.genericWorkloadEnabled = true
 			snapshot = NewEmptySnapshot()
 
 			for _, op := range test.operations {
@@ -1931,6 +1986,39 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			// Make sure we visited all the cached nodes in the above for loop.
 			if i != len(cache.nodes) {
 				t.Errorf("Not all the nodes were visited by following the NodeInfo linked list. Expected to see %v nodes, saw %v.", len(cache.nodes), i)
+			}
+
+			// Check number of podGroupStates and their content in the snapshot.
+			if len(snapshot.podGroupStates) != len(test.expectedPodGroupStatesSnapshot) {
+				t.Errorf("unexpected number of podGroupStates. Expected: %v, got: %v", len(test.expectedPodGroupStatesSnapshot), len(snapshot.podGroupStates))
+			}
+			for key, want := range test.expectedPodGroupStatesSnapshot {
+				got, ok := snapshot.podGroupStates[key]
+				if !ok {
+					t.Errorf("expected pod group state for key %v not found in snapshot", key)
+					continue
+				}
+				if len(got.allPods) != len(want.allPods) {
+					t.Errorf("podGroupStatesSnapshot[%v].allPods: expected %d pods, got %d", key, len(want.allPods), len(got.allPods))
+				} else {
+					for uid, wantPod := range want.allPods {
+						gotPod, exists := got.allPods[uid]
+						if !exists {
+							t.Errorf("podGroupStatesSnapshot[%v].allPods: expected pod with UID %v but got none", key, uid)
+						} else if gotPod.Name != wantPod.Name || gotPod.Namespace != wantPod.Namespace {
+							t.Errorf("podGroupStatesSnapshot[%v].allPods[%v]: expected %v/%v, got %v/%v", key, uid, wantPod.Namespace, wantPod.Name, gotPod.Namespace, gotPod.Name)
+						}
+					}
+				}
+				if !want.assignedPods.Equal(got.assignedPods) {
+					t.Errorf("podGroupStatesSnapshot[%v].assignedPods: expected %v, got %v", key, want.assignedPods, got.assignedPods)
+				}
+				if !want.unscheduledPods.Equal(got.unscheduledPods) {
+					t.Errorf("podGroupStatesSnapshot[%v].unscheduledPods: expected %v, got %v", key, want.unscheduledPods, got.unscheduledPods)
+				}
+				if !want.assumedPods.Equal(got.assumedPods) {
+					t.Errorf("podGroupStatesSnapshot[%v].assumedPods: expected %v, got %v", key, want.assumedPods, got.assumedPods)
+				}
 			}
 
 			// Check number of nodes with pods with affinity

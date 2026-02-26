@@ -35,13 +35,8 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-func init() {
-	metrics.Register()
-}
 
 func Test_isSchedulableAfterPodAdded(t *testing.T) {
 	tests := []struct {
@@ -270,7 +265,6 @@ func TestGangSchedulingFlow(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			logger, ctx := ktesting.NewTestContext(t)
 			cache := internalcache.New(ctx, nil)
-			// snapshot := internalcache.NewEmptySnapshot()
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 			workloadInformer := informerFactory.Scheduling().V1alpha1().Workloads()
@@ -280,7 +274,6 @@ func TestGangSchedulingFlow(t *testing.T) {
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodGroupManager(cache),
-				// frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 				frameworkruntime.WithPodActivator(fakeActivator),
 			)

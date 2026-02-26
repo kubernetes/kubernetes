@@ -76,7 +76,7 @@ func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 	return nil
 }
 
-func (c *shareListerContract) PodGroupStatesInfo() fwk.PodGroupStateLister {
+func (c *shareListerContract) PodGroupStatesInfos() fwk.PodGroupStateLister {
 	return nil
 }
 

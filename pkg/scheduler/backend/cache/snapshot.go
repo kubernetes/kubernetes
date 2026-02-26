@@ -22,8 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -56,7 +58,7 @@ type Snapshot struct {
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods    map[string]*v1.Pod
-	podGroupStates map[PodGroupKey]*PodGroupStateSnapshot
+	podGroupStates map[PodGroupKey]*podGroupStateSnapshot
 	generation     int64
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
@@ -73,7 +75,7 @@ func NewEmptySnapshot() *Snapshot {
 		nodeInfoMap:    make(map[string]*framework.NodeInfo),
 		usedPVCSet:     sets.New[string](),
 		assumedPods:    make(map[string]*v1.Pod),
-		podGroupStates: make(map[PodGroupKey]*PodGroupStateSnapshot),
+		podGroupStates: make(map[PodGroupKey]*podGroupStateSnapshot),
 	}
 }
 
@@ -189,8 +191,8 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
-// PodGroupStatesInfo returns a PodGroupStateLister.
-func (s *Snapshot) PodGroupStatesInfo() fwk.PodGroupStateLister {
+// PodGroupStatesInfos returns a PodGroupStateLister.
+func (s *Snapshot) PodGroupStatesInfos() fwk.PodGroupStateLister {
 	return s
 }
 
@@ -267,11 +269,10 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
-	if pod.Spec.WorkloadRef != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && pod.Spec.WorkloadRef != nil {
 		pgKey := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 		if pgs, ok := s.podGroupStates[pgKey]; ok {
-			pgs.assumedPods.Insert(pod.UID)
-			pgs.unscheduledPods.Delete(pod.UID)
+			pgs.assumePod(pod.UID)
 		}
 	}
 	return nil
@@ -290,11 +291,10 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	}
 	delete(s.assumedPods, key)
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
-	if assumedPod.Spec.WorkloadRef != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && assumedPod.Spec.WorkloadRef != nil {
 		pgKey := NewPodGroupKey(assumedPod.Namespace, assumedPod.Spec.WorkloadRef)
 		if pgs, ok := s.podGroupStates[pgKey]; ok {
-			pgs.assumedPods.Delete(assumedPod.UID)
-			pgs.unscheduledPods.Insert(assumedPod.UID)
+			pgs.forgetPod(assumedPod.UID)
 		}
 	}
 	nodeName := assumedPod.Spec.NodeName

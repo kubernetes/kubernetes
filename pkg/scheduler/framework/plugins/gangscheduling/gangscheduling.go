@@ -139,7 +139,7 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return nil
 	}
 
-	podGroupState, err := pl.handle.PodGroupManager().GetLivePodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.handle.PodGroupManager().GetPodGroupState(namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -212,8 +212,8 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 func (pl *GangScheduling) getPodGroupState(state fwk.CycleState, namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
 	if state != nil {
 		if _, err := state.Read(schedframework.PermitPodGroupModeKey); err == nil {
-			return pl.handle.SnapshotSharedLister().PodGroupStatesInfo().GetPodGroupState(namespace, workloadRef)
+			return pl.handle.SnapshotSharedLister().PodGroupStatesInfos().GetPodGroupState(namespace, workloadRef)
 		}
 	}
-	return pl.handle.PodGroupManager().GetLivePodGroupState(namespace, workloadRef)
+	return pl.handle.PodGroupManager().GetPodGroupState(namespace, workloadRef)
 }
