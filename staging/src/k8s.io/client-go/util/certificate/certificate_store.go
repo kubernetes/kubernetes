@@ -145,7 +145,11 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	} else if pairFileExists {
 		s.logger.Info("Loading cert/key pair from a file", "filePath", pairFile)
-		return loadFile(pairFile)
+		crt, lerr := loadFile(pairFile)
+		if lerr == nil {
+			return crt, nil
+		}
+		s.logger.Info("Loading cert/key pair from %q failed, err: %v, try other cert configuration", pairFile, lerr)
 	}
 
 	certFileExists, err := fileExists(s.certFile)
