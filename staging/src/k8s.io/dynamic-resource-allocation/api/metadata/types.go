@@ -17,8 +17,8 @@ limitations under the License.
 package metadata
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DeviceMetadata contains metadata about devices allocated to a ResourceClaim.
@@ -28,6 +28,12 @@ import (
 type DeviceMetadata struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
+
+	// PodClaimName is the name used to reference this claim in the pod spec
+	// (i.e., the entry in pod.spec.resourceClaims[].name). For claims
+	// created from a ResourceClaimTemplate, this differs from the actual
+	// ResourceClaim name and is needed to resolve the mapping.
+	PodClaimName *string
 
 	// Requests contains the device allocation information for each request
 	// in the ResourceClaim.

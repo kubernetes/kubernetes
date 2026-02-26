@@ -59,6 +59,11 @@ func (in *DeviceMetadata) DeepCopyInto(out *DeviceMetadata) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.PodClaimName != nil {
+		in, out := &in.PodClaimName, &out.PodClaimName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Requests != nil {
 		in, out := &in.Requests, &out.Requests
 		*out = make([]DeviceMetadataRequest, len(*in))

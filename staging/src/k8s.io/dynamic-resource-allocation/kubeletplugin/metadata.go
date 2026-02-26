@@ -112,6 +112,28 @@ const (
 	metadataDirPerms  = os.FileMode(0755)
 )
 
+// claimRef bundles the identity and pod-level reference for a ResourceClaim.
+// It is threaded through the write path so individual functions don't need
+// long parameter lists.
+type claimRef struct {
+	namespace    string
+	name         string
+	uid          types.UID
+	podClaimName *string
+}
+
+func newClaimRef(claim *resourceapi.ResourceClaim) claimRef {
+	ref := claimRef{
+		namespace: claim.Namespace,
+		name:      claim.Name,
+		uid:       claim.UID,
+	}
+	if v, ok := claim.Annotations[resourceapi.PodResourceClaimAnnotation]; ok {
+		ref.podClaimName = &v
+	}
+	return ref
+}
+
 // metadataWriter handles writing metadata files and CDI specs for the
 // device metadata feature. All state is derived from files on disk.
 type metadataWriter struct {
@@ -136,6 +158,8 @@ func (w *metadataWriter) processPreparedClaim(
 	claim *resourceapi.ResourceClaim,
 	devices []Device,
 ) (map[string]string, error) {
+	ref := newClaimRef(claim)
+
 	preparedDevicesByRequest := make(map[string][]Device)
 	for _, dev := range devices {
 		for _, reqName := range dev.Requests {
@@ -148,7 +172,7 @@ func (w *metadataWriter) processPreparedClaim(
 	for requestRef, devs := range preparedDevicesByRequest {
 		baseReq := resourceclaim.BaseRequestRef(requestRef)
 
-		if err := w.writeMetadataFile(claim, baseReq, requestRef, devs); err != nil {
+		if err := w.writeMetadataFile(ref, baseReq, requestRef, devs); err != nil {
 			return nil, fmt.Errorf("write metadata for request %q: %w", requestRef, err)
 		}
 
@@ -194,18 +218,17 @@ func (w *metadataWriter) cleanupClaim(claimNamespace, claimName string, claimUID
 // requestName may include a subrequest name (e.g. "gpu/high-memory"); the
 // base request name is used for the file path.
 func (w *metadataWriter) updateRequestMetadata(
-	claimNamespace, claimName string,
-	claimUID types.UID,
+	ref claimRef,
 	requestName string,
 	devices []Device,
 ) error {
 	baseReq := resourceclaim.BaseRequestRef(requestName)
-	filePath := w.metadataFilePath(claimNamespace, claimName, baseReq)
+	filePath := w.metadataFilePath(ref.namespace, ref.name, baseReq)
 
 	existing, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("request %q not found in prepared claim %s/%s", requestName, claimNamespace, claimName)
+			return fmt.Errorf("request %q not found in prepared claim %s/%s", requestName, ref.namespace, ref.name)
 		}
 		return fmt.Errorf("read metadata file: %w", err)
 	}
@@ -215,8 +238,10 @@ func (w *metadataWriter) updateRequestMetadata(
 		return fmt.Errorf("decode existing metadata: %w", err)
 	}
 
+	ref.podClaimName = prev.PodClaimName
+
 	generation := prev.Generation + 1
-	dm := w.buildDeviceMetadata(claimNamespace, claimName, claimUID, generation, requestName, devices)
+	dm := w.buildDeviceMetadata(ref, generation, requestName, devices)
 
 	data, err := runtime.Encode(metadataEncoder, dm)
 	if err != nil {
@@ -234,19 +259,19 @@ func (w *metadataWriter) updateRequestMetadata(
 // baseRequestName is used for the file path; requestRef (which may include
 // a subrequest name) is recorded in the metadata content.
 func (w *metadataWriter) writeMetadataFile(
-	claim *resourceapi.ResourceClaim,
+	ref claimRef,
 	baseRequestName string,
 	requestRef string,
 	devices []Device,
 ) error {
-	dm := w.buildDeviceMetadata(claim.Namespace, claim.Name, claim.UID, 1, requestRef, devices)
+	dm := w.buildDeviceMetadata(ref, 1, requestRef, devices)
 
 	data, err := runtime.Encode(metadataEncoder, dm)
 	if err != nil {
 		return fmt.Errorf("encode metadata: %w", err)
 	}
 
-	filePath := w.metadataFilePath(claim.Namespace, claim.Name, baseRequestName)
+	filePath := w.metadataFilePath(ref.namespace, ref.name, baseRequestName)
 	if err := os.MkdirAll(filepath.Dir(filePath), metadataDirPerms); err != nil {
 		return fmt.Errorf("create metadata directory: %w", err)
 	}
@@ -261,8 +286,7 @@ func (w *metadataWriter) writeMetadataFile(
 // buildDeviceMetadata constructs the v1alpha1 DeviceMetadata from claim info
 // and device data.
 func (w *metadataWriter) buildDeviceMetadata(
-	claimNamespace, claimName string,
-	claimUID types.UID,
+	ref claimRef,
 	generation int64,
 	requestName string,
 	devices []Device,
@@ -288,11 +312,12 @@ func (w *metadataWriter) buildDeviceMetadata(
 
 	return &v1alpha1.DeviceMetadata{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       claimName,
-			Namespace:  claimNamespace,
-			UID:        claimUID,
+			Name:       ref.name,
+			Namespace:  ref.namespace,
+			UID:        ref.uid,
 			Generation: generation,
 		},
+		PodClaimName: ref.podClaimName,
 		Requests: []v1alpha1.DeviceMetadataRequest{
 			{
 				Name:    requestName,

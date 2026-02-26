@@ -71,9 +71,9 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Device_To_metadata_Device(in *Device, out *metadata.Device, s conversion.Scope) error {
-	out.Name = in.Name
 	out.Driver = in.Driver
 	out.Pool = in.Pool
+	out.Name = in.Name
 	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.NetworkData = (*v1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
 	return nil
@@ -85,9 +85,9 @@ func Convert_v1alpha1_Device_To_metadata_Device(in *Device, out *metadata.Device
 }
 
 func autoConvert_metadata_Device_To_v1alpha1_Device(in *metadata.Device, out *Device, s conversion.Scope) error {
-	out.Name = in.Name
 	out.Driver = in.Driver
 	out.Pool = in.Pool
+	out.Name = in.Name
 	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.NetworkData = (*v1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
 	return nil
@@ -100,6 +100,7 @@ func Convert_metadata_Device_To_v1alpha1_Device(in *metadata.Device, out *Device
 
 func autoConvert_v1alpha1_DeviceMetadata_To_metadata_DeviceMetadata(in *DeviceMetadata, out *metadata.DeviceMetadata, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.PodClaimName = (*string)(unsafe.Pointer(in.PodClaimName))
 	out.Requests = *(*[]metadata.DeviceMetadataRequest)(unsafe.Pointer(&in.Requests))
 	return nil
 }
@@ -111,6 +112,7 @@ func Convert_v1alpha1_DeviceMetadata_To_metadata_DeviceMetadata(in *DeviceMetada
 
 func autoConvert_metadata_DeviceMetadata_To_v1alpha1_DeviceMetadata(in *metadata.DeviceMetadata, out *DeviceMetadata, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.PodClaimName = (*string)(unsafe.Pointer(in.PodClaimName))
 	out.Requests = *(*[]DeviceMetadataRequest)(unsafe.Pointer(&in.Requests))
 	return nil
 }

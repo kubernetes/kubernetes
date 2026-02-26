@@ -73,5 +73,10 @@ func (d *Helper) UpdateRequestMetadata(
 	if d.metadataWriter == nil {
 		return fmt.Errorf("device metadata is not enabled")
 	}
-	return d.metadataWriter.updateRequestMetadata(claimNamespace, claimName, claimUID, requestName, devices)
+	ref := claimRef{
+		namespace: claimNamespace,
+		name:      claimName,
+		uid:       claimUID,
+	}
+	return d.metadataWriter.updateRequestMetadata(ref, requestName, devices)
 }

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -154,7 +155,9 @@ func expectedCDISpec(reqName, metadataHostPath string) cdiSpec {
 
 func TestProcessPreparedClaim(t *testing.T) {
 	testcases := map[string]struct {
-		devices []Device
+		devices            []Device
+		claimAnnotations   map[string]string
+		expectPodClaimName *string
 	}{
 		"with-metadata": {
 			devices: []Device{{
@@ -198,12 +201,26 @@ func TestProcessPreparedClaim(t *testing.T) {
 				Metadata:   stringAttrs(map[string]string{"memoryGB": "80"}),
 			}},
 		},
+		"with-pod-claim-name-annotation": {
+			devices: []Device{{
+				Requests:   []string{testRequest},
+				PoolName:   "node-1",
+				DeviceName: "gpu-0",
+				Metadata:   stringAttrs(map[string]string{"model": "A100"}),
+			}},
+			claimAnnotations:   map[string]string{resourceapi.PodResourceClaimAnnotation: "my-gpu"},
+			expectPodClaimName: ptr.To("my-gpu"),
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			w, pluginDir, cdiDir := newTestWriter(t)
 			claim := testClaim()
+
+			if tc.claimAnnotations != nil {
+				claim.Annotations = tc.claimAnnotations
+			}
 
 			cdiIDs, err := w.processPreparedClaim(claim, tc.devices)
 			if err != nil {
@@ -225,7 +242,9 @@ func TestProcessPreparedClaim(t *testing.T) {
 				metadataPath := filepath.Join(pluginDir, metadataSubDir,
 					testClaimNS+"_"+testClaimName, baseReq, "metadata.json")
 				dm := readMetadataFile(t, metadataPath)
-				if diff := cmp.Diff(expectedRequestMetadata(requestRef, devs), dm); diff != "" {
+				expected := expectedRequestMetadata(requestRef, devs)
+				expected.PodClaimName = tc.expectPodClaimName
+				if diff := cmp.Diff(expected, dm); diff != "" {
 					t.Errorf("metadata for request %q (-want +got):\n%s", requestRef, diff)
 				}
 
@@ -446,13 +465,15 @@ func TestUpdateRequestMetadata(t *testing.T) {
 			}
 			for i := range tc.preUpdates {
 				if err := w.updateRequestMetadata(
-					testClaimNS, testClaimName, testClaimUID, tc.requestName, tc.updateDevices); err != nil {
+					claimRef{namespace: testClaimNS, name: testClaimName, uid: testClaimUID},
+					tc.requestName, tc.updateDevices); err != nil {
 					t.Fatalf("pre-updateRequestMetadata (%d): %v", i+1, err)
 				}
 			}
 
 			err := w.updateRequestMetadata(
-				testClaimNS, testClaimName, tc.claimUID, tc.requestName, tc.updateDevices)
+				claimRef{namespace: testClaimNS, name: testClaimName, uid: tc.claimUID},
+				tc.requestName, tc.updateDevices)
 
 			if tc.expectError != "" {
 				if err == nil {
