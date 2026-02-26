@@ -2310,12 +2310,13 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 	tests := []struct {
 		name            string
 		preFilterPlugin *TestPlugin
-		filterPlugin    *TestPlugin
+		filterPlugin    fwk.Plugin
 		pod             *v1.Pod
 		nominatedPod    *v1.Pod
 		node            *v1.Node
 		nodeInfo        *framework.NodeInfo
 		wantStatus      *fwk.Status
+		wantStateKey    fwk.StateKey // if non-empty, verify this key exists in CycleState after run
 	}{
 		{
 			name:            "node has no nominated pod",
@@ -2402,6 +2403,24 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			nodeInfo:     framework.NewNodeInfo(pod),
 			wantStatus:   nil,
 		},
+		{
+			name: "filter plugin writes state with nominated pods and pre filters return unschedulable",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(fwk.Unschedulable),
+				},
+			},
+			filterPlugin: &TestPluginToWriteState{
+				name: "TestPlugin2",
+			},
+			pod:          highPriorityPod,
+			nominatedPod: lowPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   nil,
+			wantStateKey: testPluginToWriteState,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2423,15 +2442,15 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 			if tt.filterPlugin != nil {
-				if err := registry.Register(tt.filterPlugin.name,
+				if err := registry.Register(tt.filterPlugin.Name(),
 					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 						return tt.filterPlugin, nil
 					}); err != nil {
-					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
+					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.Name())
 				}
 				cfgPls.Filter.Enabled = append(
 					cfgPls.Filter.Enabled,
-					config.Plugin{Name: tt.filterPlugin.name},
+					config.Plugin{Name: tt.filterPlugin.Name()},
 				)
 			}
 
@@ -2470,106 +2489,10 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
 			}
-		})
-	}
-}
-
-func TestFilterPluginsWriteStateWithNominatedPods(t *testing.T) {
-	tests := []struct {
-		name            string
-		preFilterPlugin *TestPlugin
-		filterPlugin    *TestPluginToWriteState
-		pod             *v1.Pod
-		nominatedPod    *v1.Pod
-		node            *v1.Node
-		nodeInfo        *framework.NodeInfo
-		wantStatus      *fwk.Status
-	}{
-		{
-			name: "node has a low-priority nominated pod and pre filters return unschedulable",
-			preFilterPlugin: &TestPlugin{
-				name: "TestPlugin1",
-				inj: injectedResult{
-					PreFilterAddPodStatus: int(fwk.Unschedulable),
-				},
-			},
-			filterPlugin: &TestPluginToWriteState{
-				name: "TestPlugin2",
-			},
-			pod:          highPriorityPod,
-			nominatedPod: lowPriorityPod,
-			node:         node,
-			nodeInfo:     framework.NewNodeInfo(pod),
-			wantStatus:   nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			registry := Registry{}
-			cfgPls := &config.Plugins{}
-
-			if tt.preFilterPlugin != nil {
-				if err := registry.Register(tt.preFilterPlugin.name,
-					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-						return tt.preFilterPlugin, nil
-					}); err != nil {
-					t.Fatalf("fail to register preFilter plugin (%s)", tt.preFilterPlugin.name)
+			if tt.wantStateKey != "" {
+				if _, err := state.Read(tt.wantStateKey); err != nil {
+					t.Errorf("Expected state key %q to exist, but got error: %v", tt.wantStateKey, err)
 				}
-				cfgPls.PreFilter.Enabled = append(
-					cfgPls.PreFilter.Enabled,
-					config.Plugin{Name: tt.preFilterPlugin.name},
-				)
-			}
-			if tt.filterPlugin != nil {
-				if err := registry.Register(tt.filterPlugin.name,
-					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-						return tt.filterPlugin, nil
-					}); err != nil {
-					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
-				}
-				cfgPls.Filter.Enabled = append(
-					cfgPls.Filter.Enabled,
-					config.Plugin{Name: tt.filterPlugin.name},
-				)
-			}
-
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
-			podInformer := informerFactory.Core().V1().Pods().Informer()
-			err := podInformer.GetStore().Add(tt.pod)
-			if err != nil {
-				t.Fatalf("Error adding pod to podInformer: %s", err)
-			}
-			if tt.nominatedPod != nil {
-				err = podInformer.GetStore().Add(tt.nominatedPod)
-				if err != nil {
-					t.Fatalf("Error adding nominated pod to podInformer: %s", err)
-				}
-			}
-
-			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
-			if tt.nominatedPod != nil {
-				podNominator.AddNominatedPod(
-					logger,
-					mustNewPodInfo(t, tt.nominatedPod),
-					&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
-			}
-			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile, WithPodNominator(podNominator))
-			if err != nil {
-				t.Fatalf("fail to create framework: %s", err)
-			}
-			defer func() {
-				_ = f.Close()
-			}()
-			tt.nodeInfo.SetNode(tt.node)
-			f.RunFilterPluginsWithNominatedPods(ctx, state, tt.pod, tt.nodeInfo)
-			_, err = state.Read(testPluginToWriteState)
-			if err != nil {
-				t.Fatalf("Error reading state: %s", err)
 			}
 		})
 	}
