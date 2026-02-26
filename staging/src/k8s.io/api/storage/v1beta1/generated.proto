@@ -251,6 +251,14 @@ message CSIDriverSpec {
   // +featureGate=CSIServiceAccountTokenSecrets
   // +optional
   optional bool serviceAccountTokenInSecrets = 10;
+
+  // PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver
+  // on the node is missing.
+  // This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+  // Default is "false".
+  // +featureGate=VolumeLimitScaling
+  // +optional
+  optional bool preventPodSchedulingIfMissing = 11;
 }
 
 // DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.

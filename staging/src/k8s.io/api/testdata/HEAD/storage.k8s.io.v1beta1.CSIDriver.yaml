@@ -33,6 +33,7 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  PreventPodSchedulingIfMissing: true
   attachRequired: true
   fsGroupPolicy: fsGroupPolicyValue
   nodeAllocatableUpdatePeriodSeconds: 9
