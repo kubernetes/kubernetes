@@ -1,0 +1,99 @@
+# HostPortConflict Scenario
+# Best-case scenario for opportunistic batching.
+# The `HostPort` constraint (port 80) strictly limits scheduling to 1 pod per node.
+# Since 5000 Pods need port 80 and we have 5000 Nodes, once Pod N is scheduled on Node X, Node X is immediately invalid for Pod N+1.
+# Opportunistic batching should detect this and skip Node X for Pod N+1 without running plugins, resulting in significant performance improvement (O(N) -> O(1) node scans).
+- name: HostPortConflict
+  defaultPodTemplatePath: ../templates/pod-hostport-80.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5000Nodes_5000Pods_OpportunisticBatching_Enabled
+    featureGates:
+      OpportunisticBatching: true
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_OpportunisticBatching_Disabled
+    featureGates:
+      OpportunisticBatching: false
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      measurePods: 5000
+
+# ResourceSaturation Scenario
+# Simulates a common "bin-packing" scenario where pods fill up nodes based on CPU/Memory.
+# We use pods requesting 3 CPU on 4 CPU nodes, which forces a 1-pod-per-node placement (since 3+3 > 4).
+# This validates that the batching logic correctly handles resource availability constraints, which are more complex than simple boolean predicates like HostPort.
+- name: ResourceSaturation
+  defaultPodTemplatePath: ../templates/pod-saturation.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5000Nodes_5000Pods_OpportunisticBatching_Enabled
+    featureGates:
+      OpportunisticBatching: true
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_OpportunisticBatching_Disabled
+    featureGates:
+      OpportunisticBatching: false
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      measurePods: 5000
+
+# AlternatingSignatures Scenario
+# Tests the overhead of batching when the workload constantly changes.
+# We alternate between two different pod templates (HostPort 80 vs HostPort 81).
+# This prevents the scheduler from forming long batches, forcing it to frequently create and destroy batches.
+# The goal is to ensure `OpportunisticBatching` does not introduce significant regression compared to the disabled state in this 'worst-case' churn scenario.
+- name: AlternatingSignatures
+  defaultPodTemplatePath: ../templates/pod-hostport-80.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    countParam: $halfPods
+    skipWaitToCompletion: true
+    podTemplatePath: ../templates/pod-hostport-80.yaml
+  - opcode: createPods
+    countParam: $halfPods
+    podTemplatePath: ../templates/pod-hostport-81.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5000Nodes_MixedPods_OpportunisticBatching_Enabled
+    featureGates:
+      OpportunisticBatching: true
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      halfPods: 2500
+  - name: 5000Nodes_MixedPods_OpportunisticBatching_Disabled
+    featureGates:
+      OpportunisticBatching: false
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      halfPods: 2500
