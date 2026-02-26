@@ -820,6 +820,7 @@ func Test_InFlightPods(t *testing.T) {
 					popPod(t, logger, q, action.podPopped)
 				case action.eventHappens != nil:
 					q.MoveAllToActiveOrBackoffQueue(logger, *action.eventHappens, nil, nil, nil)
+					q.flushPendingMoveEvents(logger)
 				case action.podEnqueued != nil:
 					err := q.AddUnschedulableIfNotPresent(logger, action.podEnqueued, q.SchedulingCycle())
 					if err != nil {
@@ -947,6 +948,7 @@ func TestPop(t *testing.T) {
 
 			// Activate it again.
 			q.MoveAllToActiveOrBackoffQueue(logger, pvAdd, nil, nil, nil)
+			q.flushPendingMoveEvents(logger)
 
 			// Now check result of Pop.
 			poppedPod = popPod(t, logger, q, pod)
@@ -1022,6 +1024,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 
 	// move all pods to active queue when we were trying to schedule them
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	oldCycle := q.SchedulingCycle()
 
 	firstPod, _ := q.Pop(logger)
@@ -1926,9 +1929,11 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					b.StartTimer()
 					if tt.moveEvent.Resource != "" {
 						q.MoveAllToActiveOrBackoffQueue(logger, tt.moveEvent, nil, nil, nil)
+						q.flushPendingMoveEvents(logger)
 					} else {
 						// Random case.
 						q.MoveAllToActiveOrBackoffQueue(logger, events[i%len(events)], nil, nil, nil)
+						q.flushPendingMoveEvents(logger)
 					}
 				}
 			})
@@ -2036,6 +2041,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			cl.Step(test.duration)
 
 			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+			q.flushPendingMoveEvents(logger)
 
 			if q.backoffQ.len() == 0 && test.expectedQ == backoffQ {
 				t.Fatalf("expected pod to be queued to backoffQ, but it was not")
@@ -2125,6 +2131,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	// This NodeAdd event moves unschedulablePodInfo and highPriorityPodInfo to the backoffQ,
 	// because of the queueing hint function registered for NodeAdd/fooPlugin.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	if q.activeQ.len() != 1 {
 		t.Errorf("Expected 1 item to be in activeQ, but got: %v", q.activeQ.len())
@@ -2207,6 +2214,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c.Step(q.backoffQ.podMaxBackoffDuration())
 	q.flushBackoffQCompleted(logger) // flush the completed backoffQ to move hpp1 to activeQ.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	if q.activeQ.len() != 4 {
 		t.Errorf("Expected 4 items to be in activeQ, but got: %v", q.activeQ.len())
 	}
@@ -2265,6 +2273,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithoutQueueingHint(t *testi
 	// This NodeAdd event moves unschedulablePodInfo and highPriorityPodInfo to the backoffQ,
 	// because of the queueing hint function registered for NodeAdd/fooPlugin.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	if q.activeQ.len() != 1 {
 		t.Errorf("Expected 1 item to be in activeQ, but got: %v", q.activeQ.len())
 	}
@@ -2321,6 +2330,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithoutQueueingHint(t *testi
 	c.Step(q.backoffQ.podMaxBackoffDuration())
 	q.flushBackoffQCompleted(logger) // flush the completed backoffQ to move hpp1 to activeQ.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	if q.activeQ.len() != 4 {
 		t.Errorf("Expected 4 items to be in activeQ, but got: %v", q.activeQ.len())
 	}
@@ -2567,6 +2577,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			c.Step(DefaultPodInitialBackoffDuration + time.Second)
 
 			q.AssignedPodUpdated(logger, nil, tt.updatedAssignedPod, tt.event)
+			q.flushPendingMoveEvents(logger)
 
 			if q.activeQ.has(newQueuedPodInfoForLookup(tt.unschedPod)) != tt.wantToRequeue {
 				t.Fatalf("unexpected Pod move: Pod should be requeued: %v. Pod is actually requeued: %v", tt.wantToRequeue, !tt.wantToRequeue)
@@ -2702,6 +2713,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	}
 	// Move all to active queue. We should still see the same set of pods.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	gotPods, gotSummary = q.PendingPods()
 	if diff := cmp.Diff(expectedSet, makeSet(gotPods)); diff != "" {
 		t.Errorf("Unexpected list of pending Pods (-want, +got):\n%s", diff)
@@ -2880,6 +2892,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	c.Step(q.backoffQ.podMaxBackoffDuration())
 	// Move all unschedulable pods to the active queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 	// Simulation is over. Now let's pop all pods. The pod popped first should be
 	// the last one we pop here.
 	for i := 0; i < 5; i++ {
@@ -2933,6 +2946,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
 	// Move all unschedulable pods to the active queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 
 	// Simulate a pod being popped by the scheduler,
 	// At this time, unschedulable pod should be popped.
@@ -2965,6 +2979,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
 	// Move all unschedulable pods to the active queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 
 	// At this time, newerPod should be popped
 	// because it is the oldest tried pod.
@@ -3010,6 +3025,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 	}
 	// Move all unschedulable pods to the active/backoff queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	q.flushPendingMoveEvents(logger)
 
 	p, err = q.Pop(logger)
 	if err != nil {
@@ -3316,6 +3332,7 @@ var (
 	}
 	moveAllToActiveOrBackoffQ = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+		queue.flushPendingMoveEvents(logger)
 	}
 	flushBackoffQ = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.clock.(*testingclock.FakeClock).Step(3 * time.Second)
@@ -4139,6 +4156,7 @@ func TestBackOffFlow(t *testing.T) {
 
 				// An event happens.
 				q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+				q.flushPendingMoveEvents(logger)
 
 				if !q.backoffQ.has(podInfo) {
 					t.Errorf("pod %v is not in the backoff queue", podID)
@@ -4251,6 +4269,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 				}
 			}
 			q.MoveAllToActiveOrBackoffQueue(logger, tt.event, nil, nil, tt.preEnqueueCheck)
+			q.flushPendingMoveEvents(logger)
 			got := sets.New[string]()
 			c.Step(2 * q.backoffQ.podMaxBackoffDuration())
 			gotPodInfos := q.backoffQ.popAllBackoffCompleted(logger)
