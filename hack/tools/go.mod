@@ -6,6 +6,7 @@ godebug default=go1.25
 
 require (
 	golang.org/x/mod v0.27.0
+	golang.org/x/tools v0.36.0
 	k8s.io/publishing-bot v0.5.0
 )
 
@@ -56,7 +57,6 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
-	golang.org/x/tools v0.36.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
 	google.golang.org/protobuf v1.36.4 // indirect

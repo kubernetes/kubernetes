@@ -41,6 +41,7 @@ BASH_TARGETS=(
 	update-generated-api-compatibility-data
 	update-generated-docs
 	update-openapi-spec
+	update-apigo
 	update-gofmt
 	update-golangci-lint-config
 )
