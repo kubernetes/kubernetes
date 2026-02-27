@@ -31,6 +31,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -56,6 +57,16 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+var symbolsForDisruptionMode = sets.New(schedulingv1alpha2.DisruptionModePod, schedulingv1alpha2.DisruptionModePodGroup)
+
+// Validate_DisruptionMode validates an instance of DisruptionMode according
+// to declarative validation rules in the API schema.
+func Validate_DisruptionMode(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.DisruptionMode) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDisruptionMode, nil).MarkAlpha()...)
+
+	return errs
 }
 
 // Validate_GangSchedulingPolicy validates an instance of GangSchedulingPolicy according
@@ -220,6 +231,32 @@ func Validate_PodGroupSpec(ctx context.Context, op operation.Operation, fldPath 
 			return &oldObj.SchedulingPolicy
 		}), oldObj != nil)...)
 
+	// field schedulingv1alpha2.PodGroupSpec.DisruptionMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha2.DisruptionMode, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DisruptionMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("disruptionMode"), obj.DisruptionMode, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupSpec) *schedulingv1alpha2.DisruptionMode {
+			return oldObj.DisruptionMode
+		}), oldObj != nil)...)
+
 	return errs
 }
 
@@ -258,6 +295,28 @@ func Validate_PodGroupTemplate(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroupSchedulingPolicy {
 			return &oldObj.SchedulingPolicy
+		}), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupTemplate.DisruptionMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha2.DisruptionMode, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DisruptionMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("disruptionMode"), obj.DisruptionMode, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.DisruptionMode {
+			return oldObj.DisruptionMode
 		}), oldObj != nil)...)
 
 	return errs

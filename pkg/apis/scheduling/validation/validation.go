@@ -22,6 +22,7 @@ import (
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -31,6 +32,11 @@ import (
 // validateWorkloadName can be used to check whether the given
 // name for a Workload is valid.
 var validateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
+
+var allowedDisruptionModes = sets.New(
+	scheduling.DisruptionModePod,
+	scheduling.DisruptionModePodGroup,
+)
 
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.
@@ -69,7 +75,11 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 
 // ValidatePodGroup tests if all fields in a PodGroup are set correctly.
 func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	if mode := podGroup.Spec.DisruptionMode; mode != nil {
+		allErrs = append(allErrs, validateDisruptionMode(podGroup.Spec.DisruptionMode, field.NewPath("spec"))...)
+	}
+	return allErrs
 }
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.
@@ -82,12 +92,38 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.DisruptionMode, oldSpec.DisruptionMode, fldPath.Child("disruptionMode")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	return validatePodGroupTemplates(fldPath.Child("podGroupTemplates"), spec)
+}
+
+func validatePodGroupTemplates(fldPath *field.Path, spec *scheduling.WorkloadSpec) field.ErrorList {
+	var allErrs field.ErrorList
+	for i := range spec.PodGroupTemplates {
+		template := &spec.PodGroupTemplates[i]
+		if mode := template.DisruptionMode; mode != nil {
+			allErrs = append(allErrs, validateDisruptionMode(mode, fldPath.Index(i))...)
+		}
+	}
+	return allErrs
+}
+
+func validateDisruptionMode(mode *scheduling.DisruptionMode, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !allowedDisruptionModes.Has(*mode) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("disruptionMode"), mode, sets.List(allowedDisruptionModes)).MarkCoveredByDeclarative())
+	}
+	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

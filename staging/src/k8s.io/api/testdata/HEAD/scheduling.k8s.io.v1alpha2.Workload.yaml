@@ -38,7 +38,8 @@ spec:
     kind: kindValue
     name: nameValue
   podGroupTemplates:
-  - name: nameValue
+  - disruptionMode: disruptionModeValue
+    name: nameValue
     schedulingPolicy:
       basic: {}
       gang:

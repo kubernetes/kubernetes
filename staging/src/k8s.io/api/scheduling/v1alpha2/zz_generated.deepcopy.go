@@ -154,6 +154,11 @@ func (in *PodGroupSpec) DeepCopyInto(out *PodGroupSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.SchedulingPolicy.DeepCopyInto(&out.SchedulingPolicy)
+	if in.DisruptionMode != nil {
+		in, out := &in.DisruptionMode, &out.DisruptionMode
+		*out = new(DisruptionMode)
+		**out = **in
+	}
 	return
 }
 
@@ -194,6 +199,11 @@ func (in *PodGroupStatus) DeepCopy() *PodGroupStatus {
 func (in *PodGroupTemplate) DeepCopyInto(out *PodGroupTemplate) {
 	*out = *in
 	in.SchedulingPolicy.DeepCopyInto(&out.SchedulingPolicy)
+	if in.DisruptionMode != nil {
+		in, out := &in.DisruptionMode, &out.DisruptionMode
+		*out = new(DisruptionMode)
+		**out = **in
+	}
 	return
 }
 

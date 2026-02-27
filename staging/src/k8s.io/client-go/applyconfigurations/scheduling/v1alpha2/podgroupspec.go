@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha2
 
+import (
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+)
+
 // PodGroupSpecApplyConfiguration represents a declarative configuration of the PodGroupSpec type for use
 // with apply.
 //
@@ -30,6 +34,13 @@ type PodGroupSpecApplyConfiguration struct {
 	// It is copied from a template if the PodGroup is created from one.
 	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// It is copied from a template if the PodGroup is created from one.
+	// One of Pod, PodGroup. Defaults to Pod if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -51,5 +62,13 @@ func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroup
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupSpecApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionMode field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithDisruptionMode(value schedulingv1alpha2.DisruptionMode) *PodGroupSpecApplyConfiguration {
+	b.DisruptionMode = &value
 	return b
 }

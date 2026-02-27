@@ -125,6 +125,16 @@ type PodGroupTemplate struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
+
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// One of Pod, PodGroup. Defaults to Pod if unset.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	// +k8s:alpha(since:"1.36")=+k8s:optional
+	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode,casttype=DisruptionMode"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -168,6 +178,20 @@ type GangSchedulingPolicy struct {
 	// +k8s:minimum=1
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }
+
+// DisruptionMode describes the mode in which a PodGroup can be disrupted (e.g. preempted).
+// +enum
+// +k8s:alpha(since: "1.36")=+k8s:enum
+type DisruptionMode string
+
+const (
+	// DisruptionModePod means that individual pods can be disrupted or preempted independently.
+	// It doesn't depend on exact set of pods currently running in this PodGroup.
+	DisruptionModePod DisruptionMode = "Pod"
+	// DisruptionModePodGroup means that the whole PodGroup needs to be disrupted
+	// or preempted together.
+	DisruptionModePodGroup DisruptionMode = "PodGroup"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -227,6 +251,19 @@ type PodGroupSpec struct {
 	// +required
 	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
+
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// It is copied from a template if the PodGroup is created from one.
+	// One of Pod, PodGroup. Defaults to Pod if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode,casttype=DisruptionMode"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.

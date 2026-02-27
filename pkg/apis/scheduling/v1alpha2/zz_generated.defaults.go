@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha2
 
 import (
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,5 +30,34 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.PodGroup{}, func(obj interface{}) { SetObjectDefaults_PodGroup(obj.(*schedulingv1alpha2.PodGroup)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.PodGroupList{}, func(obj interface{}) { SetObjectDefaults_PodGroupList(obj.(*schedulingv1alpha2.PodGroupList)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.Workload{}, func(obj interface{}) { SetObjectDefaults_Workload(obj.(*schedulingv1alpha2.Workload)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.WorkloadList{}, func(obj interface{}) { SetObjectDefaults_WorkloadList(obj.(*schedulingv1alpha2.WorkloadList)) })
 	return nil
+}
+
+func SetObjectDefaults_PodGroup(in *schedulingv1alpha2.PodGroup) {
+	SetDefaults_PodGroupSpec(&in.Spec)
+}
+
+func SetObjectDefaults_PodGroupList(in *schedulingv1alpha2.PodGroupList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_PodGroup(a)
+	}
+}
+
+func SetObjectDefaults_Workload(in *schedulingv1alpha2.Workload) {
+	for i := range in.Spec.PodGroupTemplates {
+		a := &in.Spec.PodGroupTemplates[i]
+		SetDefaults_PodGroupTemplate(a)
+	}
+}
+
+func SetObjectDefaults_WorkloadList(in *schedulingv1alpha2.WorkloadList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Workload(a)
+	}
 }

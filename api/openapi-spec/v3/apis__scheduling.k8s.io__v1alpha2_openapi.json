@@ -149,6 +149,10 @@
       "io.k8s.api.scheduling.v1alpha2.PodGroupSpec": {
         "description": "PodGroupSpec defines the desired state of a PodGroup.",
         "properties": {
+          "disruptionMode": {
+            "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. It is copied from a template if the PodGroup is created from one. One of Pod, PodGroup. Defaults to Pod if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+            "type": "string"
+          },
           "podGroupTemplateRef": {
             "allOf": [
               {
@@ -199,6 +203,10 @@
       "io.k8s.api.scheduling.v1alpha2.PodGroupTemplate": {
         "description": "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
         "properties": {
+          "disruptionMode": {
+            "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. Defaults to Pod if unset. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+            "type": "string"
+          },
           "name": {
             "default": "",
             "description": "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",

@@ -21,10 +21,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var podGroup = &scheduling.PodGroup{
@@ -48,10 +51,15 @@ var podGroup = &scheduling.PodGroup{
 }
 
 var (
-	fieldImmutableError    = "field is immutable"
-	minCountError          = "must be greater than or equal to 1"
-	oneOfError             = "must specify one of: `basic`, `gang`"
-	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
+	fieldImmutableError      = "field is immutable"
+	minCountError            = "must be greater than or equal to 1"
+	oneOfError               = "must specify one of: `basic`, `gang`"
+	multipleFieldsSetError   = "must specify exactly one of: `basic`, `gang`"
+	supportedDisruptionModes = `supported values: "Pod", "PodGroup"`
+
+	podDisruptionMode      = new(scheduling.DisruptionModePod)
+	podGroupDisruptionMode = new(scheduling.DisruptionModePodGroup)
+	invalidDisruptionMode  = new(scheduling.DisruptionMode("Invalid"))
 )
 
 func TestStrategy(t *testing.T) {
@@ -77,9 +85,10 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
 	testCases := map[string]struct {
-		obj                   *scheduling.PodGroup
-		expectObj             *scheduling.PodGroup
-		expectValidationError string
+		obj                           *scheduling.PodGroup
+		expectObj                     *scheduling.PodGroup
+		expectValidationError         string
+		enableWorkloadAwarePreemption bool
 	}{
 		"simple": {
 			obj:       podGroup,
@@ -125,11 +134,60 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectObj: podGroup,
 		},
+		"workload aware preemption disabled - drop disruption mode": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podDisruptionMode
+				return pg
+			}(),
+			expectObj: podGroup,
+		},
+		"workload aware preemption enabled - preserve disruption mode (pod)": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podDisruptionMode
+				return pg
+			}(),
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podDisruptionMode
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - preserve disruption mode (pod group)": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+				return pg
+			}(),
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - unknown disruption mode": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = invalidDisruptionMode
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         supportedDisruptionModes,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			podGroup := tc.obj.DeepCopy()
+
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.GangScheduling:          tc.enableWorkloadAwarePreemption,
+				features.WorkloadAwarePreemption: tc.enableWorkloadAwarePreemption,
+			})
 
 			strategy := NewStrategy()
 			strategy.PrepareForCreate(ctx, podGroup)
@@ -158,9 +216,10 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                *scheduling.PodGroup
-		newObj                *scheduling.PodGroup
-		expectValidationError string
+		oldObj                        *scheduling.PodGroup
+		newObj                        *scheduling.PodGroup
+		expectValidationError         string
+		enableWorkloadAwarePreemption bool
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -209,6 +268,25 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: fieldImmutableError,
 		},
+		"disruption mode update, workload aware preemption disabled": {
+			oldObj: podGroup,
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+				return pg
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"disruption mode update, workload aware preemption enabled": {
+			oldObj: podGroup,
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -216,6 +294,12 @@ func TestStrategyUpdate(t *testing.T) {
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
 			newPodGroup.ResourceVersion = "4"
+
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.GangScheduling:          tc.enableWorkloadAwarePreemption,
+				features.WorkloadAwarePreemption: tc.enableWorkloadAwarePreemption,
+			})
 
 			strategy := NewStrategy()
 			strategy.PrepareForUpdate(ctx, newPodGroup, podGroup)
@@ -337,7 +421,9 @@ func TestStatusStrategyUpdate(t *testing.T) {
 
 			expectObj := tc.expectObj.DeepCopy()
 			expectObj.ResourceVersion = "4"
-			assert.Equal(t, expectObj, newObj)
+			if diff := cmp.Diff(expectObj, newObj); diff != "" {
+				t.Errorf("PodGroup mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

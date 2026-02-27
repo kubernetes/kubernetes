@@ -57,7 +57,8 @@
           "gang": {
             "minCount": 1
           }
-        }
+        },
+        "disruptionMode": "disruptionModeValue"
       }
     ]
   }

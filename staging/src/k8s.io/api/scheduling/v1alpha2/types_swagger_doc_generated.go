@@ -79,6 +79,7 @@ var map_PodGroupSpec = map[string]string{
 	"":                    "PodGroupSpec defines the desired state of a PodGroup.",
 	"podGroupTemplateRef": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
 	"schedulingPolicy":    "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. It is copied from a template if the PodGroup is created from one. This field is immutable.",
+	"disruptionMode":      "DisruptionMode defines the mode in which a given PodGroup can be disrupted. It is copied from a template if the PodGroup is created from one. One of Pod, PodGroup. Defaults to Pod if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
 }
 
 func (PodGroupSpec) SwaggerDoc() map[string]string {
@@ -98,6 +99,7 @@ var map_PodGroupTemplate = map[string]string{
 	"":                 "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
 	"name":             "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
 	"schedulingPolicy": "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"disruptionMode":   "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. Defaults to Pod if unset. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {

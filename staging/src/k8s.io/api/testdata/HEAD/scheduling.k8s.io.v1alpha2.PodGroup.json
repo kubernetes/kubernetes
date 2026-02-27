@@ -55,7 +55,8 @@
       "gang": {
         "minCount": 1
       }
-    }
+    },
+    "disruptionMode": "disruptionModeValue"
   },
   "status": {
     "conditions": [

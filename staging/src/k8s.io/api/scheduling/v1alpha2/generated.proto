@@ -116,6 +116,19 @@ message PodGroupSpec {
   // +required
   // +k8s:alpha(since:"1.36")=+k8s:immutable
   optional PodGroupSchedulingPolicy schedulingPolicy = 2;
+
+  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // It is copied from a template if the PodGroup is created from one.
+  // One of Pod, PodGroup. Defaults to Pod if unset.
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:optional
+  // +k8s:alpha(since:"1.36")=+k8s:immutable
+  optional string disruptionMode = 3;
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -159,6 +172,16 @@ message PodGroupTemplate {
   //
   // +required
   optional PodGroupSchedulingPolicy schedulingPolicy = 2;
+
+  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // One of Pod, PodGroup. Defaults to Pod if unset.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:alpha(since:"1.36")=+k8s:optional
+  optional string disruptionMode = 3;
 }
 
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).

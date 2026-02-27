@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -29,6 +30,11 @@ import (
 
 	// Ensure all API groups are registered with the scheme
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
+)
+
+var allowedDisruptionModes = sets.New(
+	scheduling.DisruptionModePod,
+	scheduling.DisruptionModePodGroup,
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -135,6 +141,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid with basic policy": {
 			input: mkValidWorkload(setBasicPolicy(0)),
 		},
+		"pod disruption mode": {
+			input: mkValidWorkload(setDisruptionMode(0, podDisruptionMode)),
+		},
+		"pod group disruption mode": {
+			input: mkValidWorkload(setDisruptionMode(0, podGroupDisruptionMode)),
+		},
+		"invalid disruption mode": {
+			input:        mkValidWorkload(setDisruptionMode(0, invalidDisruptionMode)),
+			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("spec", "podGroupTemplates").Index(0).Child("disruptionMode"), invalidDisruptionMode, sets.List(allowedDisruptionModes)).MarkAlpha()},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -219,6 +235,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update from gang to basic policy": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
+		},
+		"invalid update of disruption mode": {
+			oldObj:       mkValidWorkload(setResourceVersion("1"), setDisruptionMode(0, podDisruptionMode)),
+			updateObj:    mkValidWorkload(setResourceVersion("1"), setDisruptionMode(0, podGroupDisruptionMode)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
 		},
 	}
@@ -352,5 +373,11 @@ func setControllerRef(apiGroup, kind, name string) func(obj *scheduling.Workload
 			Kind:     kind,
 			Name:     name,
 		}
+	}
+}
+
+func setDisruptionMode(pgIdx int, mode *scheduling.DisruptionMode) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.PodGroupTemplates[pgIdx].DisruptionMode = mode
 	}
 }

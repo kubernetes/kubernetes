@@ -21,10 +21,17 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+)
+
+var (
+	podDisruptionMode      = new(scheduling.DisruptionModePod)
+	podGroupDisruptionMode = new(scheduling.DisruptionModePodGroup)
+	invalidDisruptionMode  = new(scheduling.DisruptionMode("Invalid"))
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -188,6 +195,18 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef = nil
 		}),
+		"pod disruption mode for basic policy": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[0].DisruptionMode = podDisruptionMode
+		}),
+		"pod disruption mode for gang policy": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[1].DisruptionMode = podDisruptionMode
+		}),
+		"pod group disruption mode for basic policy": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[0].DisruptionMode = podGroupDisruptionMode
+		}),
+		"pod group disruption mode for gang policy": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[1].DisruptionMode = podGroupDisruptionMode
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -246,6 +265,14 @@ func TestValidateWorkload(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"invalid disruption mode": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].DisruptionMode = invalidDisruptionMode
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "podGroupTemplates").Index(1).Child("disruptionMode"), invalidDisruptionMode, sets.List(allowedDisruptionModes)).MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -355,6 +382,18 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Spec.ControllerRef = nil
 			}),
 		},
+		"change disruption mode": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].DisruptionMode = podGroupDisruptionMode
+			}),
+		},
+		"delete disruption mode": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].DisruptionMode = podGroupDisruptionMode
+			}),
+			update: mkWorkload(),
+		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -400,6 +439,24 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 func TestValidatePodGroup(t *testing.T) {
 	successCases := map[string]*scheduling.PodGroup{
 		"gang policy": mkPodGroup(),
+		"pod disruption mode for gang policy": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.DisruptionMode = podDisruptionMode
+		}),
+		"pod disruption mode for basic policy": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+				Basic: &scheduling.BasicSchedulingPolicy{},
+			}
+			pg.Spec.DisruptionMode = podDisruptionMode
+		}),
+		"pod group disruption mode for gang policy": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.DisruptionMode = podGroupDisruptionMode
+		}),
+		"pod group disruption mode for basic policy": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+				Basic: &scheduling.BasicSchedulingPolicy{},
+			}
+			pg.Spec.DisruptionMode = podGroupDisruptionMode
+		}),
 	}
 	for name, podGroup := range successCases {
 		errs := ValidatePodGroup(podGroup)
@@ -458,6 +515,14 @@ func TestValidatePodGroup(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"invalid disruption mode": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.DisruptionMode = invalidDisruptionMode
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "disruptionMode"), invalidDisruptionMode, sets.List(allowedDisruptionModes)).MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -563,6 +628,18 @@ func TestValidatePodGroupUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				pg.Spec.SchedulingPolicy.Basic = &scheduling.BasicSchedulingPolicy{}
 			}),
+		},
+		"change disruption mode": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+			}),
+		},
+		"delete disruption mode": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.DisruptionMode = podGroupDisruptionMode
+			}),
+			update: mkPodGroup(),
 		},
 	}
 	for name, tc := range failureCases {
