@@ -300,6 +300,8 @@ func autoConvert_v1alpha2_PodGroupSpec_To_scheduling_PodGroupSpec(in *scheduling
 	if err := Convert_v1alpha2_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
 		return err
 	}
+	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -313,6 +315,8 @@ func autoConvert_scheduling_PodGroupSpec_To_v1alpha2_PodGroupSpec(in *scheduling
 	if err := Convert_scheduling_PodGroupSchedulingPolicy_To_v1alpha2_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
 		return err
 	}
+	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -346,6 +350,8 @@ func autoConvert_v1alpha2_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *sc
 	if err := Convert_v1alpha2_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
 		return err
 	}
+	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -359,6 +365,8 @@ func autoConvert_scheduling_PodGroupTemplate_To_v1alpha2_PodGroupTemplate(in *sc
 	if err := Convert_scheduling_PodGroupSchedulingPolicy_To_v1alpha2_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
 		return err
 	}
+	out.PriorityClassName = (*string)(unsafe.Pointer(in.PriorityClassName))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 

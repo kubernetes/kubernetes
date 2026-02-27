@@ -53898,6 +53898,20 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSpec(ref common.ReferenceCallb
 							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName defines the priority that should be considered when scheduling this pod group. It is copied from the PodGroupTemplate on PodGroup creation. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority reflects the priority of the pod group. The higher the value, the higher the priority. It is copied from the PodGroupTemplate on PodGroup creation. This field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"schedulingPolicy"},
 			},
@@ -53966,6 +53980,20 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplate(ref common.ReferenceC
 							Description: "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName defines the priority that should be considered when scheduling this pod group. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority reflects the priority of the pod group. The higher the value, the higher the priority. If admission control is enabled, it rejects manual configuration of this field. The admission controller populates this field from the priority class. This field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

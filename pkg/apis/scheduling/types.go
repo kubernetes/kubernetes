@@ -178,6 +178,22 @@ type PodGroupTemplate struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// If no priority class is specified, admission control can set this to the global default priority class if it exists.
+	// Otherwise, the pod group's priority will be zero.
+	// This field is immutable.
+	//
+	// +optional
+	PriorityClassName *string
+
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// If admission control is enabled, it rejects manual configuration of this field.
+	// The admission controller populates this field from the priority class.
+	// This field is immutable.
+	//
+	// +optional
+	Priority *int32
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -269,6 +285,20 @@ type PodGroupSpec struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	//
+	// +optional
+	PriorityClassName *string
+
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	//
+	// +optional
+	Priority *int32
 }
 
 // PodGroupStatus represents information about the status of a pod group.

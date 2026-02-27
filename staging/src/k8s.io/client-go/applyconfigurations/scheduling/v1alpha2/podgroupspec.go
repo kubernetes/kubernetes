@@ -30,6 +30,14 @@ type PodGroupSpecApplyConfiguration struct {
 	// It is copied from the template on PodGroup creation.
 	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	Priority *int32 `json:"priority,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -51,5 +59,21 @@ func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroup
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupSpecApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithPriorityClassName sets the PriorityClassName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PriorityClassName field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithPriorityClassName(value string) *PodGroupSpecApplyConfiguration {
+	b.PriorityClassName = &value
+	return b
+}
+
+// WithPriority sets the Priority field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Priority field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithPriority(value int32) *PodGroupSpecApplyConfiguration {
+	b.Priority = &value
 	return b
 }

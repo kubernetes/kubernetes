@@ -55,7 +55,9 @@
       "gang": {
         "minCount": 1
       }
-    }
+    },
+    "priorityClassName": "priorityClassNameValue",
+    "priority": 4
   },
   "status": {
     "conditions": [

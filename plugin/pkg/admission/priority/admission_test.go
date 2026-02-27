@@ -24,14 +24,19 @@ import (
 
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -243,6 +248,166 @@ func TestPriorityClassAdmission(t *testing.T) {
 		if err == nil && test.expectError {
 			t.Errorf("Test %q: expected error and no error recevied", test.name)
 		}
+	}
+}
+
+func TestAdmitWorkload(t *testing.T) {
+	workload := func(priorityClassName *string) *scheduling.Workload {
+		return &scheduling.Workload{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-workload",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: scheduling.WorkloadSpec{
+				PodGroupTemplates: []scheduling.PodGroupTemplate{
+					{
+						Name:              "test-podgrouptemplate",
+						PriorityClassName: priorityClassName,
+					},
+				},
+			},
+		}
+	}
+
+	workloadWithPriority := func(priorityClassName string, priority *int32) *scheduling.Workload {
+		w := workload(ptr.To(priorityClassName))
+		w.Spec.PodGroupTemplates[0].Priority = priority
+		return w
+	}
+
+	attributes := func(workload *scheduling.Workload, operation admission.Operation) admission.Attributes {
+		var oldObj runtime.Object
+		var options runtime.Object = &metav1.CreateOptions{}
+		if operation == admission.Update {
+			oldObj = workload.DeepCopy()
+			options = &metav1.UpdateOptions{}
+		}
+		return admission.NewAttributesRecord(
+			workload,
+			oldObj,
+			scheduling.Kind("Workload").WithVersion("v1alpha1"),
+			workload.ObjectMeta.Namespace,
+			"",
+			scheduling.Resource("workloads").WithVersion("v1alpha1"),
+			"",
+			operation,
+			options,
+			false,
+			nil,
+		)
+	}
+
+	testCases := []struct {
+		name                          string
+		priorityClasses               []*scheduling.PriorityClass
+		prepareWorkload               *scheduling.Workload
+		operation                     admission.Operation
+		expectError                   bool
+		expectedPriorityClass         string
+		expectedPriority              int32
+		enableWorkloadAwarePreemption bool
+	}{
+		{
+			name:                          "workload with empty priorityClassName, accepted and set priorityClassName to global default",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workload(nil),
+			operation:                     admission.Create,
+			expectError:                   false,
+			expectedPriorityClass:         "default1",
+			expectedPriority:              defaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "workload with explicit priorityClassName listed in priorityClasses, accepted",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workload(ptr.To("nondefault1")),
+			operation:                     admission.Create,
+			expectError:                   false,
+			expectedPriorityClass:         "nondefault1",
+			expectedPriority:              nondefaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "workload with non-existent priorityClassName, rejected",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workload(ptr.To("non-existent")),
+			operation:                     admission.Create,
+			expectError:                   true,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "workload with any priorityClassName but feature gate disabled, skips validation",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workload(ptr.To("non-existent")),
+			operation:                     admission.Create,
+			expectError:                   false,
+			enableWorkloadAwarePreemption: false,
+		},
+		{
+			name:                          "workload with no priorityClassName and no global default, accepted and priority should be zero",
+			priorityClasses:               []*scheduling.PriorityClass{nondefaultClass1},
+			prepareWorkload:               workload(nil),
+			operation:                     admission.Create,
+			expectError:                   false,
+			expectedPriorityClass:         "",
+			expectedPriority:              0,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "workload create with pre-set Priority matching computed value, accepted",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workloadWithPriority("nondefault1", ptr.To(nondefaultClass1.Value)),
+			operation:                     admission.Create,
+			expectError:                   false,
+			expectedPriorityClass:         "nondefault1",
+			expectedPriority:              nondefaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "workload create with pre-set Priority not matching computed value, rejected",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workloadWithPriority("nondefault1", ptr.To(int32(9999))),
+			operation:                     admission.Create,
+			expectError:                   true,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "update operation is a no-op, admission does not mutate workload on update",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareWorkload:               workload(ptr.To("non-existent")),
+			operation:                     admission.Update,
+			expectError:                   false,
+			enableWorkloadAwarePreemption: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.GangScheduling:          true,
+				features.WorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
+			})
+
+			admissionPlugin := NewPlugin()
+			if err := addPriorityClasses(admissionPlugin, tt.priorityClasses); err != nil {
+				t.Fatalf("unable to configure priority classes: %v", err)
+			}
+
+			err := admissionPlugin.Admit(context.TODO(), attributes(tt.prepareWorkload, tt.operation), nil)
+			if (err != nil) != tt.expectError {
+				t.Errorf("Workload Admit(), error = %v, want = %v", err, tt.expectError)
+			}
+			if !tt.expectError && tt.operation == admission.Create && tt.enableWorkloadAwarePreemption {
+				pgt := tt.prepareWorkload.Spec.PodGroupTemplates[0]
+				if *pgt.PriorityClassName != tt.expectedPriorityClass {
+					t.Errorf("Workload Admit(), priorityClassName = %v, want = %v", *pgt.PriorityClassName, tt.expectedPriorityClass)
+				}
+				if *pgt.Priority != tt.expectedPriority {
+					t.Errorf("Workload Admit(), Priority = %v, want = %v", *pgt.Priority, tt.expectedPriority)
+				}
+			}
+		})
 	}
 }
 

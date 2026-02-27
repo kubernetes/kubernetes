@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -188,6 +190,12 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef = nil
 		}),
+		"valid priorityClassName": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[0].PriorityClassName = ptr.To("high-priority")
+		}),
+		"empty priorityClassName": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[0].PriorityClassName = nil
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -246,6 +254,14 @@ func TestValidateWorkload(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"priority exceeds maximum": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].Priority = ptr.To(int32(scheduling.HighestUserDefinablePriority + 1))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), int32(scheduling.HighestUserDefinablePriority+1), fmt.Sprintf("must be %v or less", scheduling.HighestUserDefinablePriority)),
 			},
 		},
 	}
@@ -353,6 +369,22 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 			old: mkWorkload(),
 			update: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef = nil
+			}),
+		},
+		"change priorityClassName": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].PriorityClassName = ptr.To("high-priority")
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].PriorityClassName = ptr.To("low-priority")
+			}),
+		},
+		"change priority": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].Priority = ptr.To(int32(1000))
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].Priority = ptr.To(int32(2000))
 			}),
 		},
 	}

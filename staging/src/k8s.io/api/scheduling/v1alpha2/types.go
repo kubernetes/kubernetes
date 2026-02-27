@@ -125,6 +125,27 @@ type PodGroupTemplate struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
+
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// If no priority class is specified, admission control can set this to the global default priority class if it exists.
+	// Otherwise, the pod group's priority will be zero.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	PriorityClassName *string `json:"priorityClassName,omitempty" protobuf:"bytes,3,opt,name=priorityClassName"`
+
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// If admission control is enabled, it rejects manual configuration of this field.
+	// The admission controller populates this field from the priority class.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,4,opt,name=priority"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -227,6 +248,25 @@ type PodGroupSpec struct {
 	// +required
 	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
+
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	PriorityClassName *string `json:"priorityClassName,omitempty" protobuf:"bytes,3,opt,name=priorityClassName"`
+
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// It is copied from the PodGroupTemplate on PodGroup creation.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,4,opt,name=priority"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.

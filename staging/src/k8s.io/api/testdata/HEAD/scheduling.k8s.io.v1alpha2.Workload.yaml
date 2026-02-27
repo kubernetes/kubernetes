@@ -39,6 +39,8 @@ spec:
     name: nameValue
   podGroupTemplates:
   - name: nameValue
+    priority: 4
+    priorityClassName: priorityClassNameValue
     schedulingPolicy:
       basic: {}
       gang:

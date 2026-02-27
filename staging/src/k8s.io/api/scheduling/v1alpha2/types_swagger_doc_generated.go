@@ -79,6 +79,8 @@ var map_PodGroupSpec = map[string]string{
 	"":                    "PodGroupSpec defines the desired state of a PodGroup.",
 	"podGroupTemplateRef": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
 	"schedulingPolicy":    "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. It is copied from the template on PodGroup creation. This field is immutable.",
+	"priorityClassName":   "PriorityClassName defines the priority that should be considered when scheduling this pod group. It is copied from the PodGroupTemplate on PodGroup creation. This field is immutable.",
+	"priority":            "Priority reflects the priority of the pod group. The higher the value, the higher the priority. It is copied from the PodGroupTemplate on PodGroup creation. This field is immutable.",
 }
 
 func (PodGroupSpec) SwaggerDoc() map[string]string {
@@ -95,9 +97,11 @@ func (PodGroupStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupTemplate = map[string]string{
-	"":                 "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
-	"name":             "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
-	"schedulingPolicy": "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"":                  "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
+	"name":              "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
+	"schedulingPolicy":  "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"priorityClassName": "PriorityClassName defines the priority that should be considered when scheduling this pod group. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero. This field is immutable.",
+	"priority":          "Priority reflects the priority of the pod group. The higher the value, the higher the priority. If admission control is enabled, it rejects manual configuration of this field. The admission controller populates this field from the priority class. This field is immutable.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {

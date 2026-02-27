@@ -69,7 +69,13 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 
 // ValidatePodGroup tests if all fields in a PodGroup are set correctly.
 func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodGroupSpec(&podGroup.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validatePodGroupSpec(spec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
+	return validatePriority(spec.Priority, fldPath.Child("priority"))
 }
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.
@@ -82,12 +88,41 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PriorityClassName, oldSpec.PriorityClassName, fldPath.Child("priorityClassName")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Priority, oldSpec.Priority, fldPath.Child("priority")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	return validatePodGroupTemplates(fldPath, spec)
+}
+
+func validatePodGroupTemplates(fldPath *field.Path, spec *scheduling.WorkloadSpec) field.ErrorList {
+	var allErrs field.ErrorList
+	podGroupsPath := fldPath.Child("podGroupTemplates")
+	for i := range spec.PodGroupTemplates {
+		allErrs = append(allErrs, validatePodGroupTemplate(&spec.PodGroupTemplates[i], podGroupsPath.Index(i))...)
+	}
+	return allErrs
+}
+
+func validatePodGroupTemplate(podGroupTemplate *scheduling.PodGroupTemplate, fldPath *field.Path) field.ErrorList {
+	return validatePriority(podGroupTemplate.Priority, fldPath.Child("priority"))
+}
+
+func validatePriority(priority *int32, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if priority != nil && *priority > scheduling.HighestUserDefinablePriority {
+		allErrs = append(allErrs, field.Invalid(fldPath, *priority, fmt.Sprintf("must be %v or less", scheduling.HighestUserDefinablePriority)))
+	}
+	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
