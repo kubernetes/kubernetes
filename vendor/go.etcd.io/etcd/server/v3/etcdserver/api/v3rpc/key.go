@@ -32,6 +32,8 @@ type kvServer struct {
 	// Txn.Success can have at most 128 operations,
 	// and Txn.Failure can have at most 128 operations.
 	maxTxnOps uint
+	// we want compile errors if new methods are added
+	pb.UnsafeKVServer
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {
@@ -50,6 +52,29 @@ func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResp
 
 	s.hdr.fill(resp.Header)
 	return resp, nil
+}
+
+func (s *kvServer) RangeStream(r *pb.RangeRequest, rs pb.KV_RangeStreamServer) error {
+	if err := checkRangeRequest(r); err != nil {
+		return err
+	}
+	resp := &pb.RangeStreamResponse{
+		RangeResponse: &pb.RangeResponse{
+			Header: &pb.ResponseHeader{},
+		},
+	}
+	s.hdr.fill(resp.RangeResponse.Header)
+	// Revision will be send later
+	resp.RangeResponse.Header.Revision = 0
+	err := rs.Send(resp)
+	if err != nil {
+		return togRPCError(err)
+	}
+	err = s.kv.RangeStream(r, rs)
+	if err != nil {
+		return togRPCError(err)
+	}
+	return nil
 }
 
 func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {

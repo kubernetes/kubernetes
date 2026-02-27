@@ -900,7 +900,35 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
 	startTime := time.Now()
-	if recursive {
+	// TODO: Figure out rangestream with regular lists that bypass WatchCache. Keep this off for now.
+	if false && recursive && utilfeature.DefaultFeatureGate.Enabled(features.RangeStream) {
+		// RangeStream used for direct List calls (e.g. from controllers or when WatchList is disabled)
+		rangeStart := keyPrefix
+		if options.Continue != "" {
+			rangeStart = options.Continue
+		}
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		getOpts := []clientv3.OpOption{
+			clientv3.WithRange(rangeEnd),
+			clientv3.WithLimit(options.Limit),
+			clientv3.WithRev(options.Revision),
+		}
+		klog.V(4).Infof("Using RangeStream for %s", keyPrefix)
+		streamResp, err := s.client.KV.GetStream(ctx, rangeStart, getOpts...)
+		if err != nil {
+			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+			return resp, err
+		}
+		var rangeResp *clientv3.GetResponse
+		rangeResp, err = clientv3.GetStreamToGetResponse(streamResp)
+		metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+		if err != nil {
+			return resp, err
+		}
+		resp.Kvs = rangeResp.Kvs
+		resp.Count = rangeResp.Count
+		resp.Revision = rangeResp.Header.Revision
+	} else if recursive {
 		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
 		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
 	} else {

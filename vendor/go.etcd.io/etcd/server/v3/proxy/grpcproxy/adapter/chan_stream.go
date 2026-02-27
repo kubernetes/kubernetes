@@ -16,12 +16,11 @@ package adapter
 
 import (
 	"context"
+	"io"
 	"maps"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 // chanServerStream implements grpc.ServerStream with a chanStream
@@ -46,9 +45,9 @@ func (ss *chanServerStream) SendHeader(md metadata.MD) error {
 		ss.headerc = nil
 		ss.headers = nil
 		return nil
-	case <-ss.Context().Done():
+	case <-ss.Context().Done(): //nolint:staticcheck // TODO: remove for a supported version
 	}
-	return ss.Context().Err()
+	return ss.Context().Err() //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (ss *chanServerStream) SetHeader(md metadata.MD) error {
@@ -121,7 +120,7 @@ func (s *chanStream) RecvMsg(m any) error {
 		select {
 		case msg, ok := <-s.recvc:
 			if !ok {
-				return status.Error(codes.Canceled, "the client connection is closing")
+				return io.EOF
 			}
 			if err, ok := msg.(error); ok {
 				return err
@@ -130,12 +129,22 @@ func (s *chanStream) RecvMsg(m any) error {
 			return nil
 		case <-s.ctx.Done():
 		}
-		if len(s.recvc) == 0 {
-			// prioritize any pending recv messages over canceled context
-			break
+		// Context is done. Do one non-blocking read to prioritize a
+		// pending message or channel closure (EOF) over the context error.
+		select {
+		case msg, ok := <-s.recvc:
+			if !ok {
+				return io.EOF
+			}
+			if err, ok := msg.(error); ok {
+				return err
+			}
+			*v = msg
+			return nil
+		default:
+			return s.ctx.Err()
 		}
 	}
-	return s.ctx.Err()
 }
 
 func newPipeStream(ctx context.Context, ssHandler func(chanServerStream) error) chanClientStream {
@@ -159,6 +168,7 @@ func newPipeStream(ctx context.Context, ssHandler func(chanServerStream) error) 
 			case <-cctx.Done():
 			}
 		}
+		close(srv.sendc)
 		scancel()
 		ccancel()
 	}()

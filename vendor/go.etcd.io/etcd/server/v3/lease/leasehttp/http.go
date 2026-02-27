@@ -73,6 +73,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, ErrLeaseHTTPTimeout.Error(), http.StatusRequestTimeout)
 			return
 		}
+		// gofail: var beforeServeHTTPLeaseRenew struct{}
 		ttl, rerr := h.l.Renew(lease.LeaseID(lreq.ID))
 		if rerr != nil {
 			if errors.Is(rerr, lease.ErrLeaseNotFound) {
@@ -171,8 +172,8 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 	if err != nil {
 		return -1, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/protobuf")
-	req.Cancel = ctx.Done()
 
 	resp, err := cc.Do(req)
 	if err != nil {

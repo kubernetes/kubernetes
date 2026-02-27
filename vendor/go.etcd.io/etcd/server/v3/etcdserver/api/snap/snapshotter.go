@@ -78,7 +78,7 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	fname := fmt.Sprintf("%016x-%016x%s", snapshot.Metadata.Term, snapshot.Metadata.Index, snapSuffix)
 	b := pbutil.MustMarshal(snapshot)
 	crc := crc32.Update(0, crcTable, b)
-	snap := snappb.Snapshot{Crc: crc, Data: b}
+	snap := snappb.Snapshot{Crc: &crc, Data: b}
 	d, err := snap.Marshal()
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (s *Snapshotter) LoadNewestAvailable(walSnaps []walpb.Snapshot) (*raftpb.Sn
 	return s.loadMatching(func(snapshot *raftpb.Snapshot) bool {
 		m := snapshot.Metadata
 		for i := len(walSnaps) - 1; i >= 0; i-- {
-			if m.Term == walSnaps[i].Term && m.Index == walSnaps[i].Index {
+			if m.Term == walSnaps[i].GetTerm() && m.Index == walSnaps[i].GetIndex() {
 				return true
 			}
 		}
@@ -172,16 +172,16 @@ func Read(lg *zap.Logger, snapname string) (*raftpb.Snapshot, error) {
 		return nil, err
 	}
 
-	if len(serializedSnap.Data) == 0 || serializedSnap.Crc == 0 {
+	if len(serializedSnap.Data) == 0 || serializedSnap.GetCrc() == 0 {
 		lg.Warn("failed to read empty snapshot data", zap.String("path", snapname))
 		return nil, ErrEmptySnapshot
 	}
 
 	crc := crc32.Update(0, crcTable, serializedSnap.Data)
-	if crc != serializedSnap.Crc {
+	if crc != serializedSnap.GetCrc() {
 		lg.Warn("snap file is corrupt",
 			zap.String("path", snapname),
-			zap.Uint32("prev-crc", serializedSnap.Crc),
+			zap.Uint32("prev-crc", serializedSnap.GetCrc()),
 			zap.Uint32("new-crc", crc),
 		)
 		return nil, ErrCRCMismatch

@@ -16,8 +16,11 @@ package mvcc
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sync"
+
+	"go.opentelemetry.io/otel/trace"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -45,7 +48,7 @@ type WatchStream interface {
 	// in events that are sent to the created watcher through stream channel.
 	// The watch ID is used when it's not equal to AutoWatchID. Otherwise,
 	// an auto-generated watch ID is returned.
-	Watch(id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error)
+	Watch(ctx context.Context, id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error)
 
 	// Chan returns a chan. All watch response will be sent to the returned chan.
 	Chan() <-chan WatchResponse
@@ -109,7 +112,7 @@ type watchStream struct {
 }
 
 // Watch creates a new watcher in the stream and returns its WatchID.
-func (ws *watchStream) Watch(id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error) {
+func (ws *watchStream) Watch(ctx context.Context, id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error) {
 	// prevent wrong range where key >= end lexicographically
 	// watch request with 'WithFromKey' has empty-byte range end
 	if len(end) != 0 && bytes.Compare(key, end) != -1 {
@@ -134,7 +137,11 @@ func (ws *watchStream) Watch(id WatchID, key, end []byte, startRev int64, fcs ..
 
 	w, c := ws.watchable.watch(key, end, startRev, id, ws.ch, fcs...)
 
-	ws.cancels[id] = c
+	span := trace.SpanFromContext(ctx)
+	ws.cancels[id] = func() {
+		defer span.End()
+		c()
+	}
 	ws.watchers[id] = w
 	return id, nil
 }

@@ -18,8 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sort"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -27,234 +25,12 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/server/v3/auth"
-	"go.etcd.io/etcd/server/v3/etcdserver/errors"
 	"go.etcd.io/etcd/server/v3/lease"
 	"go.etcd.io/etcd/server/v3/storage/mvcc"
 )
 
-func Put(ctx context.Context, lg *zap.Logger, lessor lease.Lessor, kv mvcc.KV, p *pb.PutRequest) (resp *pb.PutResponse, trace *traceutil.Trace, err error) {
-	trace = traceutil.Get(ctx)
-	// create put tracing if the trace in context is empty
-	if trace.IsEmpty() {
-		trace = traceutil.New("put",
-			lg,
-			traceutil.Field{Key: "key", Value: string(p.Key)},
-			traceutil.Field{Key: "req_size", Value: p.Size()},
-		)
-		ctx = context.WithValue(ctx, traceutil.TraceKey{}, trace)
-	}
-	leaseID := lease.LeaseID(p.Lease)
-	if leaseID != lease.NoLease {
-		if l := lessor.Lookup(leaseID); l == nil {
-			return nil, nil, lease.ErrLeaseNotFound
-		}
-	}
-	txnWrite := kv.Write(trace)
-	defer txnWrite.End()
-	resp, err = put(ctx, txnWrite, p)
-	return resp, trace, err
-}
-
-func put(ctx context.Context, txnWrite mvcc.TxnWrite, p *pb.PutRequest) (resp *pb.PutResponse, err error) {
-	trace := traceutil.Get(ctx)
-	resp = &pb.PutResponse{}
-	resp.Header = &pb.ResponseHeader{}
-	val, leaseID := p.Value, lease.LeaseID(p.Lease)
-
-	var rr *mvcc.RangeResult
-	if p.IgnoreValue || p.IgnoreLease || p.PrevKv {
-		trace.StepWithFunction(func() {
-			rr, err = txnWrite.Range(context.TODO(), p.Key, nil, mvcc.RangeOptions{})
-		}, "get previous kv pair")
-
-		if err != nil {
-			return nil, err
-		}
-	}
-	if p.IgnoreValue || p.IgnoreLease {
-		if rr == nil || len(rr.KVs) == 0 {
-			// ignore_{lease,value} flag expects previous key-value pair
-			return nil, errors.ErrKeyNotFound
-		}
-	}
-	if p.IgnoreValue {
-		val = rr.KVs[0].Value
-	}
-	if p.IgnoreLease {
-		leaseID = lease.LeaseID(rr.KVs[0].Lease)
-	}
-	if p.PrevKv {
-		if rr != nil && len(rr.KVs) != 0 {
-			resp.PrevKv = &rr.KVs[0]
-		}
-	}
-
-	resp.Header.Revision = txnWrite.Put(p.Key, val, leaseID)
-	trace.AddField(traceutil.Field{Key: "response_revision", Value: resp.Header.Revision})
-	return resp, nil
-}
-
-func DeleteRange(ctx context.Context, lg *zap.Logger, kv mvcc.KV, dr *pb.DeleteRangeRequest) (resp *pb.DeleteRangeResponse, trace *traceutil.Trace, err error) {
-	trace = traceutil.Get(ctx)
-	// create delete tracing if the trace in context is empty
-	if trace.IsEmpty() {
-		trace = traceutil.New("delete_range",
-			lg,
-			traceutil.Field{Key: "key", Value: string(dr.Key)},
-			traceutil.Field{Key: "range_end", Value: string(dr.RangeEnd)},
-		)
-		ctx = context.WithValue(ctx, traceutil.TraceKey{}, trace)
-	}
-	txnWrite := kv.Write(trace)
-	defer txnWrite.End()
-	resp, err = deleteRange(ctx, txnWrite, dr)
-	return resp, trace, err
-}
-
-func deleteRange(ctx context.Context, txnWrite mvcc.TxnWrite, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
-	resp := &pb.DeleteRangeResponse{}
-	resp.Header = &pb.ResponseHeader{}
-	end := mkGteRange(dr.RangeEnd)
-
-	if dr.PrevKv {
-		rr, err := txnWrite.Range(ctx, dr.Key, end, mvcc.RangeOptions{})
-		if err != nil {
-			return nil, err
-		}
-		if rr != nil {
-			resp.PrevKvs = make([]*mvccpb.KeyValue, len(rr.KVs))
-			for i := range rr.KVs {
-				resp.PrevKvs[i] = &rr.KVs[i]
-			}
-		}
-	}
-
-	resp.Deleted, resp.Header.Revision = txnWrite.DeleteRange(dr.Key, end)
-	return resp, nil
-}
-
-func Range(ctx context.Context, lg *zap.Logger, kv mvcc.KV, r *pb.RangeRequest) (resp *pb.RangeResponse, trace *traceutil.Trace, err error) {
-	trace = traceutil.Get(ctx)
-	if trace.IsEmpty() {
-		trace = traceutil.New("range", lg)
-		ctx = context.WithValue(ctx, traceutil.TraceKey{}, trace)
-	}
-	defer func(start time.Time) {
-		success := err == nil
-		RangeSecObserve(success, time.Since(start))
-	}(time.Now())
-	txnRead := kv.Read(mvcc.ConcurrentReadTxMode, trace)
-	defer txnRead.End()
-	resp, err = executeRange(ctx, lg, txnRead, r)
-	return resp, trace, err
-}
-
-func executeRange(ctx context.Context, lg *zap.Logger, txnRead mvcc.TxnRead, r *pb.RangeRequest) (*pb.RangeResponse, error) {
-	trace := traceutil.Get(ctx)
-
-	resp := &pb.RangeResponse{}
-	resp.Header = &pb.ResponseHeader{}
-
-	limit := r.Limit
-	if r.SortOrder != pb.RangeRequest_NONE ||
-		r.MinModRevision != 0 || r.MaxModRevision != 0 ||
-		r.MinCreateRevision != 0 || r.MaxCreateRevision != 0 {
-		// fetch everything; sort and truncate afterwards
-		limit = 0
-	}
-	if limit > 0 {
-		// fetch one extra for 'more' flag
-		limit = limit + 1
-	}
-
-	ro := mvcc.RangeOptions{
-		Limit: limit,
-		Rev:   r.Revision,
-		Count: r.CountOnly,
-	}
-
-	rr, err := txnRead.Range(ctx, r.Key, mkGteRange(r.RangeEnd), ro)
-	if err != nil {
-		return nil, err
-	}
-
-	if r.MaxModRevision != 0 {
-		f := func(kv *mvccpb.KeyValue) bool { return kv.ModRevision > r.MaxModRevision }
-		pruneKVs(rr, f)
-	}
-	if r.MinModRevision != 0 {
-		f := func(kv *mvccpb.KeyValue) bool { return kv.ModRevision < r.MinModRevision }
-		pruneKVs(rr, f)
-	}
-	if r.MaxCreateRevision != 0 {
-		f := func(kv *mvccpb.KeyValue) bool { return kv.CreateRevision > r.MaxCreateRevision }
-		pruneKVs(rr, f)
-	}
-	if r.MinCreateRevision != 0 {
-		f := func(kv *mvccpb.KeyValue) bool { return kv.CreateRevision < r.MinCreateRevision }
-		pruneKVs(rr, f)
-	}
-
-	sortOrder := r.SortOrder
-	if r.SortTarget != pb.RangeRequest_KEY && sortOrder == pb.RangeRequest_NONE {
-		// Since current mvcc.Range implementation returns results
-		// sorted by keys in lexiographically ascending order,
-		// sort ASCEND by default only when target is not 'KEY'
-		sortOrder = pb.RangeRequest_ASCEND
-	} else if r.SortTarget == pb.RangeRequest_KEY && sortOrder == pb.RangeRequest_ASCEND {
-		// Since current mvcc.Range implementation returns results
-		// sorted by keys in lexiographically ascending order,
-		// don't re-sort when target is 'KEY' and order is ASCEND
-		sortOrder = pb.RangeRequest_NONE
-	}
-	if sortOrder != pb.RangeRequest_NONE {
-		var sorter sort.Interface
-		switch {
-		case r.SortTarget == pb.RangeRequest_KEY:
-			sorter = &kvSortByKey{&kvSort{rr.KVs}}
-		case r.SortTarget == pb.RangeRequest_VERSION:
-			sorter = &kvSortByVersion{&kvSort{rr.KVs}}
-		case r.SortTarget == pb.RangeRequest_CREATE:
-			sorter = &kvSortByCreate{&kvSort{rr.KVs}}
-		case r.SortTarget == pb.RangeRequest_MOD:
-			sorter = &kvSortByMod{&kvSort{rr.KVs}}
-		case r.SortTarget == pb.RangeRequest_VALUE:
-			sorter = &kvSortByValue{&kvSort{rr.KVs}}
-		default:
-			lg.Panic("unexpected sort target", zap.Int32("sort-target", int32(r.SortTarget)))
-		}
-		switch {
-		case sortOrder == pb.RangeRequest_ASCEND:
-			sort.Sort(sorter)
-		case sortOrder == pb.RangeRequest_DESCEND:
-			sort.Sort(sort.Reverse(sorter))
-		}
-	}
-
-	if r.Limit > 0 && len(rr.KVs) > int(r.Limit) {
-		rr.KVs = rr.KVs[:r.Limit]
-		resp.More = true
-	}
-	trace.Step("filter and sort the key-value pairs")
-	resp.Header.Revision = rr.Rev
-	resp.Count = int64(rr.Count)
-	resp.Kvs = make([]*mvccpb.KeyValue, len(rr.KVs))
-	for i := range rr.KVs {
-		if r.KeysOnly {
-			rr.KVs[i].Value = nil
-		}
-		resp.Kvs[i] = &rr.KVs[i]
-	}
-	trace.Step("assemble the response")
-	return resp, nil
-}
-
-func Txn(ctx context.Context, lg *zap.Logger, rt *pb.TxnRequest, txnModeWriteWithSharedBuffer bool, kv mvcc.KV, lessor lease.Lessor) (*pb.TxnResponse, *traceutil.Trace, error) {
-	trace := traceutil.Get(ctx)
-	if trace.IsEmpty() {
-		trace = traceutil.New("transaction", lg)
-		ctx = context.WithValue(ctx, traceutil.TraceKey{}, trace)
-	}
+func Txn(ctx context.Context, lg *zap.Logger, rt *pb.TxnRequest, txnModeWriteWithSharedBuffer bool, kv mvcc.KV, lessor lease.Lessor) (txnResp *pb.TxnResponse, trace *traceutil.Trace, err error) {
+	ctx, trace = traceutil.EnsureTrace(ctx, lg, "transaction")
 	isWrite := !IsTxnReadonly(rt)
 	// When the transaction contains write operations, we use ReadTx instead of
 	// ConcurrentReadTx to avoid extra overhead of copying buffer.
@@ -275,7 +51,7 @@ func Txn(ctx context.Context, lg *zap.Logger, rt *pb.TxnRequest, txnModeWriteWit
 	if isWrite {
 		trace.AddField(traceutil.Field{Key: "read_only", Value: false})
 	}
-	_, err := checkTxn(txnRead, rt, lessor, txnPath)
+	_, err = checkTxn(trace, txnRead, rt, lessor, txnPath)
 	if err != nil {
 		txnRead.End()
 		return nil, nil, err
@@ -292,7 +68,7 @@ func Txn(ctx context.Context, lg *zap.Logger, rt *pb.TxnRequest, txnModeWriteWit
 	} else {
 		txnWrite = mvcc.NewReadOnlyTxnWrite(txnRead)
 	}
-	txnResp, err := txn(ctx, lg, txnWrite, rt, isWrite, txnPath)
+	txnResp, err = txn(ctx, lg, txnWrite, rt, isWrite, txnPath)
 	txnWrite.End()
 
 	trace.AddField(
@@ -371,7 +147,7 @@ func executeTxn(ctx context.Context, lg *zap.Logger, txnWrite mvcc.TxnWrite, rt 
 				traceutil.Field{Key: "req_type", Value: "range"},
 				traceutil.Field{Key: "range_begin", Value: string(tv.RequestRange.Key)},
 				traceutil.Field{Key: "range_end", Value: string(tv.RequestRange.RangeEnd)})
-			resp, err := executeRange(ctx, lg, txnWrite, tv.RequestRange)
+			resp, err := executeRange(ctx, lg, txnWrite, tv.RequestRange, true)
 			if err != nil {
 				return 0, fmt.Errorf("applyTxn: failed Range: %w", err)
 			}
@@ -382,10 +158,11 @@ func executeTxn(ctx context.Context, lg *zap.Logger, txnWrite mvcc.TxnWrite, rt 
 				traceutil.Field{Key: "req_type", Value: "put"},
 				traceutil.Field{Key: "key", Value: string(tv.RequestPut.Key)},
 				traceutil.Field{Key: "req_size", Value: tv.RequestPut.Size()})
-			resp, err := put(ctx, txnWrite, tv.RequestPut)
+			prevKV, err := getPrevKV(trace, txnWrite, tv.RequestPut)
 			if err != nil {
-				return 0, fmt.Errorf("applyTxn: failed Put: %w", err)
+				return 0, fmt.Errorf("applyTxn: failed to get prevKV on put: %w", err)
 			}
+			resp := put(ctx, txnWrite, tv.RequestPut, prevKV)
 			respi.(*pb.ResponseOp_ResponsePut).ResponsePut = resp
 			trace.StopSubTrace()
 		case *pb.RequestOp_RequestDeleteRange:
@@ -410,38 +187,7 @@ func executeTxn(ctx context.Context, lg *zap.Logger, txnWrite mvcc.TxnWrite, rt 
 	return txns, nil
 }
 
-func checkPut(rv mvcc.ReadView, lessor lease.Lessor, req *pb.PutRequest) error {
-	if req.IgnoreValue || req.IgnoreLease {
-		// expects previous key-value, error if not exist
-		rr, err := rv.Range(context.TODO(), req.Key, nil, mvcc.RangeOptions{})
-		if err != nil {
-			return err
-		}
-		if rr == nil || len(rr.KVs) == 0 {
-			return errors.ErrKeyNotFound
-		}
-	}
-	if lease.LeaseID(req.Lease) != lease.NoLease {
-		if l := lessor.Lookup(lease.LeaseID(req.Lease)); l == nil {
-			return lease.ErrLeaseNotFound
-		}
-	}
-	return nil
-}
-
-func checkRange(rv mvcc.ReadView, req *pb.RangeRequest) error {
-	switch {
-	case req.Revision == 0:
-		return nil
-	case req.Revision > rv.Rev():
-		return mvcc.ErrFutureRev
-	case req.Revision < rv.FirstRev():
-		return mvcc.ErrCompacted
-	}
-	return nil
-}
-
-func checkTxn(rv mvcc.ReadView, rt *pb.TxnRequest, lessor lease.Lessor, txnPath []bool) (int, error) {
+func checkTxn(trace *traceutil.Trace, rv mvcc.ReadView, rt *pb.TxnRequest, lessor lease.Lessor, txnPath []bool) (int, error) {
 	txnCount := 0
 	reqs := rt.Success
 	if !txnPath[0] {
@@ -454,10 +200,10 @@ func checkTxn(rv mvcc.ReadView, rt *pb.TxnRequest, lessor lease.Lessor, txnPath 
 		case *pb.RequestOp_RequestRange:
 			err = checkRange(rv, tv.RequestRange)
 		case *pb.RequestOp_RequestPut:
-			err = checkPut(rv, lessor, tv.RequestPut)
+			err = checkPut(trace, rv, lessor, tv.RequestPut)
 		case *pb.RequestOp_RequestDeleteRange:
 		case *pb.RequestOp_RequestTxn:
-			txns, err = checkTxn(rv, tv.RequestTxn, lessor, txnPath[1:])
+			txns, err = checkTxn(trace, rv, tv.RequestTxn, lessor, txnPath[1:])
 			txnCount += txns + 1
 			txnPath = txnPath[txns+1:]
 		default:
@@ -468,67 +214,6 @@ func checkTxn(rv mvcc.ReadView, rt *pb.TxnRequest, lessor lease.Lessor, txnPath 
 		}
 	}
 	return txnCount, nil
-}
-
-// mkGteRange determines if the range end is a >= range. This works around grpc
-// sending empty byte strings as nil; >= is encoded in the range end as '\0'.
-// If it is a GTE range, then []byte{} is returned to indicate the empty byte
-// string (vs nil being no byte string).
-func mkGteRange(rangeEnd []byte) []byte {
-	if len(rangeEnd) == 1 && rangeEnd[0] == 0 {
-		return []byte{}
-	}
-	return rangeEnd
-}
-
-func pruneKVs(rr *mvcc.RangeResult, isPrunable func(*mvccpb.KeyValue) bool) {
-	j := 0
-	for i := range rr.KVs {
-		rr.KVs[j] = rr.KVs[i]
-		if !isPrunable(&rr.KVs[i]) {
-			j++
-		}
-	}
-	rr.KVs = rr.KVs[:j]
-}
-
-type kvSort struct{ kvs []mvccpb.KeyValue }
-
-func (s *kvSort) Swap(i, j int) {
-	t := s.kvs[i]
-	s.kvs[i] = s.kvs[j]
-	s.kvs[j] = t
-}
-func (s *kvSort) Len() int { return len(s.kvs) }
-
-type kvSortByKey struct{ *kvSort }
-
-func (s *kvSortByKey) Less(i, j int) bool {
-	return bytes.Compare(s.kvs[i].Key, s.kvs[j].Key) < 0
-}
-
-type kvSortByVersion struct{ *kvSort }
-
-func (s *kvSortByVersion) Less(i, j int) bool {
-	return (s.kvs[i].Version - s.kvs[j].Version) < 0
-}
-
-type kvSortByCreate struct{ *kvSort }
-
-func (s *kvSortByCreate) Less(i, j int) bool {
-	return (s.kvs[i].CreateRevision - s.kvs[j].CreateRevision) < 0
-}
-
-type kvSortByMod struct{ *kvSort }
-
-func (s *kvSortByMod) Less(i, j int) bool {
-	return (s.kvs[i].ModRevision - s.kvs[j].ModRevision) < 0
-}
-
-type kvSortByValue struct{ *kvSort }
-
-func (s *kvSortByValue) Less(i, j int) bool {
-	return bytes.Compare(s.kvs[i].Value, s.kvs[j].Value) < 0
 }
 
 func compareInt64(a, b int64) int {

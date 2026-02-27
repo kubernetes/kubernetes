@@ -459,9 +459,10 @@ func restoreIntoIndex(lg *zap.Logger, idx index) (chan<- revKeyValue, <-chan int
 			}
 
 			rev := BytesToRev(rkv.key)
-			verify.Verify(func() {
-				if rev.Main < currentRev {
-					panic(fmt.Errorf("revision %d shouldn't be less than the previous revision %d", rev.Main, currentRev))
+			verify.Verify("revision shouldn't be less than the previous revision", func() (bool, map[string]any) {
+				return rev.Main >= currentRev, map[string]any{
+					"revision":          rev.Main,
+					"previous revision": currentRev,
 				}
 			})
 			currentRev = rev.Main

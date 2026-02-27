@@ -123,8 +123,8 @@ func validateConsistentIndex(cfg Config, hardstate *raftpb.HardState, snapshot *
 		return fmt.Errorf("backend.Term (%v) must be <= WAL.HardState.term, (%v)", term, hardstate.Term)
 	}
 
-	if index < snapshot.Index {
-		return fmt.Errorf("backend.ConsistentIndex (%v) must be >= last snapshot index (%v)", index, snapshot.Index)
+	if index < snapshot.GetIndex() {
+		return fmt.Errorf("backend.ConsistentIndex (%v) must be >= last snapshot index (%v)", index, snapshot.GetIndex())
 	}
 
 	cfg.Logger.Info("verification: consistentIndex OK", zap.Uint64("backend-consistent-index", index), zap.Uint64("hardstate-commit", hardstate.Commit))

@@ -15,7 +15,6 @@
 package mvcc
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -477,9 +476,9 @@ func kvsToEvents(lg *zap.Logger, revs, vals [][]byte) (evs []mvccpb.Event) {
 			lg.Panic("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
 		}
 
-		ty := mvccpb.PUT
+		ty := mvccpb.Event_PUT
 		if isTombstone(revs[i]) {
-			ty = mvccpb.DELETE
+			ty = mvccpb.Event_DELETE
 			// patch in mod revision so watchers won't skip
 			kv.ModRevision = BytesToRev(revs[i]).Main
 		}
@@ -616,14 +615,19 @@ func (w *watcher) send(wr WatchResponse) bool {
 		wr.Events = ne
 	}
 
-	verify.Verify(func() {
+	verify.Verify("Event.ModRevision is less than the w.startRev for watchID", func() (bool, map[string]any) {
 		if w.startRev > 0 {
 			for _, ev := range wr.Events {
 				if ev.Kv.ModRevision < w.startRev {
-					panic(fmt.Sprintf("Event.ModRevision(%d) is less than the w.startRev(%d) for watchID: %d", ev.Kv.ModRevision, w.startRev, w.id))
+					return false, map[string]any{
+						"Event.ModRevision": ev.Kv.ModRevision,
+						"w.startRev":        w.startRev,
+						"watchID":           w.id,
+					}
 				}
 			}
 		}
+		return true, nil
 	})
 
 	// if all events are filtered out, we should send nothing.
