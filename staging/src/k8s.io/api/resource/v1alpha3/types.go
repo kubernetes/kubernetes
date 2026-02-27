@@ -72,12 +72,13 @@ type CELDeviceSelector struct {
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
 	//
-	// For CEL expression syntax and examples, see:
-	// - CEL Optional Types: https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
-	// - CEL Overview: https://kubernetes.io/docs/reference/using-api/cel/
-	//
 	// Common errors:
-	// - "no such key": Use has() macro, optional chaining (.?), or orValue() for optional fields.
+	// - "no such key": Use has() macro, optional chaining (.?), or orValue()
+	//   for optional fields. See CEL Optional Types for details:
+	//   https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
+	//
+	// For more CEL expression syntax and examples, see:
+	// https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
