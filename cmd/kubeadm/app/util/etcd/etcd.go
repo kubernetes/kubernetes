@@ -533,8 +533,10 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		ret = append(ret, Member{Name: memberName, PeerURL: m.PeerURLs[0]})
 	}
 
-	// Add the new member client address to the list of endpoints
-	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
+	if !isLearner {
+		// Add the new member client address to the list of endpoints
+		c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
+	}
 
 	return ret, nil
 }
