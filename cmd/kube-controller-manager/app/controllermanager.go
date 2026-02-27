@@ -702,9 +702,14 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 			go func() {
 				defer wg.Done()
 
-				// It would be better to unblock and return on context cancelled here,
+				// Since all controllers are started concurrently, we need to sleep within [0, factor * D].
+				// Jitter returns duration within [D, D + factor * D], so we need to subtract D.
+				baseInterval := controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration
+				sleepInterval := wait.Jitter(baseInterval, controllerStartJitterMaxFactor) - baseInterval
+
+				// It would be better to unblock and return on context canceled here,
 				// but that makes tests more flaky regarding timing.
-				time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, controllerStartJitterMaxFactor))
+				time.Sleep(sleepInterval)
 
 				logger.V(1).Info("Controller starting...", "controller", controller.Name())
 
