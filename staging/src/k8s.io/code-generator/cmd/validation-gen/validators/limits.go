@@ -30,12 +30,14 @@ const (
 	maxItemsTagName  = "k8s:maxItems"
 	minimumTagName   = "k8s:minimum"
 	maxLengthTagName = "k8s:maxLength"
+	maxBytesTagName  = "k8s:maxBytes"
 )
 
 func init() {
 	RegisterTagValidator(maxItemsTagValidator{})
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maxLengthTagValidator{})
+	RegisterTagValidator(maxBytesTagValidator{})
 }
 
 type maxLengthTagValidator struct{}
@@ -52,9 +54,7 @@ func (maxLengthTagValidator) ValidScopes() sets.Set[Scope] {
 	return maxLengthTagValidScopes
 }
 
-var (
-	maxLengthValidator = types.Name{Package: libValidationPkg, Name: "MaxLength"}
-)
+var maxLengthValidator = types.Name{Package: libValidationPkg, Name: "MaxLength"}
 
 func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
@@ -81,7 +81,7 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 		Tag:            mltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         sets.List(mltv.ValidScopes()),
-		Description: `Indicates that a string field has a limit on its length in characters.
+		Description:    `Indicates that a string field has a limit on its length in characters.
 		This could allow up to 4*N bytes if multi-byte characters are used.
 		If you want to limit length of bytes specifically, use maxBytes.`,
 		Payloads: []TagPayloadDoc{{
@@ -134,7 +134,7 @@ func (mltv maxBytesTagValidator) Docs() TagDoc {
 		Tag:            mltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         sets.List(mltv.ValidScopes()),
-		Description: `Indicates that a string field has a limit on its length in bytes.
+		Description:    `Indicates that a string field has a limit on its length in bytes.
 		This could only allow as few as N/4 multi-byte characters.
 		If you want to limit length of characters specifically, use maxLength.`,
 		Payloads: []TagPayloadDoc{{
@@ -146,7 +146,6 @@ func (mltv maxBytesTagValidator) Docs() TagDoc {
 	}
 }
 
->>>>>>> d860a611ab8 (fixup! validators limits gofmt)
 type maxItemsTagValidator struct{}
 
 func (maxItemsTagValidator) Init(_ Config) {}
@@ -166,9 +165,7 @@ func (maxItemsTagValidator) ValidScopes() sets.Set[Scope] {
 	return maxItemsTagValidScopes
 }
 
-var (
-	maxItemsValidator = types.Name{Package: libValidationPkg, Name: "MaxItems"}
-)
+var maxItemsValidator = types.Name{Package: libValidationPkg, Name: "MaxItems"}
 
 func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
@@ -219,9 +216,7 @@ func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 	return minimumTagValidScopes
 }
 
-var (
-	minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
-)
+var minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
 
 func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations

@@ -316,9 +316,9 @@ func TestMaxBytes(t *testing.T) {
 			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
 		},
 	}, {
-		name:  "mixture of characters, less bytes than max",
-		value: "©abc®®",
-		max:   10,
+		name:     "mixture of characters, less bytes than max",
+		value:    "©abc®®",
+		max:      10,
 		wantErrs: nil,
 	}, {
 		name:  "mixture of characters, more bytes than max",
