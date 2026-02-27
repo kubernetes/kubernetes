@@ -48940,7 +48940,7 @@ func schema_k8sio_api_resource_v1alpha1_PoolStatus(ref common.ReferenceCallback)
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node.",
+							Description: "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -48968,7 +48968,7 @@ func schema_k8sio_api_resource_v1alpha1_PoolStatus(ref common.ReferenceCallback)
 					},
 					"unavailableDevices": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated.",
+							Description: "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -48982,13 +48982,13 @@ func schema_k8sio_api_resource_v1alpha1_PoolStatus(ref common.ReferenceCallback)
 					},
 					"generation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Generation is the maximum metadata.generation observed across all ResourceSlices in this pool. Can be used to detect changes.",
+							Description: "Generation is the maximum metadata.generation observed across all ResourceSlices in this pool. Can be used to detect changes. A value of 0 means no generation information was available.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 				},
-				Required: []string{"driver", "poolName", "totalDevices", "allocatedDevices", "availableDevices", "sliceCount"},
+				Required: []string{"driver", "poolName", "totalDevices", "allocatedDevices", "availableDevices", "unavailableDevices", "sliceCount", "generation"},
 			},
 		},
 	}
@@ -49032,7 +49032,6 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequest(ref common.Ref
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is populated by the controller with the calculated pool status. Once observationTime is set, the status is considered complete and immutable.",
-							Default:     map[string]interface{}{},
 							Ref:         ref(resourcev1alpha1.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -49153,7 +49152,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name.",
+							Description: "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name. When omitted, no pools matched the request filters.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49211,20 +49210,22 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 					},
 					"truncation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned. When omitted, the response was not truncated.\n\n\nPossible enum values:\n - `\"Truncated\"` indicates the response was truncated due to the limit.",
+							Description: "Truncation indicates whether the response was truncated due to the limit. Set to \"Truncated\" when there are more pools matching the filter criteria than were returned, or \"None\" when the response includes all matching pools.\n\n\nPossible enum values:\n - `\"None\"` indicates the response was not truncated.\n - `\"Truncated\"` indicates the response was truncated due to the limit.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Truncated"},
+							Enum:        []interface{}{"None", "Truncated"},
 						},
 					},
 					"totalMatchingPools": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. When nil, the status has not yet been populated. A value of 0 means no pools matched the filter criteria.",
+							Description: "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 				},
+				Required: []string{"observationTime", "truncation", "totalMatchingPools"},
 			},
 		},
 		Dependencies: []string{

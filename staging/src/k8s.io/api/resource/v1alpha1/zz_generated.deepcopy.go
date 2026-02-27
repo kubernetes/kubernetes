@@ -49,6 +49,16 @@ func (in *PoolStatus) DeepCopyInto(out *PoolStatus) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.UnavailableDevices != nil {
+		in, out := &in.UnavailableDevices, &out.UnavailableDevices
+		*out = new(int32)
+		**out = **in
+	}
+	if in.Generation != nil {
+		in, out := &in.Generation, &out.Generation
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -68,7 +78,11 @@ func (in *ResourcePoolStatusRequest) DeepCopyInto(out *ResourcePoolStatusRequest
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
-	in.Status.DeepCopyInto(&out.Status)
+	if in.Status != nil {
+		in, out := &in.Status, &out.Status
+		*out = new(ResourcePoolStatusRequestStatus)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -174,11 +188,6 @@ func (in *ResourcePoolStatusRequestStatus) DeepCopyInto(out *ResourcePoolStatusR
 		in, out := &in.ValidationErrors, &out.ValidationErrors
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.Truncation != nil {
-		in, out := &in.Truncation, &out.Truncation
-		*out = new(TruncationStatus)
-		**out = **in
 	}
 	if in.TotalMatchingPools != nil {
 		in, out := &in.TotalMatchingPools, &out.TotalMatchingPools

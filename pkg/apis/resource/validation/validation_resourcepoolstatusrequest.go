@@ -42,7 +42,7 @@ func ValidateResourcePoolStatusRequestUpdate(request, oldRequest *resource.Resou
 // ValidateResourcePoolStatusRequestStatusUpdate tests if a status update to ResourcePoolStatusRequest is valid.
 func ValidateResourcePoolStatusRequestStatusUpdate(request, oldRequest *resource.ResourcePoolStatusRequest) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&request.ObjectMeta, &oldRequest.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourcePoolStatusRequestStatusUpdate(&request.Status, &oldRequest.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, validateResourcePoolStatusRequestStatusUpdate(request.Status, oldRequest.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -82,8 +82,13 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	var allErrs field.ErrorList
 
 	// Once observationTime is set, status becomes immutable (request is complete)
-	if oldStatus.ObservationTime != nil {
+	if oldStatus != nil && oldStatus.ObservationTime != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status, oldStatus, fldPath)...)
+		return allErrs
+	}
+
+	// If new status is nil, nothing to validate
+	if status == nil {
 		return allErrs
 	}
 
@@ -149,8 +154,8 @@ func validatePoolStatus(pool resource.PoolStatus, fldPath *field.Path) field.Err
 	if pool.AvailableDevices != nil && *pool.AvailableDevices < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableDevices"), *pool.AvailableDevices, "must be non-negative"))
 	}
-	if pool.UnavailableDevices < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("unavailableDevices"), pool.UnavailableDevices, "must be non-negative"))
+	if pool.UnavailableDevices != nil && *pool.UnavailableDevices < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("unavailableDevices"), *pool.UnavailableDevices, "must be non-negative"))
 	}
 
 	// SliceCount must be positive
@@ -159,8 +164,8 @@ func validatePoolStatus(pool resource.PoolStatus, fldPath *field.Path) field.Err
 	}
 
 	// Generation must be non-negative
-	if pool.Generation < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), pool.Generation, "must be non-negative"))
+	if pool.Generation != nil && *pool.Generation < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), *pool.Generation, "must be non-negative"))
 	}
 
 	return allErrs

@@ -62,7 +62,7 @@ func (*resourcePoolStatusRequestStrategy) GetResetFields() map[fieldpath.APIVers
 func (*resourcePoolStatusRequestStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	request := obj.(*resource.ResourcePoolStatusRequest)
 	// Status must not be set by user on create.
-	request.Status = resource.ResourcePoolStatusRequestStatus{}
+	request.Status = nil
 }
 
 func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

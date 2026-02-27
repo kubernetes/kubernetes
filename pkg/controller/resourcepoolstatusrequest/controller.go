@@ -116,7 +116,7 @@ func NewController(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newReq := new.(*resourcev1alpha1.ResourcePoolStatusRequest)
-			if newReq.Status.ObservationTime == nil {
+			if newReq.Status == nil || newReq.Status.ObservationTime == nil {
 				c.enqueueRequest(logger, new)
 			}
 		},
@@ -210,7 +210,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	}
 
 	// Skip if already processed (status.observationTime is set)
-	if request.Status.ObservationTime != nil {
+	if request.Status != nil && request.Status.ObservationTime != nil {
 		logger.V(4).Info("Request already processed, skipping", "request", key)
 		return nil
 	}
@@ -222,7 +222,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 
 	// Update the request status
 	requestCopy := request.DeepCopy()
-	requestCopy.Status = status
+	requestCopy.Status = &status
 
 	_, err = c.client.ResourceV1alpha1().ResourcePoolStatusRequests().UpdateStatus(ctx, requestCopy, metav1.UpdateOptions{})
 	if err != nil {
@@ -348,14 +348,17 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		totalDevices := info.totalDevices
 		allocDevices := allocatedDevices
 		availDevices := availableDevices
+		unavailDevices := int32(0)
+		generation := info.generation
 		pool := resourcev1alpha1.PoolStatus{
-			Driver:           info.driver,
-			PoolName:         info.poolName,
-			TotalDevices:     &totalDevices,
-			AllocatedDevices: &allocDevices,
-			AvailableDevices: &availDevices,
-			SliceCount:       info.sliceCount,
-			Generation:       info.generation,
+			Driver:             info.driver,
+			PoolName:           info.poolName,
+			TotalDevices:       &totalDevices,
+			AllocatedDevices:   &allocDevices,
+			AvailableDevices:   &availDevices,
+			UnavailableDevices: &unavailDevices,
+			SliceCount:         info.sliceCount,
+			Generation:         &generation,
 		}
 		if info.nodeName != "" {
 			nodeName := info.nodeName
@@ -373,7 +376,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	})
 
 	totalMatchingPools := int32(len(pools))
-	var truncation *resourcev1alpha1.TruncationStatus
+	truncation := resourcev1alpha1.TruncationStatusNone
 
 	// Apply limit if specified
 	limit := int32(100) // default
@@ -382,8 +385,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	}
 	if int32(len(pools)) > limit {
 		pools = pools[:limit]
-		truncatedStatus := resourcev1alpha1.TruncationStatusTruncated
-		truncation = &truncatedStatus
+		truncation = resourcev1alpha1.TruncationStatusTruncated
 	}
 
 	now := metav1.Now()
@@ -415,8 +417,11 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 // errorStatus returns a status indicating a processing failure.
 func errorStatus(message string) resourcev1alpha1.ResourcePoolStatusRequestStatus {
 	now := metav1.Now()
+	zero := int32(0)
 	return resourcev1alpha1.ResourcePoolStatusRequestStatus{
-		ObservationTime: &now,
+		ObservationTime:    &now,
+		TotalMatchingPools: &zero,
+		Truncation:         resourcev1alpha1.TruncationStatusNone,
 		Conditions: []metav1.Condition{
 			{
 				Type:               resourcev1alpha1.ResourcePoolStatusRequestConditionFailed,
@@ -438,7 +443,7 @@ func (c *Controller) enqueueRequest(logger klog.Logger, obj interface{}) {
 	}
 
 	// Skip if already processed
-	if request.Status.ObservationTime != nil {
+	if request.Status != nil && request.Status.ObservationTime != nil {
 		return
 	}
 
@@ -479,7 +484,7 @@ func (c *Controller) cleanupExpiredRequests(ctx context.Context) {
 
 // shouldDeleteRequest determines if a request should be deleted based on TTL.
 func (c *Controller) shouldDeleteRequest(request *resourcev1alpha1.ResourcePoolStatusRequest) bool {
-	if request.Status.ObservationTime != nil {
+	if request.Status != nil && request.Status.ObservationTime != nil {
 		// Completed request: check against completedRequestTTL
 		return isOlderThan(request.Status.ObservationTime.Time, completedRequestTTL)
 	}

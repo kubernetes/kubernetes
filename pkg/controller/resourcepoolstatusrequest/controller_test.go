@@ -39,7 +39,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 		expectedPools int
 		expectedTotal int32
 		expectedAlloc int32
-		expectedTrunc *resourcev1alpha1.TruncationStatus
+		expectedTrunc resourcev1alpha1.TruncationStatus
 	}{
 		{
 			name: "single-pool-no-allocations",
@@ -160,7 +160,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 			},
 			claims:        []*resourcev1.ResourceClaim{},
 			expectedPools: 1,
-			expectedTrunc: ptr.To(resourcev1alpha1.TruncationStatusTruncated),
+			expectedTrunc: resourcev1alpha1.TruncationStatusTruncated,
 		},
 		{
 			name: "no-matching-pools",
@@ -238,7 +238,13 @@ func TestCalculatePoolStatus(t *testing.T) {
 				t.Errorf("Expected %d pools, got %d", tc.expectedPools, len(status.Pools))
 			}
 
-			if tc.expectedPools > 0 && tc.expectedTrunc == nil {
+			// Default expected truncation to None when not explicitly set
+			expectedTrunc := tc.expectedTrunc
+			if expectedTrunc == "" {
+				expectedTrunc = resourcev1alpha1.TruncationStatusNone
+			}
+
+			if tc.expectedPools > 0 && expectedTrunc == resourcev1alpha1.TruncationStatusNone {
 				var totalDevices, allocatedDevices int32
 				for _, pool := range status.Pools {
 					if pool.TotalDevices != nil {
@@ -256,8 +262,8 @@ func TestCalculatePoolStatus(t *testing.T) {
 				}
 			}
 
-			if (status.Truncation == nil) != (tc.expectedTrunc == nil) || (status.Truncation != nil && tc.expectedTrunc != nil && *status.Truncation != *tc.expectedTrunc) {
-				t.Errorf("Expected truncation=%v, got %v", tc.expectedTrunc, status.Truncation)
+			if status.Truncation != expectedTrunc {
+				t.Errorf("Expected truncation=%v, got %v", expectedTrunc, status.Truncation)
 			}
 
 			// Verify observation time is set
@@ -331,7 +337,7 @@ func TestSkipProcessedRequest(t *testing.T) {
 		Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 			Driver: "test.example.com",
 		},
-		Status: resourcev1alpha1.ResourcePoolStatusRequestStatus{
+		Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
 			ObservationTime: &now, // Already processed
 		},
 	}
@@ -486,7 +492,7 @@ func TestShouldDeleteRequest(t *testing.T) {
 				Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 					Driver: "test.example.com",
 				},
-				Status: resourcev1alpha1.ResourcePoolStatusRequestStatus{
+				Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
 					ObservationTime: ptr.To(metav1.Now()),
 				},
 			},
@@ -502,7 +508,7 @@ func TestShouldDeleteRequest(t *testing.T) {
 				Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 					Driver: "test.example.com",
 				},
-				Status: resourcev1alpha1.ResourcePoolStatusRequestStatus{
+				Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
 					ObservationTime: ptr.To(metav1.NewTime(time.Now().Add(-2 * time.Hour))),
 				},
 			},
@@ -560,7 +566,7 @@ func TestCleanupExpiredRequests(t *testing.T) {
 		Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 			Driver: "test.example.com",
 		},
-		Status: resourcev1alpha1.ResourcePoolStatusRequestStatus{
+		Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
 			ObservationTime: ptr.To(metav1.NewTime(time.Now().Add(-2 * time.Hour))),
 		},
 	}
@@ -573,7 +579,7 @@ func TestCleanupExpiredRequests(t *testing.T) {
 		Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 			Driver: "test.example.com",
 		},
-		Status: resourcev1alpha1.ResourcePoolStatusRequestStatus{
+		Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
 			ObservationTime: ptr.To(metav1.Now()),
 		},
 	}

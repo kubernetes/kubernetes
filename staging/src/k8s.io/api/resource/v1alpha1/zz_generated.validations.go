@@ -109,6 +109,7 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("nodeName"), obj.NodeName, safe.Field(oldObj, func(oldObj *PoolStatus) *string { return oldObj.NodeName }), oldObj != nil)...)
 
@@ -181,7 +182,8 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -189,7 +191,7 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("unavailableDevices"), &obj.UnavailableDevices, safe.Field(oldObj, func(oldObj *PoolStatus) *int32 { return &oldObj.UnavailableDevices }), oldObj != nil)...)
+		}(fldPath.Child("unavailableDevices"), obj.UnavailableDevices, safe.Field(oldObj, func(oldObj *PoolStatus) *int32 { return oldObj.UnavailableDevices }), oldObj != nil)...)
 
 	// field PoolStatus.SliceCount
 	errs = append(errs,
@@ -220,7 +222,8 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -228,7 +231,7 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}(fldPath.Child("generation"), &obj.Generation, safe.Field(oldObj, func(oldObj *PoolStatus) *int64 { return &oldObj.Generation }), oldObj != nil)...)
+		}(fldPath.Child("generation"), obj.Generation, safe.Field(oldObj, func(oldObj *PoolStatus) *int64 { return oldObj.Generation }), oldObj != nil)...)
 
 	return errs
 }
@@ -246,15 +249,6 @@ func Validate_ResourcePoolStatusRequest(ctx context.Context, op operation.Operat
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourcePoolStatusRequestSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -267,10 +261,18 @@ func Validate_ResourcePoolStatusRequest(ctx context.Context, op operation.Operat
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourcePoolStatusRequestStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequest) *ResourcePoolStatusRequestStatus { return &oldObj.Status }), oldObj != nil)...)
+		}(fldPath.Child("status"), obj.Status, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequest) *ResourcePoolStatusRequestStatus { return oldObj.Status }), oldObj != nil)...)
 
 	return errs
 }
@@ -353,7 +355,8 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -433,7 +436,8 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -442,7 +446,7 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			// call the type's validation function
 			errs = append(errs, Validate_TruncationStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("truncation"), obj.Truncation, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestStatus) *TruncationStatus { return oldObj.Truncation }), oldObj != nil)...)
+		}(fldPath.Child("truncation"), &obj.Truncation, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestStatus) *TruncationStatus { return &oldObj.Truncation }), oldObj != nil)...)
 
 	// field ResourcePoolStatusRequestStatus.TotalMatchingPools
 	errs = append(errs,
@@ -453,7 +457,8 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -466,7 +471,7 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 	return errs
 }
 
-var symbolsForTruncationStatus = sets.New(TruncationStatusTruncated)
+var symbolsForTruncationStatus = sets.New(TruncationStatusNone, TruncationStatusTruncated)
 
 // Validate_TruncationStatus validates an instance of TruncationStatus according
 // to declarative validation rules in the API schema.

@@ -31,13 +31,13 @@ var map_PoolStatus = map[string]string{
 	"":                   "PoolStatus contains status information for a single resource pool.",
 	"driver":             "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
 	"poolName":           "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
-	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node.",
+	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
 	"totalDevices":       "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices.",
 	"allocatedDevices":   "AllocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated.",
 	"availableDevices":   "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available.",
-	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated.",
+	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available.",
 	"sliceCount":         "SliceCount is the number of ResourceSlices that make up this pool.",
-	"generation":         "Generation is the maximum metadata.generation observed across all ResourceSlices in this pool. Can be used to detect changes.",
+	"generation":         "Generation is the maximum metadata.generation observed across all ResourceSlices in this pool. Can be used to detect changes. A value of 0 means no generation information was available.",
 }
 
 func (PoolStatus) SwaggerDoc() map[string]string {
@@ -79,11 +79,11 @@ func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
 var map_ResourcePoolStatusRequestStatus = map[string]string{
 	"":                   "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
 	"observationTime":    "ObservationTime is the timestamp when the controller calculated this status. Once set, the request is considered complete and will not be reprocessed. Users should delete and recreate the request to get updated information.",
-	"pools":              "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name.",
+	"pools":              "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name. When omitted, no pools matched the request filters.",
 	"conditions":         "Conditions provide information about the state of the request.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
 	"validationErrors":   "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results.",
-	"truncation":         "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned. When omitted, the response was not truncated.",
-	"totalMatchingPools": "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. When nil, the status has not yet been populated. A value of 0 means no pools matched the filter criteria.",
+	"truncation":         "Truncation indicates whether the response was truncated due to the limit. Set to \"Truncated\" when there are more pools matching the filter criteria than were returned, or \"None\" when the response includes all matching pools.",
+	"totalMatchingPools": "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
 }
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {

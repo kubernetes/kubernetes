@@ -31,6 +31,7 @@ type PoolStatusApplyConfiguration struct {
 	PoolName *string `json:"poolName,omitempty"`
 	// NodeName is the node this pool is associated with.
 	// When omitted, the pool is not associated with a specific node.
+	// Must be a valid DNS subdomain name (RFC1123).
 	NodeName *string `json:"nodeName,omitempty"`
 	// TotalDevices is the total number of devices in the pool across all slices.
 	// A value of 0 means the pool has no devices.
@@ -44,11 +45,13 @@ type PoolStatusApplyConfiguration struct {
 	AvailableDevices *int32 `json:"availableDevices,omitempty"`
 	// UnavailableDevices is the number of devices that are not available
 	// due to taints or other conditions, but are not allocated.
+	// A value of 0 means all unallocated devices are available.
 	UnavailableDevices *int32 `json:"unavailableDevices,omitempty"`
 	// SliceCount is the number of ResourceSlices that make up this pool.
 	SliceCount *int32 `json:"sliceCount,omitempty"`
 	// Generation is the maximum metadata.generation observed across all
 	// ResourceSlices in this pool. Can be used to detect changes.
+	// A value of 0 means no generation information was available.
 	Generation *int64 `json:"generation,omitempty"`
 }
 

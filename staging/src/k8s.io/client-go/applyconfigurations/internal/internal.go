@@ -13037,7 +13037,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestStatus
-      default: {}
 - name: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestSpec
   map:
     fields:
@@ -13078,6 +13077,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: truncation
       type:
         scalar: string
+      default: ""
     - name: validationErrors
       type:
         list:

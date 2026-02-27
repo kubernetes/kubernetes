@@ -24,7 +24,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.36
-// +k8s:supportsSubresource=/status
+// +k8s:supportsSubresource="/status"
 
 // ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
 // based on the provided filters. The request follows a request/response pattern similar
@@ -42,14 +42,14 @@ type ResourcePoolStatusRequest struct {
 	// The spec is immutable once created.
 	//
 	// +required
-	// +k8s:immutable
-	Spec ResourcePoolStatusRequestSpec `json:"spec,omitzero" protobuf:"bytes,2,name=spec"`
+	Spec ResourcePoolStatusRequestSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status is populated by the controller with the calculated pool status.
 	// Once observationTime is set, the status is considered complete and immutable.
 	//
 	// +optional
-	Status ResourcePoolStatusRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	// +k8s:optional
+	Status *ResourcePoolStatusRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // ResourcePoolStatusRequestSpec defines the filters for the pool status request.
@@ -101,12 +101,13 @@ type ResourcePoolStatusRequestStatus struct {
 	// Once set, the request is considered complete and will not be reprocessed.
 	// Users should delete and recreate the request to get updated information.
 	//
-	// +optional
-	// +k8s:optional
-	ObservationTime *metav1.Time `json:"observationTime,omitempty" protobuf:"bytes,1,opt,name=observationTime"`
+	// +required
+	// +k8s:required
+	ObservationTime *metav1.Time `json:"observationTime" protobuf:"bytes,1,opt,name=observationTime"`
 
 	// Pools contains the status of each pool matching the request filters.
 	// The list is sorted by driver, then pool name.
+	// When omitted, no pools matched the request filters.
 	//
 	// +optional
 	// +k8s:optional
@@ -141,22 +142,22 @@ type ResourcePoolStatusRequestStatus struct {
 	ValidationErrors []string `json:"validationErrors,omitempty" protobuf:"bytes,4,rep,name=validationErrors"`
 
 	// Truncation indicates whether the response was truncated due to the limit.
-	// When set to "Truncated", there are more pools matching the filter criteria
-	// than were returned. When omitted, the response was not truncated.
+	// Set to "Truncated" when there are more pools matching the filter criteria
+	// than were returned, or "None" when the response includes all matching pools.
 	//
-	// +optional
-	// +k8s:optional
-	Truncation *TruncationStatus `json:"truncation,omitempty" protobuf:"bytes,5,opt,name=truncation"`
+	// +required
+	// +k8s:required
+	Truncation TruncationStatus `json:"truncation" protobuf:"bytes,5,opt,name=truncation"`
 
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
-	// even when the response is truncated. When nil, the status has not yet been
-	// populated. A value of 0 means no pools matched the filter criteria.
+	// even when the response is truncated. A value of 0 means no pools matched
+	// the filter criteria.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	TotalMatchingPools *int32 `json:"totalMatchingPools,omitempty" protobuf:"varint,6,opt,name=totalMatchingPools"`
+	TotalMatchingPools *int32 `json:"totalMatchingPools" protobuf:"varint,6,opt,name=totalMatchingPools"`
 }
 
 // PoolStatus contains status information for a single resource pool.
@@ -179,9 +180,11 @@ type PoolStatus struct {
 
 	// NodeName is the node this pool is associated with.
 	// When omitted, the pool is not associated with a specific node.
+	// Must be a valid DNS subdomain name (RFC1123).
 	//
 	// +optional
 	// +k8s:optional
+	// +k8s:format=k8s-long-name
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
 	// TotalDevices is the total number of devices in the pool across all slices.
@@ -211,11 +214,12 @@ type PoolStatus struct {
 
 	// UnavailableDevices is the number of devices that are not available
 	// due to taints or other conditions, but are not allocated.
+	// A value of 0 means all unallocated devices are available.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	UnavailableDevices int32 `json:"unavailableDevices,omitempty" protobuf:"varint,7,opt,name=unavailableDevices"`
+	UnavailableDevices *int32 `json:"unavailableDevices" protobuf:"varint,7,opt,name=unavailableDevices"`
 
 	// SliceCount is the number of ResourceSlices that make up this pool.
 	//
@@ -226,11 +230,12 @@ type PoolStatus struct {
 
 	// Generation is the maximum metadata.generation observed across all
 	// ResourceSlices in this pool. Can be used to detect changes.
+	// A value of 0 means no generation information was available.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	Generation int64 `json:"generation,omitempty" protobuf:"varint,9,opt,name=generation"`
+	Generation *int64 `json:"generation" protobuf:"varint,9,opt,name=generation"`
 }
 
 // TruncationStatus is a string enum indicating whether the response was truncated.
@@ -240,6 +245,9 @@ type PoolStatus struct {
 type TruncationStatus string
 
 const (
+	// TruncationStatusNone indicates the response was not truncated.
+	TruncationStatusNone TruncationStatus = "None"
+
 	// TruncationStatusTruncated indicates the response was truncated due to the limit.
 	TruncationStatusTruncated TruncationStatus = "Truncated"
 )

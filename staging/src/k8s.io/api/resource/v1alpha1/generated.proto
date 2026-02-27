@@ -48,9 +48,11 @@ message PoolStatus {
 
   // NodeName is the node this pool is associated with.
   // When omitted, the pool is not associated with a specific node.
+  // Must be a valid DNS subdomain name (RFC1123).
   //
   // +optional
   // +k8s:optional
+  // +k8s:format=k8s-long-name
   optional string nodeName = 3;
 
   // TotalDevices is the total number of devices in the pool across all slices.
@@ -80,9 +82,10 @@ message PoolStatus {
 
   // UnavailableDevices is the number of devices that are not available
   // due to taints or other conditions, but are not allocated.
+  // A value of 0 means all unallocated devices are available.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 unavailableDevices = 7;
 
@@ -95,9 +98,10 @@ message PoolStatus {
 
   // Generation is the maximum metadata.generation observed across all
   // ResourceSlices in this pool. Can be used to detect changes.
+  // A value of 0 means no generation information was available.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int64 generation = 9;
 }
@@ -117,13 +121,13 @@ message ResourcePoolStatusRequest {
   // The spec is immutable once created.
   //
   // +required
-  // +k8s:immutable
   optional ResourcePoolStatusRequestSpec spec = 2;
 
   // Status is populated by the controller with the calculated pool status.
   // Once observationTime is set, the status is considered complete and immutable.
   //
   // +optional
+  // +k8s:optional
   optional ResourcePoolStatusRequestStatus status = 3;
 }
 
@@ -180,12 +184,13 @@ message ResourcePoolStatusRequestStatus {
   // Once set, the request is considered complete and will not be reprocessed.
   // Users should delete and recreate the request to get updated information.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time observationTime = 1;
 
   // Pools contains the status of each pool matching the request filters.
   // The list is sorted by driver, then pool name.
+  // When omitted, no pools matched the request filters.
   //
   // +optional
   // +k8s:optional
@@ -220,20 +225,20 @@ message ResourcePoolStatusRequestStatus {
   repeated string validationErrors = 4;
 
   // Truncation indicates whether the response was truncated due to the limit.
-  // When set to "Truncated", there are more pools matching the filter criteria
-  // than were returned. When omitted, the response was not truncated.
+  // Set to "Truncated" when there are more pools matching the filter criteria
+  // than were returned, or "None" when the response includes all matching pools.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   optional string truncation = 5;
 
   // TotalMatchingPools is the total number of pools that matched the filter criteria,
   // regardless of truncation. This helps users understand how many pools exist
-  // even when the response is truncated. When nil, the status has not yet been
-  // populated. A value of 0 means no pools matched the filter criteria.
+  // even when the response is truncated. A value of 0 means no pools matched
+  // the filter criteria.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 totalMatchingPools = 6;
 }

@@ -8124,7 +8124,7 @@ func TestPrintResourcePoolStatusRequest(t *testing.T) {
 				Spec: resourceapis.ResourcePoolStatusRequestSpec{
 					Driver: "driver.example.com",
 				},
-				Status: resourceapis.ResourcePoolStatusRequestStatus{
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
 					TotalMatchingPools: ptr.To(int32(3)),
 					Conditions: []metav1.Condition{
 						{

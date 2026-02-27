@@ -237,7 +237,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					ObservationTime:    &now,
 					TotalMatchingPools: ptr.To(int32(2)),
 					Pools: []resource.PoolStatus{
@@ -249,7 +249,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 							AllocatedDevices: ptr.To(int32(2)),
 							AvailableDevices: ptr.To(int32(2)),
 							SliceCount:       1,
-							Generation:       1,
+							Generation:       ptr.To(int64(1)),
 						},
 					},
 					Conditions: []metav1.Condition{
@@ -267,7 +267,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 		"status-immutable-after-observation-time-set": {
 			oldRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					ObservationTime:    &now,
 					TotalMatchingPools: ptr.To(int32(2)),
 				}
@@ -275,7 +275,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			}(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					ObservationTime:    &now,
 					TotalMatchingPools: ptr.To(int32(5)), // changed
 				}
@@ -291,7 +291,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:     "", // missing
@@ -308,7 +308,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:     "test.example.com",
@@ -325,7 +325,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:       "test.example.com",
@@ -343,7 +343,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:           "test.example.com",
@@ -361,7 +361,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:     "test.example.com",
@@ -378,13 +378,13 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					Pools: []resource.PoolStatus{
 						{
 							Driver:     "test.example.com",
 							PoolName:   "pool-1",
 							SliceCount: 1,
-							Generation: -1,
+							Generation: ptr.To(int64(-1)),
 						},
 					},
 				}
@@ -396,7 +396,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					TotalMatchingPools: ptr.To(int32(-1)),
 				}
 				return r
@@ -411,7 +411,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				for i := range errors {
 					errors[i] = "error"
 				}
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					ValidationErrors: errors,
 				}
 				return r
@@ -422,7 +422,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
-				r.Status = resource.ResourcePoolStatusRequestStatus{
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
 					ValidationErrors: []string{strings.Repeat("x", 257)},
 				}
 				return r

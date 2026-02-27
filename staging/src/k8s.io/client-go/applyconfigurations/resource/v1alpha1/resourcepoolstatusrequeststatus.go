@@ -35,6 +35,7 @@ type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	ObservationTime *v1.Time `json:"observationTime,omitempty"`
 	// Pools contains the status of each pool matching the request filters.
 	// The list is sorted by driver, then pool name.
+	// When omitted, no pools matched the request filters.
 	Pools []PoolStatusApplyConfiguration `json:"pools,omitempty"`
 	// Conditions provide information about the state of the request.
 	//
@@ -46,13 +47,13 @@ type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	// the request. If present, the request may have partial or no results.
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 	// Truncation indicates whether the response was truncated due to the limit.
-	// When set to "Truncated", there are more pools matching the filter criteria
-	// than were returned. When omitted, the response was not truncated.
+	// Set to "Truncated" when there are more pools matching the filter criteria
+	// than were returned, or "None" when the response includes all matching pools.
 	Truncation *resourcev1alpha1.TruncationStatus `json:"truncation,omitempty"`
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
-	// even when the response is truncated. When nil, the status has not yet been
-	// populated. A value of 0 means no pools matched the filter criteria.
+	// even when the response is truncated. A value of 0 means no pools matched
+	// the filter criteria.
 	TotalMatchingPools *int32 `json:"totalMatchingPools,omitempty"`
 }
 

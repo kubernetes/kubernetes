@@ -61,15 +61,19 @@ func (m *PoolStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	i = encodeVarintGenerated(dAtA, i, uint64(m.Generation))
-	i--
-	dAtA[i] = 0x48
+	if m.Generation != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Generation))
+		i--
+		dAtA[i] = 0x48
+	}
 	i = encodeVarintGenerated(dAtA, i, uint64(m.SliceCount))
 	i--
 	dAtA[i] = 0x40
-	i = encodeVarintGenerated(dAtA, i, uint64(m.UnavailableDevices))
-	i--
-	dAtA[i] = 0x38
+	if m.UnavailableDevices != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.UnavailableDevices))
+		i--
+		dAtA[i] = 0x38
+	}
 	if m.AvailableDevices != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.AvailableDevices))
 		i--
@@ -125,16 +129,18 @@ func (m *ResourcePoolStatusRequest) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	_ = i
 	var l int
 	_ = l
-	{
-		size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
+	if m.Status != nil {
+		{
+			size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x1a
 	}
-	i--
-	dAtA[i] = 0x1a
 	{
 		size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -270,13 +276,11 @@ func (m *ResourcePoolStatusRequestStatus) MarshalToSizedBuffer(dAtA []byte) (int
 		i--
 		dAtA[i] = 0x30
 	}
-	if m.Truncation != nil {
-		i -= len(*m.Truncation)
-		copy(dAtA[i:], *m.Truncation)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Truncation)))
-		i--
-		dAtA[i] = 0x2a
-	}
+	i -= len(m.Truncation)
+	copy(dAtA[i:], m.Truncation)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Truncation)))
+	i--
+	dAtA[i] = 0x2a
 	if len(m.ValidationErrors) > 0 {
 		for iNdEx := len(m.ValidationErrors) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.ValidationErrors[iNdEx])
@@ -363,9 +367,13 @@ func (m *PoolStatus) Size() (n int) {
 	if m.AvailableDevices != nil {
 		n += 1 + sovGenerated(uint64(*m.AvailableDevices))
 	}
-	n += 1 + sovGenerated(uint64(m.UnavailableDevices))
+	if m.UnavailableDevices != nil {
+		n += 1 + sovGenerated(uint64(*m.UnavailableDevices))
+	}
 	n += 1 + sovGenerated(uint64(m.SliceCount))
-	n += 1 + sovGenerated(uint64(m.Generation))
+	if m.Generation != nil {
+		n += 1 + sovGenerated(uint64(*m.Generation))
+	}
 	return n
 }
 
@@ -379,8 +387,10 @@ func (m *ResourcePoolStatusRequest) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Spec.Size()
 	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Status.Size()
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.Status != nil {
+		l = m.Status.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -447,10 +457,8 @@ func (m *ResourcePoolStatusRequestStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	if m.Truncation != nil {
-		l = len(*m.Truncation)
-		n += 1 + l + sovGenerated(uint64(l))
-	}
+	l = len(m.Truncation)
+	n += 1 + l + sovGenerated(uint64(l))
 	if m.TotalMatchingPools != nil {
 		n += 1 + sovGenerated(uint64(*m.TotalMatchingPools))
 	}
@@ -474,9 +482,9 @@ func (this *PoolStatus) String() string {
 		`TotalDevices:` + valueToStringGenerated(this.TotalDevices) + `,`,
 		`AllocatedDevices:` + valueToStringGenerated(this.AllocatedDevices) + `,`,
 		`AvailableDevices:` + valueToStringGenerated(this.AvailableDevices) + `,`,
-		`UnavailableDevices:` + fmt.Sprintf("%v", this.UnavailableDevices) + `,`,
+		`UnavailableDevices:` + valueToStringGenerated(this.UnavailableDevices) + `,`,
 		`SliceCount:` + fmt.Sprintf("%v", this.SliceCount) + `,`,
-		`Generation:` + fmt.Sprintf("%v", this.Generation) + `,`,
+		`Generation:` + valueToStringGenerated(this.Generation) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -488,7 +496,7 @@ func (this *ResourcePoolStatusRequest) String() string {
 	s := strings.Join([]string{`&ResourcePoolStatusRequest{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ResourcePoolStatusRequestSpec", "ResourcePoolStatusRequestSpec", 1), `&`, ``, 1) + `,`,
-		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ResourcePoolStatusRequestStatus", "ResourcePoolStatusRequestStatus", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(this.Status.String(), "ResourcePoolStatusRequestStatus", "ResourcePoolStatusRequestStatus", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -540,7 +548,7 @@ func (this *ResourcePoolStatusRequestStatus) String() string {
 		`Pools:` + repeatedStringForPools + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`ValidationErrors:` + fmt.Sprintf("%v", this.ValidationErrors) + `,`,
-		`Truncation:` + valueToStringGenerated(this.Truncation) + `,`,
+		`Truncation:` + fmt.Sprintf("%v", this.Truncation) + `,`,
 		`TotalMatchingPools:` + valueToStringGenerated(this.TotalMatchingPools) + `,`,
 		`}`,
 	}, "")
@@ -744,7 +752,7 @@ func (m *PoolStatus) Unmarshal(dAtA []byte) error {
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field UnavailableDevices", wireType)
 			}
-			m.UnavailableDevices = 0
+			var v int32
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -754,11 +762,12 @@ func (m *PoolStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.UnavailableDevices |= int32(b&0x7F) << shift
+				v |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.UnavailableDevices = &v
 		case 8:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SliceCount", wireType)
@@ -782,7 +791,7 @@ func (m *PoolStatus) Unmarshal(dAtA []byte) error {
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Generation", wireType)
 			}
-			m.Generation = 0
+			var v int64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -792,11 +801,12 @@ func (m *PoolStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Generation |= int64(b&0x7F) << shift
+				v |= int64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.Generation = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -941,6 +951,9 @@ func (m *ResourcePoolStatusRequest) Unmarshal(dAtA []byte) error {
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
+			}
+			if m.Status == nil {
+				m.Status = &ResourcePoolStatusRequestStatus{}
 			}
 			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -1414,8 +1427,7 @@ func (m *ResourcePoolStatusRequestStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			s := TruncationStatus(dAtA[iNdEx:postIndex])
-			m.Truncation = &s
+			m.Truncation = TruncationStatus(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 6:
 			if wireType != 0 {

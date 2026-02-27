@@ -98,9 +98,9 @@ func autoConvert_v1alpha1_PoolStatus_To_resource_PoolStatus(in *resourcev1alpha1
 	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
 	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
 	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
-	out.UnavailableDevices = in.UnavailableDevices
+	out.UnavailableDevices = (*int32)(unsafe.Pointer(in.UnavailableDevices))
 	out.SliceCount = in.SliceCount
-	out.Generation = in.Generation
+	out.Generation = (*int64)(unsafe.Pointer(in.Generation))
 	return nil
 }
 
@@ -116,9 +116,9 @@ func autoConvert_resource_PoolStatus_To_v1alpha1_PoolStatus(in *resource.PoolSta
 	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
 	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
 	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
-	out.UnavailableDevices = in.UnavailableDevices
+	out.UnavailableDevices = (*int32)(unsafe.Pointer(in.UnavailableDevices))
 	out.SliceCount = in.SliceCount
-	out.Generation = in.Generation
+	out.Generation = (*int64)(unsafe.Pointer(in.Generation))
 	return nil
 }
 
@@ -132,9 +132,7 @@ func autoConvert_v1alpha1_ResourcePoolStatusRequest_To_resource_ResourcePoolStat
 	if err := Convert_v1alpha1_ResourcePoolStatusRequestSpec_To_resource_ResourcePoolStatusRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_ResourcePoolStatusRequestStatus_To_resource_ResourcePoolStatusRequestStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out.Status = (*resource.ResourcePoolStatusRequestStatus)(unsafe.Pointer(in.Status))
 	return nil
 }
 
@@ -148,9 +146,7 @@ func autoConvert_resource_ResourcePoolStatusRequest_To_v1alpha1_ResourcePoolStat
 	if err := Convert_resource_ResourcePoolStatusRequestSpec_To_v1alpha1_ResourcePoolStatusRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_resource_ResourcePoolStatusRequestStatus_To_v1alpha1_ResourcePoolStatusRequestStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out.Status = (*resourcev1alpha1.ResourcePoolStatusRequestStatus)(unsafe.Pointer(in.Status))
 	return nil
 }
 
@@ -210,7 +206,7 @@ func autoConvert_v1alpha1_ResourcePoolStatusRequestStatus_To_resource_ResourcePo
 	out.Pools = *(*[]resource.PoolStatus)(unsafe.Pointer(&in.Pools))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ValidationErrors = *(*[]string)(unsafe.Pointer(&in.ValidationErrors))
-	out.Truncation = (*resource.TruncationStatus)(unsafe.Pointer(in.Truncation))
+	out.Truncation = resource.TruncationStatus(in.Truncation)
 	out.TotalMatchingPools = (*int32)(unsafe.Pointer(in.TotalMatchingPools))
 	return nil
 }
@@ -225,7 +221,7 @@ func autoConvert_resource_ResourcePoolStatusRequestStatus_To_v1alpha1_ResourcePo
 	out.Pools = *(*[]resourcev1alpha1.PoolStatus)(unsafe.Pointer(&in.Pools))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ValidationErrors = *(*[]string)(unsafe.Pointer(&in.ValidationErrors))
-	out.Truncation = (*resourcev1alpha1.TruncationStatus)(unsafe.Pointer(in.Truncation))
+	out.Truncation = resourcev1alpha1.TruncationStatus(in.Truncation)
 	out.TotalMatchingPools = (*int32)(unsafe.Pointer(in.TotalMatchingPools))
 	return nil
 }

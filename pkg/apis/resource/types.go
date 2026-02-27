@@ -2023,7 +2023,7 @@ type ResourcePoolStatusRequest struct {
 
 	// Status is populated by the controller with the calculated pool status.
 	// +optional
-	Status ResourcePoolStatusRequestStatus
+	Status *ResourcePoolStatusRequestStatus
 }
 
 // ResourcePoolStatusRequestSpec defines the filters for the pool status request.
@@ -2084,8 +2084,7 @@ type ResourcePoolStatusRequestStatus struct {
 	ValidationErrors []string
 
 	// Truncation indicates whether the response was truncated due to the limit.
-	// +optional
-	Truncation *TruncationStatus
+	Truncation TruncationStatus
 
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
@@ -2098,6 +2097,9 @@ type ResourcePoolStatusRequestStatus struct {
 type TruncationStatus string
 
 const (
+	// TruncationStatusNone indicates the response was not truncated.
+	TruncationStatusNone TruncationStatus = "None"
+
 	// TruncationStatusTruncated indicates the response was truncated due to the limit.
 	TruncationStatusTruncated TruncationStatus = "Truncated"
 )
@@ -2127,16 +2129,14 @@ type PoolStatus struct {
 
 	// UnavailableDevices is the number of devices that are not available
 	// due to taints or other conditions, but are not allocated.
-	// +optional
-	UnavailableDevices int32
+	UnavailableDevices *int32
 
 	// SliceCount is the number of ResourceSlices that make up this pool.
 	SliceCount int32
 
 	// Generation is the maximum metadata.generation observed across all
 	// ResourceSlices in this pool. Can be used to detect changes.
-	// +optional
-	Generation int64
+	Generation *int64
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.

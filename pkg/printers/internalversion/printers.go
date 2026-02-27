@@ -3276,16 +3276,17 @@ func printResourcePoolStatusRequest(obj *resource.ResourcePoolStatusRequest, opt
 	}
 
 	status := "Pending"
-	for _, cond := range obj.Status.Conditions {
-		if cond.Type == "Complete" && cond.Status == metav1.ConditionTrue {
-			status = "Complete"
-			break
-		}
-	}
-
 	var totalMatchingPools int32
-	if obj.Status.TotalMatchingPools != nil {
-		totalMatchingPools = *obj.Status.TotalMatchingPools
+	if obj.Status != nil {
+		for _, cond := range obj.Status.Conditions {
+			if cond.Type == "Complete" && cond.Status == metav1.ConditionTrue {
+				status = "Complete"
+				break
+			}
+		}
+		if obj.Status.TotalMatchingPools != nil {
+			totalMatchingPools = *obj.Status.TotalMatchingPools
+		}
 	}
 	row.Cells = append(row.Cells, obj.Name, obj.Spec.Driver, totalMatchingPools, status, translateTimestampSince(obj.CreationTimestamp))
 
