@@ -32,6 +32,9 @@ func Test(t *testing.T) {
 		ListMapOfOpaqueStructField:     []OtherStruct{{"foo"}, {"bar"}},
 		MapOfStringToStructField:       map[OtherString]OtherStruct{"a": {"foo"}, "b": {"bar"}},
 		MapOfStringToOpaqueStructField: map[OtherString]OtherStruct{"a": {"foo"}, "b": {"bar"}},
+		OtherStruct:                    OtherStruct{"foo"},
+		SomeSlice:                      []OtherStruct{{"foo"}},
+		SomeMap:                        map[OtherString]OtherStruct{"a": {"foo"}},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"structField":                         {"field Struct.StructField", "type OtherStruct"},
 		"structPtrField":                      {"field Struct.StructPtrField", "type OtherStruct"},

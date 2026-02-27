@@ -79,6 +79,16 @@ type Struct struct {
 	// +k8s:eachKey=+k8s:opaqueType
 	// +k8s:eachVal=+k8s:opaqueType
 	MapOfStringToOpaqueStructField map[OtherString]OtherStruct `json:"mapOfStringToOpaqueStructField"`
+
+	// +k8s:opaqueType
+	OtherStruct
+
+	// +k8s:eachVal=+k8s:opaqueType
+	SomeSlice []OtherStruct
+
+	// +k8s:eachKey=+k8s:opaqueType
+	// +k8s:eachVal=+k8s:opaqueType
+	SomeMap map[OtherString]OtherStruct
 }
 
 // +k8s:validateFalse="type OtherStruct"
@@ -89,6 +99,10 @@ type OtherStruct struct {
 
 // +k8s:validateFalse="type OtherString"
 type OtherString string
+
+type SomeSlice []OtherStruct
+
+type SomeMap map[OtherString]OtherStruct
 
 // TODO: the validateFalse test fixture doesn't handle map and slice types, and
 // fixing it requires fixing randfill.  That is a tomorrow problem.  For now, the

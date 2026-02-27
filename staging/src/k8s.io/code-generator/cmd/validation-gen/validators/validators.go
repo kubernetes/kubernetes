@@ -412,7 +412,7 @@ type Validations struct {
 }
 
 func (v *Validations) Empty() bool {
-	return v.Len() == 0
+	return v.Len() == 0 && !v.OpaqueType && !v.OpaqueKeyType && !v.OpaqueValType
 }
 
 func (v *Validations) Len() int {

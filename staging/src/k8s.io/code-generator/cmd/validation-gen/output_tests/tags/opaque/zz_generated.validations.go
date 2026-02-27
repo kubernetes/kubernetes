@@ -54,6 +54,22 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type SomeMap
+	scheme.AddValidationFunc((SomeMap)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_SomeMap(ctx, op, nil /* fldPath */, obj.(SomeMap), safe.Cast[SomeMap](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type SomeSlice
+	scheme.AddValidationFunc((SomeSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_SomeSlice(ctx, op, nil /* fldPath */, obj.(SomeSlice), safe.Cast[SomeSlice](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -106,6 +122,18 @@ func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *OtherStruct) *string { return &oldObj.StringField }), oldObj != nil)...)
 
+	return errs
+}
+
+// Validate_SomeMap validates an instance of SomeMap according
+// to declarative validation rules in the API schema.
+func Validate_SomeMap(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj SomeMap) (errs field.ErrorList) {
+	return errs
+}
+
+// Validate_SomeSlice validates an instance of SomeSlice according
+// to declarative validation rules in the API schema.
+func Validate_SomeSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj SomeSlice) (errs field.ErrorList) {
 	return errs
 }
 
@@ -290,6 +318,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("mapOfStringToOpaqueStructField"), obj.MapOfStringToOpaqueStructField, safe.Field(oldObj, func(oldObj *Struct) map[OtherString]OtherStruct { return oldObj.MapOfStringToOpaqueStructField }), oldObj != nil)...)
 
+	// field Struct.OtherStruct has no validation
+	// field Struct.SomeSlice has no validation
+	// field Struct.SomeMap has no validation
 	return errs
 }
 
