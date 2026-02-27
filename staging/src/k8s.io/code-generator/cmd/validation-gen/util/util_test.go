@@ -452,3 +452,55 @@ func TestIsDirectComparable(t *testing.T) {
 		}
 	}
 }
+
+func TestParseInt(t *testing.T) {
+	type testcase struct {
+		name          string
+		in            string
+		expectedOut   int
+		expectedError bool
+	}
+
+	testcases := []testcase{
+		{
+			name:          "valid canonical integer string",
+			in:            "100",
+			expectedOut:   100,
+			expectedError: false,
+		},
+		{
+			name:          "invalid canonical integer string, not an integer at all",
+			in:            "notanint",
+			expectedOut:   0,
+			expectedError: true,
+		},
+		{
+			name:          "invalid canonical integer string, spurious leading zeros",
+			in:            "00100",
+			expectedOut:   0,
+			expectedError: true,
+		},
+		{
+			name:          "invalid canonical integer string, octal value",
+			in:            "0o123",
+			expectedOut:   0,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := ParseInt(tc.in)
+			switch {
+			case tc.expectedError && err == nil:
+				t.Error("expected an error but did not receive one")
+			case !tc.expectedError && err != nil:
+				t.Errorf("received an unexpected error: %v", err)
+			}
+
+			if out != tc.expectedOut {
+				t.Errorf("expected an output value of %d but got %d", tc.expectedOut, out)
+			}
+		})
+	}
+}
