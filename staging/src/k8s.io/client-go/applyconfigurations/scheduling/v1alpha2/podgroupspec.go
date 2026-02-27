@@ -30,6 +30,18 @@ type PodGroupSpecApplyConfiguration struct {
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// If the pod group belongs to a workload, the PriorityClassName is copied from the PodGroupTemplate.
+	// Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
+	// (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero).
+	// This field is immutable.
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+	// Priority reflects the priority of the pod group. The higher the value, the higher the priority.
+	// If the pod group belongs to a workload, the Priority is copied from the PodGroupTemplate.
+	// Otherwise, it is validated and resolved similarly to the Priority on PodGroupTemplate
+	// (i.e. if admission control is enabled, it populates this field from the priority class and it rejects manual configuration of this field).
+	// This field is immutable.
+	Priority *int32 `json:"priority,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -51,5 +63,21 @@ func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroup
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupSpecApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithPriorityClassName sets the PriorityClassName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PriorityClassName field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithPriorityClassName(value string) *PodGroupSpecApplyConfiguration {
+	b.PriorityClassName = &value
+	return b
+}
+
+// WithPriority sets the Priority field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Priority field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithPriority(value int32) *PodGroupSpecApplyConfiguration {
+	b.Priority = &value
 	return b
 }

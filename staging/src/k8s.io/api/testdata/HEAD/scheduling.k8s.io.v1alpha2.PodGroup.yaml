@@ -37,6 +37,8 @@ spec:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue
       workloadName: workloadNameValue
+  priority: 4
+  priorityClassName: priorityClassNameValue
   schedulingPolicy:
     basic: {}
     gang:

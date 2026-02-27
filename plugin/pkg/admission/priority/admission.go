@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -90,11 +92,12 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 
 var (
 	podResource           = core.Resource("pods")
+	workloadResource      = scheduling.Resource("workloads")
+	podGroupResource      = scheduling.Resource("podgroups")
 	priorityClassResource = scheduling.Resource("priorityclasses")
 )
 
-// Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
-// Note that pod validation mechanism prevents update of a pod priority.
+// Admit checks Pods, Workloads, and PodGroups and admits or rejects them. It also resolves the priority of pods, workloads, and pod groups based on their PriorityClass.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -107,10 +110,112 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return p.admitPod(a)
 		}
 		return nil
-
+	case workloadResource:
+		if operation == admission.Create {
+			return p.admitWorkload(a)
+		}
+		return nil
+	case podGroupResource:
+		if operation == admission.Create {
+			return p.admitPodGroup(a)
+		}
+		return nil
 	default:
 		return nil
 	}
+}
+
+// admitWorkload validates PriorityClassName and resolves Priority for a Workload and its PodGroupTemplates.
+// If PriorityClassName is provided, it must refer to an existing PriorityClass.
+// Otherwise it is set to a global default PriorityClass if it exists.
+// Priority value is resolved based on the PriorityClass.
+// If PriorityClass is not provided and there is no global default PriorityClass, the priority of the Workload will be set to 0.
+func (p *Plugin) admitWorkload(a admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return nil
+	}
+
+	workload, ok := a.GetObject().(*scheduling.Workload)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind Workload but was unable to be converted")
+	}
+
+	for i := range workload.Spec.PodGroupTemplates {
+		pgt := &workload.Spec.PodGroupTemplates[i]
+		var priority int32 = 0
+		if pgt.PriorityClassName == nil || len(*pgt.PriorityClassName) == 0 {
+			defaultPriorityClassName, defaultPriority, _, err := p.getDefaultPriority()
+			if err != nil {
+				return fmt.Errorf("failed to get default priority class: %w", err)
+			}
+			pgt.PriorityClassName = &defaultPriorityClassName
+			priority = defaultPriority
+		} else {
+			priorityClass, err := p.lister.Get(*pgt.PriorityClassName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", *pgt.PriorityClassName))
+				}
+				return fmt.Errorf("failed to resolve PriorityClass with name %s: %w", *pgt.PriorityClassName, err)
+			}
+			priority = priorityClass.Value
+		}
+		// Reject if pod group template contained a priority that differs from the one computed from the priority class.
+		if pgt.Priority != nil && *pgt.Priority != priority {
+			return admission.NewForbidden(a, fmt.Errorf("the priority of pod group template (%d) must match the one computed (%d) from the given priority class", *pgt.Priority, priority))
+		}
+		pgt.Priority = &priority
+	}
+	return nil
+}
+
+// admitPodGroup validates PriorityClassName and resolves Priority for a standalone PodGroup.
+// If PriorityClassName is provided, it must refer to an existing PriorityClass.
+// Otherwise it is set to a global default PriorityClass if it exists.
+// Priority value is resolved based on the PriorityClass.
+// If PriorityClass is not provided and there is no global default PriorityClass, the priority of the PodGroup will be set to 0.
+func (p *Plugin) admitPodGroup(a admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return nil
+	}
+
+	pg, ok := a.GetObject().(*scheduling.PodGroup)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind PodGroup but was unable to be converted")
+	}
+
+	// Only admit standalone pod groups i.e. pod groups without any reference to a workload .
+	// Pod groups that have a PodGroupTemplateRef, have their Priority and PriorityClassName copied on creation from PodGroupTemplate,
+	// which passed admission control when the workload was created.
+	if pg.Spec.PodGroupTemplateRef != nil {
+		return nil
+	}
+
+	var priority int32 = 0
+	if pg.Spec.PriorityClassName == nil || len(*pg.Spec.PriorityClassName) == 0 {
+		defaultPriorityClassName, defaultPriority, _, err := p.getDefaultPriority()
+		if err != nil {
+			return fmt.Errorf("failed to get default priority class: %w", err)
+		}
+		pg.Spec.PriorityClassName = &defaultPriorityClassName
+		priority = defaultPriority
+	} else {
+		priorityClass, err := p.lister.Get(*pg.Spec.PriorityClassName)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", *pg.Spec.PriorityClassName))
+			}
+			return fmt.Errorf("failed to resolve PriorityClass with name %s: %w", *pg.Spec.PriorityClassName, err)
+		}
+		priority = priorityClass.Value
+	}
+
+	// Reject if the pod group contained a priority that differs from the one computed from the priority class.
+	if pg.Spec.Priority != nil && *pg.Spec.Priority != priority {
+		return admission.NewForbidden(a, fmt.Errorf("the priority of the pod group (%d) must match the one computed (%d) from the given priority class", *pg.Spec.Priority, priority))
+	}
+	pg.Spec.Priority = &priority
+	return nil
 }
 
 // Validate checks PriorityClasses and admits or rejects them.

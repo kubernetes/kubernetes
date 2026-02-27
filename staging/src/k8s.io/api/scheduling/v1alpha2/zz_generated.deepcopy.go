@@ -154,6 +154,16 @@ func (in *PodGroupSpec) DeepCopyInto(out *PodGroupSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.SchedulingPolicy.DeepCopyInto(&out.SchedulingPolicy)
+	if in.PriorityClassName != nil {
+		in, out := &in.PriorityClassName, &out.PriorityClassName
+		*out = new(string)
+		**out = **in
+	}
+	if in.Priority != nil {
+		in, out := &in.Priority, &out.Priority
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
@@ -194,6 +204,16 @@ func (in *PodGroupStatus) DeepCopy() *PodGroupStatus {
 func (in *PodGroupTemplate) DeepCopyInto(out *PodGroupTemplate) {
 	*out = *in
 	in.SchedulingPolicy.DeepCopyInto(&out.SchedulingPolicy)
+	if in.PriorityClassName != nil {
+		in, out := &in.PriorityClassName, &out.PriorityClassName
+		*out = new(string)
+		**out = **in
+	}
+	if in.Priority != nil {
+		in, out := &in.Priority, &out.Priority
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

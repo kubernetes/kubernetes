@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // podGroupStrategy implements behavior for PodGroup objects.
@@ -66,6 +68,25 @@ func (*podGroupStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	podGroup := obj.(*scheduling.PodGroup)
 	// Status must not be set by user on create.
 	podGroup.Status = scheduling.PodGroupStatus{}
+	dropDisabledPodGroupFields(podGroup, nil, operation.Create)
+}
+
+func dropDisabledPodGroupFields(newPodGroup, oldPodGroup *scheduling.PodGroup, opType operation.Type) {
+	if opType == operation.Create {
+		// The PriorityClassName and Priority fields are immutable, so we only
+		// have to drop them on PodGroup creation if needed.
+		dropDisabledWorkloadAwarePreemptionFields(newPodGroup)
+	}
+}
+
+// dropDisabledWorkloadAwarePreemptionFields drops PriorityClassName and Priority fields
+// from a PodGroup if the WorkloadAwarePreemption is disabled.
+func dropDisabledWorkloadAwarePreemptionFields(podGroup *scheduling.PodGroup) {
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return
+	}
+	podGroup.Spec.PriorityClassName = nil
+	podGroup.Spec.Priority = nil
 }
 
 func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -18,13 +18,18 @@ package podgroup
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var podGroup = &scheduling.PodGroup{
@@ -44,6 +49,8 @@ var podGroup = &scheduling.PodGroup{
 				MinCount: 5,
 			},
 		},
+		PriorityClassName: ptr.To("low-priority"),
+		Priority:          ptr.To(int32(1000)),
 	},
 }
 
@@ -209,6 +216,24 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: fieldImmutableError,
 		},
+		"changing priorityClassName not allowed": {
+			oldObj: podGroup,
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.PriorityClassName = ptr.To("high-priority")
+				return pg
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"changing priority not allowed": {
+			oldObj: podGroup,
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.Priority = ptr.To(int32(2000))
+				return pg
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -233,6 +258,60 @@ func TestStrategyUpdate(t *testing.T) {
 			}
 			if tc.expectValidationError != "" {
 				t.Fatal("expected validation error(s), got none")
+			}
+		})
+	}
+}
+
+func TestPodGroupStrategyCreate(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		preparePodGroup               func(*scheduling.PodGroup)
+		enableWorkloadAwarePreemption bool
+		expectPriorityClassName       *string
+		expectPriority                *int32
+	}{
+		{
+			name: "priorityClassName is preserved upon creating a pod group when workload-aware-preemption is enabled",
+			preparePodGroup: func(pg *scheduling.PodGroup) {
+				pg.Spec.PriorityClassName = ptr.To("high-priority")
+			},
+			enableWorkloadAwarePreemption: true,
+			expectPriorityClassName:       ptr.To("high-priority"),
+			expectPriority:                ptr.To(int32(1000)),
+		},
+		{
+			name: "priorityClassName and priority are cleared upon creating a pod group when workload-aware-preemption is disabled",
+			preparePodGroup: func(pg *scheduling.PodGroup) {
+				pg.Spec.PriorityClassName = ptr.To("high-priority")
+				pg.Spec.Priority = ptr.To(int32(1000))
+			},
+			enableWorkloadAwarePreemption: false,
+			expectPriorityClassName:       nil,
+			expectPriority:                nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.GangScheduling:          tt.enableWorkloadAwarePreemption,
+				features.WorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
+			})
+
+			ctx := ctxWithRequestInfo()
+			pg := podGroup.DeepCopy()
+			tt.preparePodGroup(pg)
+
+			strategy := NewStrategy()
+			strategy.PrepareForCreate(ctx, pg)
+
+			if !reflect.DeepEqual(tt.expectPriorityClassName, pg.Spec.PriorityClassName) {
+				t.Errorf("Expected priorityClassName = %v, got %v", tt.expectPriorityClassName, pg.Spec.PriorityClassName)
+			}
+			if !reflect.DeepEqual(tt.expectPriority, pg.Spec.Priority) {
+				t.Errorf("Expected priority = %v, got %v", tt.expectPriority, pg.Spec.Priority)
 			}
 		})
 	}

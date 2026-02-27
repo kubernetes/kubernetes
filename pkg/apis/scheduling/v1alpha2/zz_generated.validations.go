@@ -220,6 +220,51 @@ func Validate_PodGroupSpec(ctx context.Context, op operation.Operation, fldPath 
 			return &oldObj.SchedulingPolicy
 		}), oldObj != nil)...)
 
+	// field schedulingv1alpha2.PodGroupSpec.PriorityClassName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("priorityClassName"), obj.PriorityClassName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupSpec) *string { return oldObj.PriorityClassName }), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupSpec.Priority
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("priority"), obj.Priority, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupSpec) *int32 { return oldObj.Priority }), oldObj != nil)...)
+
 	return errs
 }
 
@@ -259,6 +304,51 @@ func Validate_PodGroupTemplate(ctx context.Context, op operation.Operation, fldP
 		}(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroupSchedulingPolicy {
 			return &oldObj.SchedulingPolicy
 		}), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupTemplate.PriorityClassName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("priorityClassName"), obj.PriorityClassName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *string { return oldObj.PriorityClassName }), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupTemplate.Priority
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("priority"), obj.Priority, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *int32 { return oldObj.Priority }), oldObj != nil)...)
 
 	return errs
 }

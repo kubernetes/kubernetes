@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // workloadStrategy implements behavior for Workload objects.
@@ -42,7 +44,30 @@ func (workloadStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	workload := obj.(*scheduling.Workload)
+	dropDisabledWorkloadFields(workload, nil, operation.Create)
+}
+
+func dropDisabledWorkloadFields(newWorkload, oldWorkload *scheduling.Workload, opType operation.Type) {
+	if opType == operation.Create {
+		// The PriorityClassName and Priority fields are immutable, so we only
+		// have to drop them on Workload creation if needed.
+		dropDisabledWorkloadAwarePreemptionFields(newWorkload)
+	}
+}
+
+// dropDisabledWorkloadAwarePreemptionFields drops PriorityClassName and Priority from all
+// PodGroupTemplates in the workload if the WorkloadAwarePreemption is disabled.
+func dropDisabledWorkloadAwarePreemptionFields(workload *scheduling.Workload) {
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return
+	}
+	for i := range workload.Spec.PodGroupTemplates {
+		workload.Spec.PodGroupTemplates[i].PriorityClassName = nil
+		workload.Spec.PodGroupTemplates[i].Priority = nil
+	}
+}
 
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	workloadScheduling := obj.(*scheduling.Workload)
