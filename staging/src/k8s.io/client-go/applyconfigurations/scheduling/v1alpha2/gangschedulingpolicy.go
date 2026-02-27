@@ -27,6 +27,17 @@ type GangSchedulingPolicyApplyConfiguration struct {
 	// at the same time for the scheduler to admit the entire group.
 	// It must be a positive integer.
 	MinCount *int32 `json:"minCount,omitempty"`
+	// DesiredCount is the expected number of pods that will belong to this
+	// PodGroup. This field is a hint to the scheduler to help it make better
+	// placement decisions for the group as a whole.
+	//
+	// Unlike gang's minCount, this field does not block scheduling. If the number
+	// of available pods is less than desiredCount but at least minCount, the scheduler
+	// can still attempt to schedule the available pods, but will optimistically try
+	// to select a placement that can accommodate the future pods.
+	//
+	// When provided desiredCount must be greater or equal to minCount.
+	DesiredCount *int32 `json:"desiredCount,omitempty"`
 }
 
 // GangSchedulingPolicyApplyConfiguration constructs a declarative configuration of the GangSchedulingPolicy type for use with
@@ -40,5 +51,13 @@ func GangSchedulingPolicy() *GangSchedulingPolicyApplyConfiguration {
 // If called multiple times, the MinCount field is set to the value of the last call.
 func (b *GangSchedulingPolicyApplyConfiguration) WithMinCount(value int32) *GangSchedulingPolicyApplyConfiguration {
 	b.MinCount = &value
+	return b
+}
+
+// WithDesiredCount sets the DesiredCount field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DesiredCount field is set to the value of the last call.
+func (b *GangSchedulingPolicyApplyConfiguration) WithDesiredCount(value int32) *GangSchedulingPolicyApplyConfiguration {
+	b.DesiredCount = &value
 	return b
 }

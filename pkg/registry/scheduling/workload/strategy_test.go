@@ -20,9 +20,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var workload = &scheduling.Workload{
@@ -38,6 +43,12 @@ var workload = &scheduling.Workload{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 5,
 					},
+				},
+			},
+			{
+				Name: "baz",
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+					Basic: &scheduling.BasicSchedulingPolicy{},
 				},
 			},
 		},
@@ -60,6 +71,88 @@ func ctxWithRequestInfo() context.Context {
 		Resource:          "workloads",
 		IsResourceRequest: true,
 	})
+}
+
+func TestWorkloadStrategyCreate(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		prepareWorkload            func(*scheduling.Workload)
+		enablePodGroupDesiredCount bool
+		expectedDesiredCounts      []*int32
+		expectValidationErrors     bool
+	}{
+		{
+			name:                   "simple",
+			prepareWorkload:        func(w *scheduling.Workload) {},
+			expectValidationErrors: false,
+		},
+		{
+			name:                   "failed validation",
+			prepareWorkload:        func(w *scheduling.Workload) { w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = -1 },
+			expectValidationErrors: true,
+		},
+		{
+			name: "PodGroupDesiredCount: disabled",
+			prepareWorkload: func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.DesiredCount = ptr.To(int32(6))
+				w.Spec.PodGroupTemplates[1].SchedulingPolicy.Basic.DesiredCount = ptr.To(int32(6))
+			},
+			expectedDesiredCounts:  []*int32{nil, nil},
+			expectValidationErrors: false,
+		},
+		{
+			name: "PodGroupDesiredCount: enabled",
+			prepareWorkload: func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.DesiredCount = ptr.To(int32(6))
+				w.Spec.PodGroupTemplates[1].SchedulingPolicy.Basic.DesiredCount = ptr.To(int32(6))
+			},
+			expectedDesiredCounts:      []*int32{ptr.To(int32(6)), ptr.To(int32(6))},
+			enablePodGroupDesiredCount: true,
+			expectValidationErrors:     false,
+		},
+		{
+			name: "failed validation: desiredCount < minCount",
+			prepareWorkload: func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.DesiredCount = ptr.To(int32(4))
+			},
+			enablePodGroupDesiredCount: true,
+			expectValidationErrors:     true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:      true,
+				features.PodGroupDesiredCount: tt.enablePodGroupDesiredCount,
+			})
+
+			ctx := ctxWithRequestInfo()
+			w := workload.DeepCopy()
+			tt.prepareWorkload(w)
+
+			Strategy.PrepareForCreate(ctx, w)
+			errs := Strategy.Validate(ctx, w)
+
+			if (len(errs) != 0) != tt.expectValidationErrors {
+				t.Errorf("Expected validation error = %v, got %v", tt.expectValidationErrors, errs)
+			}
+
+			if tt.expectedDesiredCounts != nil {
+				for i, pg := range w.Spec.PodGroupTemplates {
+					var actual *int32
+					if pg.SchedulingPolicy.Gang != nil {
+						actual = pg.SchedulingPolicy.Gang.DesiredCount
+					} else if pg.SchedulingPolicy.Basic != nil {
+						actual = pg.SchedulingPolicy.Basic.DesiredCount
+					}
+					if diff := cmp.Diff(tt.expectedDesiredCounts[i], actual); diff != "" {
+						t.Errorf("PodGroup %d DesiredCount mismatch (-want +got):\n%s", i, diff)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestPodSchedulingStrategyCreate(t *testing.T) {

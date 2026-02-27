@@ -19323,11 +19323,23 @@
     },
     "io.k8s.api.scheduling.v1alpha2.BasicSchedulingPolicy": {
       "description": "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
+      "properties": {
+        "desiredCount": {
+          "description": "DesiredCount is the expected number of pods that will belong to this PodGroup. This field is a hint to the scheduler to help it make better placement decisions for the group as a whole.\n\nUnlike gang's minCount, this field does not block scheduling. If the number of available pods is less than desiredCount, the scheduler can still attempt to schedule the available pods, but will optimistically try to select a placement that can accommodate the future pods.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha2.GangSchedulingPolicy": {
       "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
       "properties": {
+        "desiredCount": {
+          "description": "DesiredCount is the expected number of pods that will belong to this PodGroup. This field is a hint to the scheduler to help it make better placement decisions for the group as a whole.\n\nUnlike gang's minCount, this field does not block scheduling. If the number of available pods is less than desiredCount but at least minCount, the scheduler can still attempt to schedule the available pods, but will optimistically try to select a placement that can accommodate the future pods.\n\nWhen provided desiredCount must be greater or equal to minCount.",
+          "format": "int32",
+          "type": "integer"
+        },
         "minCount": {
           "description": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
           "format": "int32",

@@ -81,6 +81,7 @@ func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, 
 			return
 		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
 
+	// field schedulingv1alpha2.GangSchedulingPolicy.DesiredCount has no validation
 	return errs
 }
 
@@ -127,7 +128,7 @@ func Validate_PodGroupSchedulingPolicy(ctx context.Context, op operation.Operati
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha2.BasicSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -147,7 +148,7 @@ func Validate_PodGroupSchedulingPolicy(ctx context.Context, op operation.Operati
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha2.GangSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations

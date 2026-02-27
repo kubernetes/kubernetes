@@ -182,6 +182,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha2_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(in *schedulingv1alpha2.BasicSchedulingPolicy, out *scheduling.BasicSchedulingPolicy, s conversion.Scope) error {
+	out.DesiredCount = (*int32)(unsafe.Pointer(in.DesiredCount))
 	return nil
 }
 
@@ -191,6 +192,7 @@ func Convert_v1alpha2_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(
 }
 
 func autoConvert_scheduling_BasicSchedulingPolicy_To_v1alpha2_BasicSchedulingPolicy(in *scheduling.BasicSchedulingPolicy, out *schedulingv1alpha2.BasicSchedulingPolicy, s conversion.Scope) error {
+	out.DesiredCount = (*int32)(unsafe.Pointer(in.DesiredCount))
 	return nil
 }
 
@@ -201,6 +203,7 @@ func Convert_scheduling_BasicSchedulingPolicy_To_v1alpha2_BasicSchedulingPolicy(
 
 func autoConvert_v1alpha2_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in *schedulingv1alpha2.GangSchedulingPolicy, out *scheduling.GangSchedulingPolicy, s conversion.Scope) error {
 	out.MinCount = in.MinCount
+	out.DesiredCount = (*int32)(unsafe.Pointer(in.DesiredCount))
 	return nil
 }
 
@@ -211,6 +214,7 @@ func Convert_v1alpha2_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in
 
 func autoConvert_scheduling_GangSchedulingPolicy_To_v1alpha2_GangSchedulingPolicy(in *scheduling.GangSchedulingPolicy, out *schedulingv1alpha2.GangSchedulingPolicy, s conversion.Scope) error {
 	out.MinCount = in.MinCount
+	out.DesiredCount = (*int32)(unsafe.Pointer(in.DesiredCount))
 	return nil
 }
 

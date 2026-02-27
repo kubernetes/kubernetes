@@ -79,6 +79,11 @@ func (m *BasicSchedulingPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DesiredCount != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DesiredCount))
+		i--
+		dAtA[i] = 0x8
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -102,6 +107,11 @@ func (m *GangSchedulingPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DesiredCount != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DesiredCount))
+		i--
+		dAtA[i] = 0x10
+	}
 	i = encodeVarintGenerated(dAtA, i, uint64(m.MinCount))
 	i--
 	dAtA[i] = 0x8
@@ -637,6 +647,9 @@ func (m *BasicSchedulingPolicy) Size() (n int) {
 	}
 	var l int
 	_ = l
+	if m.DesiredCount != nil {
+		n += 1 + sovGenerated(uint64(*m.DesiredCount))
+	}
 	return n
 }
 
@@ -647,6 +660,9 @@ func (m *GangSchedulingPolicy) Size() (n int) {
 	var l int
 	_ = l
 	n += 1 + sovGenerated(uint64(m.MinCount))
+	if m.DesiredCount != nil {
+		n += 1 + sovGenerated(uint64(*m.DesiredCount))
+	}
 	return n
 }
 
@@ -843,6 +859,7 @@ func (this *BasicSchedulingPolicy) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&BasicSchedulingPolicy{`,
+		`DesiredCount:` + valueToStringGenerated(this.DesiredCount) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -853,6 +870,7 @@ func (this *GangSchedulingPolicy) String() string {
 	}
 	s := strings.Join([]string{`&GangSchedulingPolicy{`,
 		`MinCount:` + fmt.Sprintf("%v", this.MinCount) + `,`,
+		`DesiredCount:` + valueToStringGenerated(this.DesiredCount) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1046,6 +1064,26 @@ func (m *BasicSchedulingPolicy) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: BasicSchedulingPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DesiredCount", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DesiredCount = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -1115,6 +1153,26 @@ func (m *GangSchedulingPolicy) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DesiredCount", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DesiredCount = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

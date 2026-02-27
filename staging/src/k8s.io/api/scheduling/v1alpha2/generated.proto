@@ -31,6 +31,17 @@ option go_package = "k8s.io/api/scheduling/v1alpha2";
 // BasicSchedulingPolicy indicates that standard Kubernetes
 // scheduling behavior should be used.
 message BasicSchedulingPolicy {
+  // DesiredCount is the expected number of pods that will belong to this
+  // PodGroup. This field is a hint to the scheduler to help it make better
+  // placement decisions for the group as a whole.
+  //
+  // Unlike gang's minCount, this field does not block scheduling. If the number
+  // of available pods is less than desiredCount, the scheduler can still attempt
+  // to schedule the available pods, but will optimistically try to select a
+  // placement that can accommodate the future pods.
+  //
+  // +optional
+  optional int32 desiredCount = 1;
 }
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
@@ -43,6 +54,20 @@ message GangSchedulingPolicy {
   // +k8s:alpha(since:"1.36")=+k8s:required
   // +k8s:alpha(since:"1.36")=+k8s:minimum=1
   optional int32 minCount = 1;
+
+  // DesiredCount is the expected number of pods that will belong to this
+  // PodGroup. This field is a hint to the scheduler to help it make better
+  // placement decisions for the group as a whole.
+  //
+  // Unlike gang's minCount, this field does not block scheduling. If the number
+  // of available pods is less than desiredCount but at least minCount, the scheduler
+  // can still attempt to schedule the available pods, but will optimistically try
+  // to select a placement that can accommodate the future pods.
+  //
+  // When provided desiredCount must be greater or equal to minCount.
+  //
+  // +optional
+  optional int32 desiredCount = 2;
 }
 
 // PodGroup represents a runtime instance of pods grouped together.

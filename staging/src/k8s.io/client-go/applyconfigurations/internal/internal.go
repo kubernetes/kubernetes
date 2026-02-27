@@ -14427,19 +14427,16 @@ var schemaYAML = typed.YAMLObject(`types:
       default: 0
 - name: io.k8s.api.scheduling.v1alpha2.BasicSchedulingPolicy
   map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
+    fields:
+    - name: desiredCount
+      type:
+        scalar: numeric
 - name: io.k8s.api.scheduling.v1alpha2.GangSchedulingPolicy
   map:
     fields:
+    - name: desiredCount
+      type:
+        scalar: numeric
     - name: minCount
       type:
         scalar: numeric

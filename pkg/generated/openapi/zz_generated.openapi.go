@@ -53688,6 +53688,15 @@ func schema_k8sio_api_scheduling_v1alpha2_BasicSchedulingPolicy(ref common.Refer
 			SchemaProps: spec.SchemaProps{
 				Description: "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"desiredCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DesiredCount is the expected number of pods that will belong to this PodGroup. This field is a hint to the scheduler to help it make better placement decisions for the group as a whole.\n\nUnlike gang's minCount, this field does not block scheduling. If the number of available pods is less than desiredCount, the scheduler can still attempt to schedule the available pods, but will optimistically try to select a placement that can accommodate the future pods.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -53704,6 +53713,13 @@ func schema_k8sio_api_scheduling_v1alpha2_GangSchedulingPolicy(ref common.Refere
 						SchemaProps: spec.SchemaProps{
 							Description: "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
 							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"desiredCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DesiredCount is the expected number of pods that will belong to this PodGroup. This field is a hint to the scheduler to help it make better placement decisions for the group as a whole.\n\nUnlike gang's minCount, this field does not block scheduling. If the number of available pods is less than desiredCount but at least minCount, the scheduler can still attempt to schedule the available pods, but will optimistically try to select a placement that can accommodate the future pods.\n\nWhen provided desiredCount must be greater or equal to minCount.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

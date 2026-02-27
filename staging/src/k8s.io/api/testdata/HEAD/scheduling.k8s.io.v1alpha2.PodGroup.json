@@ -51,9 +51,12 @@
       }
     },
     "schedulingPolicy": {
-      "basic": {},
+      "basic": {
+        "desiredCount": 1
+      },
       "gang": {
-        "minCount": 1
+        "minCount": 1,
+        "desiredCount": 2
       }
     }
   },

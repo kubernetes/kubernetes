@@ -40,6 +40,8 @@ spec:
   podGroupTemplates:
   - name: nameValue
     schedulingPolicy:
-      basic: {}
+      basic:
+        desiredCount: 1
       gang:
+        desiredCount: 2
         minCount: 1

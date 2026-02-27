@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha2
 
-import (
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
-)
-
 // PodGroupSchedulingPolicyApplyConfiguration represents a declarative configuration of the PodGroupSchedulingPolicy type for use
 // with apply.
 //
@@ -29,7 +25,7 @@ import (
 type PodGroupSchedulingPolicyApplyConfiguration struct {
 	// Basic specifies that the pods in this group should be scheduled using
 	// standard Kubernetes scheduling behavior.
-	Basic *schedulingv1alpha2.BasicSchedulingPolicy `json:"basic,omitempty"`
+	Basic *BasicSchedulingPolicyApplyConfiguration `json:"basic,omitempty"`
 	// Gang specifies that the pods in this group should be scheduled using
 	// all-or-nothing semantics.
 	Gang *GangSchedulingPolicyApplyConfiguration `json:"gang,omitempty"`
@@ -44,8 +40,8 @@ func PodGroupSchedulingPolicy() *PodGroupSchedulingPolicyApplyConfiguration {
 // WithBasic sets the Basic field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Basic field is set to the value of the last call.
-func (b *PodGroupSchedulingPolicyApplyConfiguration) WithBasic(value schedulingv1alpha2.BasicSchedulingPolicy) *PodGroupSchedulingPolicyApplyConfiguration {
-	b.Basic = &value
+func (b *PodGroupSchedulingPolicyApplyConfiguration) WithBasic(value *BasicSchedulingPolicyApplyConfiguration) *PodGroupSchedulingPolicyApplyConfiguration {
+	b.Basic = value
 	return b
 }
 
