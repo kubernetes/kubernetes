@@ -67,6 +67,8 @@ const (
 	// updates while eviction is in progress. Once it is done, it no longer gets
 	// updated until in progress again.
 	ruleStatusPeriod = 10 * time.Second
+
+	maxUIDCacheEntries = 500
 )
 
 // Controller listens to Taint changes of DRA devices and Toleration changes of ResourceClaims,
@@ -104,6 +106,10 @@ type Controller struct {
 	hasSynced     atomic.Int32
 	metrics       metrics.Metrics
 	workqueue     workqueue.TypedRateLimitingInterface[workItem]
+
+	// The evictedPods cache keeps track of Pods for which we know that
+	// they have been evicted.
+	evictedPods *uidCache
 
 	evictPodHook    func(pod tainteviction.NamespacedObject, eviction evictionAndReason)
 	cancelEvictHook func(pod tainteviction.NamespacedObject) bool
@@ -383,10 +389,11 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 	tc.mutex.Lock()
 	tc.maybeDeletePodCount++
 	eviction, ok := tc.deletePodAt[podRef]
+	evicted := tc.evictedPods.has(podRef.UID)
 	tc.mutex.Unlock()
-	logger.V(5).Info("Processing pod deletion work item", "active", ok, "eviction", eviction)
+	logger.V(5).Info("Processing pod deletion work item", "active", ok, "eviction", eviction, "evicted", evicted)
 
-	if !ok {
+	if !ok || evicted {
 		logger.V(5).Info("Work item for pod deletion obsolete, nothing to do")
 		return 0, nil
 	}
@@ -401,8 +408,12 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 	defer func() {
 		if finalErr == nil {
 			// Forget the deletion time, we are done.
+			// Also remember that we don't even need to
+			// check the pod again, should it have been
+			// added to the queue again in the meantime.
 			tc.mutex.Lock()
 			delete(tc.deletePodAt, podRef)
+			tc.evictedPods.add(podRef.UID)
 			tc.mutex.Unlock()
 		}
 	}()
@@ -739,7 +750,8 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 			sliceInformer.Informer().HasSyncedChecker(),
 			classInformer.Informer().HasSyncedChecker(),
 		},
-		metrics: metrics.Global,
+		metrics:     metrics.Global,
+		evictedPods: newUIDCache(maxUIDCacheEntries),
 	}
 
 	// The informer for DeviceTaintRules only gets instantiated if the corresponding
