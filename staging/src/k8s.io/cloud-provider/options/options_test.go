@@ -481,7 +481,7 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 		"--allocate-node-cidrs=true",
 		"--authorization-always-allow-paths=",
 		"--bind-address=0.0.0.0",
-		"--secure-port=10200",
+		"--secure-port=10400",
 		fmt.Sprintf("--cert-dir=%s/certs", tmpdir),
 		"--cloud-provider=aws",
 		"--cluster-cidr=1.2.3.4/24",
