@@ -4198,7 +4198,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			for i, pod := range tc.pods {
-				pod := pod
 				pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
 				if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
 					pb.index(fmt.Sprintf("%v", i))
@@ -5904,7 +5903,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			for i, pod := range tc.pods {
-				pod := pod
 				pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
 				if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
 					pb.index(fmt.Sprintf("%v", getCompletionIndex(pod.Annotations)))
