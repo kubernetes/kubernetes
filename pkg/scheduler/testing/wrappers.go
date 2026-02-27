@@ -1602,6 +1602,14 @@ func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
 	return wrapper
 }
 
+func (wrapper *PodGroupWrapper) DesiredCount(count int32) *PodGroupWrapper {
+	if wrapper.PodGroup.Spec.SchedulingPolicy.Basic == nil {
+		wrapper.PodGroup.Spec.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	}
+	wrapper.PodGroup.Spec.SchedulingPolicy.Basic.DesiredCount = ptr.To(count)
+	return wrapper
+}
+
 // BasicPolicy sets the PodGroup policy to Basic.
 func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 	wrapper.PodGroup.Spec.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}

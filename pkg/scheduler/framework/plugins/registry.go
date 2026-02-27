@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/coscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -69,6 +70,7 @@ func NewInTreeRegistry() runtime.Registry {
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
 		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
 		gangscheduling.Name:                  runtime.FactoryAdapter(fts, gangscheduling.New),
+		coscheduling.Name:                    runtime.FactoryAdapter(fts, coscheduling.New),
 	}
 
 	return registry

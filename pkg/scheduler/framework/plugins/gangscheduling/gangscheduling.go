@@ -22,7 +22,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -70,45 +68,11 @@ func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEven
 	return []fwk.ClusterEventWithHint{
 		// A new pod being added might be the one that completes a gang, meeting its MinCount requirement.
 		// PodSchedulingGroup field is immutable, so there is no need to subscribe on Pod/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: helper.IsSchedulableAfterPodAdded},
 		// A PodGroup being added can be making a waiting gang schedulable.
 		// PodGroups are immutable, so there's no need to handle PodGroup/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: helper.IsSchedulableAfterPodGroupAdded},
 	}, nil
-}
-
-func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedPod, err := util.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	if !helper.MatchingSchedulingGroup(pod, addedPod) {
-		logger.V(5).Info("another pod was added but it doesn't match the target pod's scheduling group",
-			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
-		return fwk.QueueSkip, nil
-	}
-
-	logger.V(5).Info("another pod was added and it matches the target pod's scheduling group, which may make the pod schedulable",
-		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
-	return fwk.Queue, nil
-}
-
-func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	if pod.Spec.SchedulingGroup == nil || pod.Namespace != addedPodGroup.Namespace || *pod.Spec.SchedulingGroup.PodGroupName != addedPodGroup.Name {
-		logger.V(5).Info("pod group was added but it doesn't match the target pod's scheduling group",
-			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
-		return fwk.QueueSkip, nil
-	}
-
-	logger.V(5).Info("pod group was added and it matches the target pod's scheduling group, which may make the pod schedulable",
-		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
-	return fwk.Queue, nil
 }
 
 // PreEnqueue checks if the pod belongs to a gang and, if so, whether the gang has met its MinCount of available pods.
