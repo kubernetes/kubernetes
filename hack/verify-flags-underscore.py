@@ -39,7 +39,7 @@ def is_binary(pathname):
                     return True
                 if len(chunk) < CHUNKSIZE:
                     break # done
-    except:
+    except Exception:
         return True
 
     return False
