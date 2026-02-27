@@ -164,8 +164,8 @@ message CELDeviceSelector {
   // before referencing them.
   //
   // For CEL expression syntax and examples, see:
-  // - CEL Optional Types: https://kubernetes.io/docs/reference/using-api/cel/#optional-types
-  // - DRA Device Selection: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/#cel-expressions
+  // - CEL Optional Types: https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
+  // - CEL Overview: https://kubernetes.io/docs/reference/using-api/cel/
   //
   // Common errors:
   // - "no such key": Use has() macro, optional chaining (?), or orValue() for optional fields.
