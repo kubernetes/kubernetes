@@ -1257,6 +1257,21 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				),
 			),
 		},
+		"valid networkdevicedata interfacename with multi-byte characters": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName: strings.Repeat("𝄞", resource.NetworkDeviceDataInterfaceNameMaxLength/4), // the G clef unicode character is exactly 4 bytes so repeating this 256/4 times means that it is exactly 256 bytes worth of length and should be valid.
+						},
+					},
+				),
+			),
+		},
 		"invalid networkdevicedata interfacename too long": {
 			old: mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(
@@ -1272,7 +1287,28 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxLength").MarkAlpha(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
+		"invalid networkdevicedata interfacename too long with multi-byte characters repeating max bytes length times": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							// The G clef unicode character is exactly 4 bytes in length so repeating the character
+							// the same number of times as the maxBytes payload means that we are guaranteed to fail
+							// a byte-based length check, but not a character based check.
+							InterfaceName: strings.Repeat("𝄞", resource.NetworkDeviceDataInterfaceNameMaxLength),
+						},
+					},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		"valid status.devices.networkData.hardwareAddress": {
@@ -1285,6 +1321,21 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 						Device: "device-0",
 						NetworkData: &resource.NetworkDeviceData{
 							HardwareAddress: strings.Repeat("a", resource.NetworkDeviceDataHardwareAddressMaxLength),
+						},
+					},
+				),
+			),
+		},
+		"valid status.devices.networkData.hardwareAddress with multi-byte characters": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							HardwareAddress: strings.Repeat("𝄞", resource.NetworkDeviceDataHardwareAddressMaxLength/4), // the G clef unicode character is exactly 4 bytes so repeating this 256/4 times means that it is exactly 256 bytes worth of length and should be valid.
 						},
 					},
 				),
@@ -1305,7 +1356,28 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				),
 			),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxLength").MarkAlpha(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
+		"invalid status.devices.networkData.hardwareAddress too long with multi-byte characters repeating max bytes length times": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							// The G clef unicode character is exactly 4 bytes in length so repeating the character
+							// the same number of times as the maxBytes payload means that we are guaranteed to fail
+							// a byte-based length check, but not a character based check.
+							HardwareAddress: strings.Repeat("𝄞", resource.NetworkDeviceDataHardwareAddressMaxLength),
+						},
+					},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		"invalid status.devices.networkData.ips duplicate": {

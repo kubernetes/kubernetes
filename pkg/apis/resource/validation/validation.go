@@ -1329,11 +1329,11 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 	}
 
 	if len(networkDeviceData.InterfaceName) > resource.NetworkDeviceDataInterfaceNameMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, resource.NetworkDeviceDataInterfaceNameMaxLength).WithOrigin("maxLength").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, resource.NetworkDeviceDataInterfaceNameMaxLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 
 	if len(networkDeviceData.HardwareAddress) > resource.NetworkDeviceDataHardwareAddressMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength).WithOrigin("maxLength").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
