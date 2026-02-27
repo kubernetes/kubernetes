@@ -94,15 +94,21 @@ func defaultPodResourceLimits(pod *api.Pod) {
 		return
 	}
 	if pod.Spec.Resources == nil ||
-		len(pod.Spec.Resources.Requests) == 0 ||
-		len(pod.Spec.Resources.Limits) > 0 {
+		len(pod.Spec.Resources.Requests) == 0 {
 		return
 	}
 
 	// Determine which resources we need to default (only CPU and memory from pod-level requests)
+	// Only add resources that don't already have a pod-level limit set
 	resourcesToDefault := make(map[api.ResourceName]bool)
 	for resName := range pod.Spec.Resources.Requests {
 		if resName == api.ResourceCPU || resName == api.ResourceMemory {
+			// Skip if this resource already has a pod-level limit
+			if pod.Spec.Resources.Limits != nil {
+				if _, hasLimit := pod.Spec.Resources.Limits[resName]; hasLimit {
+					continue
+				}
+			}
 			resourcesToDefault[resName] = true
 		}
 	}
@@ -141,8 +147,10 @@ func defaultPodResourceLimits(pod *api.Pod) {
 	v1Pod := obj.(*apiv1.Pod)
 	aggrLimits := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
 
-	// Default pod-level limits to aggregated container limits
-	pod.Spec.Resources.Limits = api.ResourceList{}
+	// Default pod-level limits to aggregated container limits, preserving existing limits
+	if pod.Spec.Resources.Limits == nil {
+		pod.Spec.Resources.Limits = api.ResourceList{}
+	}
 	for resName := range resourcesToDefault {
 		if q, ok := aggrLimits[apiv1.ResourceName(resName)]; ok {
 			pod.Spec.Resources.Limits[resName] = q
