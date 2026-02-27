@@ -346,6 +346,29 @@ func TooLong(field *Path, _ interface{}, maxLength int) *Error {
 	}
 }
 
+// TooLongCharacters returns a *Error indicating "too long".  This is used to report that
+// the given value is too long in characters (including multi-byte characters).
+// This is similar to Invalid, but the returned  error will not include the too-long value.
+// If maxLength is negative, it will be included in the message. The value argument is not used.
+func TooLongCharacters[T ~string](field *Path, _ T, maxLength int) *Error {
+	var msg string
+	if maxLength >= 0 {
+		bs := "chars"
+		if maxLength == 1 {
+			bs = "char"
+		}
+		msg = fmt.Sprintf("may not be more than %d %s", maxLength, bs)
+	} else {
+		msg = "value is too long"
+	}
+	return &Error{
+		Type:     ErrorTypeTooLong,
+		Field:    field.String(),
+		BadValue: "<value omitted>",
+		Detail:   msg,
+	}
+}
+
 // TooLongMaxLength returns a *Error indicating "too long".
 // Deprecated: Use TooLong instead.
 func TooLongMaxLength(field *Path, value interface{}, maxLength int) *Error {
