@@ -459,6 +459,9 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			if !test.csiServiceAccountTokenSecretsEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
+			if !test.mutableCSINodeAllocatableCountEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.SELinuxMountReadWriteOncePod:   test.seLinuxMountReadWriteOncePodEnabled,
 				features.MutableCSINodeAllocatableCount: test.mutableCSINodeAllocatableCountEnabled,
