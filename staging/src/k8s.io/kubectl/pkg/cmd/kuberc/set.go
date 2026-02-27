@@ -121,7 +121,7 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.Section, "section", o.Section, "Section to modify: 'defaults', 'aliases', or 'credentialplugin'")
 	cmd.MarkFlagRequired("section") // nolint:errcheck
 	cmd.Flags().StringVar(&o.Command, "command", o.Command, "Command to configure (e.g., 'get', 'create', 'set env')")
-	// cmd.MarkFlagRequired("command") // nolint:errcheck
+	cmd.MarkFlagRequired("command") // nolint:errcheck
 	cmd.Flags().StringVar(&o.AliasName, "name", o.AliasName, "Alias name (required for --section=aliases)")
 	cmd.Flags().StringVar(&o.PluginPolicy, "policy", o.PluginPolicy, "Plugin policy to use for exec credential plugins")
 	cmd.Flags().StringArrayVar(&o.Options, "option", o.Options, "Flag option in the form flag=value (can be specified multiple times)")
@@ -168,6 +168,30 @@ func (o *SetOptions) Validate() error {
 
 	if o.Section == sectionDefaults && (len(o.PrependArgs) > 0 || len(o.AppendArgs) > 0) {
 		return fmt.Errorf("--prependarg and --appendarg are only valid for --section=%s", sectionAliases)
+	}
+
+	if o.Section != sectionCredentialPlugin && o.Command == "" {
+		return fmt.Errorf("required flag 'command' not set")
+	}
+
+	if o.Section == sectionCredentialPlugin {
+		if o.PluginPolicy == "" {
+			return fmt.Errorf("--policy is required when --section=%s", sectionCredentialPlugin)
+		}
+
+		switch v1beta1.CredentialPluginPolicy(o.PluginPolicy) {
+		case v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll:
+			if len(o.AllowlistEntries) != 0 {
+				return fmt.Errorf("--allowlist-entry may only be used when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
+			}
+		case v1beta1.PluginPolicyAllowlist:
+			if len(o.AllowlistEntries) == 0 {
+				return fmt.Errorf("--allowlist-entry is required when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
+			}
+		default:
+			return fmt.Errorf("invalid value for --policy: %q", o.PluginPolicy)
+		}
+
 	}
 
 	return nil
