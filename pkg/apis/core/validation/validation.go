@@ -6299,17 +6299,12 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Do not allow removing resource requests/limits on resize.
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for ix, ctr := range oldPod.Spec.InitContainers {
-			if !isRestartableInitContainer(&ctr) {
-				continue
-			}
-			allErrs = append(allErrs, validateContainerResize(
-				&newPod.Spec.InitContainers[ix].Resources,
-				&oldPod.Spec.InitContainers[ix].Resources,
-				newPod.Spec.InitContainers[ix].ResizePolicy,
-				specPath.Child("initContainers").Index(ix).Child("resources"))...)
-		}
+	for ix := range oldPod.Spec.InitContainers {
+		allErrs = append(allErrs, validateContainerResize(
+			&newPod.Spec.InitContainers[ix].Resources,
+			&oldPod.Spec.InitContainers[ix].Resources,
+			newPod.Spec.InitContainers[ix].ResizePolicy,
+			specPath.Child("initContainers").Index(ix).Child("resources"))...)
 	}
 	for ix := range oldPod.Spec.Containers {
 		allErrs = append(allErrs, validateContainerResize(
@@ -6332,27 +6327,29 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 	newPodSpecCopy.Containers = newContainers
 
-	// Ensure that only CPU and memory resources are mutable for restartable init containers.
-	// Also ensure that resources are immutable for non-restartable init containers.
+	// Ensure that only CPU and memory resources are mutable for init containers.
 	var newInitContainers []core.Container
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for ix, container := range newPodSpecCopy.InitContainers {
-			if isRestartableInitContainer(&container) { // restartable init container
-				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
-				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
-					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-					errs := field.Forbidden(specPath, "only cpu and memory resources for sidecar containers are mutable")
-					allErrs = append(allErrs, errs)
+	for ix, container := range newPodSpecCopy.InitContainers {
+		if !isRestartableInitContainer(&container) { // non-sidecar init container.
+			if container.ResizePolicy != nil {
+				for _, resizePolicy := range container.ResizePolicy {
+					if resizePolicy.RestartPolicy == core.RestartContainer {
+						errs := field.Forbidden(specPath.Child("initContainers"), "non-sidecar init containers with a resize policy of RestartContainer cannot be resized")
+						allErrs = append(allErrs, errs)
+					}
 				}
-			} else if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) { // non-restartable init container
-				// This likely means that the user has modified resources of non-sidecar init container.
-				errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
-				allErrs = append(allErrs, errs)
 			}
-			newInitContainers = append(newInitContainers, container)
 		}
-		newPodSpecCopy.InitContainers = newInitContainers
+
+		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
+			// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+			errs := field.Forbidden(specPath, "only cpu and memory resources for init or sidecar containers are mutable")
+			allErrs = append(allErrs, errs)
+		}
+		newInitContainers = append(newInitContainers, container)
 	}
+	newPodSpecCopy.InitContainers = newInitContainers
 
 	if len(allErrs) > 0 {
 		return allErrs
