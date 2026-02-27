@@ -1465,7 +1465,7 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha()...)
+			errs = append(errs, validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha()...)
 			return
 		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1.NetworkDeviceData) *string { return &oldObj.InterfaceName }), oldObj != nil)...)
 
@@ -1508,7 +1508,7 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 128).MarkAlpha()...)
+			errs = append(errs, validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 128).MarkAlpha()...)
 			return
 		}(fldPath.Child("hardwareAddress"), &obj.HardwareAddress, safe.Field(oldObj, func(oldObj *resourcev1.NetworkDeviceData) *string { return &oldObj.HardwareAddress }), oldObj != nil)...)
 
