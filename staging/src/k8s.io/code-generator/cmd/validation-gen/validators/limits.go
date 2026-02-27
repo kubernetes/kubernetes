@@ -81,7 +81,7 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 		Tag:            mltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         sets.List(mltv.ValidScopes()),
-		Description:    `Indicates that a string field has a limit on its length in characters.
+		Description: `Indicates that a string field has a limit on its length in characters.
 		This could allow up to 4*N bytes if multi-byte characters are used.
 		If you want to limit length of bytes specifically, use maxBytes.`,
 		Payloads: []TagPayloadDoc{{
@@ -134,7 +134,7 @@ func (mltv maxBytesTagValidator) Docs() TagDoc {
 		Tag:            mltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         sets.List(mltv.ValidScopes()),
-		Description:    `Indicates that a string field has a limit on its length in bytes.
+		Description: `Indicates that a string field has a limit on its length in bytes.
 		This could only allow as few as N/4 multi-byte characters.
 		If you want to limit length of characters specifically, use maxLength.`,
 		Payloads: []TagPayloadDoc{{
