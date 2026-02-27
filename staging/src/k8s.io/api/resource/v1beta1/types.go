@@ -1241,7 +1241,7 @@ type CELDeviceSelector struct {
 	// - CEL Overview: https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// Common errors:
-	// - "no such key": Use has() macro, optional chaining (?), or orValue() for optional fields.
+	// - "no such key": Use has() macro, optional chaining (.?), or orValue() for optional fields.
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
