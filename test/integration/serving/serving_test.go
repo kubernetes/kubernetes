@@ -31,15 +31,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
-	"k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
+	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
 	"k8s.io/client-go/tools/cache"
 
+	apiserverfeat "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
+	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
@@ -358,8 +359,18 @@ users:
 		t.Fatal(err)
 	}
 
-	statuszWantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
-	statuszWantBodyJSON := &v1beta1.Statusz{
+	statuszWantBodyText := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyAlpha1 := &statuszv1alpha1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
+	}
+	statuszWantBodyBeta1 := &statuszv1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
 			APIVersion: "config.k8s.io/v1beta1",
@@ -382,29 +393,30 @@ users:
 	}
 
 	statuszTestCases := []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string           // for text/plain
-		wantJSON     *v1beta1.Statusz // for structured json
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string
+		wantBodyStructured    interface{}
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     statuszWantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
 			name:         "invalid accept header",
@@ -425,13 +437,39 @@ users:
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1alpha1;as=Statusz,application/json;g=config.k8s.io;v=v1beta1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyAlpha1,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1beta1;as=Statusz,application/json;g=config.k8s.io;v=v1alpha1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyBeta1,
+			wantDeprecationHeader: false,
 		},
 	}
 
@@ -491,6 +529,7 @@ users:
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	_, ctx := ktesting.NewTestContext(t)
 	flags := []string{
 		"--authentication-skip-lookup",
@@ -560,26 +599,14 @@ users:
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !strings.Contains(string(body), tc.wantBodySub) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got v1alpha1.Statusz
-					if err := json.Unmarshal(body, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
-					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
-						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
-					}
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					statusztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})

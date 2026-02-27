@@ -18,5 +18,5 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +k8s:openapi-model-package=io.k8s.apiserver.pkg.server.statusz.api.v1alpha1
 
-// Package v1alpha1 contains API Schema definitions for the zpages v1alpha1 API group
+// Package v1alpha1 contains API Schema definitions for the statusz v1alpha1 API group
 package v1alpha1
