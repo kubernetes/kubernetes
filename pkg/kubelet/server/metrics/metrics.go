@@ -88,13 +88,13 @@ var (
 		},
 		[]string{"provider"},
 	)
-	// StreamingWebSocketRequests counts WebSocket streaming requests received by the kubelet
-	// when ExtendWebSocketsToKubelet is enabled, labeled by subresource.
-	StreamingWebSocketRequests = metrics.NewCounterVec(
+	// WebSocketStreamingRequests counts WebSocket streaming requests received by the kubelet,
+	// labeled by subresource.
+	WebSocketStreamingRequests = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeletSubsystem,
-			Name:           "streaming_websocket_requests_total",
-			Help:           "Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet when ExtendWebSocketsToKubelet is enabled.",
+			Name:           "websocket_streaming_requests_total",
+			Help:           "Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"subresource"},
@@ -111,13 +111,13 @@ func Register() {
 		legacyregistry.MustRegister(HTTPInflightRequests)
 		legacyregistry.MustRegister(VolumeStatCalDuration)
 		legacyregistry.MustRegister(MetricsProvider)
-		legacyregistry.MustRegister(StreamingWebSocketRequests)
+		legacyregistry.MustRegister(WebSocketStreamingRequests)
 	})
 }
 
 // ResetForTest resets metrics that support reset, for use in unit tests.
 func ResetForTest() {
-	StreamingWebSocketRequests.Reset()
+	WebSocketStreamingRequests.Reset()
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.
@@ -138,8 +138,8 @@ func SetMetricsProvider(provider MetricsProviderType) {
 	MetricsProvider.WithLabelValues(string(provider)).Set(1)
 }
 
-// IncStreamingWebSocketRequest increments the count of WebSocket streaming requests received
+// IncWebSocketStreamingRequest increments the count of WebSocket streaming requests received
 // by the kubelet for the given subresource (exec/attach/portforward).
-func IncStreamingWebSocketRequest(subresource string) {
-	StreamingWebSocketRequests.WithLabelValues(subresource).Inc()
+func IncWebSocketStreamingRequest(subresource string) {
+	WebSocketStreamingRequests.WithLabelValues(subresource).Inc()
 }

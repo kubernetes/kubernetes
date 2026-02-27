@@ -33,14 +33,14 @@ func TestIncWebSocketStreamingRequest(t *testing.T) {
 	ctx := context.Background()
 	IncWebSocketStreamingRequest(ctx, "exec", "proxied_to_kubelet")
 	IncWebSocketStreamingRequest(ctx, "exec", "translated_at_apiserver")
-	IncWebSocketStreamingRequest(ctx, "portforward", "tunneled_at_apiserver")
+	IncWebSocketStreamingRequest(ctx, "portforward", "translated_at_apiserver")
 
 	expected := `
-# HELP apiserver_websocket_streaming_requests_total [ALPHA] Total number of streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when ExtendWebSocketsToKubelet is enabled and the kubelet advertises support; otherwise it is translated_at_apiserver (exec/attach) or tunneled_at_apiserver (portforward).
+# HELP apiserver_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
 # TYPE apiserver_websocket_streaming_requests_total counter
 apiserver_websocket_streaming_requests_total{proxy_type="proxied_to_kubelet",subresource="exec"} 1
 apiserver_websocket_streaming_requests_total{proxy_type="translated_at_apiserver",subresource="exec"} 1
-apiserver_websocket_streaming_requests_total{proxy_type="tunneled_at_apiserver",subresource="portforward"} 1
+apiserver_websocket_streaming_requests_total{proxy_type="translated_at_apiserver",subresource="portforward"} 1
 `
 
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),

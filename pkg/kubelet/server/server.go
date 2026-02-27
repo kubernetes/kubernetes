@@ -958,7 +958,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
 		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
-		servermetrics.IncStreamingWebSocketRequest("attach")
+		servermetrics.IncWebSocketStreamingRequest("attach")
 		streamOptions := translator.Options{
 			Stdin:  streamOpts.Stdin,
 			Stdout: streamOpts.Stdout,
@@ -995,7 +995,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
 		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
-		servermetrics.IncStreamingWebSocketRequest("exec")
+		servermetrics.IncWebSocketStreamingRequest("exec")
 		streamOptions := translator.Options{
 			Stdin:  streamOpts.Stdin,
 			Stdout: streamOpts.Stdout,
@@ -1078,7 +1078,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
 	// If upgrade request is for tunneling websockets, wrap with tunneling handling.
 	if websocketSPDYTunnel {
-		servermetrics.IncStreamingWebSocketRequest("portforward")
+		servermetrics.IncWebSocketStreamingRequest("portforward")
 		handler = translator.NewTunnelingHandler(handler)
 	}
 	handler.ServeHTTP(response.ResponseWriter, request.Request)

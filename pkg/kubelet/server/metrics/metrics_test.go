@@ -24,25 +24,25 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
-func TestIncStreamingWebSocketRequest(t *testing.T) {
+func TestIncWebSocketStreamingRequest(t *testing.T) {
 	Register()
 	ResetForTest()
 	t.Cleanup(ResetForTest)
 
-	IncStreamingWebSocketRequest("exec")
-	IncStreamingWebSocketRequest("attach")
-	IncStreamingWebSocketRequest("portforward")
+	IncWebSocketStreamingRequest("exec")
+	IncWebSocketStreamingRequest("attach")
+	IncWebSocketStreamingRequest("portforward")
 
 	expected := `
-# HELP kubelet_streaming_websocket_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet when ExtendWebSocketsToKubelet is enabled.
-# TYPE kubelet_streaming_websocket_requests_total counter
-kubelet_streaming_websocket_requests_total{subresource="attach"} 1
-kubelet_streaming_websocket_requests_total{subresource="exec"} 1
-kubelet_streaming_websocket_requests_total{subresource="portforward"} 1
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="attach"} 1
+kubelet_websocket_streaming_requests_total{subresource="exec"} 1
+kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
 `
 
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
-		"kubelet_streaming_websocket_requests_total"); err != nil {
+		"kubelet_websocket_streaming_requests_total"); err != nil {
 		t.Errorf("unexpected metric output: %v", err)
 	}
 }

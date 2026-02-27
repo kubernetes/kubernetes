@@ -299,7 +299,7 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 			proxymetrics.IncWebSocketStreamingRequest(ctx, "portforward", "proxied_to_kubelet")
 			return handler, nil
 		}
-		proxymetrics.IncWebSocketStreamingRequest(ctx, "portforward", "tunneled_at_apiserver")
+		proxymetrics.IncWebSocketStreamingRequest(ctx, "portforward", "translated_at_apiserver")
 		tunnelingHandler := translator.NewTunnelingHandler(handler)
 		handler = translator.NewTranslatingHandler(handler, tunnelingHandler, wsstream.IsWebSocketRequestWithTunnelingProtocol)
 	}

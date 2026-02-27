@@ -60,10 +60,9 @@ var (
 		&metrics.CounterOpts{
 			Subsystem: subsystem,
 			Name:      "websocket_streaming_requests_total",
-			Help: "Total number of streaming requests (exec/attach/portforward) routed by the API server, " +
-				"labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when " +
-				"ExtendWebSocketsToKubelet is enabled and the kubelet advertises support; otherwise it is " +
-				"translated_at_apiserver (exec/attach) or tunneled_at_apiserver (portforward).",
+			Help: "Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, " +
+				"labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet " +
+				"handles the request directly; otherwise translated_at_apiserver.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"subresource", "proxy_type"},
@@ -96,7 +95,7 @@ func IncStreamTunnelRequest(ctx context.Context, status string) {
 
 // IncWebSocketStreamingRequest increments the count of WebSocket streaming requests
 // routed by the API server with the given subresource (exec/attach/portforward) and
-// proxy_type (proxied_to_kubelet, translated_at_apiserver, or tunneled_at_apiserver).
+// proxy_type (proxied_to_kubelet or translated_at_apiserver).
 func IncWebSocketStreamingRequest(ctx context.Context, subresource, proxyType string) {
 	websocketStreamingRequestsTotal.WithContext(ctx).WithLabelValues(subresource, proxyType).Add(1)
 }
