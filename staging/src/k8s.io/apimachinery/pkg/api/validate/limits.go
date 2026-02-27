@@ -18,6 +18,8 @@ package validate
 
 import (
 	"context"
+	"math"
+	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
@@ -31,9 +33,40 @@ func MaxLength[T ~string](_ context.Context, _ operation.Operation, fldPath *fie
 	if value == nil {
 		return nil
 	}
-	if len(*value) > max {
-		return field.ErrorList{field.TooLong(fldPath, *value, max).WithOrigin("maxLength")}
+
+	// if the length of the value in bytes is less
+	// than the maximum size then we can confidently
+	// say that this value is within the bounds
+	// enforced by the maximum value regardless
+	// of the actual makeup of characters in the value
+	byteLength := len(*value)
+	if byteLength <= max {
+		return nil
 	}
+
+	// because runes are up to 4 byte characters, if we assume all characters
+	// in the input are runes, the minimum number of characters that
+	// are specified is len(value)/4. If the minimum multi-byte
+	// character count is greater than our enforced maximum, we
+	// can confidently say that the value is invalid without having
+	// to actually perform the more expensive rune counting step
+	minimum := int(math.Ceil(float64(byteLength) / 4.0))
+	if minimum > max || utf8.RuneCountInString(string(*value)) > max {
+		return field.ErrorList{field.TooLongCharacters(fldPath, *value, max).WithOrigin("maxLength")}
+	}
+	return nil
+}
+
+// MaxBytes verifies that the specified value is not longer than max bytes.
+func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	if len(*value) > max {
+		return field.ErrorList{field.TooLong(fldPath, *value, max).WithOrigin("maxBytes")}
+	}
+
 	return nil
 }
 
