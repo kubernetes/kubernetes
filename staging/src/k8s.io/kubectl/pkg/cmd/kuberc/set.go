@@ -121,7 +121,6 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.Section, "section", o.Section, "Section to modify: 'defaults', 'aliases', or 'credentialplugin'")
 	cmd.MarkFlagRequired("section") // nolint:errcheck
 	cmd.Flags().StringVar(&o.Command, "command", o.Command, "Command to configure (e.g., 'get', 'create', 'set env')")
-	cmd.MarkFlagRequired("command") // nolint:errcheck
 	cmd.Flags().StringVar(&o.AliasName, "name", o.AliasName, "Alias name (required for --section=aliases)")
 	cmd.Flags().StringVar(&o.PluginPolicy, "policy", o.PluginPolicy, "Plugin policy to use for exec credential plugins")
 	cmd.Flags().StringArrayVar(&o.Options, "option", o.Options, "Flag option in the form flag=value (can be specified multiple times)")
