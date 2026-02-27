@@ -596,39 +596,6 @@
   help: Number of PersistentVolumeClaim creation requests
   type: Counter
   stabilityLevel: ALPHA
-- name: kubelet_credential_provider_config_info
-  help: Information about the last applied credential provider configuration with
-    hash as label
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - hash
-- name: credential_provider_plugin_duration
-  subsystem: kubelet
-  help: Duration of execution in seconds for credential provider plugin
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-- name: credential_provider_plugin_errors_total
-  subsystem: kubelet
-  help: Number of errors from credential provider plugin
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin_name
 - name: pv_collector_bound_pv_count
   help: Gauge measuring number of persistent volume currently bound
   type: Custom
@@ -777,7 +744,7 @@
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - operation_name
   - plugin_name
@@ -811,6 +778,39 @@
     If serving certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
+- name: kubelet_credential_provider_config_info
+  help: Information about the last applied credential provider configuration with
+    hash as label
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - hash
+- name: credential_provider_plugin_duration
+  subsystem: kubelet
+  help: Duration of execution in seconds for credential provider plugin
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: credential_provider_plugin_errors_total
+  subsystem: kubelet
+  help: Number of errors from credential provider plugin
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
 - name: server_expiration_renew_errors
   subsystem: kubelet
   help: Counter of certificate renewal errors.
@@ -3226,16 +3226,6 @@
   labels:
   - crd
   - reason
-- name: apiextensions_openapi_v3_regeneration_count
-  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
-    causing CRD and reason.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - crd
-  - group
-  - reason
-  - version
 - name: conversion_webhook_duration_seconds
   namespace: apiserver
   help: Conversion webhook request latency
@@ -3294,6 +3284,16 @@
   - 4.096
   - 8.192
   - 16.384
+- name: apiextensions_openapi_v3_regeneration_count
+  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
+    causing CRD and reason.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - crd
+  - group
+  - reason
+  - version
 - name: match_condition_evaluation_errors_total
   subsystem: admission
   namespace: apiserver
@@ -3397,34 +3397,6 @@
   - operation
   - rejected
   - type
-- name: check_duration_seconds
-  subsystem: mutating_admission_policy
-  namespace: apiserver
-  help: Mutation admission latency for individual mutation expressions in seconds,
-    labeled by policy and binding.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - error_type
-  - policy
-  - policy_binding
-  buckets:
-  - 5e-07
-  - 0.001
-  - 0.01
-  - 0.1
-  - 1
-- name: check_total
-  subsystem: mutating_admission_policy
-  namespace: apiserver
-  help: Mutation admission policy check total, labeled by policy and further identified
-    by binding.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - error_type
-  - policy
-  - policy_binding
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -3508,6 +3480,34 @@
   help: Counter of apiserver requests rejected due to an error in audit logging backend.
   type: Counter
   stabilityLevel: ALPHA
+- name: check_duration_seconds
+  subsystem: mutating_admission_policy
+  namespace: apiserver
+  help: Mutation admission latency for individual mutation expressions in seconds,
+    labeled by policy and binding.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - error_type
+  - policy
+  - policy_binding
+  buckets:
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+- name: check_total
+  subsystem: mutating_admission_policy
+  namespace: apiserver
+  help: Mutation admission policy check total, labeled by policy and further identified
+    by binding.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error_type
+  - policy
+  - policy_binding
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
