@@ -1191,7 +1191,7 @@ type CELDeviceSelector struct {
 	//  - driver (string): the name of the driver which defines this device.
 	//  - attributes (map[string]object): the device's attributes, grouped by prefix
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
-	//    of the attributes which were prefixed by "dra.example.com".
+	//    of the attributes which were prefixed by "dra.example.com").
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
 	//  - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device
 	//    (v1.34+ with the DRAConsumableCapacity feature enabled).
@@ -1223,6 +1223,13 @@ type CELDeviceSelector struct {
 	//
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
+	//
+	// For CEL expression syntax and examples, see:
+	// - CEL Optional Types: https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
+	// - CEL Overview: https://kubernetes.io/docs/reference/using-api/cel/
+	//
+	// Common errors:
+	// - "no such key": Use has() macro, optional chaining (?), or orValue() for optional fields.
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
