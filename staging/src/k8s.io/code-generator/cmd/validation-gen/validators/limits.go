@@ -65,7 +65,7 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := strconv.Atoi(tag.Value)
+	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
 		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
@@ -80,8 +80,10 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         mltv.ValidScopes().UnsortedList(),
-		Description:    "Indicates that a string field has a limit on its length.",
+		Scopes:         sets.List(mltv.ValidScopes()),
+		Description: `Indicates that a string field has a limit on its length in characters.
+		This could allow up to 4*N bytes if multi-byte characters are used.
+		If you want to limit length of bytes specifically, use maxBytes.`,
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This field must be no more than X characters long.",
@@ -91,6 +93,60 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 	}
 }
 
+type maxBytesTagValidator struct{}
+
+func (maxBytesTagValidator) Init(_ Config) {}
+
+func (maxBytesTagValidator) TagName() string {
+	return maxBytesTagName
+}
+
+var maxBytesTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
+
+func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
+	return maxBytesTagValidScopes
+}
+
+var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
+
+func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal < 0 {
+		return result, fmt.Errorf("must be greater than or equal to zero")
+	}
+	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal))
+	return result, nil
+}
+
+func (mltv maxBytesTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mltv.TagName(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(mltv.ValidScopes()),
+		Description: `Indicates that a string field has a limit on its length in bytes.
+		This could only allow as few as N/4 multi-byte characters.
+		If you want to limit length of characters specifically, use maxLength.`,
+		Payloads: []TagPayloadDoc{{
+			Description: "<non-negative integer>",
+			Docs:        "This field must be no more than X bytes long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+>>>>>>> d860a611ab8 (fixup! validators limits gofmt)
 type maxItemsTagValidator struct{}
 
 func (maxItemsTagValidator) Init(_ Config) {}
