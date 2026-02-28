@@ -569,24 +569,25 @@ func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 
 	// determine the N number of free cores (physical cpus) within the UncoreCache, then
 	// determine the M number of free cpus (virtual cpus) that correspond with the free cores
+	allFreeCores := a.details.CoresNeededInUncoreCache(a.topo.NumCores, uncoreID)
 	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
 	freeCPUs := a.details.CPUsInCores(freeCores.UnsortedList()...)
 
-	// when SMT/hyperthread is enabled and remaining cpu requirement is an odd integer value:
-	// sort the free CPUs that were determined based on the cores that have available cpus.
-	// if the amount of free cpus is greather than the cpus needed, we can drop the last cpu
-	// since the odd integer request will only require one out of the two free cpus that
-	// correspond to the last core
-	if a.numCPUsNeeded%2 != 0 && a.topo.CPUsPerCore() > 1 {
-		// we sort freeCPUs to ensure we pack virtual cpu allocations, meaning we allocate
-		// whole core's worth of cpus as much as possible to reduce smt-misalignment
+	// when some cores are partially available (not all sibling threads free),
+	// the initial numCoresNeeded may not provide enough CPUs.
+	// incrementally try more cores until we have enough CPUs or exhaust all cores.
+	for freeCPUs.Size() < a.numCPUsNeeded && numCoresNeeded < allFreeCores.Size() {
+		numCoresNeeded++
+		freeCores = a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
+		freeCPUs = a.details.CPUsInCores(freeCores.UnsortedList()...)
+	}
+
+	// when SMT/hyperthread is enabled and we have more free CPUs than needed:
+	// sort the free CPUs and trim to the exact number needed, packing whole
+	// cores as much as possible to reduce smt-misalignment
+	if a.topo.CPUsPerCore() > 1 && freeCPUs.Size() > a.numCPUsNeeded {
 		sortFreeCPUs := freeCPUs.List()
-		if len(sortFreeCPUs) > a.numCPUsNeeded {
-			// if we are in takePartialUncore, the accumulator is not satisfied after
-			// takeFullUncore, so freeCPUs.Size() can't be < 1
-			sortFreeCPUs = sortFreeCPUs[:freeCPUs.Size()-1]
-		}
-		freeCPUs = cpuset.New(sortFreeCPUs...)
+		freeCPUs = cpuset.New(sortFreeCPUs[:a.numCPUsNeeded]...)
 	}
 
 	// claim the cpus if the free cpus within the UncoreCache can satisfy the needed cpus
