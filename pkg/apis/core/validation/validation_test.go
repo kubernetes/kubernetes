@@ -15199,7 +15199,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 		),
-		err:  `status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		err:  `status.resourceClaimStatuses[0].resourceClaimName: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
 		test: "Invalid ResourceClaim name",
 	}, {
 		new: *podtest.MakePod("foo",
