@@ -968,10 +968,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return err
 	}
 
-	// Always update the pod status once. Even if there was a resize error, the resize may have been
-	// partially actuated.
-	defer m.runtimeHelper.RequestPodRelist(pod.UID, true)
-
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
@@ -1618,20 +1614,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Get podSandboxConfig for containers to start.
-	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
-	result.AddSyncResult(configPodSandboxResult)
 	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, podContainerChanges.Attempt)
 	if err != nil {
-		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
 		logger.Error(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
-		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, message)
+		result.Fail(fmt.Errorf("GeneratePodSandboxConfig for pod %q failed: %w", format.Pod(pod), err))
 		return
 	}
 
 	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
 	if err != nil {
 		logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
-		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, err.Error())
+		result.Fail(err)
 		return
 	}
 
@@ -1716,7 +1709,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
-			result.SyncResults = append(result.SyncResults, m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
+			result.AddSyncResult(m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}
 
@@ -1725,7 +1718,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
 
-	return
+	return result
 }
 
 // incrementImageVolumeMetrics increments the image volume mount metrics

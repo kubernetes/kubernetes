@@ -267,7 +267,7 @@ type podSyncer interface {
 	// pod has reached a terminal state and the presence of the error indicates succeeded or failed.
 	// If an error is returned, the sync was not successful and should be rerun in the future. This
 	// is a long running method and should exit early with context.Canceled if the context is canceled.
-	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
+	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
 	// SyncTerminatingPod attempts to ensure the pod's containers are no longer running and to collect
 	// any final status. This method is repeatedly invoked with diminishing grace periods until it exits
 	// without error. Once this method exits with no error other components are allowed to tear down
@@ -285,7 +285,7 @@ type podSyncer interface {
 	SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 }
 
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
@@ -309,7 +309,7 @@ func newPodSyncerFuncs(s podSyncer) podSyncerFuncs {
 
 var _ podSyncer = podSyncerFuncs{}
 
-func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
 }
 func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
@@ -1282,6 +1282,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 			}
 
 			// Take the appropriate action (illegal phases are prevented by UpdatePod)
+			var postSync func()
 			switch {
 			case update.WorkType == TerminatedPod:
 				err = p.podSyncer.SyncTerminatedPod(ctx, update.Options.Pod, status)
@@ -1301,10 +1302,14 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				}
 
 			default:
-				isTerminal, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
+				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
 			}
 
 			lastSyncTime = p.clock.Now()
+			if postSync != nil {
+				postSync()
+			}
+
 			return err
 		}()
 

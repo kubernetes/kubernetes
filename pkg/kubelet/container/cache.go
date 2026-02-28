@@ -157,9 +157,7 @@ func (c *cache) UpdateTime(timestamp time.Time) {
 	// Notify all the subscribers if the condition is met.
 	for id := range c.subscribers {
 		// The global timestamp is only used for pods that are missing from the cache.
-		if _, ok := c.pods[id]; !ok {
-			c.notify(id, *c.timestamp)
-		}
+		c.notify(id, *c.timestamp)
 	}
 }
 

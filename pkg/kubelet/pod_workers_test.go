@@ -87,7 +87,7 @@ func (f *fakePodWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions
 	case kubetypes.SyncPodKill:
 		f.triggeredDeletion = append(f.triggeredDeletion, uid)
 	default:
-		isTerminal, err := f.syncPodFn(ctx, options.UpdateType, options.Pod, options.MirrorPod, status)
+		isTerminal, _, err := f.syncPodFn(ctx, options.UpdateType, options.Pod, options.MirrorPod, status)
 		if err != nil {
 			f.t.Errorf("Unexpected error: %v", err)
 		}
@@ -407,7 +407,7 @@ func createPodWorkersWithLogger(_ klog.Logger) (*podWorkers, *containertest.Fake
 	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
 	w := newPodWorkers(
 		&podSyncerFuncs{
-			syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+			syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 				func() {
 					lock.Lock()
 					defer lock.Unlock()
@@ -417,7 +417,7 @@ func createPodWorkersWithLogger(_ klog.Logger) (*podWorkers, *containertest.Fake
 						updateType: updateType,
 					})
 				}()
-				return false, nil
+				return false, nil, nil
 			},
 			syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 				func() {
@@ -1204,17 +1204,17 @@ type terminalPhaseSync struct {
 	terminal sets.Set[string]
 }
 
-func (s *terminalPhaseSync) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
-	isTerminal, err := s.fn(ctx, updateType, pod, mirrorPod, podStatus)
+func (s *terminalPhaseSync) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+	isTerminal, _, err := s.fn(ctx, updateType, pod, mirrorPod, podStatus)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if !isTerminal {
 		s.lock.Lock()
 		defer s.lock.Unlock()
 		isTerminal = s.terminal.Has(string(pod.UID))
 	}
-	return isTerminal, nil
+	return isTerminal, nil, nil
 }
 
 func (s *terminalPhaseSync) SetTerminal(uid types.UID) {
@@ -2125,15 +2125,15 @@ type simpleFakeKubelet struct {
 	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+func (kl *simpleFakeKubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
-	return false, nil
+	return false, nil, nil
 }
 
-func (kl *simpleFakeKubelet) SyncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+func (kl *simpleFakeKubelet) SyncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	kl.wg.Done()
-	return false, nil
+	return false, nil, nil
 }
 
 func (kl *simpleFakeKubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
