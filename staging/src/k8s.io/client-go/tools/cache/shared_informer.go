@@ -277,6 +277,11 @@ type HandlerOptions struct {
 	//
 	// If nil, the default resync period of the shared informer is used.
 	ResyncPeriod *time.Duration
+
+	// Name is a identifier for this event handler, used as a
+	// label in metrics (e.g. pending notifications gauge). When empty,
+	// a name is derived automatically from the handler type or function names.
+	Name string
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -904,7 +909,12 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 		}
 	}
 
-	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker())
+	handlerName := options.Name
+	if handlerName == "" {
+		handlerName = nameForHandler(handler)
+	}
+
+	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker(), s.identifier, handlerName)
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -1049,6 +1059,19 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 
 	if p.listeners == nil {
 		p.listeners = make(map[*processorListener]bool)
+	}
+
+	// First-wins dedup: if a listener with the same handlerName already
+	// exists, downgrade the new listener's metrics to noop so that two
+	// handlers sharing a Prometheus label don't corrupt each other's gauge.
+	for l := range p.listeners {
+		if l.handlerName == listener.handlerName {
+			listener.logger.Info("Warning: duplicate event handler name detected; metrics for this handler registration will not be published", "handlerName", listener.handlerName)
+			listener.metrics = &processorListenerMetrics{
+				pendingNotifications: noopMetric{},
+			}
+			break
+		}
 	}
 
 	p.listeners[listener] = true
@@ -1221,6 +1244,8 @@ type processorListener struct {
 	// TODO: This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
 	// we should try to do something better.
 	pendingNotifications buffer.RingGrowing
+	metrics              *processorListenerMetrics
+	handlerName          string
 
 	// requestedResyncPeriod is how frequently the listener wants a
 	// full resync from the shared informer, but modified by two
@@ -1257,7 +1282,7 @@ func (p *processorListener) HasSyncedChecker() DoneChecker {
 	return p.syncTracker
 }
 
-func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker) *processorListener {
+func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker, id InformerNameAndResource, handlerName string) *processorListener {
 	ret := &processorListener{
 		logger:                logger,
 		nextCh:                make(chan interface{}),
@@ -1265,8 +1290,10 @@ func newProcessListener(logger klog.Logger, handler ResourceEventHandler, reques
 		done:                  make(chan struct{}),
 		upstreamHasSynced:     hasSynced,
 		handler:               handler,
-		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), nameForHandler(handler))),
+		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), handlerName)),
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
+		metrics:               newProcessorListenerMetrics(id, handlerName),
+		handlerName:           handlerName,
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
 	}
@@ -1299,6 +1326,7 @@ func (p *processorListener) pop() {
 			if !ok { // Nothing to pop
 				nextCh = nil // Disable this select case
 			}
+			p.metrics.pendingNotifications.Set(float64(p.pendingNotifications.Len()))
 		case notificationToAdd, ok := <-p.addCh:
 			if !ok {
 				return
@@ -1309,6 +1337,7 @@ func (p *processorListener) pop() {
 				nextCh = p.nextCh
 			} else { // There is already a notification waiting to be dispatched
 				p.pendingNotifications.WriteOne(notificationToAdd)
+				p.metrics.pendingNotifications.Set(float64(p.pendingNotifications.Len()))
 			}
 		}
 	}
