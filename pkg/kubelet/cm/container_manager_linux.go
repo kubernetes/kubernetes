@@ -1065,8 +1065,8 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 	return containerDynamicResources
 }
 
-func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity(extendedResource)
 }
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {

@@ -1191,15 +1191,15 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 	}
 }
 
-// ShouldResetExtendedResourceCapacity returns whether the extended resources should be zeroed or not,
-// depending on whether the node has been recreated. Absence of the checkpoint file strongly indicates the node
-// has been recreated.
-func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	checkpoints, err := m.checkpointManager.ListCheckpoints()
-	if err != nil {
-		return false
-	}
-	return len(checkpoints) == 0
+// ShouldResetExtendedResourceCapacity returns whether the extended resource
+// should be zeroed or not, depending on whether the resource has an active provider.
+func (m *ManagerImpl) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	// on manager start, the checkpoint is loaded and populates endpoints based
+	// on which plugin provided a given resource.
+	_, exists := m.endpoints[string(extendedResource)]
+	return !exists
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntName string) bool {

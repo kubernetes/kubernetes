@@ -1702,7 +1702,6 @@ func TestDevicePreStartContainer(t *testing.T) {
 }
 
 func TestResetExtendedResource(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	as := assert.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
@@ -1727,22 +1726,11 @@ func TestResetExtendedResource(t *testing.T) {
 		),
 	)
 
-	testManager.healthyDevices[extendedResourceName] = sets.New[string]()
-	testManager.healthyDevices[extendedResourceName].Insert("dev1")
-	// checkpoint is present, indicating node hasn't been recreated
-	err = testManager.writeCheckpoint(logger)
-	require.NoError(t, err)
+	testManager.endpoints[extendedResourceName] = endpointInfo{}
+	as.False(testManager.ShouldResetExtendedResourceCapacity(v1.ResourceName(extendedResourceName)))
 
-	as.False(testManager.ShouldResetExtendedResourceCapacity())
-
-	// checkpoint is absent, representing node recreation
-	ckpts, err := ckm.ListCheckpoints()
-	as.NoError(err)
-	for _, ckpt := range ckpts {
-		err = ckm.RemoveCheckpoint(ckpt)
-		as.NoError(err)
-	}
-	as.True(testManager.ShouldResetExtendedResourceCapacity())
+	delete(testManager.endpoints, extendedResourceName)
+	as.True(testManager.ShouldResetExtendedResourceCapacity(v1.ResourceName(extendedResourceName)))
 }
 
 func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error) {

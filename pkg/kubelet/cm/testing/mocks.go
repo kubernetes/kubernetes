@@ -1350,16 +1350,16 @@ func (_c *MockContainerManager_PrepareDynamicResources_Call) RunAndReturn(run fu
 }
 
 // ShouldResetExtendedResourceCapacity provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) ShouldResetExtendedResourceCapacity() bool {
-	ret := _mock.Called()
+func (_mock *MockContainerManager) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	ret := _mock.Called(extendedResource)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ShouldResetExtendedResourceCapacity")
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func() bool); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(v1.ResourceName) bool); ok {
+		r0 = returnFunc(extendedResource)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -1372,13 +1372,20 @@ type MockContainerManager_ShouldResetExtendedResourceCapacity_Call struct {
 }
 
 // ShouldResetExtendedResourceCapacity is a helper method to define mock.On call
-func (_e *MockContainerManager_Expecter) ShouldResetExtendedResourceCapacity() *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
-	return &MockContainerManager_ShouldResetExtendedResourceCapacity_Call{Call: _e.mock.On("ShouldResetExtendedResourceCapacity")}
+//   - extendedResource v1.ResourceName
+func (_e *MockContainerManager_Expecter) ShouldResetExtendedResourceCapacity(extendedResource interface{}) *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
+	return &MockContainerManager_ShouldResetExtendedResourceCapacity_Call{Call: _e.mock.On("ShouldResetExtendedResourceCapacity", extendedResource)}
 }
 
-func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) Run(run func()) *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
+func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) Run(run func(extendedResource v1.ResourceName)) *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 v1.ResourceName
+		if args[0] != nil {
+			arg0 = args[0].(v1.ResourceName)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1388,7 +1395,7 @@ func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) Return(
 	return _c
 }
 
-func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) RunAndReturn(run func() bool) *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
+func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) RunAndReturn(run func(extendedResource v1.ResourceName) bool) *MockContainerManager_ShouldResetExtendedResourceCapacity_Call {
 	_c.Call.Return(run)
 	return _c
 }
