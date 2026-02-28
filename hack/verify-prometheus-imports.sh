@@ -74,7 +74,6 @@ allowed_prometheus_importers=(
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_util_test.go
-  ./test/integration/metrics/metrics_test.go
 )
 
 # Go imports always involve a double quoted string of the package path
