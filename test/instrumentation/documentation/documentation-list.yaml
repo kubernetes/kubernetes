@@ -891,6 +891,17 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: stale_sync_skips_total
+  subsystem: statefulset_controller
+  help: Total number of StatefulSet syncs skipped due to a stale watch cache.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: statefulset_max_unavailable
   subsystem: statefulset_controller
   help: Maximum number of unavailable pods allowed during StatefulSet rolling updates
@@ -6258,17 +6269,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: storage_events_received_total
-  subsystem: apiserver
-  help: Number of etcd events received split by kind.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: apiserver_storage_list_evaluated_objects_total
   help: Number of objects tested in the course of serving a LIST request from storage
   type: Counter
@@ -6777,6 +6777,17 @@
   - 10
   - 15
   - 30
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: storage_events_received_total
+  subsystem: apiserver
+  help: Number of etcd events received split by kind.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
