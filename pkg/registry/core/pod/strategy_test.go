@@ -589,6 +589,194 @@ func TestPodLevelLimitsPartialDefaulting_OnUpdateWithPartialLimits(t *testing.T)
 	}
 }
 
+// When both CPU and memory need defaulting but only CPU has all container limits,
+// only CPU should be defaulted — memory should remain unset.
+func TestPodLevelLimitsPerResourceIndependence(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	// c1 has both limits, c2 has CPU limit but NO memory limit
+	pod := newPod("plr-per-resource", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("", ""), getResourceList("100m", "")), // No memory limit
+	})
+
+	// Pod-level: both requests set, NO pod-level limits at all
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+
+	// CPU should be defaulted to sum of container CPU limits (200m) because all containers have CPU limits
+	wantCPU := resource.MustParse("200m")
+	if gotCPU, ok := pod.Spec.Resources.Limits[api.ResourceCPU]; !ok {
+		t.Errorf("expected CPU limit to be defaulted, but it was not set")
+	} else if gotCPU.Cmp(wantCPU) != 0 {
+		t.Errorf("expected CPU limit to be defaulted to %v, got %v", wantCPU.String(), gotCPU.String())
+	}
+
+	// Memory should NOT be defaulted because c2 is missing memory limit
+	if _, hasMemory := pod.Spec.Resources.Limits[api.ResourceMemory]; hasMemory {
+		t.Errorf("expected memory limit to NOT be defaulted since not all containers have memory limits, got %v", pod.Spec.Resources.Limits[api.ResourceMemory])
+	}
+}
+
+// Init container missing limits should block defaulting for that resource.
+func TestPodLevelLimitsNotDefaultedWhenInitContainerMissingLimits(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	pod := newPod("plr-init-missing", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	// Add init container WITHOUT limits
+	pod.Spec.InitContainers = []api.Container{
+		newContainer("init1", getResourceList("50m", "64Mi"), getResourceList("", "")),
+	}
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	// Neither CPU nor memory should be defaulted because init container has no limits
+	if len(pod.Spec.Resources.Limits) > 0 {
+		t.Fatalf("expected pod.Spec.Resources.Limits to remain unset when init container has no limits, got %v", pod.Spec.Resources.Limits)
+	}
+}
+
+// Init container with limits: pod-level limits should include init container contribution.
+func TestPodLevelLimitsDefaultedWithInitContainerLimits(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	pod := newPod("plr-init-with-limits", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	// Init container with limits higher than regular container
+	pod.Spec.InitContainers = []api.Container{
+		newContainer("init1", getResourceList("", ""), getResourceList("200m", "256Mi")),
+	}
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	if pod.Spec.Resources.Limits == nil {
+		t.Fatalf("expected pod.Spec.Resources.Limits to be defaulted, got nil")
+	}
+
+	// AggregateContainerLimits: max(sum_regular, peak_init) = max(100m, 200m) = 200m CPU
+	// Memory: max(128Mi, 256Mi) = 256Mi
+	wantCPU := resource.MustParse("200m")
+	wantMemory := resource.MustParse("256Mi")
+	if gotCPU := pod.Spec.Resources.Limits[api.ResourceCPU]; gotCPU.Cmp(wantCPU) != 0 {
+		t.Errorf("expected CPU limit %v, got %v", wantCPU.String(), gotCPU.String())
+	}
+	if gotMemory := pod.Spec.Resources.Limits[api.ResourceMemory]; gotMemory.Cmp(wantMemory) != 0 {
+		t.Errorf("expected memory limit %v, got %v", wantMemory.String(), gotMemory.String())
+	}
+}
+
+// Sidecar (restartable init) container with limits: should be included in aggregation.
+func TestPodLevelLimitsDefaultedWithSidecarContainerLimits(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	restartAlways := api.ContainerRestartPolicyAlways
+	pod := newPod("plr-sidecar", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	// Sidecar init container (RestartPolicy=Always) with limits
+	pod.Spec.InitContainers = []api.Container{
+		{
+			Name:          "sidecar1",
+			Resources:     getResourceRequirements(getResourceList("", ""), getResourceList("50m", "64Mi")),
+			RestartPolicy: &restartAlways,
+		},
+	}
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	if pod.Spec.Resources.Limits == nil {
+		t.Fatalf("expected pod.Spec.Resources.Limits to be defaulted, got nil")
+	}
+
+	// AggregateContainerLimits for sidecar: regular(100m) + sidecar(50m) = 150m CPU
+	// Memory: 128Mi + 64Mi = 192Mi
+	wantCPU := resource.MustParse("150m")
+	wantMemory := resource.MustParse("192Mi")
+	if gotCPU := pod.Spec.Resources.Limits[api.ResourceCPU]; gotCPU.Cmp(wantCPU) != 0 {
+		t.Errorf("expected CPU limit %v, got %v", wantCPU.String(), gotCPU.String())
+	}
+	if gotMemory := pod.Spec.Resources.Limits[api.ResourceMemory]; gotMemory.Cmp(wantMemory) != 0 {
+		t.Errorf("expected memory limit %v, got %v", wantMemory.String(), gotMemory.String())
+	}
+}
+
+// When PodLevelResourcesFixUpdateDefaulting is disabled, no defaulting should occur.
+func TestPodLevelLimitsNotDefaultedWhenFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, false)
+
+	pod := newPod("plr-gate-disabled", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	// With the feature gate disabled, limits should NOT be defaulted
+	if len(pod.Spec.Resources.Limits) > 0 {
+		t.Fatalf("expected pod.Spec.Resources.Limits to remain unset when PodLevelResourcesFixUpdateDefaulting is disabled, got %v", pod.Spec.Resources.Limits)
+	}
+}
+
+// When PodLevelResources itself is disabled, no defaulting should occur.
+func TestPodLevelLimitsNotDefaultedWhenPodLevelResourcesDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, false)
+
+	pod := newPod("plr-both-gates", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	// With PodLevelResources disabled, DropDisabledPodFields may nil out Spec.Resources entirely.
+	// Either way, limits should not be defaulted.
+	if pod.Spec.Resources != nil && len(pod.Spec.Resources.Limits) > 0 {
+		t.Fatalf("expected no pod-level limits when PodLevelResources is disabled, got %v", pod.Spec.Resources.Limits)
+	}
+}
+
 func TestSchedulingGatedCondition(t *testing.T) {
 	tests := []struct {
 		name string
