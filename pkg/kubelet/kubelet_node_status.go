@@ -191,10 +191,11 @@ func (kl *Kubelet) reconcileHugePageResource(logger klog.Logger, initialNode, ex
 // Zeros out extended resource capacity during reconciliation.
 func (kl *Kubelet) reconcileExtendedResource(logger klog.Logger, initialNode, node *v1.Node) bool {
 	requiresUpdate := updateDefaultResources(initialNode, node)
-	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
-	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
-		for k := range node.Status.Capacity {
-			if v1helper.IsExtendedResourceName(k) {
+	for k := range node.Status.Capacity {
+		if v1helper.IsExtendedResourceName(k) {
+			// Check with the device manager to see if node is missing state for any of
+			// the extended resources, in which case should be zeroed until they become available/re-introduced.
+			if kl.containerManager.ShouldResetExtendedResourceCapacity(k) {
 				logger.Info("Zero out resource capacity in existing node", "resourceName", k, "node", klog.KObj(node))
 				node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 				node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
