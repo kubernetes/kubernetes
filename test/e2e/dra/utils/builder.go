@@ -592,7 +592,7 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	// the framework, we must ensure that test pods and the claims that
 	// they use are deleted. Otherwise the driver might get deleted first,
 	// in which case deleting the claims won't work anymore.
-	tCtx.Log("delete pods and claims")
+	tCtx.Log("delete pods, podgroups, and claims")
 	pods, err := b.listTestPods(tCtx)
 	tCtx.ExpectNoError(err, "list pods")
 	for _, pod := range pods {
@@ -613,6 +613,23 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
 		return b.listTestPods(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
+
+	// Clean up PodGroups to release claims allocated for them.
+	podGroups, err := b.listTestPodGroups(tCtx)
+	tCtx.ExpectNoError(err, "list podgroups")
+	for _, podGroup := range podGroups {
+		if podGroup.DeletionTimestamp != nil {
+			continue
+		}
+		tCtx.Logf("Deleting %T %s", &podGroup, klog.KObj(&podGroup))
+		err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			tCtx.ExpectNoError(err, "delete podgroup")
+		}
+	}
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+		return b.listTestPodGroups(tCtx)
+	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining podgroups despite deletion")
 
 	claims, err := b.ClientV1(tCtx).ResourceClaims(b.namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "get resource claims")
@@ -652,6 +669,18 @@ func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
 		testPods = append(testPods, pod)
 	}
 	return testPods, nil
+}
+
+func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+	podGroups, err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		// API is disabled
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return podGroups.Items, nil
 }
 
 func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {

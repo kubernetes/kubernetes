@@ -1640,9 +1640,14 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 					for i := 0; i < opts.uniqueResourceClaimTemplatesPerPodGroup; i++ {
 						claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, podGroup.Name, podGroup.Namespace)
 						podGroupClaimName := fmt.Sprintf("claimtemplate%d", i)
+						claimName := fmt.Sprintf("generated-podgroupclaim-%s-%s-%d", podGroupName, podGroup.Namespace, i)
 						podGroup.Spec.ResourceClaims = append(podGroup.Spec.ResourceClaims, schedulingapi.PodGroupResourceClaim{
 							Name:                      podGroupClaimName,
 							ResourceClaimTemplateName: &claimTemplateName,
+						})
+						podGroup.Status.ResourceClaimStatuses = append(podGroup.Status.ResourceClaimStatuses, schedulingapi.PodGroupResourceClaimStatus{
+							Name:              podGroupClaimName,
+							ResourceClaimName: &claimName,
 						})
 					}
 					podGroups = append(podGroups, podGroup)
@@ -1772,14 +1777,9 @@ func generatePod(name, namespace, nodeName, svcAccountName, podGroupName string,
 	for i := 0; i < opts.uniquePodGroupResourceClaimTemplatesPerPod; i++ {
 		podClaimName := fmt.Sprintf("podgroupclaim%d", i)
 		podGroupClaimName := fmt.Sprintf("claimtemplate%d", i)
-		claimName := fmt.Sprintf("generated-podgroupclaim-%s-%s-%d", podGroupName, pod.Namespace, i)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
 			Name:                  podClaimName,
 			PodGroupResourceClaim: &podGroupClaimName,
-		})
-		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
-			Name:              podClaimName,
-			ResourceClaimName: &claimName,
 		})
 	}
 	// Choose shared pvcs randomly from shared pvcs in a namespace.

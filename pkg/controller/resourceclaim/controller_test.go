@@ -30,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,8 +54,10 @@ import (
 
 var (
 	testPodName          = "test-pod"
+	testPodGroupName     = "test-podgroup"
 	testNamespace        = "my-namespace"
 	testPodUID           = types.UID("uidpod1")
+	testPodGroupUID      = types.UID("uidpodgroup1")
 	otherNamespace       = "not-my-namespace"
 	podResourceClaimName = "acme-resource"
 	templateName         = "my-template"
@@ -66,12 +69,16 @@ var (
 
 	otherTestPod = makePod(testPodName+"-II", testNamespace, testPodUID+"-II")
 
+	testPodGroupWithResource = makePodGroup(testPodGroupName, testNamespace, testPodGroupUID, *makePodGroupResourceClaim(podResourceClaimName, templateName))
+
 	testClaim              = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, makeOwnerReference(testPodWithResource, true))
 	testClaimAllocated     = allocateClaim(testClaim)
 	testClaimReserved      = reserveClaim(testClaimAllocated, testPodWithResource)
 	testClaimReservedTwice = reserveClaim(testClaimReserved, otherTestPod)
 	testClaimKey           = claimKeyPrefix + testClaim.Namespace + "/" + testClaim.Name
 	testPodKey             = podKeyPrefix + testNamespace + "/" + testPodName
+
+	testClaimReservedForPodGroup = reserveClaim(testClaimAllocated, testPodGroupWithResource)
 
 	templatedTestClaim          = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
 	templatedTestClaimAllocated = allocateClaim(templatedTestClaim)
@@ -102,19 +109,21 @@ var (
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name                   string
-		key                    string
-		adminAccessEnabled     bool
-		prioritizedListEnabled bool
-		claims                 []*resourceapi.ResourceClaim
-		claimsInCache          []*resourceapi.ResourceClaim
-		pods                   []*v1.Pod
-		podsLater              []*v1.Pod
-		templates              []*resourceapi.ResourceClaimTemplate
-		expectedClaims         []resourceapi.ResourceClaim
-		expectedStatuses       map[string][]v1.PodResourceClaimStatus
-		expectedError          string
-		expectedMetrics        expectedMetrics
+		name                          string
+		key                           string
+		adminAccessEnabled            bool
+		prioritizedListEnabled        bool
+		workloadResourceClaimsEnabled bool
+		claims                        []*resourceapi.ResourceClaim
+		claimsInCache                 []*resourceapi.ResourceClaim
+		pods                          []*v1.Pod
+		podsLater                     []*v1.Pod
+		podGroups                     []*schedulingapi.PodGroup
+		templates                     []*resourceapi.ResourceClaimTemplate
+		expectedClaims                []resourceapi.ResourceClaim
+		expectedStatuses              map[string][]v1.PodResourceClaimStatus
+		expectedError                 string
+		expectedMetrics               expectedMetrics
 	}{
 		{
 			name:           "create",
@@ -300,6 +309,20 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
+			workloadResourceClaimsEnabled: true,
+			name:                          "clear-reserved-podgroup",
+			podGroups:                     []*schedulingapi.PodGroup{},
+			key:                           claimKey(testClaimReservedForPodGroup),
+			claims:                        []*resourceapi.ResourceClaim{structuredParameters(testClaimReservedForPodGroup)},
+			expectedClaims: func() []resourceapi.ResourceClaim {
+				claim := testClaimAllocated.DeepCopy()
+				claim.Finalizers = []string{}
+				claim.Status.Allocation = nil
+				return []resourceapi.ResourceClaim{*claim}
+			}(),
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
 			name: "dont-clear-reserved-structured",
 			pods: []*v1.Pod{testPodWithResource},
 			key:  claimKey(testClaimReserved),
@@ -444,6 +467,9 @@ func TestSyncHandler(t *testing.T) {
 			for _, pod := range tc.pods {
 				objects = append(objects, pod)
 			}
+			for _, podGroup := range tc.podGroups {
+				objects = append(objects, podGroup)
+			}
 			for _, claim := range tc.claims {
 				objects = append(objects, claim)
 			}
@@ -459,15 +485,17 @@ func TestSyncHandler(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
+			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
 
 			features := Features{
-				AdminAccess:     tc.adminAccessEnabled,
-				PrioritizedList: tc.prioritizedListEnabled,
+				AdminAccess:            tc.adminAccessEnabled,
+				PrioritizedList:        tc.prioritizedListEnabled,
+				WorkloadResourceClaims: tc.workloadResourceClaimsEnabled,
 			}
-			ec, err := NewController(tCtx.Logger(), features, fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(tCtx.Logger(), features, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -537,6 +565,7 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
+	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	claimTemplateClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates(testNamespace)
@@ -544,7 +573,7 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	podClient := fakeKubeClient.CoreV1().Pods(testNamespace)
 	podTmpClient := fakeKubeClient.CoreV1().Pods("tmp")
 
-	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())
@@ -669,12 +698,13 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
+	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	setupMetrics()
 	claimClient := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace)
 
-	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())
@@ -1086,13 +1116,25 @@ func structuredParameters(claim *resourceapi.ResourceClaim) *resourceapi.Resourc
 	return claim
 }
 
-func reserveClaim(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
+func reserveClaim(claim *resourceapi.ResourceClaim, obj metav1.Object) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
+	var apiGroup, resource string
+	switch obj.(type) {
+	case *v1.Pod:
+		apiGroup = v1.GroupName
+		resource = "pods"
+	case *schedulingapi.PodGroup:
+		apiGroup = schedulingapi.GroupName
+		resource = "podgroups"
+	default:
+		panic(fmt.Sprintf("invalid type: %T", obj))
+	}
 	claim.Status.ReservedFor = append(claim.Status.ReservedFor,
 		resourceapi.ResourceClaimConsumerReference{
-			Resource: "pods",
-			Name:     pod.Name,
-			UID:      pod.UID,
+			APIGroup: apiGroup,
+			Resource: resource,
+			Name:     obj.GetName(),
+			UID:      obj.GetUID(),
 		},
 	)
 	return claim
@@ -1114,6 +1156,24 @@ func makePod(name, namespace string, uid types.UID, podClaims ...v1.PodResourceC
 	}
 
 	return pod
+}
+
+func makePodGroupResourceClaim(name, templateName string) *schedulingapi.PodGroupResourceClaim {
+	return &schedulingapi.PodGroupResourceClaim{
+		Name:                      name,
+		ResourceClaimTemplateName: &templateName,
+	}
+}
+
+func makePodGroup(name, namespace string, uid types.UID, podGroupClaims ...schedulingapi.PodGroupResourceClaim) *schedulingapi.PodGroup {
+	podGroup := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, UID: uid},
+		Spec: schedulingapi.PodGroupSpec{
+			ResourceClaims: podGroupClaims,
+		},
+	}
+
+	return podGroup
 }
 
 func makeTemplate(name, namespace, classname string, adminAccess *bool) *resourceapi.ResourceClaimTemplate {
@@ -1492,12 +1552,13 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 			fakeKubeClient := createTestClient()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
+			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 
 			setupMetrics()
 
-			ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating controller: %v", err)
 			}

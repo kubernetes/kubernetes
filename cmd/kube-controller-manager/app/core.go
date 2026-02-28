@@ -480,11 +480,13 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	ephemeralController, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
 		resourceclaim.Features{
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 		},
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
 	if err != nil {

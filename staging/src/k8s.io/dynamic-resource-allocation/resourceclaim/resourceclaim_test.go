@@ -168,19 +168,19 @@ func TestResourceClaimIsForPod(t *testing.T) {
 			pod:           podWithPodGroup(podOwner, podGroupNotOwner.Name),
 			podGroup:      podGroupNotOwner,
 			claim:         claimWithPodGroupOwner,
-			expectedError: `ResourceClaim kube-system/claimWithPodGroupOwner was not created for Pod kube-system/podOwner or PodGroup kube-system/podGroupNotOwner (neither Pod nor PodGroup is the owner)`,
+			expectedError: `ResourceClaim kube-system/claimWithPodGroupOwner was not created for PodGroup kube-system/podGroupNotOwner (PodGroup is not owner)`,
 		},
 		"no-podgroup-owner": {
 			pod:           podWithPodGroup(podOwner, podGroupOwner.Name),
 			podGroup:      podGroupOwner,
 			claim:         claimNoOwner,
-			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner or PodGroup kube-system/podGroupOwner (neither Pod nor PodGroup is the owner)`,
+			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for PodGroup kube-system/podGroupOwner (PodGroup is not owner)`,
 		},
 		"different-podgroup-namespace": {
 			pod:           podWithPodGroup(podOwner, podGroupOwner.Name),
 			podGroup:      podGroupOwner,
 			claim:         userClaimWithPodGroupOwner,
-			expectedError: `ResourceClaim user-namespace/userClaimWithPodGroupOwner was not created for Pod kube-system/podOwner or PodGroup kube-system/podGroupOwner (neither Pod nor PodGroup is the owner)`,
+			expectedError: `ResourceClaim user-namespace/userClaimWithPodGroupOwner was not created for PodGroup kube-system/podGroupOwner (PodGroup is not owner)`,
 		},
 	}
 
@@ -635,20 +635,6 @@ func TestName(t *testing.T) {
 						PodGroupName: new("podgroup"),
 					},
 				},
-				Status: v1.PodStatus{
-					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
-						{
-							Name: "not-this-one",
-						},
-						{
-							Name:              "pod-claim",
-							ResourceClaimName: ptr.To("generated-claim"),
-						},
-						{
-							Name: "nor-this-one",
-						},
-					},
-				},
 			},
 			podGroup: &schedulingapi.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -660,6 +646,20 @@ func TestName(t *testing.T) {
 						{
 							Name:                      "podgroup-claim",
 							ResourceClaimTemplateName: new("resource-claim-template"),
+						},
+					},
+				},
+				Status: schedulingapi.PodGroupStatus{
+					ResourceClaimStatuses: []schedulingapi.PodGroupResourceClaimStatus{
+						{
+							Name: "not-this-one",
+						},
+						{
+							Name:              "podgroup-claim",
+							ResourceClaimName: new("generated-claim"),
+						},
+						{
+							Name: "nor-this-one",
 						},
 					},
 				},

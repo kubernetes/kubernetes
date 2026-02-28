@@ -93,21 +93,43 @@ func Name(pod *v1.Pod, podGroup *schedulingapi.PodGroup, podClaim *v1.PodResourc
 			return nil, false, fmt.Errorf("PodGroup %s/%s does not have claim %s requested by Pod %s", podGroup.Namespace, podGroup.Name, *podClaim.PodGroupResourceClaim, pod.Name)
 		}
 		podGroupClaim := podGroup.Spec.ResourceClaims[podGroupClaimIndex]
-		switch {
-		case podGroupClaim.ResourceClaimName != nil:
-			return podGroupClaim.ResourceClaimName, false, nil
-		case podGroupClaim.ResourceClaimTemplateName != nil:
-			for _, status := range pod.Status.ResourceClaimStatuses {
-				if status.Name == podClaim.Name {
-					return status.ResourceClaimName, true, nil
-				}
-			}
-			return nil, false, fmt.Errorf("PodGroup %s/%s: %w", podGroup.Namespace, podGroup.Name, ErrClaimNotFound)
-		default:
-			return nil, false, fmt.Errorf("PodGroup %s/%s, spec.resourceClaim %s: %w", podGroup.Namespace, podGroup.Name, podGroupClaim.Name, ErrAPIUnsupported)
-		}
+		return NameFromPodGroup(podGroup, &podGroupClaim)
 	default:
 		return nil, false, fmt.Errorf("Pod %s/%s, spec.resourceClaim %s: %w", pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
+	}
+}
+
+// NameFromPodGroup returns the name of the ResourceClaim object that gets
+// referenced by or created for the PodGroupResourceClaim.
+//
+// Three different results are possible:
+//
+//   - An error is returned when some field is not set as expected (either the
+//     input is invalid or the API got extended and the library and the client
+//     using it need to be updated) or the claim hasn't been created yet.
+//
+//     The error includes PodGroup and PodGroup claim name and the unexpected
+//     field and is derived from one of the pre-defined errors in this package.
+//
+//   - A nil string pointer and no error when the ResourceClaim intentionally
+//     didn't get created and the PodGroupResourceClaim can be ignored.
+//
+//   - A pointer to the name and no error when the ResourceClaim got created.
+//     In this case the boolean determines whether IsForPodGroup must be called
+//     after retrieving the ResourceClaim and before using it.
+func NameFromPodGroup(podGroup *schedulingapi.PodGroup, podGroupClaim *schedulingapi.PodGroupResourceClaim) (name *string, mustCheckOwner bool, err error) {
+	switch {
+	case podGroupClaim.ResourceClaimName != nil:
+		return podGroupClaim.ResourceClaimName, false, nil
+	case podGroupClaim.ResourceClaimTemplateName != nil:
+		for _, status := range podGroup.Status.ResourceClaimStatuses {
+			if status.Name == podGroupClaim.Name {
+				return status.ResourceClaimName, true, nil
+			}
+		}
+		return nil, false, fmt.Errorf("PodGroup %s/%s: %w", podGroup.Namespace, podGroup.Name, ErrClaimNotFound)
+	default:
+		return nil, false, fmt.Errorf("PodGroup %s/%s, spec.resourceClaim %s: %w", podGroup.Namespace, podGroup.Name, podGroupClaim.Name, ErrAPIUnsupported)
 	}
 }
 
@@ -129,12 +151,23 @@ func IsForPod(pod *v1.Pod, podGroup *schedulingapi.PodGroup, claim *resourceapi.
 			if err := podMatchesPodGroup(pod, podGroup); err != nil {
 				return err
 			}
-			if claim.Namespace != podGroup.Namespace || !metav1.IsControlledBy(claim, podGroup) {
-				return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s or PodGroup %s/%s (neither Pod nor PodGroup is the owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name, podGroup.Namespace, podGroup.Name)
-			}
-			return nil
+			return IsForPodGroup(podGroup, claim)
 		}
 		return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (Pod is not owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
+	}
+	return nil
+}
+
+// IsForPodGroup checks that the ResourceClaim is the one that
+// was created for the PodGroup. It returns an error that is informative
+// enough to be returned by the caller without adding further details
+// about the Pod or ResourceClaim.
+func IsForPodGroup(podGroup *schedulingapi.PodGroup, claim *resourceapi.ResourceClaim) error {
+	// Checking the namespaces is just a precaution. The caller should
+	// never pass in a ResourceClaim that isn't from the same namespace as the
+	// Pod.
+	if claim.Namespace != podGroup.Namespace || !metav1.IsControlledBy(claim, podGroup) {
+		return fmt.Errorf("ResourceClaim %s/%s was not created for PodGroup %s/%s (PodGroup is not owner)", claim.Namespace, claim.Name, podGroup.Namespace, podGroup.Name)
 	}
 	return nil
 }

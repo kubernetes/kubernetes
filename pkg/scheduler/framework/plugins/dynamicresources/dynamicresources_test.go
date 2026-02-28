@@ -199,12 +199,6 @@ var (
 					Node(nodeName).
 					PodGroupName(podGroupName).
 					Obj()
-	podWithPodGroupClaimInStatus = st.MakePod().Name(podName).Namespace(namespace).
-					UID(podUID).
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, PodGroupResourceClaim: &resourceName}).
-					PodGroupName(podGroupName).
-					ResourceClaimStatuses(v1.PodResourceClaimStatus{Name: resourceName2, ResourceClaimName: &claimName}).
-					Obj()
 
 	podGroupWithClaimName = st.MakePodGroup().Name(podGroupName).Namespace(namespace).
 				UID(podGroupUID).
@@ -214,6 +208,16 @@ var (
 					UID(podGroupUID).
 					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
 					Obj()
+	podGroupWithClaimTemplateInStatus = func() *schedulingapi.PodGroup {
+		pod := podGroupWithClaimTemplate.DeepCopy()
+		pod.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+			{
+				Name:              pod.Spec.ResourceClaims[0].Name,
+				ResourceClaimName: &claimName,
+			},
+		}
+		return pod
+	}()
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode           = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
@@ -1214,8 +1218,8 @@ func testPlugin(tCtx ktesting.TContext) {
 		},
 		"podgroup-claim-template": {
 			enableDRAWorkloadResourceClaims: true,
-			pod:                             podWithPodGroupClaimInStatus,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimTemplate},
+			pod:                             podWithPodGroupClaim,
+			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimTemplateInStatus},
 			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim, otherClaim},
 			want: want{
 				prebind: result{
@@ -1311,7 +1315,7 @@ func testPlugin(tCtx ktesting.TContext) {
 		},
 		"podgroup-with-resources": {
 			enableDRAWorkloadResourceClaims: true,
-			pod:                             podWithPodGroupClaimInStatus,
+			pod:                             podWithPodGroupClaim,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
 			claims:                          []*resourceapi.ResourceClaim{pendingPodGroupClaim},
 			classes:                         []*resourceapi.DeviceClass{deviceClass},
