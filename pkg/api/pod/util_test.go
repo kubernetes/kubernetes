@@ -1132,6 +1132,293 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 	}
 }
 
+func TestValidateAllowIndivisibleHugePagesValuesOption(t *testing.T) {
+	invalidHugePageSpec := &api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "c",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("3Mi"),
+				},
+			},
+		}},
+	}
+	validHugePageSpec := &api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "c",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+				},
+			},
+		}},
+	}
+
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{
+			name: "create",
+			want: false,
+		},
+		{
+			name:       "update with old invalid hugepage quantity",
+			oldPodSpec: invalidHugePageSpec,
+			want:       true,
+		},
+		{
+			name:       "update with old valid hugepage quantity",
+			oldPodSpec: validHugePageSpec,
+			want:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowIndivisibleHugePagesValues {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowIndivisibleHugePagesValues)
+			}
+		})
+	}
+}
+
+func TestValidateRelaxedValidationOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
+	withRelaxedEnv := func() *api.PodSpec {
+		return &api.PodSpec{
+			Containers: []api.Container{{
+				Name:  "c",
+				Image: "image",
+				Env: []api.EnvVar{
+					{Name: "!\"#$%&'()", Value: "x"},
+				},
+			}},
+		}
+	}
+	withRelaxedDNS := func() *api.PodSpec {
+		return &api.PodSpec{
+			DNSConfig: &api.PodDNSConfig{
+				Searches: []string{"svc_cluster.local"},
+			},
+		}
+	}
+	withRelaxedEnvAndDNS := func() *api.PodSpec {
+		spec := withRelaxedEnv()
+		spec.DNSConfig = withRelaxedDNS().DNSConfig
+		return spec
+	}
+
+	testCases := []struct {
+		name                     string
+		relaxedEnvEnabled        bool
+		relaxedDNSSearchEnabled  bool
+		podSpec                  *api.PodSpec
+		oldPodSpec               *api.PodSpec
+		wantRelaxedEnvValidation bool
+		wantRelaxedDNSValidation bool
+	}{
+		{
+			name:                     "gates disabled on create",
+			relaxedEnvEnabled:        false,
+			relaxedDNSSearchEnabled:  false,
+			podSpec:                  withRelaxedEnvAndDNS(),
+			oldPodSpec:               nil,
+			wantRelaxedEnvValidation: false,
+			wantRelaxedDNSValidation: false,
+		},
+		{
+			name:                     "gates disabled with old data in use",
+			relaxedEnvEnabled:        false,
+			relaxedDNSSearchEnabled:  false,
+			podSpec:                  withRelaxedEnv(),
+			oldPodSpec:               withRelaxedEnvAndDNS(),
+			wantRelaxedEnvValidation: true,
+			wantRelaxedDNSValidation: true,
+		},
+		{
+			name:                     "gates enabled without old data",
+			relaxedEnvEnabled:        true,
+			relaxedDNSSearchEnabled:  true,
+			podSpec:                  &api.PodSpec{},
+			oldPodSpec:               nil,
+			wantRelaxedEnvValidation: true,
+			wantRelaxedDNSValidation: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.RelaxedEnvironmentVariableValidation: tc.relaxedEnvEnabled,
+				features.RelaxedDNSSearchValidation:           tc.relaxedDNSSearchEnabled,
+			})
+
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(tc.podSpec, tc.oldPodSpec, nil, nil)
+			if tc.wantRelaxedEnvValidation != gotOptions.AllowRelaxedEnvironmentVariableValidation {
+				t.Errorf("unexpected env option diff, want: %v, got: %v", tc.wantRelaxedEnvValidation, gotOptions.AllowRelaxedEnvironmentVariableValidation)
+			}
+			if tc.wantRelaxedDNSValidation != gotOptions.AllowRelaxedDNSSearchValidation {
+				t.Errorf("unexpected dns option diff, want: %v, got: %v", tc.wantRelaxedDNSValidation, gotOptions.AllowRelaxedDNSSearchValidation)
+			}
+		})
+	}
+}
+
+func TestValidateAllowEnvFilesValidationOption(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+
+	oldWithFileKeyRef := &api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "c",
+			Image: "image",
+			Env: []api.EnvVar{{
+				Name: "A",
+				ValueFrom: &api.EnvVarSource{
+					FileKeyRef: &api.FileKeySelector{
+						VolumeName: "vol",
+						Path:       "path",
+						Key:        "key",
+					},
+				},
+			}},
+		}},
+	}
+
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		oldPodSpec     *api.PodSpec
+		want           bool
+	}{
+		{
+			name:           "feature disabled on create",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			want:           false,
+		},
+		{
+			name:           "feature disabled with old FileKeyRef in use",
+			featureEnabled: false,
+			oldPodSpec:     oldWithFileKeyRef,
+			want:           true,
+		},
+		{
+			name:           "feature enabled on create",
+			featureEnabled: true,
+			oldPodSpec:     nil,
+			want:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, tc.featureEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowEnvFilesValidation {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowEnvFilesValidation)
+			}
+		})
+	}
+}
+
+func TestValidateAllowUserNamespacesHostNetworkSupportOption(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+
+	oldWithUsernsHostNetwork := &api.PodSpec{
+		SecurityContext: &api.PodSecurityContext{
+			HostNetwork: true,
+			HostUsers:   ptr.To(false),
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		oldPodSpec     *api.PodSpec
+		want           bool
+	}{
+		{
+			name:           "feature disabled on create",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			want:           false,
+		},
+		{
+			name:           "feature disabled with old pod in use",
+			featureEnabled: false,
+			oldPodSpec:     oldWithUsernsHostNetwork,
+			want:           true,
+		},
+		{
+			name:           "feature enabled on create",
+			featureEnabled: true,
+			oldPodSpec:     nil,
+			want:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.UserNamespacesSupport:            true,
+				features.UserNamespacesHostNetworkSupport: tc.featureEnabled,
+			})
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowUserNamespacesHostNetworkSupport {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowUserNamespacesHostNetworkSupport)
+			}
+		})
+	}
+}
+
+func TestValidateAllowOnlyRecursiveSELinuxChangePolicyOption(t *testing.T) {
+	testCases := []struct {
+		name                string
+		seLinuxMountEnabled bool
+		oldPodSpec          *api.PodSpec
+		want                bool
+	}{
+		{
+			name:                "SELinuxMount enabled on create",
+			seLinuxMountEnabled: true,
+			oldPodSpec:          nil,
+			want:                false,
+		},
+		{
+			name:                "SELinuxMount disabled on create",
+			seLinuxMountEnabled: false,
+			oldPodSpec:          nil,
+			want:                true,
+		},
+		{
+			name:                "SELinuxMount disabled with old policy in use",
+			seLinuxMountEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxChangePolicy: ptr.To(api.SELinuxChangePolicyMountOption),
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, tc.seLinuxMountEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowOnlyRecursiveSELinuxChangePolicy {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowOnlyRecursiveSELinuxChangePolicy)
+			}
+		})
+	}
+}
+
 func TestDropDisabledPodStatusFields_HostIPs(t *testing.T) {
 	podWithHostIPs := func() *api.PodStatus {
 		return &api.PodStatus{
@@ -6316,7 +6603,9 @@ func TestTaintTolerationComparisonOperatorsInUse(t *testing.T) {
 	}
 }
 
-func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
+func TestValidateAllowTaintTolerationComparisonOperatorsOption(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+
 	tests := []struct {
 		name           string
 		featureEnabled bool
@@ -6409,9 +6698,9 @@ func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, test.featureEnabled)
-			actual := allowTaintTolerationComparisonOperators(test.oldPodSpec)
-			if test.expected != actual {
-				t.Errorf("expected %v, got %v", test.expected, actual)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, test.oldPodSpec, nil, nil)
+			if test.expected != gotOptions.AllowTaintTolerationComparisonOperators {
+				t.Errorf("expected %v, got %v", test.expected, gotOptions.AllowTaintTolerationComparisonOperators)
 			}
 		})
 	}

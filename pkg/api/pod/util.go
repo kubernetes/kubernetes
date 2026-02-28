@@ -407,98 +407,118 @@ func hasNonLocalProjectedTokenPath(spec *api.PodSpec) bool {
 	return false
 }
 
-// GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
+// GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata.
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
-	// default pod validation options based on feature gate
-	opts := apivalidation.PodValidationOptions{
+	opts := podValidationOptionsFromFeatureGates()
+	applyOldPodSpecValidationLoosening(&opts, podSpec, oldPodSpec)
+	applyOldPodMetaValidationLoosening(&opts, oldPodMeta)
+	return opts
+}
+
+// podValidationOptionsFromFeatureGates initializes validation options strictly from feature gate state.
+func podValidationOptionsFromFeatureGates() apivalidation.PodValidationOptions {
+	return apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
-		// Do not allow pod spec to use non-integer multiple of huge page unit size default
+		// Do not allow pod spec to use non-integer multiple of huge page unit size by default.
 		AllowIndivisibleHugePagesValues:                     false,
 		AllowInvalidLabelValueInSelector:                    false,
 		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
+		AllowOnlyRecursiveSELinuxChangePolicy:               !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMount),
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
-		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		AllowRelaxedEnvironmentVariableValidation:           utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation),
+		AllowRelaxedDNSSearchValidation:                     utilfeature.DefaultFeatureGate.Enabled(features.RelaxedDNSSearchValidation),
+		AllowEnvFilesValidation:                             utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles),
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		AllowTaintTolerationComparisonOperators:             utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators),
+		AllowUserNamespacesHostNetworkSupport:               utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport),
 		// This also allows restart rules on sidecar containers.
-		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
-		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		AllowRestartAllContainers:                      utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowImageVolumeWithDigest:                     utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
-
-	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
-	// we must allow it
-	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
-	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
-	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
-	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
-
-	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
-	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
-
-	if oldPodSpec != nil {
-		// if old spec used non-integer multiple of huge page unit size, we must allow it
-		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
-
-		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
-		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
-		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
-		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
-		if opts.AllowMatchLabelKeysInPodTopologySpread {
-			if opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge {
-				// If old spec has invalid MatchLabelKeys, we must set true
-				opts.OldPodViolatesMatchLabelKeysValidation = hasInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
-			} else {
-				// If old spec has invalid MatchLabelKeys against legacy validation, we must set true
-				opts.OldPodViolatesLegacyMatchLabelKeysValidation = hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
-			}
-		}
-		// if old spec has an invalid projected token volume path, we must allow it
-		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
-
-		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
-		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
-			for _, s := range oldPodSpec.SecurityContext.Sysctls {
-				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec.SecurityContext, nil)
-				if err != nil {
-					opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
-					break
-				}
-			}
-		}
-
-		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
-		// If oldPod has resize policy set on the restartable init container, we must allow it
-		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
-
-		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
-		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
-
-		// If old spec has userns and volume devices (doesn't work), we still allow
-		// modifications to it.
-		opts.AllowUserNamespacesWithVolumeDevices = hasUserNamespacesWithVolumeDevices(oldPodSpec)
-	}
-	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
-		// This is an update, so validate only if the existing object was valid.
-		_, err := helper.GetDeletionCostFromPodAnnotations(oldPodMeta.Annotations)
-		opts.AllowInvalidPodDeletionCost = err != nil
-	}
-
-	return opts
 }
 
-func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation) {
-		return true
+// applyOldPodSpecValidationLoosening only loosens validation based on existing persisted pod data.
+func applyOldPodSpecValidationLoosening(opts *apivalidation.PodValidationOptions, podSpec, oldPodSpec *api.PodSpec) {
+	if oldPodSpec == nil {
+		return
 	}
+
+	opts.AllowRelaxedEnvironmentVariableValidation = opts.AllowRelaxedEnvironmentVariableValidation || relaxedEnvironmentVariableValidationInUse(podSpec, oldPodSpec)
+	opts.AllowRelaxedDNSSearchValidation = opts.AllowRelaxedDNSSearchValidation || relaxedDNSSearchValidationInUse(oldPodSpec)
+	opts.AllowEnvFilesValidation = opts.AllowEnvFilesValidation || envFilesValidationInUse(oldPodSpec)
+	opts.AllowUserNamespacesHostNetworkSupport = opts.AllowUserNamespacesHostNetworkSupport || userNamespacesHostNetworkSupportInUse(oldPodSpec)
+	opts.AllowTaintTolerationComparisonOperators = opts.AllowTaintTolerationComparisonOperators || taintTolerationComparisonOperatorsInUse(oldPodSpec)
+
+	// SELinux policy validation uses inverse semantics:
+	// when SELinuxMount is disabled we allow only Recursive by default, unless the old object already has a policy set.
+	if seLinuxChangePolicyInUse(oldPodSpec) {
+		opts.AllowOnlyRecursiveSELinuxChangePolicy = false
+	}
+
+	// If old spec used non-integer multiple of huge page unit size, we must allow it.
+	opts.AllowIndivisibleHugePagesValues = opts.AllowIndivisibleHugePagesValues || usesIndivisibleHugePagesValues(oldPodSpec)
+
+	opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || hasInvalidLabelValueInAffinitySelector(oldPodSpec)
+	opts.AllowInvalidLabelValueInRequiredNodeAffinity = opts.AllowInvalidLabelValueInRequiredNodeAffinity || hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
+	// If old spec has invalid labelSelector in topologySpreadConstraint, we must allow it.
+	opts.AllowInvalidTopologySpreadConstraintLabelSelector = opts.AllowInvalidTopologySpreadConstraintLabelSelector || hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
+	if opts.AllowMatchLabelKeysInPodTopologySpread {
+		if opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge {
+			// If old spec has invalid MatchLabelKeys, we must set true.
+			opts.OldPodViolatesMatchLabelKeysValidation = opts.OldPodViolatesMatchLabelKeysValidation || hasInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+		} else {
+			// If old spec has invalid MatchLabelKeys against legacy validation, we must set true.
+			opts.OldPodViolatesLegacyMatchLabelKeysValidation = opts.OldPodViolatesLegacyMatchLabelKeysValidation || hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+		}
+	}
+	// If old spec has an invalid projected token volume path, we must allow it.
+	opts.AllowNonLocalProjectedTokenPath = opts.AllowNonLocalProjectedTokenPath || hasNonLocalProjectedTokenPath(oldPodSpec)
+
+	// If old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update.
+	if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
+		for _, s := range oldPodSpec.SecurityContext.Sysctls {
+			err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec.SecurityContext, nil)
+			if err != nil {
+				opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
+				break
+			}
+		}
+	}
+
+	opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
+	// If oldPod has resize policy set on the restartable init container, we must allow it.
+	opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
+
+	opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+	opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
+
+	// If old spec has userns and volume devices (doesn't work), we still allow modifications to it.
+	opts.AllowUserNamespacesWithVolumeDevices = opts.AllowUserNamespacesWithVolumeDevices || hasUserNamespacesWithVolumeDevices(oldPodSpec)
+}
+
+// applyOldPodMetaValidationLoosening only loosens validation based on existing persisted pod metadata.
+func applyOldPodMetaValidationLoosening(opts *apivalidation.PodValidationOptions, oldPodMeta *metav1.ObjectMeta) {
+	if oldPodMeta == nil {
+		return
+	}
+
+	// This is an update, so validate only if the existing object was valid.
+	_, err := helper.GetDeletionCostFromPodAnnotations(oldPodMeta.Annotations)
+	opts.AllowInvalidPodDeletionCost = opts.AllowInvalidPodDeletionCost || err != nil
+}
+
+func relaxedEnvironmentVariableValidationInUse(podSpec, oldPodSpec *api.PodSpec) bool {
 
 	var oldPodEnvVarNames, podEnvVarNames sets.Set[string]
 	if oldPodSpec != nil {
@@ -518,12 +538,7 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 	return false
 }
 
-func useRelaxedDNSSearchValidation(oldPodSpec *api.PodSpec) bool {
-	// Return true early if feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedDNSSearchValidation) {
-		return true
-	}
-
+func relaxedDNSSearchValidationInUse(oldPodSpec *api.PodSpec) bool {
 	// Return false early if there is no DNSConfig or Searches.
 	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil || oldPodSpec.DNSConfig.Searches == nil {
 		return false
@@ -542,12 +557,7 @@ func hasDotOrUnderscore(searches []string) bool {
 	return false
 }
 
-func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
-	// Return true early if feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport) {
-		return true
-	}
-
+func userNamespacesHostNetworkSupportInUse(oldPodSpec *api.PodSpec) bool {
 	if oldPodSpec == nil || oldPodSpec.SecurityContext == nil || oldPodSpec.SecurityContext.HostUsers == nil {
 		return false
 	}
@@ -559,12 +569,7 @@ func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
 	return oldPodSpec.SecurityContext.HostNetwork && userNamespaces
 }
 
-func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
-	// Return true early if feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) {
-		return true
-	}
-
+func envFilesValidationInUse(oldPodSpec *api.PodSpec) bool {
 	if oldPodSpec == nil {
 		return false
 	}
@@ -1631,20 +1636,6 @@ func seLinuxChangePolicyInUse(podSpec *api.PodSpec) bool {
 	return podSpec.SecurityContext.SELinuxChangePolicy != nil
 }
 
-func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMount) {
-		// All policies are allowed
-		return false
-	}
-
-	if seLinuxChangePolicyInUse(oldPodSpec) {
-		// The old pod spec has *any* policy: we need to keep that object update-able.
-		return false
-	}
-	// No feature gate + no value in the old object -> only Recursive is allowed
-	return true
-}
-
 func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -1653,16 +1644,6 @@ func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
 		if toleration.Operator == api.TolerationOpLt || toleration.Operator == api.TolerationOpGt {
 			return true
 		}
-	}
-	return false
-}
-
-func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
-	// allow the operators if the feature gate is enabled or the old pod spec uses
-	// comparison operators
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) ||
-		taintTolerationComparisonOperatorsInUse(oldPodSpec) {
-		return true
 	}
 	return false
 }
