@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -51,8 +53,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/expfmt"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -1258,15 +1258,10 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 		wg sync.WaitGroup
 	)
 
-	r := prometheus.NewRegistry()
-	h := prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Name: "latency",
-		Objectives: map[float64]float64{
-			0.5:  0.05,
-			0.75: 0.025,
-			0.9:  0.01,
-			0.99: 0.001,
-		},
+	r := metrics.NewKubeRegistry()
+	h := metrics.NewHistogramVec(&metrics.HistogramOpts{
+		Name:    "latency",
+		Buckets: []float64{0.5, 1, 2.5, 5, 10},
 	}, []string{"node"})
 	r.MustRegister(h)
 
@@ -1383,7 +1378,7 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 	values, _ := r.Gather()
 	var buf bytes.Buffer
 	for _, m := range values {
-		expfmt.MetricFamilyToText(&buf, m)
+		_, _ = testutil.MetricFamilyToText(&buf, m)
 	}
 	framework.Logf("Summary of latencies:\n%s", buf.String())
 }
