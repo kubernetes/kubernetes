@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -582,6 +583,145 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// Destroy() count in not deterministic on the actual number.
 	// https://github.com/kubernetes/kubernetes/blob/29fdbb065b5e0d195299eb2d260b975cbc554673/pkg/kubelet/kubelet_pods.go#L2006
 	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
+}
+
+func TestHandlePodCleanupsPreventsDuplicateGoroutines(t *testing.T) {
+	ctx := context.Background()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	pod := &kubecontainer.Pod{
+		ID:        "test-pod-123",
+		Name:      "test-pod",
+		Namespace: "test-namespace",
+		Containers: []*kubecontainer.Container{
+			{Name: "test-container"},
+		},
+	}
+
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeContainerManager := testKubelet.fakeContainerManager
+	kubelet := testKubelet.kubelet
+	kubelet.cgroupsPerQOS = true
+	kubelet.cgroupsBeingCleaned = nil
+
+	fakeContainerManager.PodContainerManager.AddPodFromCgroups(pod)
+
+	destroyStartedCh := make(chan struct{}, 1)
+	destroyBlockCh := make(chan struct{})
+	destroyWG := &sync.WaitGroup{}
+	destroyWG.Add(1)
+	fakeContainerManager.PodContainerManager.DestroyStartedCh = destroyStartedCh
+	fakeContainerManager.PodContainerManager.DestroyBlockCh = destroyBlockCh
+	fakeContainerManager.PodContainerManager.DestroyWG = destroyWG
+
+	fakeRuntime.PodList = nil
+
+	kubelet.HandlePodCleanups(ctx)
+	select {
+	case <-destroyStartedCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Destroy to start")
+	}
+
+	for i := 0; i < 5; i++ {
+		kubelet.HandlePodCleanups(ctx)
+	}
+
+	close(destroyBlockCh)
+	done := make(chan struct{})
+	go func() {
+		destroyWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Destroy to complete")
+	}
+
+	cgroupName := []string{pod.Name}
+	destroyCount := fakeContainerManager.PodContainerManager.GetDestroyCallCount(cgroupName)
+	assert.Equal(t, 1, destroyCount, "Destroy should be called exactly once while cleanup is in progress")
+
+	err := wait.Poll(10*time.Millisecond, 1*time.Second, func() (bool, error) {
+		kubelet.cgroupCleanupMux.Lock()
+		_, stillTracked := kubelet.cgroupsBeingCleaned[pod.ID]
+		kubelet.cgroupCleanupMux.Unlock()
+		return !stillTracked, nil
+	})
+	assert.NoError(t, err, "Pod should be removed from tracking map after cleanup completes")
+}
+
+func TestHandlePodCleanupsWithFailedDestroy(t *testing.T) {
+	ctx := context.Background()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	pod := &kubecontainer.Pod{
+		ID:        "failed-pod-456",
+		Name:      "failed-pod",
+		Namespace: "test-namespace",
+		Containers: []*kubecontainer.Container{
+			{Name: "test-container"},
+		},
+	}
+
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeContainerManager := testKubelet.fakeContainerManager
+	kubelet := testKubelet.kubelet
+	kubelet.cgroupsPerQOS = true
+	kubelet.cgroupsBeingCleaned = nil
+
+	fakeContainerManager.PodContainerManager.AddPodFromCgroups(pod)
+
+	fakeContainerManager.PodContainerManager.DestroyError = fmt.Errorf("simulated destroy failure")
+	destroyWG := &sync.WaitGroup{}
+	destroyWG.Add(1)
+	fakeContainerManager.PodContainerManager.DestroyWG = destroyWG
+
+	fakeRuntime.PodList = nil
+
+	kubelet.HandlePodCleanups(ctx)
+
+	done := make(chan struct{})
+	go func() {
+		destroyWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Destroy to complete")
+	}
+
+	err := wait.Poll(10*time.Millisecond, 1*time.Second, func() (bool, error) {
+		kubelet.cgroupCleanupMux.Lock()
+		_, stillTracked := kubelet.cgroupsBeingCleaned[pod.ID]
+		kubelet.cgroupCleanupMux.Unlock()
+		return !stillTracked, nil
+	})
+	assert.NoError(t, err, "Pod should be removed from tracking map even when Destroy fails")
+
+	fakeContainerManager.PodContainerManager.DestroyError = nil
+	destroyWG.Add(1)
+
+	kubelet.HandlePodCleanups(ctx)
+
+	done = make(chan struct{})
+	go func() {
+		destroyWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for Destroy to complete")
+	}
+
+	cgroupName := []string{pod.Name}
+	destroyCount := fakeContainerManager.PodContainerManager.GetDestroyCallCount(cgroupName)
+	assert.Equal(t, 2, destroyCount, "Destroy should be retried after previous failure")
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {

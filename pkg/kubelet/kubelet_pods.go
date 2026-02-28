@@ -2851,16 +2851,32 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(logger klog.Logger, pcm cm.PodConta
 			continue
 		}
 		logger.V(3).Info("Orphaned pod found, removing pod cgroups", "podUID", uid)
+		kl.cgroupCleanupMux.Lock()
+		if kl.cgroupsBeingCleaned == nil {
+			kl.cgroupsBeingCleaned = make(map[types.UID]bool)
+		}
+		if kl.cgroupsBeingCleaned[uid] {
+			kl.cgroupCleanupMux.Unlock()
+			logger.V(4).Info("Cgroup cleanup already in progress, skipping", "podUID", uid)
+			continue
+		}
+		kl.cgroupsBeingCleaned[uid] = true
+		kl.cgroupCleanupMux.Unlock()
 		// Destroy all cgroups of pods that should not be running,
 		// by first killing all the attached processes in these cgroups.
 		// The error return value of Destroy is explicitly checked and logged,
 		// but errors are tolerated since the housekeeping loop loop would
 		// again try to delete these unwanted pod cgroups.
-		go func() {
-			if err := pcm.Destroy(logger, val); err != nil {
-				logger.Info("Failed to destroy orphaned pod cgroup", "podUID", uid, "err", err)
+		go func(podUID types.UID, cgroupName cm.CgroupName) {
+			defer func() {
+				kl.cgroupCleanupMux.Lock()
+				delete(kl.cgroupsBeingCleaned, podUID)
+				kl.cgroupCleanupMux.Unlock()
+			}()
+			if err := pcm.Destroy(logger, cgroupName); err != nil {
+				logger.Info("Failed to destroy orphaned pod cgroup", "podUID", podUID, "err", err)
 			}
-		}()
+		}(uid, val)
 	}
 }
 
