@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,7 @@ var (
 	defaultNamespace      = ""
 	preFilterStateCmpOpts = []cmp.Option{
 		cmp.AllowUnexported(preFilterState{}, framework.PodInfo{}),
+		cmpopts.IgnoreUnexported(preFilterState{}),
 	}
 )
 
@@ -1586,7 +1588,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				defer cancel()
 				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
 				podInfo := mustNewPodInfo(t, tt.pod)
-				gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, podInfo.GetRequiredAffinityTerms(), podInfo.GetRequiredAntiAffinityTerms(), l)
+				gotAffinityPodsMap, gotAntiAffinityPodsMap, _ := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, podInfo.GetRequiredAffinityTerms(), podInfo.GetRequiredAntiAffinityTerms(), l)
 				if diff := cmp.Diff(tt.wantAffinityPodsMap, gotAffinityPodsMap); diff != "" {
 					t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
 				}
@@ -1607,7 +1609,7 @@ func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) fwk.No
 	return nodeInfo
 }
 
-func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) fwk.PodInfo {
 	podInfo, err := framework.NewPodInfo(pod)
 	if err != nil {
 		t.Fatal(err)
