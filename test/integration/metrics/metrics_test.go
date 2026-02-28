@@ -28,9 +28,6 @@ import (
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,16 +156,16 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 
-	expectedMetrics := []model.Metric{}
+	expectedMetrics := []testutil.Metric{}
 
-	metricLabels := func(group, version, resource, subresource, scope, verb string) model.Metric {
-		return map[model.LabelName]model.LabelValue{
-			model.LabelName("group"):       model.LabelValue(group),
-			model.LabelName("version"):     model.LabelValue(version),
-			model.LabelName("resource"):    model.LabelValue(resource),
-			model.LabelName("subresource"): model.LabelValue(subresource),
-			model.LabelName("scope"):       model.LabelValue(scope),
-			model.LabelName("verb"):        model.LabelValue(verb),
+	metricLabels := func(group, version, resource, subresource, scope, verb string) testutil.Metric {
+		return map[testutil.LabelName]testutil.LabelValue{
+			testutil.LabelName("group"):       testutil.LabelValue(group),
+			testutil.LabelName("version"):     testutil.LabelValue(version),
+			testutil.LabelName("resource"):    testutil.LabelValue(resource),
+			testutil.LabelName("subresource"): testutil.LabelValue(subresource),
+			testutil.LabelName("scope"):       testutil.LabelValue(scope),
+			testutil.LabelName("verb"):        testutil.LabelValue(verb),
 		}
 	}
 
@@ -178,7 +175,7 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 		}
 	}
 
-	appendExpectedMetric := func(metric model.Metric) {
+	appendExpectedMetric := func(metric testutil.Metric) {
 		expectedMetrics = append(expectedMetrics, metric)
 	}
 
@@ -254,7 +251,7 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 		t.Fatalf("apiserver_request_total metric not exposed")
 	}
 
-	hasLabels := func(current, expected model.Metric) bool {
+	hasLabels := func(current, expected testutil.Metric) bool {
 		for key, value := range expected {
 			if current[key] != value {
 				return false
@@ -281,27 +278,27 @@ func TestAPIServerMetricsLabelsWithAllowList(t *testing.T) {
 	testCases := []struct {
 		name        string
 		metricName  string
-		labelName   model.LabelName
-		allowValues model.LabelValues
+		labelName   testutil.LabelName
+		allowValues testutil.LabelValues
 		isHistogram bool
 	}{
 		{
 			name:        "check CounterVec metric",
 			metricName:  "apiserver_request_total",
 			labelName:   "code",
-			allowValues: model.LabelValues{"201", "500"},
+			allowValues: testutil.LabelValues{"201", "500"},
 		},
 		{
 			name:        "check GaugeVec metric",
 			metricName:  "apiserver_current_inflight_requests",
 			labelName:   "request_kind",
-			allowValues: model.LabelValues{"mutating"},
+			allowValues: testutil.LabelValues{"mutating"},
 		},
 		{
 			name:        "check Histogram metric",
 			metricName:  "apiserver_request_duration_seconds",
 			labelName:   "verb",
-			allowValues: model.LabelValues{"POST", "LIST"},
+			allowValues: testutil.LabelValues{"POST", "LIST"},
 			isHistogram: true,
 		},
 	}
@@ -597,7 +594,7 @@ func TestAPIServerMetricsNamespaces(t *testing.T) {
 	}
 }
 
-func getSamples(s *kubeapiservertesting.TestServer) (model.Samples, error) {
+func getSamples(s *kubeapiservertesting.TestServer) (testutil.Samples, error) {
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
 		return nil, err
@@ -610,8 +607,8 @@ func getSamples(s *kubeapiservertesting.TestServer) (model.Samples, error) {
 	return samples, nil
 }
 
-func diffMetrics(newSamples model.Samples, oldSamples model.Samples) model.Samples {
-	samplesDiff := model.Samples{}
+func diffMetrics(newSamples testutil.Samples, oldSamples testutil.Samples) testutil.Samples {
+	samplesDiff := testutil.Samples{}
 	for _, sample := range newSamples {
 		if !sampleExistsInSamples(sample, oldSamples) {
 			samplesDiff = append(samplesDiff, sample)
@@ -620,7 +617,7 @@ func diffMetrics(newSamples model.Samples, oldSamples model.Samples) model.Sampl
 	return samplesDiff
 }
 
-func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
+func sampleExistsInSamples(s *testutil.Sample, samples testutil.Samples) bool {
 	for _, sample := range samples {
 		if sample.Equal(s) {
 			return true
@@ -721,9 +718,8 @@ type consistencyCheckStatus struct {
 	status   string
 }
 
-func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
-	parser := expfmt.NewTextParser(model.UTF8Validation)
-	mfs, err := parser.TextToMetricFamilies(r)
+func parseMetric(r io.Reader, name string) (*testutil.MetricFamily, error) {
+	mfs, err := testutil.TextToMetricFamilies(r)
 	if err != nil {
 		return nil, err
 	}
