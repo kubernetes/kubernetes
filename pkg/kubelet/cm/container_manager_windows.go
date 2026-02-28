@@ -324,8 +324,8 @@ func (cm *containerManagerImpl) GetAllocatableDevices(_ klog.Logger) []*podresou
 	return nil
 }
 
-func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity(extendedResource)
 }
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler(_ klog.Logger) lifecycle.PodAdmitHandler {
