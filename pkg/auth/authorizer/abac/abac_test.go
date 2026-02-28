@@ -18,7 +18,6 @@ package abac
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -28,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	v0 "k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 )
 
@@ -818,14 +817,14 @@ func TestSubjectMatches(t *testing.T) {
 }
 
 func newWithContents(t *testing.T, contents string) (PolicyList, error) {
-	f, err := ioutil.TempFile("", "abac_test")
+	f, err := os.CreateTemp("", "abac_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)
 	}
 	f.Close()
 	defer os.Remove(f.Name())
 
-	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+	if err := os.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
 
