@@ -138,6 +138,24 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaimStatus": {
+        "description": "PodGroupResourceClaimStatus is stored in the PodGroupStatus for each PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+            "type": "string"
+          },
+          "resourceClaimName": {
+            "description": "ResourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy": {
         "description": "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
         "properties": {
@@ -232,6 +250,24 @@
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "type",
             "x-kubernetes-patch-strategy": "merge"
+          },
+          "resourceClaimStatuses": {
+            "description": "Status of resource claims.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaimStatus"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           }
         },
         "type": "object"

@@ -74,6 +74,12 @@
         "reason": "reasonValue",
         "message": "messageValue"
       }
+    ],
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
+      }
     ]
   }
 }

@@ -1132,6 +1132,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha2.PodGroup{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha2_PodGroup(ref),
 		schedulingv1alpha2.PodGroupList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha2_PodGroupList(ref),
 		schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaim(ref),
+		schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName():                                             schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaimStatus(ref),
 		schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName():                                                schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingPolicy(ref),
 		schedulingv1alpha2.PodGroupSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha2_PodGroupSpec(ref),
 		schedulingv1alpha2.PodGroupStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref),
@@ -53883,6 +53884,35 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaim(ref common.Refer
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupResourceClaimStatus is stored in the PodGroupStatus for each PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54006,11 +54036,35 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref common.ReferenceCal
 							},
 						},
 					},
+					"resourceClaimStatuses": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of resource claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			metav1.Condition{}.OpenAPIModelName()},
+			schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 

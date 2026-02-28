@@ -47,6 +47,11 @@ func (in PodGroupResourceClaim) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodGroupResourceClaimStatus) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaimStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodGroupSchedulingPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy"
 }

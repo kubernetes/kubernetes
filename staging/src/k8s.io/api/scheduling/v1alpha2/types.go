@@ -365,7 +365,7 @@ type PodGroupStatus struct {
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
 	// +featureGate=DRAWorkloadResourceClaims
-	ResourceClaimStatuses []PodGroupResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ResourceClaimStatuses []PodGroupResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,2,rep,name=resourceClaimStatuses"`
 }
 
 // Well-known condition types for PodGroups.
@@ -409,7 +409,7 @@ type PodGroupResourceClaimStatus struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:format=k8s-long-name
-	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
 }
 
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).

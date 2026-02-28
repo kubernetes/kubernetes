@@ -102,7 +102,18 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 			return
 		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroupSpec { return &oldObj.Spec }), oldObj != nil)...)
 
-	// field schedulingv1alpha2.PodGroup.Status has no validation
+	// field schedulingv1alpha2.PodGroup.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodGroupStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroupStatus { return &oldObj.Status }), oldObj != nil)...)
+
 	return errs
 }
 
@@ -182,6 +193,33 @@ func Validate_PodGroupResourceClaim(ctx context.Context, op operation.Operation,
 		}(fldPath.Child("resourceClaimTemplateName"), obj.ResourceClaimTemplateName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupResourceClaim) *string {
 			return oldObj.ResourceClaimTemplateName
 		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodGroupResourceClaimStatus validates an instance of PodGroupResourceClaimStatus according
+// to declarative validation rules in the API schema.
+func Validate_PodGroupResourceClaimStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupResourceClaimStatus) (errs field.ErrorList) {
+	// field schedulingv1alpha2.PodGroupResourceClaimStatus.Name has no validation
+
+	// field schedulingv1alpha2.PodGroupResourceClaimStatus.ResourceClaimName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("resourceClaimName"), obj.ResourceClaimName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupResourceClaimStatus) *string { return oldObj.ResourceClaimName }), oldObj != nil)...)
 
 	return errs
 }
@@ -334,6 +372,46 @@ func Validate_PodGroupSpec(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("resourceClaims"), obj.ResourceClaims, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupSpec) []schedulingv1alpha2.PodGroupResourceClaim {
 			return oldObj.ResourceClaims
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodGroupStatus validates an instance of PodGroupStatus according
+// to declarative validation rules in the API schema.
+func Validate_PodGroupStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupStatus) (errs field.ErrorList) {
+	// field schedulingv1alpha2.PodGroupStatus.Conditions has no validation
+
+	// field schedulingv1alpha2.PodGroupStatus.ResourceClaimStatuses
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha2.PodGroupResourceClaimStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaimStatus, b schedulingv1alpha2.PodGroupResourceClaimStatus) bool {
+				return a.Name == b.Name
+			})...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaimStatus, b schedulingv1alpha2.PodGroupResourceClaimStatus) bool {
+				return a.Name == b.Name
+			}, validate.SemanticDeepEqual, Validate_PodGroupResourceClaimStatus)...)
+			return
+		}(fldPath.Child("resourceClaimStatuses"), obj.ResourceClaimStatuses, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupStatus) []schedulingv1alpha2.PodGroupResourceClaimStatus {
+			return oldObj.ResourceClaimStatuses
 		}), oldObj != nil)...)
 
 	return errs

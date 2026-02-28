@@ -76,6 +76,16 @@ func (PodGroupResourceClaim) SwaggerDoc() map[string]string {
 	return map_PodGroupResourceClaim
 }
 
+var map_PodGroupResourceClaimStatus = map[string]string{
+	"":                  "PodGroupResourceClaimStatus is stored in the PodGroupStatus for each PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+	"name":              "Name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+	"resourceClaimName": "ResourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+}
+
+func (PodGroupResourceClaimStatus) SwaggerDoc() map[string]string {
+	return map_PodGroupResourceClaimStatus
+}
+
 var map_PodGroupSchedulingPolicy = map[string]string{
 	"":      "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
 	"basic": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
@@ -98,8 +108,9 @@ func (PodGroupSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupStatus = map[string]string{
-	"":           "PodGroupStatus represents information about the status of a pod group.",
-	"conditions": "Conditions represent the latest observations of the PodGroup's state.\n\nKnown condition types: - \"PodGroupScheduled\": Indicates whether the scheduling requirement has been satisfied. - \"PodGroupDisruptionTarget\": Indicates whether the PodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the PodGroupScheduled condition: - \"Unschedulable\": The PodGroup cannot be scheduled due to resource constraints,\n  affinity/anti-affinity rules, or insufficient capacity for the gang.\n- \"SchedulerError\": The PodGroup cannot be scheduled due to some internal error\n  that happened during scheduling, for example due to nodeAffinity parsing errors.\n\nKnown reasons for the PodGroupDisruptionTarget condition: - \"PreemptionByScheduler\": The PodGroup was preempted by the scheduler to make room for\n  higher-priority PodGroups or Pods.",
+	"":                      "PodGroupStatus represents information about the status of a pod group.",
+	"conditions":            "Conditions represent the latest observations of the PodGroup's state.\n\nKnown condition types: - \"PodGroupScheduled\": Indicates whether the scheduling requirement has been satisfied. - \"PodGroupDisruptionTarget\": Indicates whether the PodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the PodGroupScheduled condition: - \"Unschedulable\": The PodGroup cannot be scheduled due to resource constraints,\n  affinity/anti-affinity rules, or insufficient capacity for the gang.\n- \"SchedulerError\": The PodGroup cannot be scheduled due to some internal error\n  that happened during scheduling, for example due to nodeAffinity parsing errors.\n\nKnown reasons for the PodGroupDisruptionTarget condition: - \"PreemptionByScheduler\": The PodGroup was preempted by the scheduler to make room for\n  higher-priority PodGroups or Pods.",
+	"resourceClaimStatuses": "Status of resource claims.",
 }
 
 func (PodGroupStatus) SwaggerDoc() map[string]string {

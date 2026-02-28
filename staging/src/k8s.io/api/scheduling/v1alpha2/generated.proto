@@ -129,6 +129,28 @@ message PodGroupResourceClaim {
   optional string resourceClaimTemplateName = 3;
 }
 
+// PodGroupResourceClaimStatus is stored in the PodGroupStatus for each
+// PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
+// generated name for the corresponding ResourceClaim.
+message PodGroupResourceClaimStatus {
+  // Name uniquely identifies this resource claim inside the PodGroup. This
+  // must match the name of an entry in podgroup.spec.resourceClaims, which
+  // implies that the string must be a DNS_LABEL.
+  //
+  // +required
+  optional string name = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was generated for
+  // the PodGroup in the namespace of the PodGroup. If this is unset, then
+  // generating a ResourceClaim was not necessary. The
+  // podgroup.spec.resourceClaims entry can be ignored in this case.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimName = 2;
+}
+
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
 // Exactly one policy must be set.
 // +union
@@ -216,6 +238,19 @@ message PodGroupStatus {
   // +listType=map
   // +listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+
+  // Status of resource claims.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=4
+  // +featureGate=DRAWorkloadResourceClaims
+  repeated PodGroupResourceClaimStatus resourceClaimStatuses = 2;
 }
 
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
