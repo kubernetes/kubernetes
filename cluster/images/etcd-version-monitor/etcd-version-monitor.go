@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/pflag"
 	"google.golang.org/protobuf/proto"
 
@@ -77,7 +76,7 @@ var (
 			// etcd 3.0 metric format for total grpc requests with renamed method and service labels.
 			"etcd_grpc_requests_total": {
 				rewriters: []rewriteFunc{
-					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+					func(mf *testutil.MetricFamily) (*testutil.MetricFamily, error) {
 						mf = deepCopyMetricFamily(mf)
 						renameLabels(mf, map[string]string{
 							"grpc_method":  "method",
@@ -94,7 +93,7 @@ var (
 					// pass all metrics directly through.
 					identity,
 					// Write to the etcd 3.0 metric format for backward compatibility.
-					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+					func(mf *testutil.MetricFamily) (*testutil.MetricFamily, error) {
 						mf = deepCopyMetricFamily(mf)
 						renameMetric(mf, "etcd_grpc_requests_total")
 						renameLabels(mf, map[string]string{
@@ -117,13 +116,13 @@ var (
 			// rewritten to the etcd 3.1+ format.
 			"etcd_grpc_unary_requests_duration_seconds": {
 				rewriters: []rewriteFunc{
-					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+					func(mf *testutil.MetricFamily) (*testutil.MetricFamily, error) {
 						mf = deepCopyMetricFamily(mf)
 						renameMetric(mf, "grpc_server_handling_seconds")
 						tpeName := "grpc_type"
 						tpeVal := "unary"
 						for _, m := range mf.Metric {
-							m.Label = append(m.Label, &dto.LabelPair{Name: &tpeName, Value: &tpeVal})
+							m.Label = append(m.Label, &testutil.LabelPair{Name: &tpeName, Value: &tpeVal})
 						}
 						return mf, nil
 					},
@@ -148,9 +147,9 @@ type exportedMetric struct {
 }
 
 // rewriteFunc rewrites metrics before they are exported.
-type rewriteFunc func(mf *dto.MetricFamily) (*dto.MetricFamily, error)
+type rewriteFunc func(mf *testutil.MetricFamily) (*testutil.MetricFamily, error)
 
-func (m *monitorGatherer) Gather() ([]*dto.MetricFamily, error) {
+func (m *monitorGatherer) Gather() ([]*testutil.MetricFamily, error) {
 	etcdMetrics, err := scrapeMetrics()
 	if err != nil {
 		return nil, err
@@ -163,14 +162,14 @@ func (m *monitorGatherer) Gather() ([]*dto.MetricFamily, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*dto.MetricFamily, 0, len(exported)+len(custom))
+	result := make([]*testutil.MetricFamily, 0, len(exported)+len(custom))
 	result = append(result, exported...)
 	result = append(result, custom...)
 	return result, nil
 }
 
-func (m *monitorGatherer) rewriteExportedMetrics(metrics map[string]*dto.MetricFamily) ([]*dto.MetricFamily, error) {
-	results := make([]*dto.MetricFamily, 0, len(metrics))
+func (m *monitorGatherer) rewriteExportedMetrics(metrics map[string]*testutil.MetricFamily) ([]*testutil.MetricFamily, error) {
+	results := make([]*testutil.MetricFamily, 0, len(metrics))
 	for n, mf := range metrics {
 		if e, ok := m.exported[n]; ok {
 			// Apply rewrite rules for metrics that have them.
@@ -258,7 +257,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 }
 
 // scrapeMetrics scrapes the prometheus metrics from the etcd metrics URI.
-func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
+func scrapeMetrics() (map[string]*testutil.MetricFamily, error) {
 	req, err := http.NewRequest("GET", etcdMetricsScrapeURI, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GET request for etcd metrics: %v", err)
@@ -275,11 +274,11 @@ func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
 	return testutil.TextToMetricFamilies(resp.Body)
 }
 
-func renameMetric(mf *dto.MetricFamily, name string) {
+func renameMetric(mf *testutil.MetricFamily, name string) {
 	mf.Name = &name
 }
 
-func renameLabels(mf *dto.MetricFamily, nameMapping map[string]string) {
+func renameLabels(mf *testutil.MetricFamily, nameMapping map[string]string) {
 	for _, m := range mf.Metric {
 		for _, lbl := range m.Label {
 			if alias, ok := nameMapping[*lbl.Name]; ok {
@@ -289,7 +288,7 @@ func renameLabels(mf *dto.MetricFamily, nameMapping map[string]string) {
 	}
 }
 
-func filterMetricsByLabels(mf *dto.MetricFamily, labelValues map[string]string) {
+func filterMetricsByLabels(mf *testutil.MetricFamily, labelValues map[string]string) {
 	buf := mf.Metric[:0]
 	for _, m := range mf.Metric {
 		shouldRemove := false
@@ -306,10 +305,10 @@ func filterMetricsByLabels(mf *dto.MetricFamily, labelValues map[string]string) 
 	mf.Metric = buf
 }
 
-func groupCounterMetricsByLabels(mf *dto.MetricFamily, names map[string]bool) {
+func groupCounterMetricsByLabels(mf *testutil.MetricFamily, names map[string]bool) {
 	buf := mf.Metric[:0]
 	deleteLabels(mf, names)
-	byLabels := map[string]*dto.Metric{}
+	byLabels := map[string]*testutil.ProtoMetric{}
 	for _, m := range mf.Metric {
 		if metric, ok := byLabels[labelsKey(m.Label)]; ok {
 			metric.Counter.Value = proto.Float64(*metric.Counter.Value + *m.Counter.Value)
@@ -321,7 +320,7 @@ func groupCounterMetricsByLabels(mf *dto.MetricFamily, names map[string]bool) {
 	mf.Metric = buf
 }
 
-func labelsKey(lbls []*dto.LabelPair) string {
+func labelsKey(lbls []*testutil.LabelPair) string {
 	var buf bytes.Buffer
 	for i, lbl := range lbls {
 		buf.WriteString(lbl.String())
@@ -332,7 +331,7 @@ func labelsKey(lbls []*dto.LabelPair) string {
 	return buf.String()
 }
 
-func deleteLabels(mf *dto.MetricFamily, names map[string]bool) {
+func deleteLabels(mf *testutil.MetricFamily, names map[string]bool) {
 	for _, m := range mf.Metric {
 		buf := m.Label[:0]
 		for _, lbl := range m.Label {
@@ -345,25 +344,25 @@ func deleteLabels(mf *dto.MetricFamily, names map[string]bool) {
 	}
 }
 
-func identity(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+func identity(mf *testutil.MetricFamily) (*testutil.MetricFamily, error) {
 	return mf, nil
 }
 
-func deepCopyMetricFamily(mf *dto.MetricFamily) *dto.MetricFamily {
-	r := &dto.MetricFamily{}
+func deepCopyMetricFamily(mf *testutil.MetricFamily) *testutil.MetricFamily {
+	r := &testutil.MetricFamily{}
 	r.Name = mf.Name
 	r.Help = mf.Help
 	r.Type = mf.Type
-	r.Metric = make([]*dto.Metric, len(mf.Metric))
+	r.Metric = make([]*testutil.ProtoMetric, len(mf.Metric))
 	for i, m := range mf.Metric {
 		r.Metric[i] = deepCopyMetric(m)
 	}
 	return r
 }
 
-func deepCopyMetric(m *dto.Metric) *dto.Metric {
-	r := &dto.Metric{}
-	r.Label = make([]*dto.LabelPair, len(m.Label))
+func deepCopyMetric(m *testutil.ProtoMetric) *testutil.ProtoMetric {
+	r := &testutil.ProtoMetric{}
+	r.Label = make([]*testutil.LabelPair, len(m.Label))
 	for i, lp := range m.Label {
 		r.Label[i] = deepCopyLabelPair(lp)
 	}
@@ -376,8 +375,8 @@ func deepCopyMetric(m *dto.Metric) *dto.Metric {
 	return r
 }
 
-func deepCopyLabelPair(lp *dto.LabelPair) *dto.LabelPair {
-	r := &dto.LabelPair{}
+func deepCopyLabelPair(lp *testutil.LabelPair) *testutil.LabelPair {
+	r := &testutil.LabelPair{}
 	r.Name = lp.Name
 	r.Value = lp.Value
 	return r
