@@ -22,25 +22,17 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
-const (
-	// containerTopologyScope specifies the TopologyManagerScope per container.
-	containerTopologyScope = "container"
-	// podTopologyScope specifies the TopologyManagerScope per pod.
-	podTopologyScope = "pod"
-	// noneTopologyScope specifies the TopologyManagerScope when topologyPolicyName is none.
-	noneTopologyScope = "none"
 )
 
 type podTopologyHints map[string]map[string]TopologyHint
 
 // Scope interface for Topology Manager
 type Scope interface {
-	Name() string
+	Name() kubeletconfig.TopologyManagerScope
 	GetPolicy() Policy
 	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
@@ -56,7 +48,7 @@ type Scope interface {
 
 type scope struct {
 	mutex sync.Mutex
-	name  string
+	name  kubeletconfig.TopologyManagerScope
 	// Mapping of a Pods mapping of Containers and their TopologyHints
 	// Indexed by PodUID to ContainerName
 	podTopologyHints podTopologyHints
@@ -68,7 +60,7 @@ type scope struct {
 	podMap containermap.ContainerMap
 }
 
-func (s *scope) Name() string {
+func (s *scope) Name() kubeletconfig.TopologyManagerScope {
 	return s.name
 }
 

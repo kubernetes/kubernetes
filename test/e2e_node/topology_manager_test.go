@@ -53,8 +53,6 @@ import (
 const (
 	numaAlignmentCommand      = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env;`
 	numaAlignmentSleepCommand = numaAlignmentCommand + `sleep 1d;`
-	podScopeTopology          = "pod"
-	containerScopeTopology    = "container"
 
 	minNumaNodes                  = 2
 	minNumaNodesPreferClosestNUMA = 4
@@ -254,7 +252,7 @@ func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (in
 	return findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes)
 }
 
-func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, policy, scope string, topologyOptions map[string]string, configMap *v1.ConfigMap, numaNodes int) (*kubeletconfig.KubeletConfiguration, string) {
+func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, policy kubeletconfig.TopologyManagerPolicy, scope kubeletconfig.TopologyManagerScope, topologyOptions map[string]string, configMap *v1.ConfigMap, numaNodes int) (*kubeletconfig.KubeletConfiguration, string) {
 	// Configure Topology Manager in Kubelet with policy.
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
@@ -484,11 +482,11 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 
 	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/693-topology-manager/README.md#multi-numa-systems-tests
 	// we can do a meaningful validation only when using the single-numa node policy
-	if envInfo.policy == topologymanager.PolicySingleNumaNode {
+	if envInfo.policy == kubeletconfig.SingleNumaNodeTopologyManagerPolicy {
 		for _, pod := range podMap {
 			validatePodAlignment(ctx, f, pod, envInfo)
 		}
-		if envInfo.scope == podScopeTopology {
+		if envInfo.scope == kubeletconfig.PodTopologyManagerScope {
 			for _, pod := range podMap {
 				err := validatePodAlignmentWithPodScope(ctx, f, pod, envInfo)
 				framework.ExpectNoError(err)
@@ -679,7 +677,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 	removeSRIOVConfigOrFail(ctx, f, sd)
 }
 
-func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
+func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, policy kubeletconfig.TopologyManagerPolicy, numaNodes, coreCount int) {
 	smtLevel := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
@@ -690,7 +688,7 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
 		policy:            policy,
-		scope:             podScopeTopology,
+		scope:             kubeletconfig.PodTopologyManagerScope,
 	}
 
 	ginkgo.By(fmt.Sprintf("Admit two guaranteed pods. Both consist of 2 containers, each container with 1 CPU core. Use 1 %s device.", sd.resourceName))
@@ -867,7 +865,7 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 	teardownSRIOVConfigOrFail(ctx, f, sd)
 }
 
-func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
+func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs string, policy kubeletconfig.TopologyManagerPolicy, numaNodes, coreCount int) {
 	smtLevel := smtLevelFromSysFS()
 
 	waitForSRIOVResources(ctx, f, sd)
@@ -1080,7 +1078,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 	}
 
 	// this is the only policy that can guarantee reliable rejects
-	if policy == topologymanager.PolicySingleNumaNode {
+	if policy == kubeletconfig.SingleNumaNodeTopologyManagerPolicy {
 		// overflow NUMA node capacity: cores
 		numCores := 1 + (smtLevel * coreCount)
 		excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
@@ -1309,18 +1307,18 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var err error
 
-	var policies = []string{
-		topologymanager.PolicySingleNumaNode,
-		topologymanager.PolicyRestricted,
-		topologymanager.PolicyBestEffort,
-		topologymanager.PolicyNone,
+	var policies = []kubeletconfig.TopologyManagerPolicy{
+		kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
+		kubeletconfig.RestrictedTopologyManagerPolicy,
+		kubeletconfig.BestEffortTopologyManagerPolicy,
+		kubeletconfig.NoneTopologyManagerPolicy,
 	}
 
 	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
-		scope := containerScopeTopology
+		scope := kubeletconfig.ContainerTopologyManagerScope
 		for _, policy := range policies {
 			// Configure Topology Manager
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
@@ -1344,7 +1342,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 		ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 
-		scope := containerScopeTopology
+		scope := kubeletconfig.ContainerTopologyManagerScope
 		for _, policy := range policies {
 			// Configure Topology Manager
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
@@ -1365,8 +1363,8 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
-		policy := topologymanager.PolicySingleNumaNode
-		scope := podScopeTopology
+		policy := kubeletconfig.SingleNumaNodeTopologyManagerPolicy
+		scope := kubeletconfig.PodTopologyManagerScope
 
 		newCfg, reservedSystemCPUs := configureTopologyManagerInKubelet(oldCfg, policy, scope, topologyOptions, configMap, numaNodes)
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -1397,8 +1395,8 @@ func runPreferClosestNUMATests(f *framework.Framework) {
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
-		policy := topologymanager.PolicyBestEffort
-		scope := containerScopeTopology
+		policy := kubeletconfig.BestEffortTopologyManagerPolicy
+		scope := kubeletconfig.ContainerTopologyManagerScope
 		options := map[string]string{topologymanager.PreferClosestNUMANodes: "true"}
 
 		newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, options, &v1.ConfigMap{}, numaNodes)

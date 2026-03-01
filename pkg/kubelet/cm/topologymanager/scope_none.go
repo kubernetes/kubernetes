@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -35,7 +36,7 @@ var _ Scope = &noneScope{}
 func NewNoneScope() Scope {
 	return &noneScope{
 		scope{
-			name:             noneTopologyScope,
+			name:             kubeletconfig.NoneTopologyManagerScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           NewNonePolicy(),
 			podMap:           containermap.NewContainerMap(),

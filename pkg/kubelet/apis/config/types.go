@@ -31,19 +31,25 @@ type HairpinMode string
 const (
 	// Set the hairpin flag on the veth of containers in the respective
 	// container runtime.
-	HairpinVeth = "hairpin-veth"
+	HairpinVeth HairpinMode = "hairpin-veth"
 	// Make the container bridge promiscuous. This will force it to accept
 	// hairpin packets, even if the flag isn't set on ports of the bridge.
-	PromiscuousBridge = "promiscuous-bridge"
+	PromiscuousBridge HairpinMode = "promiscuous-bridge"
 	// Neither of the above. If the kubelet is started in this hairpin mode
 	// and kube-proxy is running in iptables mode, hairpin packets will be
 	// dropped by the container bridge.
-	HairpinNone = "none"
+	HairpinNone HairpinMode = "none"
 )
 
 // ResourceChangeDetectionStrategy denotes a mode in which internal
 // managers (secret, configmap) are discovering object changes.
 type ResourceChangeDetectionStrategy string
+
+// TopologyManagerPolicy denotes the policy of topology hint generation.
+type TopologyManagerPolicy string
+
+// TopologyManagerScope denotes the scope of topology hint generation.
+type TopologyManagerScope string
 
 // Enum settings for different strategies of kubelet managers.
 const (
@@ -58,22 +64,25 @@ const (
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
 	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with optimal NUMA node alignment for requested resources
-	RestrictedTopologyManagerPolicy = "restricted"
+	RestrictedTopologyManagerPolicy TopologyManagerPolicy = "restricted"
 	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
-	BestEffortTopologyManagerPolicy = "best-effort"
+	BestEffortTopologyManagerPolicy TopologyManagerPolicy = "best-effort"
 	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
-	NoneTopologyManagerPolicy = "none"
+	NoneTopologyManagerPolicy TopologyManagerPolicy = "none"
 	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with a single NUMA alignment of CPU and device resources.
-	SingleNumaNodeTopologyManagerPolicy = "single-numa-node"
+	SingleNumaNodeTopologyManagerPolicy TopologyManagerPolicy = "single-numa-node"
 	// ContainerTopologyManagerScope represents that
 	// topology policy is applied on a per-container basis.
-	ContainerTopologyManagerScope = "container"
+	ContainerTopologyManagerScope TopologyManagerScope = "container"
 	// PodTopologyManagerScope represents that
 	// topology policy is applied on a per-pod basis.
-	PodTopologyManagerScope = "pod"
+	PodTopologyManagerScope TopologyManagerScope = "pod"
+	// NoneTopologyManagerScope is set implicitly when NoneTopologyManagerPolicy is used,
+	// and represents that topology policy is not applied.
+	NoneTopologyManagerScope TopologyManagerScope = "none"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -266,12 +275,12 @@ type KubeletConfiguration struct {
 	// Requires the MemoryManager feature gate to be enabled.
 	MemoryManagerPolicy string
 	// TopologyManagerPolicy is the name of the policy to use.
-	TopologyManagerPolicy string
+	TopologyManagerPolicy TopologyManagerPolicy
 	// TopologyManagerScope represents the scope of topology hint generation
 	// that topology manager requests and hint providers generate.
 	// Default: "container"
 	// +optional
-	TopologyManagerScope string
+	TopologyManagerScope TopologyManagerScope
 	// TopologyManagerPolicyOptions is a set of key=value which allows to set extra options
 	// to fine tune the behaviour of the topology manager policies.
 	// Requires  both the "TopologyManager" and "TopologyManagerPolicyOptions" feature gates to be enabled.
@@ -291,7 +300,7 @@ type KubeletConfiguration struct {
 	//   "none":               do nothing.
 	// Generally, one must set --hairpin-mode=hairpin-veth to achieve hairpin NAT,
 	// because promiscuous-bridge assumes the existence of a container bridge named cbr0.
-	HairpinMode string
+	HairpinMode HairpinMode
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
 	// The CIDR to use for pod IP addresses, only used in standalone mode.

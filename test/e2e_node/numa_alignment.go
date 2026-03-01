@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -180,8 +181,8 @@ func makeEnvMap(logs string) (map[string]string, error) {
 type testEnvInfo struct {
 	numaNodes         int
 	sriovResourceName string
-	policy            string
-	scope             string
+	policy            kubeletconfig.TopologyManagerPolicy
+	scope             kubeletconfig.TopologyManagerScope
 }
 
 func containerWantsDevices(cnt *v1.Container, envInfo *testEnvInfo) bool {

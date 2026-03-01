@@ -18,13 +18,14 @@ package topologymanager
 
 import (
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 // Policy interface for Topology Manager Pod Admit Result
 type Policy interface {
 	// Returns Policy Name
-	Name() string
+	Name() kubeletconfig.TopologyManagerPolicy
 	// Returns a merged TopologyHint based on input from hint providers
 	// and a Pod Admit Handler Response based on hints and policy type
 	Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool)
@@ -35,7 +36,7 @@ type Policy interface {
 func IsAlignmentGuaranteed(p Policy) bool {
 	// We are abusing the name, but atm this matches almost 1:1 the policy name
 	// so we are not adding new fields for now.
-	return p.Name() == PolicySingleNumaNode
+	return p.Name() == kubeletconfig.SingleNumaNodeTopologyManagerPolicy
 }
 
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
@@ -147,7 +148,7 @@ type HintMerger struct {
 	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName kubeletconfig.TopologyManagerPolicy, opts PolicyOptions) HintMerger {
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
@@ -156,7 +157,7 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string
 
 		// Otherwise compare the hints, based on the policy options provided
 		var best bitmask.BitMask
-		if (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA {
+		if (policyName != kubeletconfig.SingleNumaNodeTopologyManagerPolicy) && opts.PreferClosestNUMA {
 			best = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
 		} else {
 			best = numaInfo.Narrowest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)

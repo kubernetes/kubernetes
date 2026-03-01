@@ -189,14 +189,14 @@ type NodeConfig struct {
 	QOSReserved                  map[v1.ResourceName]int64
 	CPUManagerPolicy             string
 	CPUManagerPolicyOptions      map[string]string
-	TopologyManagerScope         string
+	TopologyManagerScope         kubeletconfig.TopologyManagerScope
 	CPUManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration
-	TopologyManagerPolicy        string
+	TopologyManagerPolicy        kubeletconfig.TopologyManagerPolicy
 	TopologyManagerPolicyOptions map[string]string
 	CgroupVersion                int
 }

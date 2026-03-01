@@ -26,6 +26,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -38,61 +39,32 @@ func NewTestBitMask(sockets ...int) bitmask.BitMask {
 
 func TestNewManager(t *testing.T) {
 	tcases := []struct {
-		description    string
-		policyName     string
-		expectedPolicy string
-		expectedError  error
-		topologyError  error
-		policyOptions  map[string]string
-		topology       []cadvisorapi.Node
+		description   string
+		policy        kubeletconfig.TopologyManagerPolicy
+		expectedError error
+		topologyError error
+		policyOptions map[string]string
+		topology      []cadvisorapi.Node
 	}{
 		{
-			description:    "Policy is set to none",
-			policyName:     "none",
-			expectedPolicy: "none",
-		},
-		{
-			description:    "Policy is set to best-effort",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
-		},
-		{
-			description:    "Policy is set to restricted",
-			policyName:     "restricted",
-			expectedPolicy: "restricted",
-		},
-		{
-			description:    "Policy is set to single-numa-node",
-			policyName:     "single-numa-node",
-			expectedPolicy: "single-numa-node",
-		},
-		{
-			description:   "Policy is set to unknown",
-			policyName:    "unknown",
-			expectedError: fmt.Errorf("unknown policy: \"unknown\""),
-		},
-		{
-			description:    "Unknown policy name best-effort policy",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
-			expectedError:  fmt.Errorf("unknown Topology Manager Policy option:"),
+			description:   "Unknown policy name best-effort policy",
+			policy:        kubeletconfig.BestEffortTopologyManagerPolicy,
+			expectedError: fmt.Errorf("unknown Topology Manager Policy option:"),
 			policyOptions: map[string]string{
 				"unknown-option": "true",
 			},
 		},
 		{
-			description:    "Unknown policy name restricted policy",
-			policyName:     "restricted",
-			expectedPolicy: "restricted",
-			expectedError:  fmt.Errorf("unknown Topology Manager Policy option:"),
+			description:   "Unknown policy name restricted policy",
+			policy:        kubeletconfig.RestrictedTopologyManagerPolicy,
+			expectedError: fmt.Errorf("unknown Topology Manager Policy option:"),
 			policyOptions: map[string]string{
 				"unknown-option": "true",
 			},
 		},
 		{
-			description:    "can't get NUMA distances",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
+			description: "can't get NUMA distances",
+			policy:      kubeletconfig.BestEffortTopologyManagerPolicy,
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
 			},
@@ -104,10 +76,9 @@ func TestNewManager(t *testing.T) {
 			},
 		},
 		{
-			description:    "more than 8 NUMA nodes",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
-			expectedError:  fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", defaultMaxAllowableNUMANodes),
+			description:   "more than 8 NUMA nodes",
+			policy:        kubeletconfig.BestEffortTopologyManagerPolicy,
+			expectedError: fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", defaultMaxAllowableNUMANodes),
 			topology: []cadvisorapi.Node{
 				{
 					Id: 0,
@@ -143,63 +114,15 @@ func TestNewManager(t *testing.T) {
 	for _, tc := range tcases {
 		topology := tc.topology
 
-		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
+		_, err := NewManager(topology, tc.policy, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
 			}
-		} else {
-			rawMgr := mngr.(*manager)
-			var policyName string
-			if rawScope, ok := rawMgr.scope.(*containerScope); ok {
-				policyName = rawScope.policy.Name()
-			} else if rawScope, ok := rawMgr.scope.(*noneScope); ok {
-				policyName = rawScope.policy.Name()
-			}
-			if policyName != tc.expectedPolicy {
-				t.Errorf("Unexpected policy name. Have: %q wants %q", policyName, tc.expectedPolicy)
-			}
+		} else if err != nil {
+			t.Errorf("Unexpected error: %v", err)
 		}
-	}
-}
 
-func TestManagerScope(t *testing.T) {
-	tcases := []struct {
-		description   string
-		scopeName     string
-		expectedScope string
-		expectedError error
-	}{
-		{
-			description:   "Topology Manager Scope is set to container",
-			scopeName:     "container",
-			expectedScope: "container",
-		},
-		{
-			description:   "Topology Manager Scope is set to pod",
-			scopeName:     "pod",
-			expectedScope: "pod",
-		},
-		{
-			description:   "Topology Manager Scope is set to unknown",
-			scopeName:     "unknown",
-			expectedError: fmt.Errorf("unknown scope: \"unknown\""),
-		},
-	}
-
-	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
-
-		if tc.expectedError != nil {
-			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
-				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
-			}
-		} else {
-			rawMgr := mngr.(*manager)
-			if rawMgr.scope.Name() != tc.expectedScope {
-				t.Errorf("Unexpected scope name. Have: %q wants %q", rawMgr.scope, tc.expectedScope)
-			}
-		}
 	}
 }
 

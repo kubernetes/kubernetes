@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -129,7 +130,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 			scope{
 				hintProviders: tc.hp,
 				policy:        &mockPolicy{},
-				name:          podTopologyScope,
+				name:          kubeletconfig.PodTopologyManagerScope,
 			},
 		}
 
