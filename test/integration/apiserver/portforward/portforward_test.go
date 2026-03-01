@@ -43,8 +43,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeletportforward "k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/kubectl/pkg/cmd/portforward"
-	kubeletportforward "k8s.io/kubelet/pkg/cri/streaming/portforward"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
@@ -58,7 +58,7 @@ func TestPortforward(t *testing.T) {
 	t.Setenv("KUBECTL_PORT_FORWARD_WEBSOCKETS", "true")
 
 	var podName string
-	var podUID types.UID
+	var podUID string
 	backendServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("backend saw request: %v", req.URL.String())
 		kubeletportforward.ServePortForward(
@@ -213,7 +213,7 @@ type dummyPortForwarder struct {
 	t *testing.T
 }
 
-func (d *dummyPortForwarder) PortForward(ctx context.Context, name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+func (d *dummyPortForwarder) PortForward(ctx context.Context, name string, uid string, port int32, stream io.ReadWriteCloser) error {
 	d.t.Logf("handling port forward request for %d", port)
 
 	req, err := http.ReadRequest(bufio.NewReader(stream))

@@ -22,11 +22,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/klog/v2"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // spdyStreamExecutor handles transporting standard shell streams over an httpstream connection.
@@ -109,7 +109,7 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 			return fmt.Errorf("redirect not allowed")
 		}
 	}
-	conn, protocol, err := spdy.Negotiate(
+	conn, protocol, err := spdy.NegotiateStreaming(
 		e.upgrader,
 		&client,
 		req,

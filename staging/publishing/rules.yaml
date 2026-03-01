@@ -2,6 +2,9 @@ rules:
 - destination: apimachinery
   branches:
   - name: master
+    dependencies:
+    - repository: streaming
+      branch: master
     source:
       branch: master
       dirs:
@@ -32,6 +35,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     source:
       branch: master
@@ -75,6 +80,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -149,6 +156,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     source:
       branch: master
       dirs:
@@ -190,6 +199,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -254,6 +265,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
@@ -317,6 +330,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     source:
       branch: master
       dirs:
@@ -359,6 +374,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -442,6 +459,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -544,6 +563,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -672,6 +693,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
@@ -768,6 +791,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
@@ -881,6 +906,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
@@ -956,6 +983,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: client-go
       branch: master
     source:
@@ -1018,6 +1047,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: cli-runtime
       branch: master
@@ -1088,6 +1119,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: component-base
       branch: master
@@ -1192,6 +1225,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: client-go
       branch: master
     - repository: component-base
@@ -1267,23 +1302,40 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-client
   library: true
+- destination: cri-streaming
+  branches:
+  - name: master
+    dependencies:
+    - repository: cri-api
+      branch: master
+    - repository: streaming
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/cri-streaming
+  library: true
+- destination: streaming
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/streaming
+  library: true
 - destination: kubelet
   branches:
   - name: master
     dependencies:
     - repository: apimachinery
       branch: master
-    - repository: apiserver
+    - repository: streaming
       branch: master
     - repository: api
       branch: master
     - repository: client-go
       branch: master
-    - repository: cri-api
-      branch: master
     - repository: component-base
-      branch: master
-    - repository: kms
       branch: master
     source:
       branch: master
@@ -1378,6 +1430,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: client-go
       branch: master
     - repository: component-base
@@ -1470,6 +1524,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: apiserver
       branch: master
@@ -1581,6 +1637,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: apiserver
       branch: master
@@ -1705,6 +1763,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: api
       branch: master
     source:
@@ -1759,6 +1819,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     source:
       branch: master
@@ -1840,6 +1902,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: cli-runtime
       branch: master
@@ -1954,6 +2018,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: apiserver
       branch: master
     - repository: client-go
@@ -2045,13 +2111,13 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: apiserver
       branch: master
     - repository: api
       branch: master
     - repository: client-go
-      branch: master
-    - repository: cri-api
       branch: master
     - repository: component-base
       branch: master
@@ -2167,6 +2233,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: streaming
+      branch: master
     - repository: component-base
       branch: master
     - repository: api
@@ -2271,6 +2339,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: streaming
       branch: master
     - repository: client-go
       branch: master

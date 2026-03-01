@@ -38,6 +38,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
+  - k8s.io/streaming
   - k8s.io/utils/clock
   - k8s.io/utils/dump
   - k8s.io/utils/net
@@ -80,6 +81,7 @@
   - k8s.io/client-go
   - k8s.io/klog
   - k8s.io/kube-openapi
+  - k8s.io/streaming
   - k8s.io/utils
 
 # prevent core machinery from taking explicit v1 references unless
@@ -116,6 +118,7 @@
   - k8s.io/client-go
   - k8s.io/component-base
   - k8s.io/kube-openapi
+  - k8s.io/streaming
   - k8s.io/utils
   - k8s.io/klog
   - k8s.io/kms
@@ -139,6 +142,7 @@
   - k8s.io/component-base
   - k8s.io/kube-aggregator
   - k8s.io/kube-openapi
+  - k8s.io/streaming
   - k8s.io/klog
   - k8s.io/utils
 
@@ -153,6 +157,7 @@
   - k8s.io/kubectl
   - k8s.io/kube-openapi
   - k8s.io/metrics
+  - k8s.io/streaming
   - k8s.io/utils
   - k8s.io/klog
 
@@ -325,6 +330,20 @@
   - k8s.io/cri-api
   - k8s.io/cri-client
   - k8s.io/klog/v2
+  - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/cri-streaming"
+  allowedImports:
+  - k8s.io/cri-api
+  - k8s.io/cri-streaming
+  - k8s.io/klog/v2
+  - k8s.io/streaming
+  - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/streaming"
+  allowedImports:
+  - k8s.io/klog/v2
+  - k8s.io/streaming
   - k8s.io/utils
 
 - baseImportPath: "./staging/src/k8s.io/externaljwt"
