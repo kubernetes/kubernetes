@@ -44,3 +44,7 @@ const ToleranceScaleDownAnnotation = "autoscaling.alpha.kubernetes.io/scale-down
 // ToleranceScaleUpAnnotation is the annotation which holds the HPA tolerance specs
 // when converting the `ScaleUp.Tolerance` field from autoscaling/v2
 const ToleranceScaleUpAnnotation = "autoscaling.alpha.kubernetes.io/scale-up-tolerance"
+
+// FallbackExternalMetricsAnnotation is the annotation which holds the HPA external fallback specs
+// When converting `ExternalMetricSource.Fallback` field from autoscaling/v2
+const FallbackExternalMetricsAnnotation = "autoscaling.alpha.kubernetes.io/fallback-external-metrics"

@@ -40,7 +40,8 @@ func DropRoundTripHorizontalPodAutoscalerAnnotations(in map[string]string) (out 
 	_, hasToleranceScaleUp := in[ToleranceScaleUpAnnotation]
 	_, hasMetricsStatuses := in[MetricStatusesAnnotation]
 	_, hasConditions := in[HorizontalPodAutoscalerConditionsAnnotation]
-	if hasMetricsSpecs || hasBehaviorSpecs || hasToleranceScaleDown || hasToleranceScaleUp || hasMetricsStatuses || hasConditions {
+	_, hasFallbacks := in[FallbackExternalMetricsAnnotation]
+	if hasMetricsSpecs || hasBehaviorSpecs || hasToleranceScaleDown || hasToleranceScaleUp || hasMetricsStatuses || hasConditions || hasFallbacks {
 		out = DeepCopyStringMap(in)
 		delete(out, MetricSpecsAnnotation)
 		delete(out, BehaviorSpecsAnnotation)
@@ -48,6 +49,7 @@ func DropRoundTripHorizontalPodAutoscalerAnnotations(in map[string]string) (out 
 		delete(out, ToleranceScaleUpAnnotation)
 		delete(out, MetricStatusesAnnotation)
 		delete(out, HorizontalPodAutoscalerConditionsAnnotation)
+		delete(out, FallbackExternalMetricsAnnotation)
 		return out, true
 	}
 	return in, false

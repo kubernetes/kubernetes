@@ -3094,9 +3094,22 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.autoscaling.v2.ExternalMetricFallback
+  map:
+    fields:
+    - name: failureDurationSeconds
+      type:
+        scalar: numeric
+    - name: replicas
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.autoscaling.v2.ExternalMetricSource
   map:
     fields:
+    - name: fallback
+      type:
+        namedType: io.k8s.api.autoscaling.v2.ExternalMetricFallback
     - name: metric
       type:
         namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
@@ -3112,10 +3125,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v2.MetricValueStatus
       default: {}
+    - name: firstFailureTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: metric
       type:
         namedType: io.k8s.api.autoscaling.v2.MetricIdentifier
       default: {}
+    - name: metricFetchStatus
+      type:
+        scalar: string
 - name: io.k8s.api.autoscaling.v2.HPAScalingPolicy
   map:
     fields:

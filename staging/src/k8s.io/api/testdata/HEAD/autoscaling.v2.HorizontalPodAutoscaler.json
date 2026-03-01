@@ -151,6 +151,10 @@
             "value": "0",
             "averageValue": "0",
             "averageUtilization": 4
+          },
+          "fallback": {
+            "failureDurationSeconds": 1,
+            "replicas": 2
           }
         }
       }
@@ -282,7 +286,9 @@
             "value": "0",
             "averageValue": "0",
             "averageUtilization": 3
-          }
+          },
+          "metricFetchStatus": "metricFetchStatusValue",
+          "firstFailureTime": "2004-01-01T01:01:01Z"
         }
       }
     ],

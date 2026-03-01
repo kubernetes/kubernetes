@@ -60,10 +60,21 @@ func (CrossVersionObjectReference) SwaggerDoc() map[string]string {
 	return map_CrossVersionObjectReference
 }
 
+var map_ExternalMetricFallback = map[string]string{
+	"":                       "ExternalMetricFallback defines fallback behavior when an external metric cannot be retrieved",
+	"failureDurationSeconds": "failureDurationSeconds is the duration in seconds for which the external metric must be continuously failing before the fallback value is used. The duration is measured from the first consecutive failure. Must be greater than 0. default=180 min=180",
+	"replicas":               "replicas is the desired replica count to use when the external metric cannot be retrieved. This value is treated as the desired replica count from this metric. When multiple metrics are configured, the HPA controller uses the maximum of all desired replica counts (standard HPA multi-metric behavior). Must be greater than 0.",
+}
+
+func (ExternalMetricFallback) SwaggerDoc() map[string]string {
+	return map_ExternalMetricFallback
+}
+
 var map_ExternalMetricSource = map[string]string{
-	"":       "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
-	"metric": "metric identifies the target metric by name and selector",
-	"target": "target specifies the target value for the given metric",
+	"":         "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+	"metric":   "metric identifies the target metric by name and selector",
+	"target":   "target specifies the target value for the given metric",
+	"fallback": "fallback defines the behavior when this external metric cannot be retrieved. If not set, the HPA will not scale based on this metric when it's unavailable.",
 }
 
 func (ExternalMetricSource) SwaggerDoc() map[string]string {
@@ -71,9 +82,11 @@ func (ExternalMetricSource) SwaggerDoc() map[string]string {
 }
 
 var map_ExternalMetricStatus = map[string]string{
-	"":        "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
-	"metric":  "metric identifies the target metric by name and selector",
-	"current": "current contains the current value for the given metric",
+	"":                  "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
+	"metric":            "metric identifies the target metric by name and selector",
+	"current":           "current contains the current value for the given metric",
+	"metricFetchStatus": "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+	"firstFailureTime":  "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.",
 }
 
 func (ExternalMetricStatus) SwaggerDoc() map[string]string {

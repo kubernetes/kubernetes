@@ -2000,3 +2000,180 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 		t.Error("expected error, APIVersion should be checked")
 	}
 }
+
+func TestValidateMetricFallback(t *testing.T) {
+	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
+	if err != nil {
+		t.Errorf("unable to parse label selector: %v", err)
+	}
+
+	makeHPAWithFallback := func(fallback *autoscaling.ExternalMetricFallback) autoscaling.HorizontalPodAutoscaler {
+		return autoscaling.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind:       "Deployment",
+					Name:       "mydeployment",
+					APIVersion: "apps/v1",
+				},
+				MinReplicas: ptr.To[int32](2),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{{
+					Type: autoscaling.ExternalMetricSourceType,
+					External: &autoscaling.ExternalMetricSource{
+						Metric: autoscaling.MetricIdentifier{
+							Name:     "somemetric",
+							Selector: metricLabelSelector,
+						},
+						Target: autoscaling.MetricTarget{
+							Type:  autoscaling.ValueMetricType,
+							Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+						},
+						Fallback: fallback,
+					},
+				}},
+			},
+		}
+	}
+
+	successCases := []struct {
+		name     string
+		fallback *autoscaling.ExternalMetricFallback
+	}{
+		{
+			name:     "nil fallback",
+			fallback: nil,
+		},
+		{
+			name: "valid fallback with minimum failureDurationSeconds",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               3,
+				FailureDurationSeconds: ptr.To[int64](180),
+			},
+		},
+		{
+			name: "valid fallback with large failureDurationSeconds",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               5,
+				FailureDurationSeconds: ptr.To[int64](3600),
+			},
+		},
+		{
+			name: "valid fallback with nil failureDurationSeconds",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas: 2,
+			},
+		},
+		{
+			name: "valid fallback with replicas 2",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               2,
+				FailureDurationSeconds: ptr.To[int64](300),
+			},
+		},
+	}
+
+	for _, tc := range successCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hpa := makeHPAWithFallback(tc.fallback)
+			if errs := ValidateHorizontalPodAutoscaler(&hpa, hpaSpecValidationOpts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	errorCases := []struct {
+		name     string
+		fallback *autoscaling.ExternalMetricFallback
+		msg      string
+	}{
+		{
+			name: "failureDurationSeconds just below minimum",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               3,
+				FailureDurationSeconds: ptr.To[int64](179),
+			},
+			msg: "must be at least 180 seconds",
+		},
+		{
+			name: "failureDurationSeconds zero",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               3,
+				FailureDurationSeconds: ptr.To[int64](0),
+			},
+			msg: "must be at least 180 seconds",
+		},
+		{
+			name: "negative failureDurationSeconds",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               3,
+				FailureDurationSeconds: ptr.To[int64](-1),
+			},
+			msg: "must be at least 180 seconds",
+		},
+		{
+			name: "replicas zero",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               0,
+				FailureDurationSeconds: ptr.To[int64](300),
+			},
+			msg: "must be greater than 0",
+		},
+		{
+			name: "negative replicas",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               -1,
+				FailureDurationSeconds: ptr.To[int64](300),
+			},
+			msg: "must be greater than 0",
+		},
+		{
+			name: "lower then minReplicas",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               1,
+				FailureDurationSeconds: ptr.To[int64](300),
+			},
+			msg: "must be greater than minReplicas",
+		},
+		{
+			name: "bigger then maxReplicas",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               10,
+				FailureDurationSeconds: ptr.To[int64](300),
+			},
+			msg: "must be lower than maxReplicas",
+		},
+		{
+			name: "both replicas and failureDurationSeconds invalid",
+			fallback: &autoscaling.ExternalMetricFallback{
+				Replicas:               0,
+				FailureDurationSeconds: ptr.To[int64](10),
+			},
+			msg: "must be at least 180 seconds",
+		},
+	}
+
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hpa := makeHPAWithFallback(tc.fallback)
+			errs := ValidateHorizontalPodAutoscaler(&hpa, hpaSpecValidationOpts)
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %q", tc.msg)
+			} else {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Error(), tc.msg) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("unexpected errors: %v, expected to contain: %s", errs, tc.msg)
+				}
+			}
+		})
+	}
+}

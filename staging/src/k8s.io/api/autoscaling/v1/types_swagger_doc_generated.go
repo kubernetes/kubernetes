@@ -80,6 +80,8 @@ var map_ExternalMetricStatus = map[string]string{
 	"metricSelector":      "metricSelector is used to identify a specific time series within a given metric.",
 	"currentValue":        "currentValue is the current value of the metric (as a quantity)",
 	"currentAverageValue": "currentAverageValue is the current value of metric averaged over autoscaled pods.",
+	"metricFetchStatus":   "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+	"firstFailureTime":    "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.",
 }
 
 func (ExternalMetricStatus) SwaggerDoc() map[string]string {

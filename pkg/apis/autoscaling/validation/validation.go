@@ -70,7 +70,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef"), opts.ScaleTargetRefValidationOptions); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas, opts.ObjectMetricsValidationOptions); len(refErrs) > 0 {
+	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas, autoscaler.MaxReplicas, opts.ObjectMetricsValidationOptions); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), opts); len(refErrs) > 0 {
@@ -161,13 +161,13 @@ type HorizontalPodAutoscalerSpecValidationOptions struct {
 	ObjectMetricsValidationOptions  CrossVersionObjectReferenceValidationOptions
 }
 
-func validateMetrics(newMetrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
+func validateMetrics(newMetrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32, maxReplicas int32, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	hasObjectMetrics := false
 	hasExternalMetrics := false
 	for i, metricSpec := range newMetrics {
 		idxPath := fldPath.Index(i)
-		if targetErrs := validateMetricSpec(metricSpec, idxPath, opts); len(targetErrs) > 0 {
+		if targetErrs := validateMetricSpec(metricSpec, idxPath, minReplicas, maxReplicas, opts); len(targetErrs) > 0 {
 			allErrs = append(allErrs, targetErrs...)
 		}
 		if metricSpec.Type == autoscaling.ObjectMetricSourceType {
@@ -260,7 +260,7 @@ var validMetricSourceTypes = sets.NewString(
 	string(autoscaling.ContainerResourceMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
-func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
+func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32, maxReplicas int32, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(string(spec.Type)) == 0 {
@@ -282,7 +282,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path, opts C
 	if spec.External != nil {
 		typesPresent.Insert("external")
 		if typesPresent.Len() == 1 {
-			allErrs = append(allErrs, validateExternalSource(spec.External, fldPath.Child("external"))...)
+			allErrs = append(allErrs, validateExternalSource(spec.External, minReplicas, maxReplicas, fldPath.Child("external"))...)
 		}
 	}
 
@@ -362,11 +362,12 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 	return allErrs
 }
 
-func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *field.Path) field.ErrorList {
+func validateExternalSource(src *autoscaling.ExternalMetricSource, minReplicas *int32, maxReplicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
+	allErrs = append(allErrs, validateMetricFallback(src.Fallback, minReplicas, maxReplicas, fldPath.Child("fallback"))...)
 
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
@@ -376,6 +377,28 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("value"), "may not set both a target value for metric and a per-pod target"))
 	}
 
+	return allErrs
+}
+
+func validateMetricFallback(et *autoscaling.ExternalMetricFallback, minReplicas *int32, maxReplicas int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if et == nil {
+		return allErrs
+	}
+	if et.FailureDurationSeconds != nil {
+		if *et.FailureDurationSeconds < 180 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("failureDurationSeconds"), *et.FailureDurationSeconds, "must be at least 180 seconds"))
+		}
+	}
+	if et.Replicas <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be greater than 0"))
+	}
+	if et.Replicas < *minReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be greater than minReplicas"))
+	}
+	if maxReplicas < et.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be lower than maxReplicas"))
+	}
 	return allErrs
 }
 

@@ -70,6 +70,7 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
 	dropDisabledFields(newHPA, nil)
+
 }
 
 // Validate validates a new autoscaler.
@@ -106,6 +107,7 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	newHPA.Status = oldHPA.Status
 
 	dropDisabledFields(newHPA, oldHPA)
+	dropDisabledStatusFields(&newHPA.Status, &oldHPA.Status)
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -209,20 +211,56 @@ func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.Hor
 // dropDisabledFields will drop any disabled fields that have not previously been
 // set on the old HPA. oldHPA is ignored if nil.
 func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) {
-		return
-	}
-	if toleranceInUse(oldHPA) {
-		return
-	}
-	newBehavior := newHPA.Spec.Behavior
-	if newBehavior == nil {
-		return
+	// Handle HPAConfigurableTolerance
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) {
+
+		if toleranceInUse(oldHPA) {
+			return
+		}
+		newBehavior := newHPA.Spec.Behavior
+		if newBehavior == nil {
+			return
+		}
+
+		for _, sr := range []*autoscaling.HPAScalingRules{newBehavior.ScaleDown, newBehavior.ScaleUp} {
+			if sr != nil {
+				sr.Tolerance = nil
+			}
+		}
 	}
 
-	for _, sr := range []*autoscaling.HPAScalingRules{newBehavior.ScaleDown, newBehavior.ScaleUp} {
-		if sr != nil {
-			sr.Tolerance = nil
+	// Handle HPAExternalMetricFallback
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) {
+		if externalFallbackInUse(oldHPA) {
+			return
+		}
+
+		if newHPA.Spec.Metrics != nil {
+			for i := range newHPA.Spec.Metrics {
+				metric := &newHPA.Spec.Metrics[i]
+				if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+					metric.External.Fallback = nil
+				}
+			}
+		}
+	}
+}
+
+// dropDisabledStatusFields removes disabled fields from the HPA status.
+func dropDisabledStatusFields(newHPAStatus, oldHPAStatus *autoscaling.HorizontalPodAutoscalerStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) {
+		if externalFallbackStatusInUse(oldHPAStatus) {
+			return
+		}
+	}
+
+	if newHPAStatus.CurrentMetrics != nil {
+		for i := range newHPAStatus.CurrentMetrics {
+			metric := &newHPAStatus.CurrentMetrics[i]
+			if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+				metric.External.MetricFetchStatus = nil
+				metric.External.FirstFailureTime = nil
+			}
 		}
 	}
 }
@@ -234,6 +272,36 @@ func toleranceInUse(hpa *autoscaling.HorizontalPodAutoscaler) bool {
 	for _, sr := range []*autoscaling.HPAScalingRules{hpa.Spec.Behavior.ScaleDown, hpa.Spec.Behavior.ScaleUp} {
 		if sr != nil && sr.Tolerance != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func externalFallbackInUse(hpa *autoscaling.HorizontalPodAutoscaler) bool {
+	if hpa == nil || hpa.Spec.Metrics == nil {
+		return false
+	}
+
+	for _, metric := range hpa.Spec.Metrics {
+		if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+			if metric.External.Fallback != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func externalFallbackStatusInUse(hpaStatus *autoscaling.HorizontalPodAutoscalerStatus) bool {
+	if hpaStatus == nil || hpaStatus.CurrentMetrics == nil {
+		return false
+	}
+
+	for _, metric := range hpaStatus.CurrentMetrics {
+		if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+			if metric.External.MetricFetchStatus != nil || metric.External.FirstFailureTime != nil {
+				return true
+			}
 		}
 	}
 	return false

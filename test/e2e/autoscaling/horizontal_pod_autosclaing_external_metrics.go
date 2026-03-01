@@ -23,10 +23,14 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	v2 "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)", func() {
@@ -81,6 +85,139 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 
 		ginkgo.By("Waiting for HPA to scale down to min replicas")
 		rc.WaitForReplicas(ctx, int(*hpa.Spec.MinReplicas), maxResourceConsumerDelay+waitBuffer)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+	})
+
+})
+
+var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics fallback)", framework.WithFeatureGate(features.HPAExternalMetricFallback), func() {
+	var (
+		rc                *e2eautoscaling.ResourceConsumer
+		metricsController *e2eautoscaling.ExternalMetricsController
+	)
+
+	waitBuffer := 1 * time.Minute
+
+	f := framework.NewDefaultFramework("horizontal-pod-autoscaling-external-fallback")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		ginkgo.By("Setting up the external metrics server")
+		metricsController = e2eautoscaling.RunExternalMetricsServer(ctx, f.ClientSet, f.Namespace.Name, "external-metrics-server", nil)
+	})
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if metricsController != nil {
+			e2eautoscaling.CleanupExternalMetricsServer(ctx, f.ClientSet, f.Namespace.Name, "external-metrics-server")
+		}
+	})
+
+	// WithSerial() required due to registering of v1beta1.external.metrics.k8s.io
+	ginkgo.It("one metric fails", framework.WithSerial(), func(ctx context.Context) {
+		ginkgo.By("Creating the resource consumer deployment")
+		initPods := 1
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		metricName := "queue_messages_ready"
+		ginkgo.By(fmt.Sprintf("Creating an HPA based on external metric %s", metricName))
+
+		fallbackReplicas := 2
+		fallbackDuration := 180
+
+		metric := e2eautoscaling.CreateExternalMetricSpec(metricName, nil, v2.ValueMetricType, 50, int64(fallbackDuration), int64(fallbackReplicas))
+		externalMetric := []v2.MetricSpec{}
+		externalMetric = append(externalMetric, metric)
+
+		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscaler(ctx, rc, externalMetric, int32(initPods), 3)
+
+		ginkgo.By("Waiting for HPA to scale up to max replicas")
+		rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxResourceConsumerDelay+waitBuffer)
+
+		ginkgo.By(fmt.Sprintf("Setting %s metric value to failure", metricName))
+		err := metricsController.SetMetricFail(ctx, metricName, true, nil)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for HPA to scale down to failure value")
+		rc.WaitForReplicas(ctx, fallbackReplicas, time.Duration(fallbackDuration*2)*time.Second)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+
+		ginkgo.By("Verifying that the HPA status shows fallback is active")
+		currentHPA, getErr := f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Get(ctx, hpa.Name, metav1.GetOptions{})
+		framework.ExpectNoError(getErr)
+
+		fallbackConditionActive := false
+		for _, condition := range currentHPA.Status.Conditions {
+			if condition.Type == v2.ExternalMetricFallbackActive && condition.Status == v1.ConditionTrue {
+				framework.Logf("HPA fallback condition active: reason=%s, message=%s", condition.Reason, condition.Message)
+				fallbackConditionActive = true
+				break
+			}
+		}
+		if !fallbackConditionActive {
+			framework.Failf("expected HPA to have ExternalMetricFallbackActive condition set to True, got conditions: %+v", currentHPA.Status.Conditions)
+		}
+
+		metricInFallback := false
+		for _, metricStatus := range currentHPA.Status.CurrentMetrics {
+			if metricStatus.Type == v2.ExternalMetricSourceType && metricStatus.External != nil {
+				if ptr.Equal(metricStatus.External.MetricFetchStatus, ptr.To(v2.MetricFetchFallback)) {
+					framework.Logf("External metric %s is in fallback state", metricStatus.External.Metric.Name)
+					metricInFallback = true
+				}
+			}
+		}
+		if !metricInFallback {
+			framework.Failf("expected external metric to have MetricFetchStatus=Fallback, got metrics: %+v", currentHPA.Status.CurrentMetrics)
+		}
+	})
+
+	ginkgo.It("mutiple external metrics fail", framework.WithSerial(), func(ctx context.Context) {
+		ginkgo.By("Creating the resource consumer deployment")
+		initPods := 1
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		queueMetric := "queue_messages_ready"
+		httpMetric := "http_requests_total"
+		ginkgo.By(fmt.Sprintf("Creating an HPA based on external metrics %s,%s", queueMetric, httpMetric))
+
+		fallbackReplicasForQueue := 2
+		fallbackForQueueDuration := 180
+
+		fallbackReplicasForHTTP := 4
+		fallbackForHTTPDuration := 180
+
+		firstMetric := e2eautoscaling.CreateExternalMetricSpec(queueMetric, nil, v2.ValueMetricType, 50, int64(fallbackForQueueDuration), int64(fallbackReplicasForQueue))
+		secondMetric := e2eautoscaling.CreateExternalMetricSpec(httpMetric, nil, v2.ValueMetricType, 50, int64(fallbackForHTTPDuration), int64(fallbackReplicasForHTTP))
+
+		externalMetric := []v2.MetricSpec{}
+		externalMetric = append(externalMetric, firstMetric)
+		externalMetric = append(externalMetric, secondMetric)
+
+		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscaler(ctx, rc, externalMetric, int32(initPods), 10)
+
+		ginkgo.By("Waiting for HPA to scale up to max replicas")
+		rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxResourceConsumerDelay+waitBuffer)
+
+		ginkgo.By(fmt.Sprintf("Setting %s metric value to failure", queueMetric))
+		err := metricsController.SetMetricFail(ctx, queueMetric, true, nil)
+		framework.ExpectNoError(err)
+
+		ginkgo.By(fmt.Sprintf("Setting %s metric value to failure", httpMetric))
+		err = metricsController.SetMetricFail(ctx, httpMetric, true, nil)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for HPA to scale down to the max failure value")
+		rc.WaitForReplicas(ctx, max(fallbackReplicasForQueue, fallbackReplicasForHTTP), time.Duration(fallbackForQueueDuration+fallbackForHTTPDuration)*time.Second)
 		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 	})
 })

@@ -18,6 +18,11 @@ limitations under the License.
 
 package v2
 
+import (
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // ExternalMetricStatusApplyConfiguration represents a declarative configuration of the ExternalMetricStatus type for use
 // with apply.
 //
@@ -28,6 +33,11 @@ type ExternalMetricStatusApplyConfiguration struct {
 	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
 	// current contains the current value for the given metric
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
+	// metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
+	MetricFetchStatus *autoscalingv2.MetricFetchStatusType `json:"metricFetchStatus,omitempty"`
+	// firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
+	// Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
+	FirstFailureTime *v1.Time `json:"firstFailureTime,omitempty"`
 }
 
 // ExternalMetricStatusApplyConfiguration constructs a declarative configuration of the ExternalMetricStatus type for use with
@@ -49,5 +59,21 @@ func (b *ExternalMetricStatusApplyConfiguration) WithMetric(value *MetricIdentif
 // If called multiple times, the Current field is set to the value of the last call.
 func (b *ExternalMetricStatusApplyConfiguration) WithCurrent(value *MetricValueStatusApplyConfiguration) *ExternalMetricStatusApplyConfiguration {
 	b.Current = value
+	return b
+}
+
+// WithMetricFetchStatus sets the MetricFetchStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MetricFetchStatus field is set to the value of the last call.
+func (b *ExternalMetricStatusApplyConfiguration) WithMetricFetchStatus(value autoscalingv2.MetricFetchStatusType) *ExternalMetricStatusApplyConfiguration {
+	b.MetricFetchStatus = &value
+	return b
+}
+
+// WithFirstFailureTime sets the FirstFailureTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FirstFailureTime field is set to the value of the last call.
+func (b *ExternalMetricStatusApplyConfiguration) WithFirstFailureTime(value v1.Time) *ExternalMetricStatusApplyConfiguration {
+	b.FirstFailureTime = &value
 	return b
 }

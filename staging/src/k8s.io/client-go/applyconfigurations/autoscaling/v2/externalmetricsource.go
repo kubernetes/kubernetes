@@ -29,6 +29,9 @@ type ExternalMetricSourceApplyConfiguration struct {
 	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
 	// target specifies the target value for the given metric
 	Target *MetricTargetApplyConfiguration `json:"target,omitempty"`
+	// fallback defines the behavior when this external metric cannot be retrieved.
+	// If not set, the HPA will not scale based on this metric when it's unavailable.
+	Fallback *ExternalMetricFallbackApplyConfiguration `json:"fallback,omitempty"`
 }
 
 // ExternalMetricSourceApplyConfiguration constructs a declarative configuration of the ExternalMetricSource type for use with
@@ -50,5 +53,13 @@ func (b *ExternalMetricSourceApplyConfiguration) WithMetric(value *MetricIdentif
 // If called multiple times, the Target field is set to the value of the last call.
 func (b *ExternalMetricSourceApplyConfiguration) WithTarget(value *MetricTargetApplyConfiguration) *ExternalMetricSourceApplyConfiguration {
 	b.Target = value
+	return b
+}
+
+// WithFallback sets the Fallback field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Fallback field is set to the value of the last call.
+func (b *ExternalMetricSourceApplyConfiguration) WithFallback(value *ExternalMetricFallbackApplyConfiguration) *ExternalMetricSourceApplyConfiguration {
+	b.Fallback = value
 	return b
 }
