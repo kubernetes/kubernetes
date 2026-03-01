@@ -39,6 +39,14 @@ type TB interface {
 // without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
 type MetricFamily = dto.MetricFamily
 
+// ProtoMetric is a type alias for the protobuf Metric type from prometheus client_model,
+// enabling usage without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
+type ProtoMetric = dto.Metric
+
+// LabelPair is a type alias for the protobuf LabelPair type from prometheus client_model,
+// enabling usage without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
+type LabelPair = dto.LabelPair
+
 // GathererFunc is a type alias which enables writing gatherers as a function in tests
 // without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
 type GathererFunc = prometheus.GathererFunc
