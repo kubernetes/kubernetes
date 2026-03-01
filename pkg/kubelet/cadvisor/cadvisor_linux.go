@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	// Register supported container handlers.
@@ -102,7 +103,12 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		ctx := context.Background()
+		if IsPsiEnabled(ctx) {
+			includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		} else {
+			klog.FromContext(ctx).Info("PSI support not available")
+		}
 	}
 
 	if usingLegacyStats || localStorageCapacityIsolation {
@@ -160,6 +166,40 @@ func (cc *cadvisorClient) ImagesFsInfo(ctx context.Context) (cadvisorapiv2.FsInf
 		return cadvisorapiv2.FsInfo{}, err
 	}
 	return cc.getFsInfo(ctx, label)
+}
+
+// IsPsiEnabled checks whether PSI (Pressure Stall Information) is available on
+// the host. PSI is a single kernel feature (CONFIG_PSI / boot param "psi=")
+// that exposes /proc/pressure/{cpu,memory,io} atomically — checking the
+// /proc/pressure directory is sufficient to determine support for all three.
+func IsPsiEnabled(ctx context.Context) bool {
+	return isPsiEnabled(ctx, "/proc/pressure", "/proc/cmdline")
+}
+
+func isPsiEnabled(ctx context.Context, psiPath, cmdlinePath string) bool {
+	logger := klog.FromContext(ctx)
+	if _, err := os.Stat(psiPath); err != nil {
+		logger.V(4).Info("PSI not available", "path", psiPath, "err", err)
+		return false
+	}
+	// If the cmdline cannot be read, assume PSI is enabled since /proc/pressure exists.
+	cmdline, err := os.ReadFile(cmdlinePath)
+	if err != nil {
+		logger.V(4).Info("Could not read kernel cmdline, assuming PSI is enabled", "err", err)
+		return true
+	}
+	// Iterate from back to front because the last value wins when specified multiple times.
+	params := strings.Fields(string(cmdline))
+	for i := len(params) - 1; i >= 0; i-- {
+		if params[i] == "psi=1" {
+			break
+		}
+		if params[i] == "psi=0" {
+			logger.V(4).Info("PSI disabled via kernel boot parameter")
+			return false
+		}
+	}
+	return true
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

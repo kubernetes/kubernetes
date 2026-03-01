@@ -73,3 +73,7 @@ func (cu *cadvisorUnsupported) ContainerFsInfo(context.Context) (cadvisorapiv2.F
 func (cu *cadvisorUnsupported) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
+
+func IsPsiEnabled(ctx context.Context) bool {
+	return false
+}

@@ -86,6 +86,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	kubeletcadvisor "k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -468,7 +469,9 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		if kubeletcadvisor.IsPsiEnabled(context.Background()) {
+			includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		}
 	}
 
 	// cAdvisor metrics are exposed under the secured handler as well
