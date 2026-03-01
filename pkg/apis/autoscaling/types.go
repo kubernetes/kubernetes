@@ -336,7 +336,7 @@ type ExternalMetricFallback struct {
 	// +optional
 	// default=180
 	// min=180
-	FailureDurationSeconds *int64 `json:"failureDurationSeconds,omitempty"`
+	FailureDurationSeconds *int64
 
 	// replicas is the desired replica count to use when the external metric cannot be retrieved.
 	// This value is treated as the desired replica count from this metric.
@@ -344,7 +344,7 @@ type ExternalMetricFallback struct {
 	// desired replica counts (standard HPA multi-metric behavior).
 	// Must be greater than 0.
 	// +required
-	Replicas int32 `json:"replicas"`
+	Replicas int32
 }
 
 // ExternalMetricSource indicates how to scale on a metric not associated with
@@ -358,7 +358,7 @@ type ExternalMetricSource struct {
 	// fallback defines the behavior when this external metric cannot be retrieved.
 	// If not set, the HPA will not scale based on this metric when it's unavailable.
 	// +optional
-	Fallback *ExternalMetricFallback `json:"fallback,omitempty"`
+	Fallback *ExternalMetricFallback
 }
 
 // MetricIdentifier defines the name and optionally selector for a metric
