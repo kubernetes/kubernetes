@@ -458,6 +458,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &autoscalingv2.ContainerResourceMetricStatusApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("CrossVersionObjectReference"):
 		return &autoscalingv2.CrossVersionObjectReferenceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ExternalMetricFallback"):
+		return &autoscalingv2.ExternalMetricFallbackApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("ExternalMetricSource"):
 		return &autoscalingv2.ExternalMetricSourceApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("ExternalMetricStatus"):

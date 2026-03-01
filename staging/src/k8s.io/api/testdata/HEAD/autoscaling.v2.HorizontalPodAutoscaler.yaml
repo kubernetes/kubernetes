@@ -61,6 +61,9 @@ spec:
         type: typeValue
         value: "0"
     external:
+      fallback:
+        failureDurationSeconds: 1
+        replicas: 2
       metric:
         name: nameValue
         selector:
@@ -145,6 +148,7 @@ status:
         averageUtilization: 3
         averageValue: "0"
         value: "0"
+      firstFailureTime: "2004-01-01T01:01:01Z"
       metric:
         name: nameValue
         selector:
@@ -155,6 +159,7 @@ status:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+      metricFetchStatus: metricFetchStatusValue
     object:
       current:
         averageUtilization: 3

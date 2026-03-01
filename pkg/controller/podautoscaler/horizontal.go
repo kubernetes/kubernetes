@@ -328,6 +328,10 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 
 	for i, metricSpec := range metricSpecs {
 		replicaCountProposal, metricNameProposal, timestampProposal, condition, err := a.computeReplicasForMetric(ctx, hpa, metricSpec, specReplicas, statusReplicas, selector, &statuses[i])
+		// with external metric we want to set the condition to indicate if fallback active/disabled
+		if metricSpec.Type == autoscalingv2.ExternalMetricSourceType && condition.Type != "" {
+			setCondition(hpa, condition.Type, condition.Status, condition.Reason, "%s", condition.Message)
+		}
 
 		if err != nil {
 			if invalidMetricsCount <= 0 {
@@ -463,11 +467,13 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 		a.monitor.ObserveMetricComputationResult(actionLabel, errorLabel, time.Since(start), spec.Type)
 	}()
 
+	condition = autoscalingv2.HorizontalPodAutoscalerCondition{}
+
 	switch spec.Type {
 	case autoscalingv2.ObjectMetricSourceType:
 		metricSelector, err := metav1.LabelSelectorAsSelector(spec.Object.Metric.Selector)
 		if err != nil {
-			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
+			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get object metric value: %v", err)
 		}
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForObjectMetric(specReplicas, statusReplicas, spec, hpa, selector, status, metricSelector)
@@ -477,7 +483,7 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 	case autoscalingv2.PodsMetricSourceType:
 		metricSelector, err := metav1.LabelSelectorAsSelector(spec.Pods.Metric.Selector)
 		if err != nil {
-			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetPodsMetric", err)
+			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetPodsMetric", err)
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get pods metric value: %v", err)
 		}
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForPodsMetric(specReplicas, spec, hpa, selector, status, metricSelector)
@@ -505,7 +511,7 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 		condition := a.getUnableComputeReplicaCountCondition(hpa, "InvalidMetricSourceType", err)
 		return 0, "", time.Time{}, condition, err
 	}
-	return replicaCountProposal, metricNameProposal, timestampProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
+	return replicaCountProposal, metricNameProposal, timestampProposal, condition, nil
 }
 
 func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (deleted bool, err error) {
@@ -702,12 +708,59 @@ func (a *HorizontalController) computeStatusForContainerResourceMetric(ctx conte
 // computeStatusForExternalMetric computes the desired number of replicas for the specified metric of type ExternalMetricSourceType.
 func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, statusReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler, selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, timestampProposal time.Time, metricNameProposal string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
 	tolerances := a.tolerancesForHpa(hpa)
+
+	var fallbackExternalMetricsReplicas int32
+
+	// If feature gate enabled and fallback configuration is valid, set fallbackExternalMetricsReplicas to
+	// the configured fallback replicas. Otherwise, keep it as 0 to indicate fallback is not allowed.
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) &&
+		metricSpec.External != nil &&
+		metricSpec.External.Fallback != nil &&
+		metricSpec.External.Fallback.FailureDurationSeconds != nil &&
+		*metricSpec.External.Fallback.FailureDurationSeconds > 0 {
+		fallbackExternalMetricsReplicas = metricSpec.External.Fallback.Replicas
+	}
+
 	if metricSpec.External.Target.AverageValue != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetExternalPerPodMetricReplicas(statusReplicas, metricSpec.External.Target.AverageValue.MilliValue(), metricSpec.External.Metric.Name, tolerances, hpa.Namespace, metricSpec.External.Metric.Selector)
-		if err != nil {
+		if err != nil && fallbackExternalMetricsReplicas == 0 {
+			// No fallback allowed (either due to feature gate disabled or fallback configuration set to zero), return error immediately
 			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetExternalMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s external metric: %v", metricSpec.External.Metric.Name, err)
+			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s external metric: %w", metricSpec.External.Metric.Name, err)
+
+		} else if err != nil && fallbackExternalMetricsReplicas > 0 {
+
+			var fallbackExistingFirstFailureTime *metav1.Time
+
+			// Fetch first failure time for this metric
+			for _, m := range hpa.Status.CurrentMetrics {
+				if m.Type == autoscalingv2.ExternalMetricSourceType &&
+					m.External != nil &&
+					m.External.Metric.Name == metricSpec.External.Metric.Name {
+					fallbackExistingFirstFailureTime = m.External.FirstFailureTime
+				}
+			}
+
+			failureTimeElapsed := hasFallbackFailureThresholdElapsed(metricSpec, status, fallbackExistingFirstFailureTime)
+
+			// We're within the elapsed time, so no need to fallback
+			if !failureTimeElapsed {
+				condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetExternalMetric", err)
+				return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s external metric: %w", metricSpec.External.Metric.Name, err)
+			}
+
+			// We're in failure mode, return the fallback value and set condition, but keep trying to fetch metric in the next reconciliation
+			condition = autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type:   autoscalingv2.ExternalMetricFallbackActive,
+				Status: v1.ConditionTrue,
+				Reason: "UsingFallbackValue",
+				Message: fmt.Sprintf("Using fallback replica count %d for external metric %s due to consecutive failures exceeding %d seconds",
+					fallbackExternalMetricsReplicas, metricSpec.External.Metric.Name, *metricSpec.External.Fallback.FailureDurationSeconds),
+			}
+			return fallbackExternalMetricsReplicas, time.Now(), fmt.Sprintf("external metric %s(%+v) (fallback)", metricSpec.External.Metric.Name, metricSpec.External.Metric.Selector), condition, nil
 		}
+
+		// Success fetching metric, return the proposed replica count and metric status, unset FirstFailureTime
 		*status = autoscalingv2.MetricStatus{
 			Type: autoscalingv2.ExternalMetricSourceType,
 			External: &autoscalingv2.ExternalMetricStatus{
@@ -718,15 +771,49 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 				Current: autoscalingv2.MetricValueStatus{
 					AverageValue: resource.NewMilliQuantity(usageProposal, resource.DecimalSI),
 				},
+				MetricFetchStatus: autoscalingv2.MetricFetchHealthy,
+				FirstFailureTime:  nil,
 			},
 		}
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.External.Metric.Name, metricSpec.External.Metric.Selector), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
 	if metricSpec.External.Target.Value != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetExternalMetricReplicas(specReplicas, metricSpec.External.Target.Value.MilliValue(), metricSpec.External.Metric.Name, tolerances, hpa.Namespace, metricSpec.External.Metric.Selector, selector)
-		if err != nil {
+		if err != nil && fallbackExternalMetricsReplicas == 0 {
+			// No fallback allowed (either due to feature gate disabled or fallback configuration set to zero), return error immediately
 			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetExternalMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.Metric.Name, err)
+			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s external metric: %w", metricSpec.External.Metric.Name, err)
+
+		} else if err != nil && fallbackExternalMetricsReplicas > 0 {
+
+			var fallbackExistingFirstFailureTime *metav1.Time
+
+			// Fetch first failure time for this metric
+			for _, m := range hpa.Status.CurrentMetrics {
+				if m.Type == autoscalingv2.ExternalMetricSourceType &&
+					m.External != nil &&
+					m.External.Metric.Name == metricSpec.External.Metric.Name {
+					fallbackExistingFirstFailureTime = m.External.FirstFailureTime
+				}
+			}
+
+			failureTimeElapsed := hasFallbackFailureThresholdElapsed(metricSpec, status, fallbackExistingFirstFailureTime)
+
+			// We're within the elapsed time, so no need to fallback
+			if !failureTimeElapsed {
+				condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetExternalMetric", err)
+				return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s external metric: %w", metricSpec.External.Metric.Name, err)
+			}
+
+			// We're in failure mode, return the fallback value and set condition, but keep trying to fetch metric in the next reconciliation
+			condition = autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type:   autoscalingv2.ExternalMetricFallbackActive,
+				Status: v1.ConditionTrue,
+				Reason: "UsingFallbackValue",
+				Message: fmt.Sprintf("Using fallback replica count %d for external metric %s due to consecutive failures exceeding %d seconds",
+					fallbackExternalMetricsReplicas, metricSpec.External.Metric.Name, *metricSpec.External.Fallback.FailureDurationSeconds),
+			}
+			return fallbackExternalMetricsReplicas, time.Now(), fmt.Sprintf("external metric %s(%+v) (fallback)", metricSpec.External.Metric.Name, metricSpec.External.Metric.Selector), condition, nil
 		}
 		*status = autoscalingv2.MetricStatus{
 			Type: autoscalingv2.ExternalMetricSourceType,
@@ -738,6 +825,8 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 				Current: autoscalingv2.MetricValueStatus{
 					Value: resource.NewMilliQuantity(usageProposal, resource.DecimalSI),
 				},
+				MetricFetchStatus: autoscalingv2.MetricFetchHealthy,
+				FirstFailureTime:  nil,
 			},
 		}
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.External.Metric.Name, metricSpec.External.Metric.Selector), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
@@ -1519,4 +1608,61 @@ func minInt32(a, b int32) int32 {
 // maxInt32 is a wrapper around the max builtin to be used as a function value.
 func maxInt32(a, b int32) int32 {
 	return max(a, b)
+}
+
+func hasFallbackFailureThresholdElapsed(metricSpec autoscalingv2.MetricSpec, status *autoscalingv2.MetricStatus, fallbackExistingFirstFailureTime *metav1.Time) bool {
+	// Set it for the first time, since it's currently zero
+	// Return that passedFailureTime hasn't passed
+	if fallbackExistingFirstFailureTime.IsZero() {
+		*status = autoscalingv2.MetricStatus{
+			Type: autoscalingv2.ExternalMetricSourceType,
+			External: &autoscalingv2.ExternalMetricStatus{
+				Metric: autoscalingv2.MetricIdentifier{
+					Name:     metricSpec.External.Metric.Name,
+					Selector: metricSpec.External.Metric.Selector,
+				},
+				MetricFetchStatus: autoscalingv2.MetricFetchFailing,
+				FirstFailureTime:  &metav1.Time{Time: time.Now()},
+			},
+		}
+		return false
+	}
+
+	// We're in the fallback mode, check if the failure duration has passed since the first failure time
+	elapsedTimeSinceFirstFailure := time.Since(fallbackExistingFirstFailureTime.Time)
+	failureDuration := time.Duration(*metricSpec.External.Fallback.FailureDurationSeconds) * time.Second
+
+	failureTimeElapsed := elapsedTimeSinceFirstFailure > failureDuration
+
+	if !failureTimeElapsed {
+		// In this branch we're in the failure mode, but timeout is continuing...
+		*status = autoscalingv2.MetricStatus{
+			Type: autoscalingv2.ExternalMetricSourceType,
+			External: &autoscalingv2.ExternalMetricStatus{
+				Metric: autoscalingv2.MetricIdentifier{
+					Name:     metricSpec.External.Metric.Name,
+					Selector: metricSpec.External.Metric.Selector,
+				},
+				MetricFetchStatus: autoscalingv2.MetricFetchFailing,
+				FirstFailureTime:  fallbackExistingFirstFailureTime,
+			},
+		}
+		return false
+	}
+
+	// We are now in failure mode!
+	*status = autoscalingv2.MetricStatus{
+		Type: autoscalingv2.ExternalMetricSourceType,
+		External: &autoscalingv2.ExternalMetricStatus{
+			Metric: autoscalingv2.MetricIdentifier{
+				Name:     metricSpec.External.Metric.Name,
+				Selector: metricSpec.External.Metric.Selector,
+			},
+			MetricFetchStatus: autoscalingv2.MetricFetchFallback,
+			FirstFailureTime:  fallbackExistingFirstFailureTime,
+		},
+	}
+
+	// We're in failure mode, return true so we can set the replicas
+	return true
 }

@@ -328,6 +328,25 @@ type ContainerResourceMetricSource struct {
 	Target MetricTarget
 }
 
+// ExternalMetricFallback defines fallback behavior when an external metric cannot be retrieved
+type ExternalMetricFallback struct {
+	// failureDurationSeconds is the duration in seconds for which the external metric must be
+	// continuously failing before the fallback value is used. The duration is measured from the
+	// first consecutive failure. Must be greater than 0.
+	// +optional
+	// default=180
+	// min=180
+	FailureDurationSeconds *int64 `json:"failureDurationSeconds,omitempty"`
+
+	// replicas is the desired replica count to use when the external metric cannot be retrieved.
+	// This value is treated as the desired replica count from this metric.
+	// When multiple metrics are configured, the HPA controller uses the maximum of all
+	// desired replica counts (standard HPA multi-metric behavior).
+	// Must be greater than 0.
+	// +required
+	Replicas int32 `json:"replicas"`
+}
+
 // ExternalMetricSource indicates how to scale on a metric not associated with
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
@@ -336,6 +355,10 @@ type ExternalMetricSource struct {
 	Metric MetricIdentifier
 	// Target specifies the target value for the given metric
 	Target MetricTarget
+	// fallback defines the behavior when this external metric cannot be retrieved.
+	// If not set, the HPA will not scale based on this metric when it's unavailable.
+	// +optional
+	Fallback *ExternalMetricFallback `json:"fallback,omitempty"`
 }
 
 // MetricIdentifier defines the name and optionally selector for a metric
@@ -376,6 +399,18 @@ const (
 	ValueMetricType MetricTargetType = "Value"
 	// AverageValueMetricType is a possible value for MetricTarget.Type.
 	AverageValueMetricType MetricTargetType = "AverageValue"
+)
+
+// MetricFetchStatusType indicates whether an external metric is operating normally, failing to be fetched or using a fallback value.
+type MetricFetchStatusType string
+
+const (
+	// MetricFetchHealthy indicates the metric is being retrieved successfully
+	MetricFetchHealthy MetricFetchStatusType = "Healthy"
+	// MetricFetchFailing indicates the metric is failing to be fetched
+	MetricFetchFailing MetricFetchStatusType = "Failing"
+	// MetricFetchFallback indicates the metric is using a fallback value due to retrieval failures
+	MetricFetchFallback MetricFetchStatusType = "UsingFallbackReplicas"
 )
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
@@ -433,6 +468,13 @@ const (
 	// ScalingLimited indicates that the calculated scale based on metrics would be above or
 	// below the range for the HPA, and has thus been capped.
 	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+	// ExternalMetricFallbackActive indicates that one or more external metrics
+	// are currently using fallback values due to retrieval failures.
+	// Status will be:
+	// - "True" if any external metric is in fallback state
+	// - "False" if no external metrics are in fallback state
+	// - "Unknown" if the controller cannot determine the state
+	ExternalMetricFallbackActive HorizontalPodAutoscalerConditionType = "ExternalMetricFallbackActive"
 )
 
 // HorizontalPodAutoscalerCondition describes the state of
@@ -537,6 +579,14 @@ type ContainerResourceMetricStatus struct {
 type ExternalMetricStatus struct {
 	Metric  MetricIdentifier
 	Current MetricValueStatus
+	// metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
+	// +optional
+	MetricFetchStatus MetricFetchStatusType `json:"metricFetchStatus,omitempty"`
+
+	// firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
+	// Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
+	// +optional
+	FirstFailureTime *metav1.Time `json:"firstFailureTime,omitempty"`
 }
 
 // MetricValueStatus indicates the current value of a metric.

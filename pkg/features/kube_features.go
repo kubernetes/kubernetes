@@ -352,6 +352,12 @@ const (
 	// Enables support of configurable HPA scale-up and scale-down tolerances.
 	HPAConfigurableTolerance featuregate.Feature = "HPAConfigurableTolerance"
 
+	// owner: @omerap12,@adrianmoisey
+	// kep: https://kep.k8s.io/5679
+	//
+	// Enables support of fallback values for external metrics when retrieval fails.
+	HPAExternalMetricFallback featuregate.Feature = "HPAExternalMetricFallback"
+
 	// owner: @dxist
 	//
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
@@ -1345,6 +1351,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	HPAConfigurableTolerance: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	HPAExternalMetricFallback: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	HPAScaleToZero: {

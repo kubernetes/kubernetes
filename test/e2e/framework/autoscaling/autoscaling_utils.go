@@ -1126,7 +1126,7 @@ func CreateExternalHorizontalPodAutoscalerWithBehavior(ctx context.Context, rc *
 	}
 
 	metrics := []autoscalingv2.MetricSpec{
-		CreateExternalMetricSpec(metricName, metricSelector, targetType, targetValue),
+		CreateExternalMetricSpec(metricName, metricSelector, targetType, targetValue, 0, 0),
 	}
 
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
@@ -1149,15 +1149,12 @@ func CreateExternalHorizontalPodAutoscalerWithBehavior(ctx context.Context, rc *
 }
 
 // CreateExternalHorizontalPodAutoscaler creates an HPA with a single external metric
-func CreateExternalHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, metricName string, metricSelector map[string]string, targetType autoscalingv2.MetricTargetType, targetValue int64, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
-	metrics := []autoscalingv2.MetricSpec{
-		CreateExternalMetricSpec(metricName, metricSelector, targetType, targetValue),
-	}
+func CreateExternalHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, metrics []autoscalingv2.MetricSpec, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
 	return CreateMultiMetricHorizontalPodAutoscaler(ctx, rc, metrics, minReplicas, maxReplicas)
 }
 
 // CreateExternalMetricSpec creates a MetricSpec for external metrics
-func CreateExternalMetricSpec(metricName string, metricSelector map[string]string, targetType autoscalingv2.MetricTargetType, targetValue int64) autoscalingv2.MetricSpec {
+func CreateExternalMetricSpec(metricName string, metricSelector map[string]string, targetType autoscalingv2.MetricTargetType, targetValue int64, fallbackDuration, replicas int64) autoscalingv2.MetricSpec {
 	var selector *metav1.LabelSelector
 	if len(metricSelector) > 0 {
 		selector = &metav1.LabelSelector{
@@ -1176,6 +1173,24 @@ func CreateExternalMetricSpec(metricName string, metricSelector map[string]strin
 		target.AverageValue = resource.NewQuantity(targetValue, resource.DecimalSI)
 	}
 
+	// since fallback duration can't be 0
+	if fallbackDuration != 0 {
+		fallback := autoscalingv2.ExternalMetricFallback{
+			FailureDurationSeconds: &fallbackDuration,
+			Replicas:               int32(replicas),
+		}
+		return autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ExternalMetricSourceType,
+			External: &autoscalingv2.ExternalMetricSource{
+				Metric: autoscalingv2.MetricIdentifier{
+					Name:     metricName,
+					Selector: selector,
+				},
+				Target:   target,
+				Fallback: &fallback,
+			},
+		}
+	}
 	return autoscalingv2.MetricSpec{
 		Type: autoscalingv2.ExternalMetricSourceType,
 		External: &autoscalingv2.ExternalMetricSource{
@@ -1186,6 +1201,7 @@ func CreateExternalMetricSpec(metricName string, metricSelector map[string]strin
 			Target: target,
 		},
 	}
+
 }
 
 // CreateResourceMetricSpec creates a MetricSpec for resource metrics (CPU/Memory)

@@ -328,6 +328,7 @@ func autoConvert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in 
 func autoConvert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *autoscalingv1.ExternalMetricSource, s conversion.Scope) error {
 	// WARNING: in.Metric requires manual conversion: does not exist in peer-type
 	// WARNING: in.Target requires manual conversion: does not exist in peer-type
+	// WARNING: in.Fallback requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -342,6 +343,8 @@ func autoConvert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in 
 func autoConvert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *autoscalingv1.ExternalMetricStatus, s conversion.Scope) error {
 	// WARNING: in.Metric requires manual conversion: does not exist in peer-type
 	// WARNING: in.Current requires manual conversion: does not exist in peer-type
+	// WARNING: in.MetricFetchStatus requires manual conversion: does not exist in peer-type
+	// WARNING: in.FirstFailureTime requires manual conversion: does not exist in peer-type
 	return nil
 }
 

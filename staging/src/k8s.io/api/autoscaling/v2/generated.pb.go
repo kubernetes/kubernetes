@@ -39,6 +39,8 @@ func (m *ContainerResourceMetricStatus) Reset() { *m = ContainerResourceMetricSt
 
 func (m *CrossVersionObjectReference) Reset() { *m = CrossVersionObjectReference{} }
 
+func (m *ExternalMetricFallback) Reset() { *m = ExternalMetricFallback{} }
+
 func (m *ExternalMetricSource) Reset() { *m = ExternalMetricSource{} }
 
 func (m *ExternalMetricStatus) Reset() { *m = ExternalMetricStatus{} }
@@ -205,6 +207,37 @@ func (m *CrossVersionObjectReference) MarshalToSizedBuffer(dAtA []byte) (int, er
 	return len(dAtA) - i, nil
 }
 
+func (m *ExternalMetricFallback) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ExternalMetricFallback) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ExternalMetricFallback) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Replicas))
+	i--
+	dAtA[i] = 0x10
+	if m.FailureDurationSeconds != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.FailureDurationSeconds))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *ExternalMetricSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -225,6 +258,18 @@ func (m *ExternalMetricSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Fallback != nil {
+		{
+			size, err := m.Fallback.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	{
 		size, err := m.Target.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -268,6 +313,23 @@ func (m *ExternalMetricStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.FirstFailureTime != nil {
+		{
+			size, err := m.FirstFailureTime.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	i -= len(m.MetricFetchStatus)
+	copy(dAtA[i:], m.MetricFetchStatus)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricFetchStatus)))
+	i--
+	dAtA[i] = 0x1a
 	{
 		size, err := m.Current.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -1376,6 +1438,19 @@ func (m *CrossVersionObjectReference) Size() (n int) {
 	return n
 }
 
+func (m *ExternalMetricFallback) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.FailureDurationSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.FailureDurationSeconds))
+	}
+	n += 1 + sovGenerated(uint64(m.Replicas))
+	return n
+}
+
 func (m *ExternalMetricSource) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1386,6 +1461,10 @@ func (m *ExternalMetricSource) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Target.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.Fallback != nil {
+		l = m.Fallback.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1399,6 +1478,12 @@ func (m *ExternalMetricStatus) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Current.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.MetricFetchStatus)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.FirstFailureTime != nil {
+		l = m.FirstFailureTime.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1807,6 +1892,17 @@ func (this *CrossVersionObjectReference) String() string {
 	}, "")
 	return s
 }
+func (this *ExternalMetricFallback) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExternalMetricFallback{`,
+		`FailureDurationSeconds:` + valueToStringGenerated(this.FailureDurationSeconds) + `,`,
+		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ExternalMetricSource) String() string {
 	if this == nil {
 		return "nil"
@@ -1814,6 +1910,7 @@ func (this *ExternalMetricSource) String() string {
 	s := strings.Join([]string{`&ExternalMetricSource{`,
 		`Metric:` + strings.Replace(strings.Replace(this.Metric.String(), "MetricIdentifier", "MetricIdentifier", 1), `&`, ``, 1) + `,`,
 		`Target:` + strings.Replace(strings.Replace(this.Target.String(), "MetricTarget", "MetricTarget", 1), `&`, ``, 1) + `,`,
+		`Fallback:` + strings.Replace(this.Fallback.String(), "ExternalMetricFallback", "ExternalMetricFallback", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1825,6 +1922,8 @@ func (this *ExternalMetricStatus) String() string {
 	s := strings.Join([]string{`&ExternalMetricStatus{`,
 		`Metric:` + strings.Replace(strings.Replace(this.Metric.String(), "MetricIdentifier", "MetricIdentifier", 1), `&`, ``, 1) + `,`,
 		`Current:` + strings.Replace(strings.Replace(this.Current.String(), "MetricValueStatus", "MetricValueStatus", 1), `&`, ``, 1) + `,`,
+		`MetricFetchStatus:` + fmt.Sprintf("%v", this.MetricFetchStatus) + `,`,
+		`FirstFailureTime:` + strings.Replace(fmt.Sprintf("%v", this.FirstFailureTime), "Time", "v1.Time", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2538,6 +2637,95 @@ func (m *CrossVersionObjectReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *ExternalMetricFallback) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExternalMetricFallback: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExternalMetricFallback: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FailureDurationSeconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.FailureDurationSeconds = &v
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Replicas", wireType)
+			}
+			m.Replicas = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Replicas |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *ExternalMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2630,6 +2818,42 @@ func (m *ExternalMetricSource) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Target.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Fallback", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Fallback == nil {
+				m.Fallback = &ExternalMetricFallback{}
+			}
+			if err := m.Fallback.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2746,6 +2970,74 @@ func (m *ExternalMetricStatus) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Current.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MetricFetchStatus", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MetricFetchStatus = MetricFetchStatusType(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FirstFailureTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FirstFailureTime == nil {
+				m.FirstFailureTime = &v1.Time{}
+			}
+			if err := m.FirstFailureTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

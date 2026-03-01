@@ -77,6 +77,25 @@ message CrossVersionObjectReference {
   optional string apiVersion = 3;
 }
 
+// ExternalMetricFallback defines fallback behavior when an external metric cannot be retrieved
+message ExternalMetricFallback {
+  // failureDurationSeconds is the duration in seconds for which the external metric must be
+  // continuously failing before the fallback value is used. The duration is measured from the
+  // first consecutive failure. Must be greater than 0.
+  // +optional
+  // default=180
+  // min=180
+  optional int64 failureDurationSeconds = 1;
+
+  // replicas is the desired replica count to use when the external metric cannot be retrieved.
+  // This value is treated as the desired replica count from this metric.
+  // When multiple metrics are configured, the HPA controller uses the maximum of all
+  // desired replica counts (standard HPA multi-metric behavior).
+  // Must be greater than 0.
+  // +required
+  optional int32 replicas = 2;
+}
+
 // ExternalMetricSource indicates how to scale on a metric not associated with
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
@@ -86,6 +105,11 @@ message ExternalMetricSource {
 
   // target specifies the target value for the given metric
   optional MetricTarget target = 2;
+
+  // fallback defines the behavior when this external metric cannot be retrieved.
+  // If not set, the HPA will not scale based on this metric when it's unavailable.
+  // +optional
+  optional ExternalMetricFallback fallback = 3;
 }
 
 // ExternalMetricStatus indicates the current value of a global metric
@@ -96,6 +120,15 @@ message ExternalMetricStatus {
 
   // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
+
+  // metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
+  // +optional
+  optional string metricFetchStatus = 3;
+
+  // firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
+  // Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time firstFailureTime = 4;
 }
 
 // HPAScalingPolicy is a single policy which must hold true for a specified past interval.
