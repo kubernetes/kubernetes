@@ -89,3 +89,49 @@ func fileOwner(path string) error {
 	fmt.Printf("owner GID of %q: %v\n", path, buf.Gid)
 	return nil
 }
+
+func linkFileMode(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	fileinfo, err := os.Lstat(path)
+	if err != nil {
+		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("mode of link file %q: %v\n", path, fileinfo.Mode())
+	return nil
+}
+
+func linkFilePerm(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	fileinfo, err := os.Lstat(path)
+	if err != nil {
+		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("perms of link file %q: %v\n", path, fileinfo.Mode().Perm())
+	return nil
+}
+
+func linkFileOwner(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	buf := syscall.Stat_t{}
+	if err := syscall.Lstat(path, &buf); err != nil {
+		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("owner UID of link file %q: %v\n", path, buf.Uid)
+	fmt.Printf("owner GID of link file %q: %v\n", path, buf.Gid)
+	return nil
+}

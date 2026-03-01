@@ -38,6 +38,9 @@ var (
 	fileModePath              = ""
 	filePermPath              = ""
 	fileOwnerPath             = ""
+	linkFileModePath          = ""
+	linkFilePermPath          = ""
+	linkFileOwnerPath         = ""
 	newFilePath0644           = ""
 	newFilePath0666           = ""
 	newFilePath0660           = ""
@@ -53,6 +56,9 @@ func init() {
 	CmdMounttest.Flags().StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
 	CmdMounttest.Flags().StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
 	CmdMounttest.Flags().StringVar(&fileOwnerPath, "file_owner", "", "Path to print the owning UID and GID of")
+	CmdMounttest.Flags().StringVar(&linkFileModePath, "link_file_mode", "", "Path to print the link file mode bits of")
+	CmdMounttest.Flags().StringVar(&linkFilePermPath, "link_file_perm", "", "Path to print the link file perms of")
+	CmdMounttest.Flags().StringVar(&linkFileOwnerPath, "link_file_owner", "", "Path to print the link file owning UID and GID of")
 	CmdMounttest.Flags().StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
 	CmdMounttest.Flags().StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
 	CmdMounttest.Flags().StringVar(&newFilePath0660, "new_file_0660", "", "Path to write to and read from with perm 0660")
@@ -119,6 +125,21 @@ func main(cmd *cobra.Command, args []string) {
 	}
 
 	err = fileOwner(fileOwnerPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = linkFileMode(linkFileModePath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = linkFilePerm(linkFilePermPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = linkFileOwner(linkFileOwnerPath)
 	if err != nil {
 		errs = append(errs, err)
 	}
