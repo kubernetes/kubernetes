@@ -153,8 +153,15 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod) {
 	pod = podClient.Create(ctx, pod)
 
-	ginkgo.By("Waiting for pod to start")
-	err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout*6)
+	ginkgo.By("Waiting for pod to start or complete")
+	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "started or completed", framework.PodStartTimeout*6, func(p *v1.Pod) (bool, error) {
+		switch p.Status.Phase {
+		case v1.PodRunning, v1.PodSucceeded, v1.PodFailed:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for pod completion")
