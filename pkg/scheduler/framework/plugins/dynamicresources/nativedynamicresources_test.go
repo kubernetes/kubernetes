@@ -596,6 +596,101 @@ func TestBuildNativeDRAInfo(t *testing.T) {
 	}
 }
 
+func TestValidateNativeDRAClaims(t *testing.T) {
+	tests := []struct {
+		name                      string
+		pod                       *v1.Pod
+		nativeResourceClaimStatus []v1.PodNativeResourceClaimStatus
+		nodeInfo                  *framework.NodeInfo
+		wantErr                   bool
+	}{
+		{
+			name:    "no native resource claims",
+			pod:     st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			wantErr: false,
+		},
+		{
+			name: "claim used by this pod only",
+			pod:  st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			nativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{ClaimInfo: v1.ObjectReference{UID: "claim-uid"}},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				ni := framework.NewNodeInfo()
+				ni.NativeDRAClaimStates = map[types.UID]*fwk.NativeDRAClaimAllocationState{
+					"claim-uid": {ConsumerPods: sets.New[types.UID]("pod-uid")},
+				}
+				return ni
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "claim not in node info",
+			pod:  st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			nativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{ClaimInfo: v1.ObjectReference{UID: "claim-uid"}},
+			},
+			nodeInfo: framework.NewNodeInfo(),
+			wantErr:  false,
+		},
+		{
+			name: "claim shared, current pod not in consumers",
+			pod:  st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			nativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{ClaimInfo: v1.ObjectReference{UID: "claim-uid"}},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				ni := framework.NewNodeInfo()
+				ni.NativeDRAClaimStates = map[types.UID]*fwk.NativeDRAClaimAllocationState{
+					"claim-uid": {ConsumerPods: sets.New[types.UID]("other-pod-uid", "another-pod-uid")},
+				}
+				return ni
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "claim shared, current pod in consumers",
+			pod:  st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			nativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{ClaimInfo: v1.ObjectReference{UID: "claim-uid"}},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				ni := framework.NewNodeInfo()
+				ni.NativeDRAClaimStates = map[types.UID]*fwk.NativeDRAClaimAllocationState{
+					"claim-uid": {ConsumerPods: sets.New[types.UID]("pod-uid", "another-pod-uid")},
+				}
+				return ni
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "claim only used by other pod",
+			pod:  st.MakePod().Name("test-pod").UID("pod-uid").Obj(),
+			nativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+				{ClaimInfo: v1.ObjectReference{UID: "claim-uid"}},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				ni := framework.NewNodeInfo()
+				ni.NativeDRAClaimStates = map[types.UID]*fwk.NativeDRAClaimAllocationState{
+					"claim-uid": {ConsumerPods: sets.New[types.UID]("other-pod-uid")},
+				}
+				return ni
+			}(),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pl := &DynamicResources{}
+			err := pl.validateNativeDRAClaims(tt.pod, tt.nodeInfo, tt.nativeResourceClaimStatus)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateNativeDRAClaims() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestPatchNativeResourceClaimStatus(t *testing.T) {
 	nodeName := "test-node"
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()

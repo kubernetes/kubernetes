@@ -229,6 +229,17 @@ func (pl *DynamicResources) validateNativeDRAClaims(pod *v1.Pod, nodeInfo fwk.No
 	if len(nativeResourceClaimStatus) == 0 {
 		return nil
 	}
+	for _, claim := range nativeResourceClaimStatus {
+		claimStates := nodeInfo.GetNativeResourceDRAClaimStates()
+		if state, ok := claimStates[claim.ClaimInfo.UID]; ok && state != nil {
+			if state.ConsumerPods.Len() > 1 {
+				return fmt.Errorf("native resource claim %s shared by multiple pods", claim.ClaimInfo.Name)
+			}
+			if state.ConsumerPods.Len() == 1 && !state.ConsumerPods.Has(pod.UID) {
+				return fmt.Errorf("native resource claim %s is already used by another pod", claim.ClaimInfo.Name)
+			}
+		}
+	}
 	return nil
 }
 
@@ -263,7 +274,7 @@ func (pl *DynamicResources) getPodNativeResourceFootprint(logger klog.Logger, no
 	}
 
 	if err := pl.validateNativeDRAClaims(pod, nodeInfo, podNativeDRAStatus); err != nil {
-		return nil, nil, statusError(logger, err)
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, err.Error())
 	}
 
 	// Calculate Effective Container Requests for PodRequests helper
