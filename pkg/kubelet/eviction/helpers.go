@@ -241,11 +241,9 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 			softContainerFsDisk = idx
 		}
 		if threshold.Signal == evictionapi.SignalContainerFsInodesFree && isHardEvictionThreshold(threshold) {
-			err = errors.Join(fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
 			hardContainerFsINodes = idx
 		}
 		if threshold.Signal == evictionapi.SignalContainerFsInodesFree && !isHardEvictionThreshold(threshold) {
-			err = errors.Join(fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
 			softContainerFsINodes = idx
 		}
 	}
@@ -281,6 +279,7 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 		// will not be present and we should not add containerfs.inodesFree either.
 		if hardNodeINodeDisk.Signal != "" {
 			if hardContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
 				thresholds[hardContainerFsINodes] = evictionapi.Threshold{
 					Signal: evictionapi.SignalContainerFsInodesFree, Operator: hardNodeINodeDisk.Operator, Value: hardNodeINodeDisk.Value, MinReclaim: hardNodeINodeDisk.MinReclaim,
 				}
@@ -295,6 +294,7 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 		}
 		if softNodeINodeDisk.Signal != "" {
 			if softContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
 				thresholds[softContainerFsINodes] = evictionapi.Threshold{
 					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softNodeINodeDisk.GracePeriod, Operator: softNodeINodeDisk.Operator, Value: softNodeINodeDisk.Value, MinReclaim: softNodeINodeDisk.MinReclaim,
 				}
@@ -341,6 +341,7 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 		// will not be present and we should not add containerfs.inodesFree either.
 		if hardImageINodeDisk.Signal != "" {
 			if hardContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
 				thresholds[hardContainerFsINodes] = evictionapi.Threshold{
 					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: hardImageINodeDisk.GracePeriod, Operator: hardImageINodeDisk.Operator, Value: hardImageINodeDisk.Value, MinReclaim: hardImageINodeDisk.MinReclaim,
 				}
@@ -355,6 +356,7 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 		}
 		if softImageINodeDisk.Signal != "" {
 			if softContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
 				thresholds[softContainerFsINodes] = evictionapi.Threshold{
 					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softImageINodeDisk.GracePeriod, Operator: softImageINodeDisk.Operator, Value: softImageINodeDisk.Value, MinReclaim: softImageINodeDisk.MinReclaim,
 				}
