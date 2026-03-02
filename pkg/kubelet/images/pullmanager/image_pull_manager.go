@@ -368,23 +368,26 @@ func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []strin
 // of the PullManager.
 func (f *PullManager) initialize(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	pullIntents, err := f.recordsAccessor.ListImagePullIntents()
-	if err != nil {
-		logger.Error(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
-	}
-
-	if len(pullIntents) == 0 {
-		return
-	}
 
 	imageObjs, err := f.imageService.ListImages(ctx)
 	if err != nil {
 		logger.Error(err, "failed to list images")
 	}
 
+	f.normalizePulledRecordsImageRefs(ctx, imageObjs)
+
+	pullIntents, err := f.recordsAccessor.ListImagePullIntents()
+	if err != nil {
+		logger.Error(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
+	}
+
 	inFlightPulls := sets.New[string]()
 	for _, intent := range pullIntents {
 		inFlightPulls.Insert(intent.Image)
+	}
+
+	if len(pullIntents) == 0 {
+		return
 	}
 
 	// Each of the images known to the CRI might consist of multiple tags and digests,
@@ -425,6 +428,52 @@ func (f *PullManager) getIntentCounterForImage(image string) int32 {
 		panic(fmt.Sprintf("expected the intentCounters sync map to only contain int32 values, got %T", intentNumAny))
 	}
 	return intentNum
+}
+
+func (f *PullManager) normalizePulledRecordsImageRefs(ctx context.Context, nodeImages []kubecontainer.Image) {
+	logger := klog.FromContext(ctx)
+
+	recordsList, err := f.recordsAccessor.ListImagePulledRecords()
+	if err != nil {
+		logger.Error(err, "there were errors listing ImagePulledRecords, continuing with an incomplete records list")
+	}
+
+	if len(recordsList) == 0 {
+		return
+	}
+
+	nodeImageIndex := make(map[string]*kubecontainer.Image, len(nodeImages))
+	for imgIdx, img := range nodeImages {
+		nodeImageIndex[img.ID] = &nodeImages[imgIdx]
+	}
+
+	for _, record := range recordsList {
+		if _, ok := nodeImageIndex[record.ImageRef]; ok {
+			continue
+		}
+
+		normalizedID, err := f.imageService.GetImageRef(ctx, kubecontainer.ImageSpec{
+			Image: record.ImageRef,
+		})
+		if err != nil || len(normalizedID) == 0 {
+			logger.Error(err, "failed to retrieve ID for image", "imageRef", record.ImageRef)
+			continue
+		}
+
+		safeToDeleteOrig := true
+		for image, creds := range record.CredentialMapping {
+			if err := f.writePulledRecordIfChanged(ctx, image, normalizedID, &creds); err != nil {
+				logger.Error(err, "failed to write an image pull record", "imageID", normalizedID)
+				safeToDeleteOrig = false
+				continue
+			}
+		}
+
+		if safeToDeleteOrig {
+			// the record should be fixed now, remove it
+			f.recordsAccessor.DeleteImagePulledRecord(logger, record.ImageRef)
+		}
+	}
 }
 
 // searchForExistingTagDigest loops through the `image` RepoDigests and RepoTags
