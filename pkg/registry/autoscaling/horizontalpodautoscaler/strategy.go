@@ -230,9 +230,12 @@ func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
 
 	// Handle HPAExternalMetricFallback
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) {
+		if externalFallbackInUse(oldHPA) {
+			return
+		}
+
 		if newHPA.Spec.Metrics != nil {
-			metrics := newHPA.Spec.Metrics
-			for _, metric := range metrics {
+			for _, metric := range newHPA.Spec.Metrics {
 				if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
 					metric.External.Fallback = nil
 				}
@@ -248,6 +251,21 @@ func toleranceInUse(hpa *autoscaling.HorizontalPodAutoscaler) bool {
 	for _, sr := range []*autoscaling.HPAScalingRules{hpa.Spec.Behavior.ScaleDown, hpa.Spec.Behavior.ScaleUp} {
 		if sr != nil && sr.Tolerance != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func externalFallbackInUse(hpa *autoscaling.HorizontalPodAutoscaler) bool {
+	if hpa == nil || hpa.Spec.Metrics == nil {
+		return false
+	}
+
+	for _, metric := range hpa.Spec.Metrics {
+		if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+			if metric.External.Fallback != nil {
+				return true
+			}
 		}
 	}
 	return false
