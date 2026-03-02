@@ -1453,7 +1453,7 @@ type SecretVolumeSource struct {
 }
 
 const (
-	SecretVolumeSourceDefaultMode int32 = 0o644
+	SecretVolumeSourceDefaultMode int32 = 0644
 )
 
 // Adapts a secret into a projected volume.
@@ -1899,7 +1899,7 @@ type ConfigMapVolumeSource struct {
 }
 
 const (
-	ConfigMapVolumeSourceDefaultMode int32 = 0o644
+	ConfigMapVolumeSourceDefaultMode int32 = 0644
 )
 
 // Adapts a ConfigMap into a projected volume.
@@ -2164,7 +2164,7 @@ type VolumeProjection struct {
 }
 
 const (
-	ProjectedVolumeSourceDefaultMode int32 = 0o644
+	ProjectedVolumeSourceDefaultMode int32 = 0644
 )
 
 // Maps a string key to a path within a volume.
@@ -8169,7 +8169,7 @@ type DownwardAPIVolumeSource struct {
 }
 
 const (
-	DownwardAPIVolumeSourceDefaultMode int32 = 0o644
+	DownwardAPIVolumeSourceDefaultMode int32 = 0644
 )
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
