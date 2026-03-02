@@ -496,7 +496,7 @@ type CSIDriverSpec struct {
 	// Default is "false".
 	// +featureGate=VolumeLimitScaling
 	// +optional
-	PreventPodSchedulingIfMissing *bool `protobuf:"varint,11,opt,name=preventPodSchedulingIfMissing"`
+	PreventPodSchedulingIfMissing *bool `json:"preventPodSchedulingIfMissing,omitempty" protobuf:"varint,11,opt,name=preventPodSchedulingIfMissing"`
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying
