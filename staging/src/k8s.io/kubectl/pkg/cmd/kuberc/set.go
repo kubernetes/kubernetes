@@ -399,6 +399,11 @@ func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
 				continue
 			}
 
+			if len(strings.TrimSpace(v)) == 0 {
+				errs = append(errs, fmt.Errorf("empty value in allowlist entry for field %q", k))
+				continue
+			}
+
 			entries = append(entries, entry)
 		}
 	}
