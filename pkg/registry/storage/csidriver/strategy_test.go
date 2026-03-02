@@ -213,6 +213,23 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		},
 	}
 
+	driverWithPreventPodSchedulingIfMissingEnabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			PreventPodSchedulingIfMissing: &enabled,
+		},
+	}
+	driverWithPreventPodSchedulingIfMissingDisabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			PreventPodSchedulingIfMissing: &disabled,
+		},
+	}
+
 	thirty := int64(30)
 	sixty := int64(60)
 	driverWithNodeAllocatableUpdatePeriodSeconds30 := &storage.CSIDriver{
@@ -248,6 +265,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		wantSELinuxMount                       *bool
 		wantNodeAllocatableUpdatePeriodSeconds *int64
 		wantServiceAccountTokenInSecrets       *bool
+		volumeLimitScalingEnabled              bool
+		wantPreventPodSchedulingIfMissing      *bool
 	}{
 		{
 			name:           "podInfoOnMount feature enabled, before: none, update: enabled",
@@ -452,6 +471,38 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			wantTokenRequests:                    []storage.TokenRequest{{Audience: gcp}},
 			wantGeneration:                       0,
 		},
+		{
+			name:                              "VolumeLimitScaling feature enabled, before: nil, update: enabled",
+			volumeLimitScalingEnabled:         true,
+			old:                               driverWithNothing,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: &enabled,
+			wantGeneration:                    1,
+		},
+		{
+			name:                              "VolumeLimitScaling feature enabled, before: enabled, update: disabled",
+			volumeLimitScalingEnabled:         true,
+			old:                               driverWithPreventPodSchedulingIfMissingEnabled,
+			update:                            driverWithPreventPodSchedulingIfMissingDisabled,
+			wantPreventPodSchedulingIfMissing: &disabled,
+			wantGeneration:                    1,
+		},
+		{
+			name:                              "VolumeLimitScaling feature disabled, before: nil, update: enabled",
+			volumeLimitScalingEnabled:         false,
+			old:                               driverWithNothing,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: nil,
+			wantGeneration:                    0,
+		},
+		{
+			name:                              "VolumeLimitScaling feature disabled, before: enabled, update: enabled",
+			volumeLimitScalingEnabled:         false,
+			old:                               driverWithPreventPodSchedulingIfMissingEnabled,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: &enabled,
+			wantGeneration:                    0,
+		},
 	}
 
 	for _, test := range tests {
@@ -463,6 +514,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 				features.SELinuxMountReadWriteOncePod:   test.seLinuxMountReadWriteOncePodEnabled,
 				features.MutableCSINodeAllocatableCount: test.mutableCSINodeAllocatableCountEnabled,
 				features.CSIServiceAccountTokenSecrets:  test.csiServiceAccountTokenSecretsEnabled,
+				features.VolumeLimitScaling:             test.volumeLimitScalingEnabled,
 			})
 
 			csiDriver := test.update.DeepCopy()
@@ -475,6 +527,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			require.Equal(t, test.wantSELinuxMount, csiDriver.Spec.SELinuxMount)
 			require.Equal(t, test.wantNodeAllocatableUpdatePeriodSeconds, csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds)
 			require.Equal(t, test.wantServiceAccountTokenInSecrets, csiDriver.Spec.ServiceAccountTokenInSecrets)
+			require.Equal(t, test.wantPreventPodSchedulingIfMissing, csiDriver.Spec.PreventPodSchedulingIfMissing)
 		})
 	}
 }
@@ -720,16 +773,65 @@ func TestCSIDriverValidation(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"valid PreventPodSchedulingIfMissing set to true",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			false,
+		},
+		{
+			"valid PreventPodSchedulingIfMissing set to false",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &disabled,
+				},
+			},
+			false,
+		},
+		{
+			"valid PreventPodSchedulingIfMissing not set (nil)",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:  &enabled,
+					PodInfoOnMount:  &enabled,
+					StorageCapacity: &enabled,
+					SELinuxMount:    &enabled,
+				},
+			},
+			false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationSELinuxMountEnabledDisabled
 			// and TestCSIDriverValidationServiceAccountTokenInSecretsEnabledDisabled
+			// and TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.SELinuxMountReadWriteOncePod:   true,
 				features.MutableCSINodeAllocatableCount: true,
 				features.CSIServiceAccountTokenSecrets:  true,
+				features.VolumeLimitScaling:             true,
 			})
 
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
@@ -1015,6 +1117,8 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 		csiDriver                            *storage.CSIDriver
 		csiServiceAccountTokenSecretsEnabled bool
 		wantServiceAccountTokenInSecrets     *bool
+		volumeLimitScalingEnabled            bool
+		wantPreventPodSchedulingIfMissing    *bool
 	}{
 		{
 			name: "ServiceAccountTokenInSecrets feature enabled, field set to true",
@@ -1070,6 +1174,54 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			csiServiceAccountTokenSecretsEnabled: false,
 			wantServiceAccountTokenInSecrets:     nil,
 		},
+		{
+			name: "VolumeLimitScaling feature enabled, field set to true",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			volumeLimitScalingEnabled:         true,
+			wantPreventPodSchedulingIfMissing: &enabled,
+		},
+		{
+			name: "VolumeLimitScaling feature disabled, field set to true should be cleared",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			volumeLimitScalingEnabled:         false,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
+		{
+			name: "VolumeLimitScaling feature enabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{},
+			},
+			volumeLimitScalingEnabled:         true,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
+		{
+			name: "VolumeLimitScaling feature disabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{},
+			},
+			volumeLimitScalingEnabled:         false,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -1079,11 +1231,13 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.CSIServiceAccountTokenSecrets: test.csiServiceAccountTokenSecretsEnabled,
+				features.VolumeLimitScaling:            test.volumeLimitScalingEnabled,
 			})
 
 			csiDriver := test.csiDriver.DeepCopy()
 			Strategy.PrepareForCreate(ctx, csiDriver)
 			require.Equal(t, test.wantServiceAccountTokenInSecrets, csiDriver.Spec.ServiceAccountTokenInSecrets)
+			require.Equal(t, test.wantPreventPodSchedulingIfMissing, csiDriver.Spec.PreventPodSchedulingIfMissing)
 		})
 	}
 }

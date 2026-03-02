@@ -1506,6 +1506,8 @@ func TestCSIDriverValidation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1844,6 +1846,8 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -2379,6 +2383,146 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			}
 			newCSIDriver := oldCSIDriver.DeepCopy()
 			newCSIDriver.Spec.SELinuxMount = test.newValue
+			err := ValidateCSIDriverUpdate(newCSIDriver, oldCSIDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+}
+
+func TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled(t *testing.T) {
+	tests := []struct {
+		name                          string
+		featureEnabled                bool
+		preventPodSchedulingIfMissing *bool
+		expectError                   bool
+	}{{
+		name:                          "feature enabled, field set to true",
+		featureEnabled:                true,
+		preventPodSchedulingIfMissing: ptr.To(true),
+		expectError:                   false,
+	}, {
+		name:                          "feature enabled, field set to false",
+		featureEnabled:                true,
+		preventPodSchedulingIfMissing: ptr.To(false),
+		expectError:                   false,
+	}, {
+		name:                          "feature enabled, nil value",
+		featureEnabled:                true,
+		preventPodSchedulingIfMissing: nil,
+		expectError:                   false,
+	}, {
+		name:                          "feature disabled, field set to true",
+		featureEnabled:                false,
+		preventPodSchedulingIfMissing: ptr.To(true),
+		expectError:                   true,
+	}, {
+		name:                          "feature disabled, field set to false",
+		featureEnabled:                false,
+		preventPodSchedulingIfMissing: ptr.To(false),
+		expectError:                   true,
+	}, {
+		name:                          "feature disabled, nil value",
+		featureEnabled:                false,
+		preventPodSchedulingIfMissing: nil,
+		expectError:                   false,
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureEnabled)
+			// SELinuxMount is required when its feature gate is enabled, so always enable it here.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
+			csiDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.preventPodSchedulingIfMissing,
+				},
+			}
+			err := ValidateCSIDriver(csiDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+
+	updateTests := []struct {
+		name           string
+		featureEnabled bool
+		oldValue       *bool
+		newValue       *bool
+		expectError    bool
+	}{{
+		name:           "feature enabled, nil->set",
+		featureEnabled: true,
+		oldValue:       nil,
+		newValue:       ptr.To(true),
+		expectError:    false,
+	}, {
+		name:           "feature enabled, set->set",
+		featureEnabled: true,
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(false),
+		expectError:    false,
+	}, {
+		name:           "feature enabled, set->nil",
+		featureEnabled: true,
+		oldValue:       ptr.To(true),
+		newValue:       nil,
+		expectError:    false,
+	}, {
+		name:           "feature disabled, nil->set",
+		featureEnabled: false,
+		oldValue:       nil,
+		newValue:       ptr.To(true),
+		expectError:    true,
+	}, {
+		name:           "feature disabled, set->set",
+		featureEnabled: false,
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(true),
+		expectError:    true,
+	}, {
+		name:           "feature disabled, set->nil",
+		featureEnabled: false,
+		oldValue:       ptr.To(true),
+		newValue:       nil,
+		expectError:    false,
+	}, {
+		name:           "feature disabled, nil->nil",
+		featureEnabled: false,
+		oldValue:       nil,
+		newValue:       nil,
+		expectError:    false,
+	}}
+	for _, test := range updateTests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
+			oldCSIDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.oldValue,
+				},
+			}
+			newCSIDriver := oldCSIDriver.DeepCopy()
+			newCSIDriver.Spec.PreventPodSchedulingIfMissing = test.newValue
 			err := ValidateCSIDriverUpdate(newCSIDriver, oldCSIDriver)
 			if test.expectError && err == nil {
 				t.Error("Expected validation error, got nil")
