@@ -394,7 +394,6 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		}
 		// copy before mutating
 		if !copiedAnnotations {
-			copiedAnnotations = true
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
 		out.Annotations[autoscaling.FallbackExternalMetricsAnnotation] = string(fallbackEnc)

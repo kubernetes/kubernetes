@@ -109,7 +109,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics f
 		}
 	})
 
-	// WithSerial() requred due to registering of v1beta1.external.metrics.k8s.io
+	// WithSerial() required due to registering of v1beta1.external.metrics.k8s.io
 	ginkgo.It("one metric fails", framework.WithSerial(), func(ctx context.Context) {
 		ginkgo.By("Creating the resource consumer deployment")
 		initPods := 1
