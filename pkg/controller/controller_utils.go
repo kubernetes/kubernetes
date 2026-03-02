@@ -557,7 +557,7 @@ func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespac
 
 func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
 	pod, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
-	if err != nil && r.OnWrite != nil {
+	if err == nil && r.OnWrite != nil {
 		ownerRef := metav1.GetControllerOfNoCopy(pod)
 		r.OnWrite(pod, ownerRef)
 	}

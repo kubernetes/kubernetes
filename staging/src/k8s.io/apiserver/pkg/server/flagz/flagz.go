@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +30,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/flagz/negotiate"
@@ -128,6 +132,31 @@ func (f *flagzCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 
 func handleFlagz(componentName string, reg *registry, serializer runtime.NegotiatedSerializer, restrictions negotiate.FlagzEndpointRestrictions) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(r.Context())
+		if !ok {
+			requestReceivedTimestamp = time.Now()
+		}
+		delegate := &metrics.ResponseWriterDelegator{ResponseWriter: w}
+		w = responsewriter.WrapForHTTP1Or2(delegate)
+
+		// Use MonitorRequest instead of InstrumentHandlerFunc because the group,
+		// version, and deprecated status depend on per-request content negotiation.
+		// For text/plain requests, group and version remain empty. For structured
+		// responses (JSON/YAML/CBOR), they are set to the negotiated API group and
+		// version (e.g., config.k8s.io/v1alpha1).
+		var group, version string
+		var deprecated bool
+		defer func() {
+			metrics.MonitorRequest(r, "GET", group, version,
+				"flagz",       // resource
+				"",            // subresource
+				"",            // scope
+				componentName, // component
+				deprecated,
+				"", // removedRelease
+				delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		}()
+
 		obj := flagz(componentName, reg.reader)
 		acceptHeader := r.Header.Get("Accept")
 		if strings.TrimSpace(acceptHeader) == "" {
@@ -163,8 +192,13 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 				)
 				return
 			}
+			// Set group, version, and deprecated from the negotiated target so
+			// the deferred MonitorRequest records the actual requested API version.
 			targetGV = mediaType.Convert.GroupVersion()
-			if reg.deprecatedVersions()[targetGV.Version] {
+			group = targetGV.Group
+			version = targetGV.Version
+			deprecated = reg.deprecatedVersions()[targetGV.Version]
+			if deprecated {
 				w.Header().Set("Warning", `299 - "This version of the flagz endpoint is deprecated. Please use a newer version."`)
 			}
 			writeStructuredResponse(obj, serializer, targetGV, restrictions, w, r)

@@ -399,10 +399,12 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
 		allDeclarativeErrs := runValidations(testCtx)
 
-		// The matcher here is more specific to ensure that errors from Alpha rules are included and matched correctly.
-		errOutputMatcherByStability := errOutputMatcher.ByValidationStabilityLevel()
+		// The matcher here is more specific to ensure that errors from Alpha rules
+		// are included and matched correctly.
+		// This also ensure that errors are coming from the declarative validations only.
+		dvErrorMatcher := errOutputMatcher.ByValidationStabilityLevel().BySource()
 		if len(expectedErrs) > 0 {
-			errOutputMatcherByStability.Test(t, expectedErrs, allDeclarativeErrs)
+			dvErrorMatcher.Test(t, expectedErrs, allDeclarativeErrs)
 		} else if len(allDeclarativeErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", allDeclarativeErrs)
 		}

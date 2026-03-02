@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,16 +37,17 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	v1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	peerproxymetrics "k8s.io/apiserver/pkg/util/peerproxy/metrics"
 )
 
 func TestRunPeerDiscoveryCacheSync(t *testing.T) {
-	localServerID := "local-server"
-
 	testCases := []struct {
 		desc                string
 		leases              []*v1.Lease
@@ -136,31 +138,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset()
-			fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-			leaseInformer := fakeInformerFactory.Coordination().V1().Leases()
-
-			fakeReconciler := newFakeReconciler()
-
-			negotiatedSerializer := serializer.NewCodecFactory(runtime.NewScheme())
-			loopbackConfig := &rest.Config{}
-			proxyConfig := &transport.Config{
-				TLS: transport.TLSConfig{Insecure: true},
-			}
-
-			h, err := NewPeerProxyHandler(
-				localServerID,
-				tt.labelSelectorString,
-				leaseInformer,
-				fakeReconciler,
-				negotiatedSerializer,
-				loopbackConfig,
-				proxyConfig,
-			)
-			if err != nil {
-				t.Fatalf("failed to create handler: %v", err)
-			}
-
+			h, fakeReconciler, leaseInformer, fakeClient, fakeInformerFactory := setupPeerProxyHandler(t, tt.labelSelectorString)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -170,13 +148,13 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to create lease: %v", err)
 				}
-				if err = leaseInformer.Informer().GetIndexer().Add(lease); err != nil {
+				if err = leaseInformer.GetIndexer().Add(lease); err != nil {
 					t.Fatalf("failed to create lease: %v", err)
 				}
 			}
 
 			go fakeInformerFactory.Start(ctx.Done())
-			cache.WaitForCacheSync(ctx.Done(), leaseInformer.Informer().HasSynced)
+			cache.WaitForCacheSync(ctx.Done(), leaseInformer.HasSynced)
 
 			// Create test servers based on leases
 			testServers := make(map[string]*httptest.Server)
@@ -199,7 +177,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			for _, lease := range tt.leases {
 				initialCache[lease.Name] = makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources")
 			}
-			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 				select {
 				case <-ctx.Done():
 					return false, ctx.Err()
@@ -219,7 +197,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to update lease: %v", err)
 				}
-				if err = leaseInformer.Informer().GetIndexer().Update(updatedLease); err != nil {
+				if err = leaseInformer.GetIndexer().Update(updatedLease); err != nil {
 					t.Fatalf("failed to update lease: %v", err)
 				}
 			}
@@ -227,7 +205,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			// Delete leases if indicated.
 			if len(tt.deletedLeaseNames) > 0 {
 				for _, leaseName := range tt.deletedLeaseNames {
-					lease, exists, err := leaseInformer.Informer().GetIndexer().GetByKey("default/" + leaseName)
+					lease, exists, err := leaseInformer.GetIndexer().GetByKey("default/" + leaseName)
 					if err != nil {
 						t.Fatalf("failed to get lease from indexer: %v", err)
 					}
@@ -239,7 +217,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed to delete lease: %v", err)
 					}
-					if err = leaseInformer.Informer().GetIndexer().Delete(deletedLease); err != nil {
+					if err = leaseInformer.GetIndexer().Delete(deletedLease); err != nil {
 						t.Fatalf("failed to delete lease: %v", err)
 					}
 
@@ -262,6 +240,118 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 
 		})
 	}
+}
+
+func TestPeerDiscoveryMetrics(t *testing.T) {
+	testCases := []struct {
+		desc             string
+		leases           []*v1.Lease
+		peerServerConfig map[string]http.HandlerFunc
+		wantMetrics      string
+	}{
+		{
+			desc: "hostport resolution error",
+			leases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "remote-resolution-error",
+						Labels: map[string]string{"apiserver-identity": "testserver"},
+					},
+					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-error")},
+				},
+			},
+			// No peer server configured means no endpoint will be registered in the reconciler.
+			// This should cause GetEndpoint to fail, triggering the "hostport_resolution" error.
+			peerServerConfig: nil,
+			wantMetrics: `
+				# HELP apiserver_peer_discovery_sync_errors_total [ALPHA] Total number of errors encountered while syncing discovery information from a peer kube-apiserver
+				# TYPE apiserver_peer_discovery_sync_errors_total counter
+				apiserver_peer_discovery_sync_errors_total{type="hostport_resolution"} 1
+			`,
+		},
+		{
+			desc: "fetch discovery error",
+			leases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "remote-fetch-error",
+						Labels: map[string]string{"apiserver-identity": "testserver"},
+					},
+					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-fetch-error")},
+				},
+			},
+			peerServerConfig: map[string]http.HandlerFunc{
+				"remote-fetch-error": func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+				},
+			},
+			wantMetrics: `
+				# HELP apiserver_peer_discovery_sync_errors_total [ALPHA] Total number of errors encountered while syncing discovery information from a peer kube-apiserver
+				# TYPE apiserver_peer_discovery_sync_errors_total counter
+				apiserver_peer_discovery_sync_errors_total{type="fetch_discovery"} 2
+			`,
+		},
+	}
+
+	peerproxymetrics.Register()
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer peerproxymetrics.Reset()
+			h, fakeReconciler, leaseInformer, _, _ := setupPeerProxyHandler(t, "apiserver-identity=testserver")
+
+			for _, lease := range tt.leases {
+				if err := leaseInformer.GetIndexer().Add(lease); err != nil {
+					t.Fatalf("failed to create lease: %v", err)
+				}
+			}
+
+			for leaseName, handler := range tt.peerServerConfig {
+				if handler == nil {
+					handler = func(w http.ResponseWriter, r *http.Request) {}
+				}
+				ts := httptest.NewServer(handler)
+				defer ts.Close()
+				fakeReconciler.setEndpoint(leaseName, ts.URL[7:])
+			}
+
+			// Directly call syncPeerDiscoveryCache
+			// We don't care about the return error of syncPeerDiscoveryCache for this test,
+			// we only care that metrics are incremented.
+			_ = h.syncPeerDiscoveryCache(context.Background())
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetrics), "apiserver_peer_discovery_sync_errors_total"); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func setupPeerProxyHandler(t *testing.T, labelSelector string) (*peerProxyHandler, *fakeReconciler, cache.SharedIndexInformer, *fake.Clientset, informers.SharedInformerFactory) {
+	localServerID := "local-server"
+	fakeClient := fake.NewSimpleClientset()
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	leaseInformer := fakeInformerFactory.Coordination().V1().Leases()
+
+	fakeReconciler := newFakeReconciler()
+	negotiatedSerializer := serializer.NewCodecFactory(runtime.NewScheme())
+	loopbackConfig := &rest.Config{}
+	proxyConfig := &transport.Config{
+		TLS: transport.TLSConfig{Insecure: true},
+	}
+
+	h, err := NewPeerProxyHandler(
+		localServerID,
+		labelSelector,
+		leaseInformer,
+		fakeReconciler,
+		negotiatedSerializer,
+		loopbackConfig,
+		proxyConfig,
+	)
+	if err != nil {
+		t.Fatalf("failed to create handler: %v", err)
+	}
+
+	return h, fakeReconciler, leaseInformer.Informer(), fakeClient, fakeInformerFactory
 }
 
 // newTestTLSServer creates a new httptest.NewTLSServer that serves discovery endpoints.

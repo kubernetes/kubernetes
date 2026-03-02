@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,18 +34,19 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this
 // with a clientset for writes and listers for reads; for tests we provide stubs.
 type StatefulPodControlObjectManager interface {
-	CreatePod(ctx context.Context, pod *v1.Pod) error
+	CreatePod(ctx context.Context, pod *v1.Pod, ss *apps.StatefulSet) error
 	GetPod(namespace, podName string) (*v1.Pod, error)
-	UpdatePod(pod *v1.Pod) error
+	UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error
 	DeletePod(pod *v1.Pod) error
-	CreateClaim(claim *v1.PersistentVolumeClaim) error
+	CreateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
-	UpdateClaim(claim *v1.PersistentVolumeClaim) error
+	UpdateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error
 }
 
 // StatefulPodControl defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -63,8 +65,9 @@ func NewStatefulPodControl(
 	podLister corelisters.PodLister,
 	claimLister corelisters.PersistentVolumeClaimLister,
 	recorder record.EventRecorder,
+	consistencyStore consistencyutil.ConsistencyStore,
 ) *StatefulPodControl {
-	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister}, recorder}
+	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister, consistencyStore}, recorder}
 }
 
 // NewStatefulPodControlFromManager creates a StatefulPodControl using the given StatefulPodControlObjectManager and recorder.
@@ -74,13 +77,23 @@ func NewStatefulPodControlFromManager(om StatefulPodControlObjectManager, record
 
 // realStatefulPodControlObjectManager uses a clientset.Interface and listers.
 type realStatefulPodControlObjectManager struct {
-	client      clientset.Interface
-	podLister   corelisters.PodLister
-	claimLister corelisters.PersistentVolumeClaimLister
+	client           clientset.Interface
+	podLister        corelisters.PodLister
+	claimLister      corelisters.PersistentVolumeClaimLister
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
-func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
-	_, err := om.client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod, ss *apps.StatefulSet) error {
+	pod, err := om.client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			podGroupResource,
+			pod.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -88,8 +101,17 @@ func (om *realStatefulPodControlObjectManager) GetPod(namespace, podName string)
 	return om.podLister.Pods(namespace).Get(podName)
 }
 
-func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod) error {
-	_, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error {
+	pod, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			podGroupResource,
+			pod.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -97,8 +119,17 @@ func (om *realStatefulPodControlObjectManager) DeletePod(pod *v1.Pod) error {
 	return om.client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 }
 
-func (om *realStatefulPodControlObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
-	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
+func (om *realStatefulPodControlObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
+	claim, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			persistentVolumeClaimGroupResource,
+			claim.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -106,8 +137,17 @@ func (om *realStatefulPodControlObjectManager) GetClaim(namespace, claimName str
 	return om.claimLister.PersistentVolumeClaims(namespace).Get(claimName)
 }
 
-func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
-	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
+	claim, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			persistentVolumeClaimGroupResource,
+			claim.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -118,7 +158,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	err := spc.objectMgr.CreatePod(ctx, pod)
+	err := spc.objectMgr.CreatePod(ctx, pod, set)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err
@@ -173,7 +213,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
 
-		updateErr := spc.objectMgr.UpdatePod(pod)
+		updateErr := spc.objectMgr.UpdatePod(pod, set)
 		if updateErr == nil {
 			return nil
 		}
@@ -252,7 +292,7 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(ctx context.Cont
 			if !isClaimOwnerUpToDate(logger, claim, set, pod) {
 				claim = claim.DeepCopy() // Make a copy so we don't mutate the shared cache.
 				updateClaimOwnerRefForSetAndPod(logger, claim, set, pod)
-				if err := spc.objectMgr.UpdateClaim(claim); err != nil {
+				if err := spc.objectMgr.UpdateClaim(claim, set); err != nil {
 					return fmt.Errorf("could not update claim %s for delete policy ownerRefs: %w", claimName, err)
 				}
 			}
@@ -343,7 +383,7 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 		pvc, err := spc.objectMgr.GetClaim(claim.Namespace, claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			err := spc.objectMgr.CreateClaim(&claim)
+			err := spc.objectMgr.CreateClaim(&claim, set)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to create PVC %s: %s", claim.Name, err))
 			}

@@ -96,18 +96,18 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
-			})...)
 			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-			})...)
+			}).MarkAlpha()...)
+			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
+			}).MarkAlpha()...)
 			return
 		}(fldPath.Child("minReplicas"), obj.MinReplicas, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 { return oldObj.MinReplicas }), oldObj != nil)...)
 
@@ -120,14 +120,14 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha()...)
 			return
 		}(fldPath.Child("maxReplicas"), &obj.MaxReplicas, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 { return &oldObj.MaxReplicas }), oldObj != nil)...)
 
@@ -163,13 +163,12 @@ func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *fi
 	// field autoscalingv1.ScaleSpec.Replicas
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
-			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
 			return
 		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *autoscalingv1.ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
 

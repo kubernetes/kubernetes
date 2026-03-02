@@ -56,6 +56,9 @@ type Error struct {
 	// that should also be caught by declarative validation.
 	CoveredByDeclarative bool
 
+	// FromImperative denotes these errors are originating from  the hand written validations.
+	FromImperative bool
+
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
 	ValidationStabilityLevel ValidationStabilityLevel
 }
@@ -504,6 +507,18 @@ func (e *Error) MarkBeta() *Error {
 func (list ErrorList) MarkBeta() ErrorList {
 	for _, err := range list {
 		err.ValidationStabilityLevel = stabilityLevelBeta
+	}
+	return list
+}
+
+func (e *Error) MarkFromImperative() *Error {
+	e.FromImperative = true
+	return e
+}
+
+func (list ErrorList) MarkFromImperative() ErrorList {
+	for _, err := range list {
+		err.FromImperative = true
 	}
 	return list
 }

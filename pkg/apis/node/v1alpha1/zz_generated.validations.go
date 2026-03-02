@@ -83,18 +83,18 @@ func Validate_RuntimeClassSpec(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
 			return
 		}(fldPath.Child("runtimeHandler"), &obj.RuntimeHandler, safe.Field(oldObj, func(oldObj *nodev1alpha1.RuntimeClassSpec) *string { return &oldObj.RuntimeHandler }), oldObj != nil)...)
 

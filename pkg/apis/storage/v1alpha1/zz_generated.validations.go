@@ -65,7 +65,7 @@ func Validate_VolumeAttachment(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -95,15 +95,15 @@ func Validate_VolumeAttachmentSpec(ctx context.Context, op operation.Operation, 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63)...)
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha()...)
 			return
 		}(fldPath.Child("attacher"), &obj.Attacher, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentSpec) *string { return &oldObj.Attacher }), oldObj != nil)...)
 

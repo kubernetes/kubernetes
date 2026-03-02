@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -37,6 +38,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type MyListStruct
+	scheme.AddValidationFunc((*MyListStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_MyListStruct(ctx, op, nil /* fldPath */, obj.(*MyListStruct), safe.Cast[*MyListStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type MyListStructBeta
+	scheme.AddValidationFunc((*MyListStructBeta)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_MyListStructBeta(ctx, op, nil /* fldPath */, obj.(*MyListStructBeta), safe.Cast[*MyListStructBeta](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type MyStruct
 	scheme.AddValidationFunc((*MyStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -70,6 +87,82 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStruct_tasks_ = validate.NewUnionMembership(validate.NewUnionMember("tasks[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("tasks[{\"name\": \"failed\"}]"))
+
+// Validate_MyListStruct validates an instance of MyListStruct according
+// to declarative validation rules in the API schema.
+func Validate_MyListStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyListStruct) (errs field.ErrorList) {
+	// field MyListStruct.TypeMeta has no validation
+
+	// field MyListStruct.Tasks
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Task, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Task, b Task) bool { return a.Name == b.Name })...)
+			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStruct_tasks_, func(list []Task) bool {
+				for i := range list {
+					if list[i].Name == "failed" {
+						return true
+					}
+				}
+				return false
+			}, func(list []Task) bool {
+				for i := range list {
+					if list[i].Name == "succeeded" {
+						return true
+					}
+				}
+				return false
+			}).MarkAlpha()...)
+			return
+		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *MyListStruct) []Task { return oldObj.Tasks }), oldObj != nil)...)
+
+	return errs
+}
+
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStructBeta_tasksBeta_ = validate.NewUnionMembership(validate.NewUnionMember("tasksBeta[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("tasksBeta[{\"name\": \"failed\"}]"))
+
+// Validate_MyListStructBeta validates an instance of MyListStructBeta according
+// to declarative validation rules in the API schema.
+func Validate_MyListStructBeta(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyListStructBeta) (errs field.ErrorList) {
+	// field MyListStructBeta.TypeMeta has no validation
+
+	// field MyListStructBeta.TasksBeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Task, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Task, b Task) bool { return a.Name == b.Name })...)
+			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStructBeta_tasksBeta_, func(list []Task) bool {
+				for i := range list {
+					if list[i].Name == "failed" {
+						return true
+					}
+				}
+				return false
+			}, func(list []Task) bool {
+				for i := range list {
+					if list[i].Name == "succeeded" {
+						return true
+					}
+				}
+				return false
+			}).MarkBeta()...)
+			return
+		}(fldPath.Child("tasksBeta"), obj.TasksBeta, safe.Field(oldObj, func(oldObj *MyListStructBeta) []Task { return oldObj.TasksBeta }), oldObj != nil)...)
+
+	return errs
 }
 
 var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyStruct_ = validate.NewUnionMembership(validate.NewUnionMember("z1"), validate.NewUnionMember("z2"))

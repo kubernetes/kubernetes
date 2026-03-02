@@ -378,13 +378,18 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			defer testServer.Close()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}, ContentType: runtime.ContentTypeJSON}})
 
+			callbackCalled := false
 			podControl := RealPodControl{
 				KubeClient: clientset,
 				Recorder:   &record.FakeRecorder{},
+				OnWrite: func(*v1.Pod, *metav1.OwnerReference) {
+					callbackCalled = true
+				},
 			}
 
 			err := test.podCreationFunc(podControl)
 			require.NoError(t, err, "unexpected error: %v", err)
+			assert.True(t, callbackCalled, "OnWrite callback was not called")
 
 			fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
 			var actualPod = &v1.Pod{}
@@ -394,6 +399,32 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 				"Body: %s", fakeHandler.RequestBody)
 		})
 	}
+}
+
+func TestPatchPodCallbacks(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset(
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+		},
+	)
+	wroteCallbackCalled := false
+	podControl := RealPodControl{
+		KubeClient: fakeClient,
+		Recorder:   &record.FakeRecorder{},
+		OnWrite: func(pod *v1.Pod, ownerRef *metav1.OwnerReference) {
+			wroteCallbackCalled = true
+		},
+	}
+
+	err := podControl.PatchPod(context.TODO(), "", "non-existing-pod", []byte("{}"))
+	assert.False(t, wroteCallbackCalled, "OnWrite callback was called when not expected")
+	assert.True(t, apierrors.IsNotFound(err), "Expected not found error")
+
+	err = podControl.PatchPod(context.TODO(), "", "test-pod", []byte("{}"))
+	assert.True(t, wroteCallbackCalled, "OnWrite callback was not called")
+	assert.NoError(t, err, "Expected no error")
 }
 
 func TestDeletePodsAllowsMissing(t *testing.T) {

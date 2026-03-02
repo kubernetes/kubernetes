@@ -47,10 +47,13 @@ type AdmissionRequest struct {
 	// otherwise identical (parallel requests, requests when earlier requests did not modify etc)
 	// The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request.
 	// It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.
+	// +optional
 	UID types.UID `json:"uid" protobuf:"bytes,1,opt,name=uid"`
 	// kind is the fully-qualified type of object being submitted (for example, v1.Pod or autoscaling.v1.Scale)
+	// +optional
 	Kind metav1.GroupVersionKind `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// resource is the fully-qualified resource being requested (for example, v1.pods)
+	// +optional
 	Resource metav1.GroupVersionResource `json:"resource" protobuf:"bytes,3,opt,name=resource"`
 	// subResource is the subresource being requested, if any (for example, "status" or "scale")
 	// +optional
@@ -95,8 +98,10 @@ type AdmissionRequest struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,6,opt,name=namespace"`
 	// operation is the operation being performed. This may be different than the operation
 	// requested. e.g. a patch can result in either a CREATE or UPDATE Operation.
+	// +optional
 	Operation Operation `json:"operation" protobuf:"bytes,7,opt,name=operation"`
 	// userInfo is information about the requesting user
+	// +optional
 	UserInfo authenticationv1.UserInfo `json:"userInfo" protobuf:"bytes,8,opt,name=userInfo"`
 	// object is the object from the incoming request.
 	// +optional
@@ -121,9 +126,11 @@ type AdmissionRequest struct {
 type AdmissionResponse struct {
 	// uid is an identifier for the individual request/response.
 	// This should be copied over from the corresponding AdmissionRequest.
+	// +optional
 	UID types.UID `json:"uid" protobuf:"bytes,1,opt,name=uid"`
 
 	// allowed indicates whether or not the admission request was permitted.
+	// +optional
 	Allowed bool `json:"allowed" protobuf:"varint,2,opt,name=allowed"`
 
 	// status is the result contains extra details into why an admission request was denied.

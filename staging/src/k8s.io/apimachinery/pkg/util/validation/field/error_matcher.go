@@ -45,6 +45,7 @@ type ErrorMatcher struct {
 	matchDetail                   func(want, got string) bool
 	requireOriginWhenInvalid      bool
 	matchValidationStabilityLevel bool
+	matchSource                   bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -88,6 +89,10 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 		return false
 	}
 	if m.matchValidationStabilityLevel && want.ValidationStabilityLevel != got.ValidationStabilityLevel {
+		return false
+	}
+
+	if m.matchSource && want.FromImperative != got.FromImperative {
 		return false
 	}
 
@@ -156,6 +161,10 @@ func (m ErrorMatcher) Render(e *Error) string {
 	if m.matchValidationStabilityLevel {
 		comma()
 		buf.WriteString(fmt.Sprintf("ValidationStabilityLevel=%s", e.ValidationStabilityLevel))
+	}
+	if m.matchSource {
+		comma()
+		buf.WriteString(fmt.Sprintf("FromImperative=%t", e.FromImperative))
 	}
 	return "{" + buf.String() + "}"
 }
@@ -230,6 +239,13 @@ func (m ErrorMatcher) ByOrigin() ErrorMatcher {
 // matching by Origin.
 func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 	m.requireOriginWhenInvalid = true
+	return m
+}
+
+// BySource returns a derived ErrorMatcher which also matches by the error origination
+// value of field errors.
+func (m ErrorMatcher) BySource() ErrorMatcher {
+	m.matchSource = true
 	return m
 }
 

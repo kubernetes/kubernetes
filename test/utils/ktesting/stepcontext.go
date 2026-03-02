@@ -26,10 +26,9 @@ package ktesting
 // The string should describe the operation that is about to happen ("starting
 // the controller", "list items") or what is being operated on ("HTTP server").
 // Multiple different prefixes get concatenated with a colon.
-func (tc *TC) WithStep(step string) *TC {
-	tc = tc.clone()
-	tc.steps += step + ": "
-	return tc
+func (tCtx TContext) WithStep(step string) TContext {
+	tCtx.steps += step + ": "
+	return tCtx
 }
 
 // Step is useful when the context with the step information is
@@ -45,22 +44,22 @@ func (tc *TC) WithStep(step string) *TC {
 // Inside the callback, the tCtx variable is the one where the step
 // has been added. This avoids the need to introduce multiple different
 // context variables and risk of using the wrong one.
-func (tc *TC) Step(step string, cb func(tCtx TContext)) {
-	tc.Helper()
-	cb(tc.WithStep(step))
+func (tCtx TContext) Step(step string, cb func(tCtx TContext)) {
+	tCtx.Helper()
+	cb(tCtx.WithStep(step))
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
 // wraps the underlying reporter so that the steps are visible in the report.
-func (tc *TC) Value(key any) any {
-	if tc.steps != "" {
+func (tCtx TContext) Value(key any) any {
+	if tCtx.steps != "" {
 		if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
-			if reporter, ok := tc.Context.Value(key).(ginkgoReporter); ok {
-				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tc.steps})
+			if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
+				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tCtx.steps})
 			}
 		}
 	}
-	return tc.Context.Value(key)
+	return tCtx.Context.Value(key)
 }
 
 type stepReporter struct {

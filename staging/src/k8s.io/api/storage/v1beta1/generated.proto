@@ -436,22 +436,22 @@ message StorageClass {
 
   // provisioner indicates the type of the provisioner.
   // +required
-  // +k8s:required
-  // +k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   optional string provisioner = 2;
 
   // parameters holds the parameters for the provisioner that should
   // create volumes of this storage class.
   // +optional
-  // +k8s:immutable
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   map<string, string> parameters = 3;
 
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
-  // +k8s:immutable
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -469,8 +469,8 @@ message StorageClass {
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
-  // +k8s:immutable
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -518,7 +518,7 @@ message VolumeAttachment {
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
-  // +k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   // +required
   optional VolumeAttachmentSpec spec = 2;
 
@@ -564,9 +564,9 @@ message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
   // +required
-  // +k8s:required
-  // +k8s:format="k8s-long-name-caseless"
-  // +k8s:maxLength=63
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format="k8s-long-name-caseless"
+  // +k8s:alpha(since: "1.36")=+k8s:maxLength=63
   optional string attacher = 1;
 
   // source represents the volume that should be attached.

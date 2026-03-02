@@ -134,7 +134,7 @@ func constraintName(c validate.UpdateConstraint) string {
 func (utc updateTagCollector) Docs() TagDoc {
 	return TagDoc{
 		Tag:            utc.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         utc.ValidScopes().UnsortedList(),
 		PayloadsType:   codetags.ValueTypeString,
 		Description: "Provides constraints on the allowed update operations of a field. " +

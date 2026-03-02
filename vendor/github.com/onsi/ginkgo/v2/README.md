@@ -119,7 +119,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 Sponsors commit to a [sponsorship](https://github.com/sponsors/onsi) for a year.  If you're an organization that makes use of Ginkgo please consider becoming a sponsor!
 
 <p style="font-size:21px; color:black;">Browser testing via 
-    <a href="https://www.lambdatest.com/" target="_blank">
-        <img src="https://www.lambdatest.com/blue-logo.png" style="vertical-align: middle;" width="250" height="45" />
+    <a href="https://www.testmu.ai/" target="_blank">
+        <img src="https://www.testmu.ai/blue-logo.png" style="vertical-align: middle;" width="250" height="45" />
     </a>
 </p>

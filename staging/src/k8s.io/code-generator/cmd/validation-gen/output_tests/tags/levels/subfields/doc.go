@@ -17,6 +17,7 @@ limitations under the License.
 // +k8s:validation-gen=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
+// +k8s:validation-gen-nolint
 package subfields
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
@@ -31,8 +32,17 @@ type Struct struct {
 
 	// +k8s:beta=+k8s:subfield(inner)=+k8s:minimum=5
 	SubfieldBeta SubStruct `json:"subfieldBeta"`
+
+	// +k8s:alpha=+k8s:subfield(z1)=+k8s:zeroOrOneOfMember
+	// +k8s:alpha=+k8s:subfield(z2)=+k8s:zeroOrOneOfMember
+	UnionField SubUnion `json:"unionField"`
 }
 
 type SubStruct struct {
 	Inner int `json:"inner"`
+}
+
+type SubUnion struct {
+	Z1 *int `json:"z1"`
+	Z2 *int `json:"z2"`
 }

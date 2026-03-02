@@ -3694,7 +3694,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 	}
 
 	if len(rules) > 20 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("restartPolicyRules"), rules, 20))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("restartPolicyRules"), len(rules), 20))
 	}
 	for i, rule := range rules {
 		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
@@ -3713,7 +3713,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 			}
 
 			if len(rule.ExitCodes.Values) > 255 {
-				allErrs = append(allErrs, field.TooLong(exitCodesFld.Child("values"), rule.ExitCodes.Values, 255))
+				allErrs = append(allErrs, field.TooMany(exitCodesFld.Child("values"), len(rule.ExitCodes.Values), 255))
 			}
 		} else {
 			allErrs = append(allErrs, field.Required(policyRulesFld.Child("exitCodes"), "must be specified"))

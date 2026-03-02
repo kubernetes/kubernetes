@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/metrics"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -150,7 +151,7 @@ type DaemonSetsController struct {
 
 	failedPodsBackoff *flowcontrol.Backoff
 
-	consistencyStore util.ConsistencyStore
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
 // NewDaemonSetsController creates a new DaemonSetsController
@@ -165,14 +166,17 @@ func NewDaemonSetsController(
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
-	var consistencyStore util.ConsistencyStore
+	var consistencyStore consistencyutil.ConsistencyStore
 	var podWriteCallback func(pod *v1.Pod, ds *metav1.OwnerReference)
 	if utilfeature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyDaemonSet) {
-		consistencyStore = util.NewConsistencyStore(map[schema.GroupResource]util.LastSyncRVGetter{
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
 			podGroupResource:       podInformer.Informer().GetStore(),
 			daemonsetGroupResource: daemonSetInformer.Informer().GetStore(),
 		})
 		podWriteCallback = func(pod *v1.Pod, ds *metav1.OwnerReference) {
+			if ds == nil {
+				return
+			}
 			consistencyStore.WroteAt(
 				types.NamespacedName{
 					Namespace: pod.Namespace,
@@ -184,7 +188,7 @@ func NewDaemonSetsController(
 			)
 		}
 	} else {
-		consistencyStore = util.NewNoopConsistencyStore()
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
 
 	dsc := &DaemonSetsController{
@@ -1282,7 +1286,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	// continue since our reads will not be in sync with our previously enacted
 	// state.
 	if err := dsc.consistencyStore.EnsureReady(dsNamespacedName); err != nil {
-		var consistencyErr *util.ConsistencyError
+		var consistencyErr *consistencyutil.ConsistencyError
 		if errors.As(err, &consistencyErr) {
 			metrics.DaemonsetRequeueSkips.WithLabelValues(
 				consistencyErr.GroupResource.Group,

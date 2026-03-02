@@ -42,22 +42,22 @@ type StorageClass struct {
 
 	// provisioner indicates the type of the provisioner.
 	// +required
-	// +k8s:required
-	// +k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
 
 	// parameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
 	// +optional
-	// +k8s:immutable
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
 	// Defaults to Delete.
 	// +optional
-	// +k8s:immutable
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 
 	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -75,8 +75,8 @@ type StorageClass struct {
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
-	// +k8s:immutable
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -124,7 +124,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.13
-// +k8s:supportsSubresource=/status
+// +k8s:supportsSubresource="/status"
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -140,7 +140,7 @@ type VolumeAttachment struct {
 
 	// spec represents specification of the desired attach/detach volume behavior.
 	// Populated by the Kubernetes system.
-	// +k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	// +required
 	Spec VolumeAttachmentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
@@ -172,9 +172,9 @@ type VolumeAttachmentSpec struct {
 	// attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
 	// +required
-	// +k8s:required
-	// +k8s:format="k8s-long-name-caseless"
-	// +k8s:maxLength=63
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:format="k8s-long-name-caseless"
+	// +k8s:alpha(since: "1.36")=+k8s:maxLength=63
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
@@ -245,7 +245,7 @@ type VolumeError struct {
 
 	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
 	//
-	// This is an optional, beta field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+	// This field requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
 	//
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
@@ -452,7 +452,7 @@ type CSIDriverSpec struct {
 	// occur (neither periodic nor upon detecting capacity-related failures), and the
 	// allocatable.count remains static. The minimum allowed value for this field is 10 seconds.
 	//
-	// This is a beta feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
+	// This feature requires the MutableCSINodeAllocatableCount feature gate to be enabled.
 	//
 	// This field is mutable.
 	//

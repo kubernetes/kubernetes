@@ -54,13 +54,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.policyName is required": {
 			input: mkValidBinding(tweakPolicyName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "policyName"), ""),
+				field.Required(field.NewPath("spec", "policyName"), "").MarkAlpha(),
 			},
 		},
 		"spec.validationActions is required": {
 			input: mkValidBinding(tweakValidateActions([]admissionregistration.ValidationAction{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "validationActions"), ""),
+				field.Required(field.NewPath("spec", "validationActions"), "").MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases
@@ -94,14 +94,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidBinding(func(obj *admissionregistration.ValidatingAdmissionPolicyBinding) { obj.ResourceVersion = "1" }),
 			updateObj: mkValidBinding(tweakPolicyName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "policyName"), ""),
+				field.Required(field.NewPath("spec", "policyName"), "").MarkAlpha(),
 			},
 		},
 		"update with empty spec.validationActions": {
 			oldObj:    mkValidBinding(),
 			updateObj: mkValidBinding(tweakValidateActions([]admissionregistration.ValidationAction{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "validationActions"), ""),
+				field.Required(field.NewPath("spec", "validationActions"), "").MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases

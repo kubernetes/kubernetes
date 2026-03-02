@@ -50,6 +50,7 @@ const (
 	cdiID         = "test-driver/test=cdi-test-device" // CDI device ID
 	poolName      = "test-pool"
 	requestName   = "test-request"
+	requestName2  = "test-request-2"
 	claimName     = "test-claim"
 	claimUID      = types.UID(claimName + "-uid")
 	podUID        = "test-pod-uid"

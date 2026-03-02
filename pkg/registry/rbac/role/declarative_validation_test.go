@@ -55,13 +55,13 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		"invalid Role missing verbs": {
 			input: mkValidRole(tweakVerbs(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
 			},
 		},
 		"invalid Role empty verbs": {
 			input: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases
@@ -103,7 +103,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    mkValidRole(),
 			update: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases

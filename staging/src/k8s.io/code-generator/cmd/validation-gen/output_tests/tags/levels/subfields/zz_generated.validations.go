@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -47,6 +48,8 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	})
 	return nil
 }
+
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_subfields_Struct_unionField_ = validate.NewUnionMembership(validate.NewUnionMember("z1"), validate.NewUnionMember("z2"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
@@ -84,6 +87,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			}()
 			return
 		}(fldPath.Child("subfieldBeta"), &obj.SubfieldBeta, safe.Field(oldObj, func(oldObj *Struct) *SubStruct { return &oldObj.SubfieldBeta }), oldObj != nil)...)
+
+	// field Struct.UnionField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *SubUnion, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_subfields_Struct_unionField_, func(obj *SubUnion) bool {
+				if obj == nil {
+					return false
+				}
+				return obj.Z1 != nil
+			}, func(obj *SubUnion) bool {
+				if obj == nil {
+					return false
+				}
+				return obj.Z2 != nil
+			}).MarkAlpha()...)
+			return
+		}(fldPath.Child("unionField"), &obj.UnionField, safe.Field(oldObj, func(oldObj *Struct) *SubUnion { return &oldObj.UnionField }), oldObj != nil)...)
 
 	return errs
 }

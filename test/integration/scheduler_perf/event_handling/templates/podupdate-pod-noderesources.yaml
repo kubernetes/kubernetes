@@ -11,4 +11,4 @@ spec:
     resources:
       requests:
         cpu: 0.0001
-        memory: {{ div 30000 .Count }}Mi
+        memory: {{ DivideInt 30000 .Count }}Mi

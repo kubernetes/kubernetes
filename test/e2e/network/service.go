@@ -54,7 +54,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	cloudprovider "k8s.io/cloud-provider"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -4210,10 +4209,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := svc.Spec.IPFamilies[0]
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
 		if svcIP == "" {
 			svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeExternalIP, family)
@@ -4296,10 +4292,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := svc.Spec.IPFamilies[0]
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
 		if svcIP == "" {
 			svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeExternalIP, family)

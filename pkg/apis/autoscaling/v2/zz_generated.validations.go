@@ -88,18 +88,18 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
-			})...)
 			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-			})...)
+			}).MarkAlpha()...)
+			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
+			}).MarkAlpha()...)
 			return
 		}(fldPath.Child("minReplicas"), obj.MinReplicas, safe.Field(oldObj, func(oldObj *autoscalingv2.HorizontalPodAutoscalerSpec) *int32 { return oldObj.MinReplicas }), oldObj != nil)...)
 
@@ -112,14 +112,14 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha()...)
 			return
 		}(fldPath.Child("maxReplicas"), &obj.MaxReplicas, safe.Field(oldObj, func(oldObj *autoscalingv2.HorizontalPodAutoscalerSpec) *int32 { return &oldObj.MaxReplicas }), oldObj != nil)...)
 

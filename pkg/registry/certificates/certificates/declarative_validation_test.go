@@ -78,13 +78,13 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		"status.conditions: Approved+Denied = invalid": {
 			input: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkAlpha(),
 			},
 		},
 		"status.conditions: Denied+Approved = invalid": {
 			input: makeValidCSR(withDeniedCondition(), withApprovedCondition()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkAlpha(),
 			},
 		},
 	}
@@ -154,7 +154,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    makeValidCSR(),
 			update: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkAlpha(),
 			},
 			subresources: []string{"/approval"}, // Can only add Approved and Denied conditions on /approval subresource
 		},

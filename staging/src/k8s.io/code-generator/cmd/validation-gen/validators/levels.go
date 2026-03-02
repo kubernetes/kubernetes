@@ -98,7 +98,7 @@ func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) 
 func (ltv *levelTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            ltv.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         ltv.ValidScopes().UnsortedList(),
 		Description:    fmt.Sprintf("Marks the given payload validation as a %s validation of the handwritten validation code. An optional Kubernetes version can be specified.", ltv.level),
 		Args: []TagArgDoc{{

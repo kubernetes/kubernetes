@@ -18,6 +18,8 @@ limitations under the License.
 
 // Package nogeneration is a test package.
 //
+// +k8s:validation-gen-nolint
+//
 //nolint:unused
 package nogeneration
 

@@ -189,6 +189,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 
 		peerEndpoints, err := h.resolveServingLocation(peerServerIDs)
 		if err != nil {
+			metrics.IncPeerProxyError(ctx, metrics.ProxyErrorEndpointResolution, gvr.Group, gvr.Version, gvr.Resource)
 			gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
 			klog.ErrorS(err, "error finding serviceable-by apiservers for the requested resource", "gvr", gvr)
 			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
@@ -252,6 +253,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 
 	proxyRoundTripper, err := h.buildProxyRoundtripper(req)
 	if err != nil {
+		metrics.IncPeerProxyError(req.Context(), metrics.ProxyErrorTransport, gvr.Group, gvr.Version, gvr.Resource)
 		klog.Errorf("failed to build proxy round tripper: %v", err)
 		return
 	}

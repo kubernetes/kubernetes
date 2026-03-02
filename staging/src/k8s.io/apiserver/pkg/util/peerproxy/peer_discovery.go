@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
+	peerproxymetrics "k8s.io/apiserver/pkg/util/peerproxy/metrics"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -94,6 +95,7 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 	// Rebuild the peer discovery cache from available leases.
 	leases, err := h.apiserverIdentityInformer.Lister().List(h.identityLeaseLabelSelector)
 	if err != nil {
+		peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorLeaseList)
 		utilruntime.HandleError(err)
 		return err
 	}
@@ -125,6 +127,7 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {
 	hostport, err := h.hostportInfo(serverID)
 	if err != nil {
+		peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorHostPortResolution)
 		return PeerDiscoveryCacheEntry{}, fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
 	}
 
@@ -142,6 +145,7 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID st
 	for _, path := range discoveryPaths {
 		discoveryResponse, discoveryErr = h.aggregateDiscovery(ctx, path, hostport)
 		if discoveryErr != nil {
+			peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorFetch)
 			klog.ErrorS(discoveryErr, "error querying discovery endpoint for serverID", "path", path, "serverID", serverID)
 			continue
 		}

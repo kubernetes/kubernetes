@@ -284,7 +284,7 @@ type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) *Driver {
-	d := NewDriverInstance(nil)
+	d := NewDriverInstance(ktesting.TContext{} /* no namespace yet, will be set later */)
 
 	ginkgo.BeforeEach(func() {
 		tCtx := f.TContext(context.Background())
@@ -300,6 +300,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator dr
 
 // NewDriverInstance is a variant of NewDriver where the driver is inactive and must
 // be started explicitly with Run. May be used inside ginkgo.It or a Go unit test.
+// The context is used to determine the test's and thus the driver's namespace.
 func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 	d := &Driver{
 		fail:       map[MethodInstance]bool{},
@@ -314,9 +315,7 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		WithRealNodes:              true,
 		ExpectResourceSliceRemoval: true,
 	}
-	if tCtx != nil {
-		d.initName(tCtx)
-	}
+	d.initName(tCtx)
 	return d
 }
 

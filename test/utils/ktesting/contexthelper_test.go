@@ -119,7 +119,11 @@ func TestCause(t *testing.T) {
 						assert.Equal(t, tt.expectDeadline, time.Until(actualDeadline), "remaining time till Deadline()")
 					}
 				}
+				// Unblock background goroutines.
 				time.Sleep(tt.sleep)
+				// Wait for them to do their work.
+				synctest.Wait()
+				// Now check.
 				actualErr := ctx.Err()
 				actualCause := context.Cause(ctx)
 				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")

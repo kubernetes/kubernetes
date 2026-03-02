@@ -71,11 +71,12 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 	result := Validations{}
 	subContext := Context{
-		Scope:      ScopeField,
-		Type:       submemb.Type,
-		Path:       context.Path.Child(subname),
-		Member:     submemb,
-		ParentPath: context.Path,
+		Scope:          ScopeField,
+		Type:           submemb.Type,
+		Path:           context.Path.Child(subname),
+		Member:         submemb,
+		ParentPath:     context.Path,
+		StabilityLevel: context.StabilityLevel,
 	}
 	if validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err

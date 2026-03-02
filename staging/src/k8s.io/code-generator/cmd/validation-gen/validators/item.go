@@ -153,11 +153,12 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	itemPath := context.Path.Key(itemKey)
 	itemSelector := generateSelector(criteria)
 	subContext := Context{
-		Scope:        ScopeListVal,
-		Type:         elemT,
-		Path:         itemPath,
-		ListSelector: itemSelector,
-		ParentPath:   context.Path,
+		Scope:          ScopeListVal,
+		Type:           elemT,
+		Path:           itemPath,
+		ListSelector:   itemSelector,
+		ParentPath:     context.Path,
+		StabilityLevel: context.StabilityLevel,
 	}
 
 	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)

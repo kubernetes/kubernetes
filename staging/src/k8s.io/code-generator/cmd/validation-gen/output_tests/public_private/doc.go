@@ -20,6 +20,8 @@ limitations under the License.
 
 // Package publicprivate is a test package.
 //
+// +k8s:validation-gen-nolint
+//
 //nolint:unused,govet // govet disables structtag check, which checks for use of tags on private fields
 package publicprivate
 

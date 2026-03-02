@@ -283,6 +283,11 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		err := wait.PollUntilContextTimeout(ctx, le.config.RetryPeriod, le.config.RenewDeadline, true, func(ctx context.Context) (done bool, err error) {
+			// PollUntilContextTimeout invokes condition even when the context is canceled when immediate=true.
+			// Short-circuit this to prevent unnecessary processing and error log messages.
+			if err := ctx.Err(); err != nil {
+				return false, err
+			}
 			if !le.config.Coordinated {
 				return le.tryAcquireOrRenew(ctx), nil
 			} else {

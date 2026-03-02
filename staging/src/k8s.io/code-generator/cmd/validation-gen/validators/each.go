@@ -88,10 +88,11 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 
 	elemContext := Context{
 		// Scope is initialized below.
-		Type:       nt.Elem,
-		Path:       context.Path.Key("(vals)"),
-		Member:     nil, // NA for list/map values
-		ParentPath: context.Path,
+		Type:           nt.Elem,
+		Path:           context.Path.Key("(vals)"),
+		Member:         nil, // NA for list/map values
+		ParentPath:     context.Path,
+		StabilityLevel: context.StabilityLevel,
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -268,11 +269,12 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	elemContext := Context{
-		Scope:      ScopeMapKey,
-		Type:       nt.Key,
-		Path:       context.Path.Key("(keys)"),
-		Member:     nil, // NA for map keys
-		ParentPath: context.Path,
+		Scope:          ScopeMapKey,
+		Type:           nt.Key,
+		Path:           context.Path.Key("(keys)"),
+		Member:         nil, // NA for map keys
+		ParentPath:     context.Path,
+		StabilityLevel: context.StabilityLevel,
 	}
 
 	if validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag); err != nil {
@@ -309,7 +311,7 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            ektv.TagName(),
 		Scopes:         ektv.ValidScopes().UnsortedList(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: TagStabilityLevelBeta,
 		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",

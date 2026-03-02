@@ -159,6 +159,19 @@ Possible values of the "reason" label are:
 Possible values of the "status" label are:
 "succeeded", "failed".`,
 		}, []string{"reason", "status"})
+
+	// JobRequeueSkips track the number of job syncs skipped due to a stale
+	// watch cache.
+	JobRequeueSkips = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      JobControllerSubsystem,
+			Name:           "stale_sync_skips_total",
+			Help:           "Total number of Job syncs skipped due to a stale watch cache.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		// These are the labels (dimensions)
+		[]string{"group", "resource"},
+	)
 )
 
 const (
@@ -212,5 +225,6 @@ func Register() {
 		legacyregistry.MustRegister(JobFinishedIndexesTotal)
 		legacyregistry.MustRegister(JobPodsCreationTotal)
 		legacyregistry.MustRegister(JobByExternalControllerTotal)
+		legacyregistry.MustRegister(JobRequeueSkips)
 	})
 }

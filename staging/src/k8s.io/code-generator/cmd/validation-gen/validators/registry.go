@@ -326,6 +326,11 @@ func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
 	return tv.Docs().StabilityLevel, nil
 }
 
+// GetStability returns the stability level for a given tag from the global registry.
+func GetStability(tag string) (TagStabilityLevel, error) {
+	return globalRegistry.Stability(tag)
+}
+
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.

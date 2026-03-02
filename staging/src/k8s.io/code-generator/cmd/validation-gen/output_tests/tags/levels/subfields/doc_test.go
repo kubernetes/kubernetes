@@ -37,6 +37,20 @@ func TestAlpha(t *testing.T) {
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
 		field.Invalid(field.NewPath("subfield", "inner"), 1, "").WithOrigin("minimum").MarkAlpha(),
 	})
+
+	one := 1
+	st.Value(&Struct{
+		Subfield:     SubStruct{Inner: 5},
+		SubfieldBeta: SubStruct{Inner: 5},
+		UnionField: SubUnion{
+			Z1: &one,
+			Z2: &one,
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
+		field.Invalid(field.NewPath("unionField"), &SubUnion{
+			Z1: &one, Z2: &one,
+		}, "only one of z1, z2 may be specified").WithOrigin("zeroOrOneOf").MarkAlpha(),
+	})
 }
 
 func TestBeta(t *testing.T) {

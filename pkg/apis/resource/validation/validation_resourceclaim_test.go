@@ -814,11 +814,11 @@ func TestValidateClaim(t *testing.T) {
 				var allErrs field.ErrorList
 				fldPath := field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations")
 				allErrs = append(allErrs,
-					field.Required(fldPath.Index(0).Child("operator"), ""),
+					field.Required(fldPath.Index(0).Child("operator"), "").MarkCoveredByDeclarative(),
 				)
 				fldPath = field.NewPath("spec", "devices", "requests").Index(1).Child("exactly", "tolerations")
 				allErrs = append(allErrs,
-					field.Required(fldPath.Index(3).Child("operator"), ""),
+					field.Required(fldPath.Index(3).Child("operator"), "").MarkCoveredByDeclarative(),
 
 					field.NotSupported(fldPath.Index(4).Child("operator"), resource.DeviceTolerationOperator("some-other-op"), []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}).MarkCoveredByDeclarative(),
 

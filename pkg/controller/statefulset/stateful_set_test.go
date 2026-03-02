@@ -719,7 +719,9 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 			om.podsIndexer.Add(pod)
 			claims := getPersistentVolumeClaims(set, pod)
 			for _, claim := range claims {
-				om.CreateClaim(&claim)
+				if err := om.CreateClaim(&claim, set); err != nil {
+					t.Errorf("Failed to create claim %s: %v", claim.Name, err)
+				}
 			}
 		}
 

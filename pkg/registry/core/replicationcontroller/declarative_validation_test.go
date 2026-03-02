@@ -49,7 +49,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("metadata.name"), ""),
+				field.Required(field.NewPath("metadata.name"), "").MarkFromImperative(),
 			},
 		},
 		"name: label format": {
@@ -67,7 +67,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = "-this-is-not-a-label"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		"name: invalid subdomain format": {
@@ -75,7 +75,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = ".this.is.not.a.subdomain"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		"name: label format with trailing dash": {
@@ -83,7 +83,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = "this-is-a-label-"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		"name: subdomain format with trailing dash": {
@@ -91,7 +91,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = "this.is.a.subdomain-"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		"name: long label format": {
@@ -109,7 +109,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = strings.Repeat("x", 254)
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		"name: too long subdomain format": {
@@ -117,7 +117,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = strings.Repeat("x.", 126) + "xx"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 		// metadata.generateName (note: it's is not really validated)
@@ -127,8 +127,8 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.GenerateName = "name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("metadata.name"), ""),
-				field.InternalError(field.NewPath("metadata.name"), fmt.Errorf("")),
+				field.Required(field.NewPath("metadata.name"), "").MarkFromImperative(),
+				field.InternalError(field.NewPath("metadata.name"), fmt.Errorf("")).MarkFromImperative(),
 			},
 		},
 
@@ -158,7 +158,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Spec.Replicas = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), ""),
+				field.Required(field.NewPath("spec.replicas"), "").MarkAlpha(),
 			},
 		},
 		"replicas: 0": {
@@ -170,7 +170,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		"replicas: negative": {
 			input: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		// spec.minReadySeconds
@@ -183,7 +183,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		"minReadySeconds: negative": {
 			input: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 	}
@@ -216,7 +216,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				rc.Name += "x"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").MarkFromImperative(),
 			},
 		},
 		// metadata.generateName
@@ -235,7 +235,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				rc.Spec.Replicas = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), ""),
+				field.Required(field.NewPath("spec.replicas"), "").MarkAlpha(),
 			},
 		},
 		"replicas: 0": {
@@ -250,7 +250,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		// spec.minReadySeconds
@@ -266,7 +266,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 	}

@@ -79,7 +79,7 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 func (mltv maxLengthTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mltv.TagName(),
-		StabilityLevel: TagStabilityLevelStable,
+		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         mltv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string field has a limit on its length.",
 		Payloads: []TagPayloadDoc{{
