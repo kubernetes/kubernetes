@@ -2270,6 +2270,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	HPAConfigurableTolerance: {},
 
+	HPAExternalMetricFallback: {},
+
 	HPAScaleToZero: {},
 
 	HostnameOverride: {},
