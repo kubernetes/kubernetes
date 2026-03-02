@@ -34,7 +34,7 @@ import (
 )
 
 // FuzzIterations is the number of fuzz iterations to run for each type.
-const FuzzIterations = 20
+const FuzzIterations = 100
 
 // NewFiller creates a new randfill.Filler for fuzzing objects.
 func NewFiller(t *testing.T, scheme *runtime.Scheme, customFuncs fuzzer.FuzzerFuncs) *randfill.Filler {
