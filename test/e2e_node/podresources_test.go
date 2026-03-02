@@ -1163,7 +1163,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 				// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
-				podresourcesGetAllocatableResourcesTests(ctx, cli, sd, cpuset.CPUSet{}, cpuset.CPUSet{})
+				podresourcesGetAllocatableResourcesTests(ctx, cli, sd, cpuset.New(), cpuset.New())
 			})
 		})
 	})
@@ -1290,7 +1290,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 				// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
-				podresourcesGetAllocatableResourcesTests(ctx, cli, nil, cpuset.CPUSet{}, cpuset.CPUSet{})
+				podresourcesGetAllocatableResourcesTests(ctx, cli, nil, cpuset.New(), cpuset.New())
 			})
 		})
 
@@ -2066,7 +2066,7 @@ func requireLackOfSRIOVDevices() {
 func getOnlineCPUs() (cpuset.CPUSet, error) {
 	onlineCPUList, err := os.ReadFile("/sys/devices/system/cpu/online")
 	if err != nil {
-		return cpuset.CPUSet{}, err
+		return cpuset.New(), err
 	}
 	return cpuset.Parse(strings.TrimSpace(string(onlineCPUList)))
 }

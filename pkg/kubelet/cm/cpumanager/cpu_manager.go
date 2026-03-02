@@ -536,8 +536,7 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result
 	}
-
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
