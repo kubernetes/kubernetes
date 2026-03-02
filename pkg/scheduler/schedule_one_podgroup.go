@@ -355,7 +355,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 		}
 	}
 
-	permitStatus := schedFwk.RunPermitPluginsWithoutWaiting(ctx, podCtx.state, assumedPodInfo.Pod, scheduleResult.SuggestedHost)
+	_, permitStatus := schedFwk.RunPermitPlugins(ctx, podCtx.state, assumedPodInfo.Pod, scheduleResult.SuggestedHost)
 	if !permitStatus.IsWait() && !permitStatus.IsSuccess() {
 		revertFn()
 		if permitStatus.IsRejected() {

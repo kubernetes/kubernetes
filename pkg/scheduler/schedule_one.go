@@ -213,8 +213,10 @@ func (sched *Scheduler) prepareForBindingCycle(
 	assumedPod := assumedPodInfo.Pod
 
 	// Run "permit" plugins.
-	runPermitStatus := schedFramework.RunPermitPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
-	if !runPermitStatus.IsWait() && !runPermitStatus.IsSuccess() {
+	pluginsWaitTime, runPermitStatus := schedFramework.RunPermitPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+	if runPermitStatus.IsWait() {
+		schedFramework.AddWaitingPod(assumedPod, pluginsWaitTime)
+	} else if !runPermitStatus.IsSuccess() {
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
