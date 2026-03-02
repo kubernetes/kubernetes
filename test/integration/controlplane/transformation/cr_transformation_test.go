@@ -498,7 +498,6 @@ func TestCRListCorruptObjects(t *testing.T) {
 	}
 }
 
-
 // createFooCR creates a Foo custom resource in the given namespace using the dynamic client.
 func createFooCR(t *testing.T, dynamicClient dynamic.Interface, name, namespace string) *unstructured.Unstructured {
 	t.Helper()
