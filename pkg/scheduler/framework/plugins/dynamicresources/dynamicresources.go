@@ -147,15 +147,6 @@ type DynamicResources struct {
 	draManager     fwk.SharedDRAManager
 }
 
-// bindingConditionsStatus is a compact per-device summary for BindingConditions logging.
-type bindingConditionsStatus struct {
-	Driver  string
-	Pool    string
-	Device  string
-	Pending []string
-	Failed  []string // only failure conditions that are true
-}
-
 const (
 	BindingConditionsStatusSuccess = "success"
 	BindingConditionsStatusFailed  = "failure"
@@ -1124,11 +1115,9 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			return pl.isPodReadyForBinding(state)
 		})
 	// GOAL: Calculate duration since start for metrics recording
-	duration := time.Since(start).Seconds()
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			err = fmt.Errorf("%w: %s", ErrDeviceBindingTimeout, err.Error())
-		}
+	duration := time.Since(start)
+	if errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("%w: %s", ErrDeviceBindingTimeout, err.Error())
 	}
 
 	// Determine status label based on error
@@ -1161,7 +1150,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		for _, res := range claim.Status.Allocation.Devices.Results {
 			schedmetrics.DRABindingConditionsPreBindDuration.
 				WithLabelValues(profileLabel, res.Driver, statusLabel).
-				Observe(duration)
+				Observe(duration.Seconds())
 		}
 
 		// Count scheduling attempts that used devices with BindingConditions.
@@ -1483,6 +1472,15 @@ func getAllocatedDeviceStatus(claim *resourceapi.ResourceClaim, deviceRequest *r
 		}
 	}
 	return nil
+}
+
+// bindingConditionsStatus is a compact per-device summary for BindingConditions logging.
+type bindingConditionsStatus struct {
+	Driver  string
+	Pool    string
+	Device  string
+	Pending []string
+	Failed  []string // only failure conditions that are true
 }
 
 // listBindingConditionsStatus inspects ONE claim and returns a summary per allocated device
