@@ -202,7 +202,6 @@ function codegen::deepcopy() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
         "${tag_pkgs[@]}" \
         "$@"
 
