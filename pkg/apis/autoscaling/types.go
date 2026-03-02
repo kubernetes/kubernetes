@@ -357,6 +357,7 @@ type ExternalMetricSource struct {
 	Target MetricTarget
 	// fallback defines the behavior when this external metric cannot be retrieved.
 	// If not set, the HPA will not scale based on this metric when it's unavailable.
+	// +featureGate=HPAExternalMetricFallback
 	// +optional
 	Fallback *ExternalMetricFallback
 }

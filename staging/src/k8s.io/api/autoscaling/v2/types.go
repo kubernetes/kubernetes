@@ -374,6 +374,8 @@ type ExternalMetricSource struct {
 
 	// fallback defines the behavior when this external metric cannot be retrieved.
 	// If not set, the HPA will not scale based on this metric when it's unavailable.
+	//
+	// +featureGate=HPAExternalMetricFallback
 	// +optional
 	Fallback *ExternalMetricFallback `json:"fallback,omitempty" protobuf:"bytes,3,opt,name=fallback"`
 }
