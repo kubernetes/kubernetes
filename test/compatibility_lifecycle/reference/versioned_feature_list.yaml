@@ -1955,6 +1955,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: UserNamespacesHostNetworkSupport
   versionedSpecs:
   - default: false
