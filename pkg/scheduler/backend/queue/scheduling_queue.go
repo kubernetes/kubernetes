@@ -672,6 +672,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 			logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
 		}
 		p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
+		// Pod not moved to activeQ.
 		return false
 	}
 
@@ -685,6 +686,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 	if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
 		p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
 	}
+	// Pod successfully moved to activeQ.
 	return true
 }
 

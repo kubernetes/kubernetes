@@ -3314,9 +3314,7 @@ var (
 		queue.Add(tCtx, pInfo.Pod)
 	}
 	addPodActiveQDirectly = func(tCtx ktesting.TContext, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		queue.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-			unlockedActiveQ.add(klog.FromContext(tCtx), pInfo, framework.EventUnscheduledPodAdd.Label())
-		})
+		queue.activeQ.add(klog.FromContext(tCtx), pInfo, framework.EventUnscheduledPodAdd.Label())
 	}
 	addPodUnschedulablePods = func(tCtx ktesting.TContext, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		if !pInfo.Gated() {
@@ -5094,8 +5092,6 @@ func TestPriorityQueue_MultipleProfiles(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, true)
 
 	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	signers := map[string]PodSigner{
 		"scheduler-1": func(ctx context.Context, pod *v1.Pod) fwk.PodSignature {
@@ -5129,4 +5125,62 @@ func TestPriorityQueue_MultipleProfiles(t *testing.T) {
 	if pInfo3.PodSignature != nil {
 		t.Errorf("Pod3: expected nil signature (no signer), got '%s'", string(pInfo3.PodSignature))
 	}
+
+}
+
+func TestConcurrentUpdateAndPop(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+
+	podName := "test-pod"
+	// Create a pod with high priority to ensure it's at the front
+	pod := st.MakePod().Name(podName).Namespace("default").UID("uid-1").Priority(100).Obj()
+	q.Add(ctx, pod)
+
+	var wg sync.WaitGroup
+	start := time.Now()
+	testDuration := 3 * time.Second
+
+	// Goroutine 1: Continuously Pop and re-Add
+	wg.Go(func() {
+		for time.Since(start) < testDuration {
+			// Pop blocks if empty, but we verify we don't block forever or panic
+			pInfo, err := q.Pop(logger)
+			if err != nil {
+				t.Errorf("Unexpected error during Pop: %v", err)
+				return
+			}
+			if pInfo == nil {
+				t.Errorf("Unexpected nil QueuedPodInfo during Pop")
+				return
+			}
+			if pInfo.Pod.UID != pod.UID {
+				t.Errorf("Expected pod UID %v, got %v", pod.UID, pInfo.Pod.UID)
+			}
+			// Simulate some work to widen the race window
+			time.Sleep(100 * time.Microsecond)
+			q.Done(pInfo.Pod.UID)
+			// Re-add to queue to keep the cycle going
+			q.Add(ctx, pInfo.Pod)
+		}
+	})
+
+	// Goroutine 2: Continuously Update the pod
+	wg.Go(func() {
+		iter := 0
+		currentPod := pod
+		for time.Since(start) < testDuration {
+			iter++
+			newPod := currentPod.DeepCopy()
+			newPod.Annotations = map[string]string{"ver": fmt.Sprintf("%d", iter)}
+			// Update is atomic
+			q.Update(ctx, currentPod, newPod)
+			currentPod = newPod
+			time.Sleep(50 * time.Microsecond)
+		}
+	})
+
+	wg.Wait()
+	q.Close()
 }
