@@ -55997,7 +55997,7 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 							Format:      "",
 						},
 					},
-					"PreventPodSchedulingIfMissing": {
+					"preventPodSchedulingIfMissing": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing. This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
 							Type:        []string{"boolean"},

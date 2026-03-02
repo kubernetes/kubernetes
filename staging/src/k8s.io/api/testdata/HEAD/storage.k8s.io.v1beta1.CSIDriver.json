@@ -61,6 +61,6 @@
     "seLinuxMount": true,
     "nodeAllocatableUpdatePeriodSeconds": 9,
     "serviceAccountTokenInSecrets": true,
-    "PreventPodSchedulingIfMissing": true
+    "preventPodSchedulingIfMissing": true
   }
 }
