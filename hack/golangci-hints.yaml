@@ -247,6 +247,13 @@ linters:
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
         path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+      
+      # The EvictionRequest.Spec.Target and Eviction.Spec.Target fields are of a union type and nonpointerstructs does not understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field EvictionRequestSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/coordination/v1alpha1/types.go"
+      - text: "nonpointerstructs: field EvictionSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/coordination/v1alpha1/types.go"
 
       - linters:
         - forbidigo
