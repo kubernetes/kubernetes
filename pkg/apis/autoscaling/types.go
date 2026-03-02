@@ -581,12 +581,12 @@ type ExternalMetricStatus struct {
 	Current MetricValueStatus
 	// metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
 	// +optional
-	MetricFetchStatus MetricFetchStatusType `json:"metricFetchStatus,omitempty"`
+	MetricFetchStatus MetricFetchStatusType
 
 	// firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
 	// Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
 	// +optional
-	FirstFailureTime *metav1.Time `json:"firstFailureTime,omitempty"`
+	FirstFailureTime *metav1.Time
 }
 
 // MetricValueStatus indicates the current value of a metric.
