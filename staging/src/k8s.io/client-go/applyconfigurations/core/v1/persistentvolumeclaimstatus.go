@@ -20,6 +20,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PersistentVolumeClaimStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimStatus type for use
@@ -98,6 +99,11 @@ type PersistentVolumeClaimStatusApplyConfiguration struct {
 	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
 	// When this is unset, there is no ModifyVolume operation being attempted.
 	ModifyVolumeStatus *ModifyVolumeStatusApplyConfiguration `json:"modifyVolumeStatus,omitempty"`
+	// UnusedSince is the timestamp that represents when the PVC last transitioned
+	// to not being in use. When the PVC is currently in use, this field is nil.
+	// It is updated when the last Pod referencing this PVC is deleted or reaches a
+	// terminal state, and cleared when a new Pod starts referencing the PVC.
+	UnusedSince *metav1.Time `json:"unusedSince,omitempty"`
 }
 
 // PersistentVolumeClaimStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimStatus type for use with
@@ -180,5 +186,13 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithCurrentVolumeAttribu
 // If called multiple times, the ModifyVolumeStatus field is set to the value of the last call.
 func (b *PersistentVolumeClaimStatusApplyConfiguration) WithModifyVolumeStatus(value *ModifyVolumeStatusApplyConfiguration) *PersistentVolumeClaimStatusApplyConfiguration {
 	b.ModifyVolumeStatus = value
+	return b
+}
+
+// WithUnusedSince sets the UnusedSince field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UnusedSince field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithUnusedSince(value metav1.Time) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.UnusedSince = &value
 	return b
 }

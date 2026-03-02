@@ -3439,6 +3439,14 @@
           "phase": {
             "description": "phase represents the current phase of PersistentVolumeClaim.",
             "type": "string"
+          },
+          "unusedSince": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "UnusedSince is the timestamp that represents when the PVC last transitioned to not being in use. When the PVC is currently in use, this field is nil. It is updated when the last Pod referencing this PVC is deleted or reaches a terminal state, and cleared when a new Pod starts referencing the PVC."
           }
         },
         "type": "object"
