@@ -553,8 +553,8 @@ func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, to
 // validatePreventPodSchedulingIfMissing validates that preventPodSchedulingIfMissing is not set when the VolumeLimitScaling feature gate is disabled.
 func validatePreventPodSchedulingIfMissing(preventPodSchedulingIfMissing *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if preventPodSchedulingIfMissing != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "preventPodSchedulingIfMissing requires the VolumeLimitScaling feature gate to be enabled"))
+	if preventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
 	return allErrs
