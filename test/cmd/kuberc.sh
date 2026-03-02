@@ -122,6 +122,10 @@ EOF
   output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=barbaz --allowlist-entry=name_foobar 2>&1)
   kube::test::if_has_string "${output_message}" "improperly formatted allowlist entry: \"name_foobar\""
 
+  # Test: Error cases - empty command
+  output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=barbaz --allowlist-entry=command= 2>&1)
+  kube::test::if_has_string "${output_message}" "empty value in allowlist entry for field \"command\""
+
   # Restore getn alias back to "namespace" for remaining tests
   kubectl kuberc set --kuberc="$KUBERC_FILE" --section=aliases --name=getn --command=get --prependarg=namespace --option=output=wide --overwrite
   # Restore get defaults back to namespace=test-kuberc-ns and output=json for remaining tests
