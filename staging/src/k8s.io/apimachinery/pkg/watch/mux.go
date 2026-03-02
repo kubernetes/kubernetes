@@ -122,16 +122,15 @@ func (m *Broadcaster) blockQueue(f func()) {
 		return
 	default:
 	}
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan struct{})
 	m.incoming <- Event{
 		Type: internalRunFunctionMarker,
 		Object: functionFakeRuntimeObject(func() {
-			defer wg.Done()
+			defer close(done)
 			f()
 		}),
 	}
-	wg.Wait()
+	<-done
 }
 
 // Watch adds a new watcher to the list and returns an Interface for it.

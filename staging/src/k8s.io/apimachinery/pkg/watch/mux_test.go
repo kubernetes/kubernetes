@@ -209,6 +209,15 @@ func BenchmarkBroadCaster(b *testing.B) {
 	b.StopTimer()
 }
 
+var blockQueueFunc = func() {}
+
+func BenchmarkBlockQueue(b *testing.B) {
+	m := NewBroadcaster(0, WaitIfChannelFull)
+	for b.Loop() {
+		m.blockQueue(blockQueueFunc)
+	}
+}
+
 func TestBroadcasterWatchAfterShutdown(t *testing.T) {
 	event1 := Event{Type: Added, Object: &myType{"foo", "hello world 1"}}
 	event2 := Event{Type: Added, Object: &myType{"bar", "hello world 2"}}
