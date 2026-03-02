@@ -295,7 +295,10 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${suite_args[@]:+${suite_args[@]}}" \
-  "${@}" &
+  "${@}" \
+  --ginkgo.focus= '--ginkgo.skip=\[Serial\]' '--ginkgo.label-filter=Feature: isEmpty && !Slow && !Disruptive && !Flaky' &
+
+# ^^^ Same test selection as in https://testgrid.k8s.io/sig-release-master-blocking#kind-master
 
 set +x
 GINKGO_CLI_PID=$!
