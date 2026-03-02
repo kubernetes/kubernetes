@@ -379,8 +379,7 @@ func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
 	var entries []v1beta1.AllowlistEntry
 	// Check if this alias already exists
 	for _, entry := range o.AllowlistEntries {
-		kvs := strings.Split(entry, ",")
-		for _, kv := range kvs {
+		for kv := range strings.SplitSeq(entry, ",") {
 			k, v, ok := strings.Cut(kv, "=")
 			if !ok {
 				errs = append(errs, fmt.Errorf("improperly formatted allowlist entry: %q", kv))
