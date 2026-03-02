@@ -85,7 +85,7 @@ The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of a
 
 ## Adopters
 
-The [User Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
+The [Use Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
 
 ## Governance 
 
