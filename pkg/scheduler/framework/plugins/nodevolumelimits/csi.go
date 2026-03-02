@@ -355,12 +355,18 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) (bool, error) {
 	// the registered driver must be a CSI driver to enforce this limit, if we can't find the driver,
 	// we assume the driver may not be a CSI driver and allow the pod to be scheduled.
-	_, err := pl.csiDriverLister.Get(pluginName)
+	csiDriver, err := pl.csiDriverLister.Get(pluginName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, fmt.Errorf("error getting CSIDriver for provider %s: %w", pluginName, err)
+	}
+
+	driverOptin := csiDriver.Spec.PreventPodSchedulingIfMissing
+
+	if driverOptin == nil || !*driverOptin {
+		return true, nil
 	}
 
 	if csiNode == nil {

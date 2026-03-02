@@ -1275,49 +1275,76 @@ func getFakeCSIDriverLister(driverNames ...string) fakeCSIDriverLister {
 	return list
 }
 
+func getFakeCSIDriverListerWithPreventPodSchedulingIfMissing(driverNames ...string) fakeCSIDriverLister {
+	var list fakeCSIDriverLister
+	for _, name := range driverNames {
+		list = append(list, storagev1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: storagev1.CSIDriverSpec{
+				PreventPodSchedulingIfMissing: ptr.To(true),
+			},
+		})
+	}
+	return list
+}
+
 func TestVolumeLimitScalingGate(t *testing.T) {
 	// Pod uses a PVC that resolves to the EBS CSI driver via PV
 	newPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
 
 	cases := []struct {
-		name                     string
-		enableVolumeLimitScaling bool
-		limitSource              string
-		limit                    int32
-		csiDriverPresent         bool
-		wantStatus               *fwk.Status
+		name                          string
+		enableVolumeLimitScaling      bool
+		limitSource                   string
+		limit                         int32
+		csiDriverPresent              bool
+		preventPodSchedulingIfMissing bool
+		wantStatus                    *fwk.Status
 	}{
 		{
-			name:                     "gate enabled - fail when driver not installed and CSIDriver exists",
-			enableVolumeLimitScaling: true,
-			limitSource:              "no-csi-driver",
-			limit:                    0,
-			csiDriverPresent:         true,
-			wantStatus:               fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s CSI driver is not installed on the node", ebsCSIDriverName)),
+			name:                          "gate enabled - allow scheduling when CSIDriver exists but PreventPodSchedulingIfMissing is not set",
+			enableVolumeLimitScaling:      true,
+			limitSource:                   "no-csi-driver",
+			limit:                         0,
+			csiDriverPresent:              true,
+			preventPodSchedulingIfMissing: false,
+			wantStatus:                    nil,
 		},
 		{
-			name:                     "gate disabled - skip driver presence check (regardless of CSIDriver presence)",
-			enableVolumeLimitScaling: false,
-			limitSource:              "no-csi-driver",
-			limit:                    0,
-			csiDriverPresent:         true,
-			wantStatus:               nil,
+			name:                          "gate enabled - fail when driver not installed and PreventPodSchedulingIfMissing is true",
+			enableVolumeLimitScaling:      true,
+			limitSource:                   "no-csi-driver",
+			limit:                         0,
+			csiDriverPresent:              true,
+			preventPodSchedulingIfMissing: true,
+			wantStatus:                    fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s CSI driver is not installed on the node", ebsCSIDriverName)),
 		},
 		{
-			name:                     "gate enabled - driver installed within limit",
-			enableVolumeLimitScaling: true,
-			limitSource:              "csinode",
-			limit:                    2,
-			csiDriverPresent:         true,
-			wantStatus:               nil,
+			name:                          "gate disabled - skip driver presence check (regardless of CSIDriver presence)",
+			enableVolumeLimitScaling:      false,
+			limitSource:                   "no-csi-driver",
+			limit:                         0,
+			csiDriverPresent:              true,
+			preventPodSchedulingIfMissing: true,
+			wantStatus:                    nil,
 		},
 		{
-			name:                     "gate enabled - allow scheduling when CSIDriver object missing",
-			enableVolumeLimitScaling: true,
-			limitSource:              "no-csi-driver",
-			limit:                    0,
-			csiDriverPresent:         false,
-			wantStatus:               nil,
+			name:                          "gate enabled - driver installed within limit",
+			enableVolumeLimitScaling:      true,
+			limitSource:                   "csinode",
+			limit:                         2,
+			csiDriverPresent:              true,
+			preventPodSchedulingIfMissing: true,
+			wantStatus:                    nil,
+		},
+		{
+			name:                          "gate enabled - allow scheduling when CSIDriver object missing",
+			enableVolumeLimitScaling:      true,
+			limitSource:                   "no-csi-driver",
+			limit:                         0,
+			csiDriverPresent:              false,
+			preventPodSchedulingIfMissing: false,
+			wantStatus:                    nil,
 		},
 	}
 
@@ -1334,6 +1361,9 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				vaLister:   getFakeVolumeAttachmentLister(0, ebsCSIDriverName),
 				csiDriverLister: func() fakeCSIDriverLister {
 					if tt.csiDriverPresent {
+						if tt.preventPodSchedulingIfMissing {
+							return getFakeCSIDriverListerWithPreventPodSchedulingIfMissing(ebsCSIDriverName)
+						}
 						return getFakeCSIDriverLister(ebsCSIDriverName)
 					}
 					return getFakeCSIDriverLister()
