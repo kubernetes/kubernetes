@@ -348,9 +348,9 @@ type ExternalMetricFallback struct {
 	// failureDurationSeconds is the duration in seconds for which the external metric must be
 	// continuously failing before the fallback value is used. The duration is measured from the
 	// first consecutive failure. Must be greater than 0.
-	// +optional
 	// default=180
 	// min=180
+	// +optional
 	FailureDurationSeconds *int64 `json:"failureDurationSeconds,omitempty" protobuf:"varint,1,opt,name=failureDurationSeconds"`
 
 	// replicas is the desired replica count to use when the external metric cannot be retrieved.
