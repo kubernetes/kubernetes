@@ -170,7 +170,7 @@ func (o *SetOptions) Validate() error {
 	}
 
 	if o.Section != sectionCredentialPlugin && o.Command == "" {
-		return fmt.Errorf("required flag 'command' not set")
+		return fmt.Errorf("--command is required when --section=%s or --section=%s", sectionAliases, sectionDefaults)
 	}
 
 	if o.Section == sectionCredentialPlugin {
