@@ -66,6 +66,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -2149,12 +2150,14 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 		subprotocols           []string // defaults to v5 if nil
 		expectDialError        bool
 		expectedSubprotocol    string
+		expectMetricInc        bool
 	}{
 		{
 			name:                   "feature gate enabled uses translating handler, v5 negotiated",
 			enableExtendWebSockets: true,
 			expectDialError:        false,
 			expectedSubprotocol:    "v5.channel.k8s.io",
+			expectMetricInc:        true,
 		},
 		{
 			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
@@ -2173,8 +2176,10 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 		},
 	}
 
+	servermetrics.Register()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
 			tCtx := ktesting.Init(t)
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -2209,6 +2214,18 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 
 			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
 			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="exec"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
 		})
 	}
 }
@@ -2223,12 +2240,14 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 		subprotocols           []string // defaults to v5 if nil
 		expectDialError        bool
 		expectedSubprotocol    string
+		expectMetricInc        bool
 	}{
 		{
 			name:                   "feature gate enabled uses translating handler, v5 negotiated",
 			enableExtendWebSockets: true,
 			expectDialError:        false,
 			expectedSubprotocol:    "v5.channel.k8s.io",
+			expectMetricInc:        true,
 		},
 		{
 			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
@@ -2247,8 +2266,10 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 		},
 	}
 
+	servermetrics.Register()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
 			tCtx := ktesting.Init(t)
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -2283,6 +2304,18 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 
 			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
 			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="attach"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
 		})
 	}
 }
@@ -2308,12 +2341,14 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 		enableExtendWebSockets bool
 		expectDialError        bool
 		expectedSubprotocol    string
+		expectMetricInc        bool
 	}{
 		{
 			name:                   "feature gate enabled uses tunneling handler, tunneling subprotocol negotiated",
 			enableExtendWebSockets: true,
 			expectDialError:        false,
 			expectedSubprotocol:    "SPDY/3.1+portforward.k8s.io",
+			expectMetricInc:        true,
 		},
 		{
 			name:                   "feature gate disabled rejects tunneling request (no port parameter)",
@@ -2322,8 +2357,10 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 		},
 	}
 
+	servermetrics.Register()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
 			tCtx := ktesting.Init(t)
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -2349,6 +2386,18 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 
 			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
 			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
 		})
 	}
 }

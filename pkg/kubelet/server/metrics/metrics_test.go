@@ -24,29 +24,6 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
-func TestIncWebSocketStreamingRequest(t *testing.T) {
-	Register()
-	ResetForTest()
-	t.Cleanup(ResetForTest)
-
-	IncWebSocketStreamingRequest("exec")
-	IncWebSocketStreamingRequest("attach")
-	IncWebSocketStreamingRequest("portforward")
-
-	expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
-# TYPE kubelet_websocket_streaming_requests_total counter
-kubelet_websocket_streaming_requests_total{subresource="attach"} 1
-kubelet_websocket_streaming_requests_total{subresource="exec"} 1
-kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
-`
-
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
-		"kubelet_websocket_streaming_requests_total"); err != nil {
-		t.Errorf("unexpected metric output: %v", err)
-	}
-}
-
 func TestSetMetricsProvider(t *testing.T) {
 	Register()
 	MetricsProvider.Reset()
