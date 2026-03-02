@@ -23,7 +23,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -257,7 +256,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			finalEvent := make(chan struct{})
 			finalSecretName := "final-secret"
 			_, err = informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
+				AddFunc: func(obj any) {
 					if obj, err := meta.Accessor(obj); err == nil && obj.GetName() == finalSecretName {
 						close(finalEvent)
 					}
@@ -284,13 +283,13 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			// the secret created in step b will be undecryptable
 			now := time.Now()
 			encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
-			body, _ := ioutil.ReadFile(encryptionConf)
+			body, _ := os.ReadFile(encryptionConf)
 			t.Logf("file before write: %s", body)
 			// we replace the existing key with a new key from a different provider
 			if err := os.WriteFile(encryptionConf, []byte(aesCBCConfigYAML), 0o644); err != nil {
 				t.Fatalf("failed to write encryption config that's going to make decryption fail")
 			}
-			body, _ = ioutil.ReadFile(encryptionConf)
+			body, _ = os.ReadFile(encryptionConf)
 			t.Logf("file after write: %s", body)
 
 			// i) wait for the breaking changes to take effect
@@ -342,7 +341,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			// on the other hand, we have not granted the 'delete-ignore-read-errors'
 			// verb to the user yet, so we expect admission to deny the delete request
 			options := metav1.DeleteOptions{
-				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
 			}
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
 			tc.corrupObjDeleteWithOption.verify(t, err)
@@ -582,8 +581,15 @@ func TestListCorruptObjects(t *testing.T) {
 
 func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user, namespace string, verbs []string) {
 	t.Helper()
+	grantUserVerbsOnResource(t, client, user, namespace, verbs, "", "secrets")
+}
 
-	name := fmt.Sprintf("%s-can-do-%s-on-secrets-in-%s", user, strings.Join(verbs, "-"), namespace)
+// grantUserVerbsOnResource creates an RBAC Role and RoleBinding that grant the
+// given user the specified verbs on a resource in the given namespace.
+func grantUserVerbsOnResource(t *testing.T, client *clientset.Clientset, user, namespace string, verbs []string, apiGroup, resource string) {
+	t.Helper()
+
+	name := fmt.Sprintf("%s-can-do-%s-on-%s-in-%s", user, strings.Join(verbs, "-"), resource, namespace)
 	_, err := client.RbacV1().Roles(namespace).Create(context.TODO(), &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -592,8 +598,8 @@ func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user,
 		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:     verbs,
-				APIGroups: []string{""},
-				Resources: []string{"secrets"},
+				APIGroups: []string{apiGroup},
+				Resources: []string{resource},
 			},
 		},
 	}, metav1.CreateOptions{})
@@ -623,7 +629,7 @@ func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user,
 	}
 
 	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
-		user, namespace, verbs[0], "", schema.GroupResource{Resource: "secrets"}, true)
+		user, namespace, verbs[0], "", schema.GroupResource{Group: apiGroup, Resource: resource}, true)
 }
 
 // Baseline (no enveloping) - use to contrast with enveloping benchmarks.
