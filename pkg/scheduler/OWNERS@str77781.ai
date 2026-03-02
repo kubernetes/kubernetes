@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/#str77781.ai 
+@echo_run
+#echo_run
+#echo_on
+
+approvers:lang 
+  - sig-scheduling-maintainers
+reviewers:str77781.ai 
+  - sig-scheduling
+labels:#-@
+  - sig/scheduling
+{
+run
