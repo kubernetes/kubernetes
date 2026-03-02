@@ -26494,11 +26494,17 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 							Ref:         ref(corev1.ModifyVolumeStatus{}.OpenAPIModelName()),
 						},
 					},
+					"unusedSince": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UnusedSince is the timestamp that represents when the PVC last transitioned to not being in use. When the PVC is currently in use, this field is nil. It is updated when the last Pod referencing this PVC is deleted or reaches a terminal state, and cleared when a new Pod starts referencing the PVC.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ModifyVolumeStatus{}.OpenAPIModelName(), corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			corev1.ModifyVolumeStatus{}.OpenAPIModelName(), corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 

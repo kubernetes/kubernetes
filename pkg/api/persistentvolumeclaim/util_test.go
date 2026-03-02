@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -619,6 +620,51 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 	}
 }
 
+func TestDropDisabledUnusedSinceFieldFromStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+	tests := []struct {
+		name     string
+		enabled  bool
+		pvc      *core.PersistentVolumeClaim
+		oldPVC   *core.PersistentVolumeClaim
+		expected *core.PersistentVolumeClaim
+	}{
+		{
+			name:     "for:newPVC=hasUnusedSince,oldPVC=nil,featuregate=false; should drop field",
+			enabled:  false,
+			pvc:      withUnusedSince(),
+			oldPVC:   nil,
+			expected: getPVC(),
+		},
+		{
+			name:     "for:newPVC=hasUnusedSince,oldPVC=doesnot,featuregate=true; should keep field",
+			enabled:  true,
+			pvc:      withUnusedSince(),
+			oldPVC:   getPVC(),
+			expected: withUnusedSince(),
+		},
+		{
+			name:     "for:newPVC=hasUnusedSince,oldPVC=hasUnusedSince,featuregate=false; should keep field",
+			enabled:  false,
+			pvc:      withUnusedSince(),
+			oldPVC:   withUnusedSince(),
+			expected: withUnusedSince(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeClaimUnusedSinceTime, test.enabled)
+
+			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
+
+			if !reflect.DeepEqual(*test.expected, *test.pvc) {
+				t.Errorf("Unexpected change: %+v", cmp.Diff(test.expected, test.pvc))
+			}
+		})
+	}
+}
+
 func getPVC() *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{}
 }
@@ -658,6 +704,15 @@ func withVolumeAttributesModifyStatus(target string, status core.PersistentVolum
 				TargetVolumeAttributesClassName: target,
 				Status:                          status,
 			},
+		},
+	}
+}
+
+func withUnusedSince() *core.PersistentVolumeClaim {
+	unusedSince := metav1.NewTime(time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC))
+	return &core.PersistentVolumeClaim{
+		Status: core.PersistentVolumeClaimStatus{
+			UnusedSince: &unusedSince,
 		},
 	}
 }

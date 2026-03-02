@@ -775,7 +775,7 @@ type PersistentVolumeClaimStatus struct {
 	// to not being in use. When the PVC is currently in use, this field is nil.
 	// It is updated when the last Pod referencing this PVC is deleted or reaches a
 	// terminal state, and cleared when a new Pod starts referencing the PVC.
-	// +featureGate=PersistentVolumeClaimUnusedSinceTime +optional
+	// +featureGate=PersistentVolumeClaimUnusedSinceTime
 	// +optional
 	UnusedSince *metav1.Time
 }

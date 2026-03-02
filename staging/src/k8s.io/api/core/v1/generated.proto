@@ -3385,6 +3385,14 @@ message PersistentVolumeClaimStatus {
   // +featureGate=VolumeAttributesClass
   // +optional
   optional ModifyVolumeStatus modifyVolumeStatus = 9;
+
+  // UnusedSince is the timestamp that represents when the PVC last transitioned
+  // to not being in use. When the PVC is currently in use, this field is nil.
+  // It is updated when the last Pod referencing this PVC is deleted or reaches a
+  // terminal state, and cleared when a new Pod starts referencing the PVC.
+  // +featureGate=PersistentVolumeClaimUnusedSinceTime
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time unusedSince = 10;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
