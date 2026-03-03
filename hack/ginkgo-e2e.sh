@@ -178,7 +178,7 @@ export PATH
 case "${E2E_TEST_DEBUG_TOOL:-ginkgo}" in
   ginkgo)
     program=("${ginkgo}")
-    program+=("--nodes=25")
+    program+=("--nodes=30")
     program+=("${ginkgo_args[@]:+${ginkgo_args[@]}}")
     ;;
   delve) program=("dlv" "exec") ;;
