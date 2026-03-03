@@ -4641,6 +4641,9 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 		}
 	}
 
+	terminalPod := makePodWithResources("terminal-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem})
+	terminalPod.Status.Phase = v1.PodFailed
+
 	pendingResizeAllocated := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod-pending-resize",
@@ -4699,6 +4702,12 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			name:                     "requests are decreasing",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			shouldRetryPendingResize: true,
+		},
+		{
+			name:                     "pod is marked as terminal",
+			oldPod:                   makePodWithResources("terminal-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			newPod:                   terminalPod,
 			shouldRetryPendingResize: true,
 		},
 	}
