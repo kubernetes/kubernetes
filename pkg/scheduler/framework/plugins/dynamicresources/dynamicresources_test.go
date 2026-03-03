@@ -2206,7 +2206,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				for _, v := range allocs {
 					totalAllocs += v
 				}
-				require.Equal(tCtx, float64(1), totalAllocs, "expected exactly one successful allocation with BindingConditions")
+				require.InEpsilon(tCtx, float64(1), totalAllocs, 0.1, "expected exactly one successful allocation with BindingConditions")
 
 				// Histogram: one success sample with requires_bindingconditions=true
 				hist, err := testutil.GetHistogramVecFromGatherer(
@@ -2355,7 +2355,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				for _, v := range timeouts {
 					totalTimeouts += v
 				}
-				require.Equal(tCtx, float64(1), totalTimeouts, "expected exactly one timeout with BindingConditions")
+				require.InEpsilon(tCtx, float64(1), totalTimeouts, 0.1, "expected exactly one timeout with BindingConditions")
 
 				// Histogram: one timeout sample with requires_bindingconditions=true
 				hist, err := testutil.GetHistogramVecFromGatherer(
