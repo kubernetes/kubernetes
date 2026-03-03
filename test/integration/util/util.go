@@ -126,6 +126,8 @@ func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedul
 	return sched, informerFactory
 }
 
+// CreateResourceClaimController creates a ResourceClaim controller and returns a blocking run function.
+// The caller is responsible for the management of the goroutine where that method is invoked.
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
@@ -139,7 +141,7 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
 	return func() {
-		go claimController.Run(ctx, 5 /* workers */)
+		claimController.Run(ctx, 5 /* workers */)
 	}
 }
 
