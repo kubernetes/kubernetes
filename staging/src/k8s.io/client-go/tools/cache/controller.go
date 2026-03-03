@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"errors"
+	corev1 "k8s.io/api/core/v1"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"sync"
 	"time"
@@ -184,9 +185,29 @@ func (c *controller) RunWithContext(ctx context.Context) {
 	wg.Wait()
 }
 
+var DebugProcessStartTime = time.Now()
+var DebugNamespaceInformerDelay = 0 * time.Second
+
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
-	return c.config.Queue.HasSynced()
+	synced := c.config.Queue.HasSynced()
+	if !synced {
+		return false
+	}
+
+	if DebugNamespaceInformerDelay > 0 {
+		_, isNamespace := c.config.ObjectType.(*corev1.Namespace)
+
+		// DEBUG: For testing issue #136288 - delay namespace informer
+		if isNamespace {
+			elapsed := time.Since(DebugProcessStartTime)
+			if elapsed < DebugNamespaceInformerDelay {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (c *controller) LastSyncResourceVersion() string {
@@ -550,7 +571,7 @@ func NewTransformingIndexerInformer(
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
 // a given handler of events OnUpdate, OnAdd, OnDelete
 func processDeltas(
-	// Object which receives event notifications from the given deltas
+// Object which receives event notifications from the given deltas
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas Deltas,
