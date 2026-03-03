@@ -118,6 +118,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: true,
 			expectedAvailable: true,
 		},
+		{
+			option:            ScaleDelayTimeOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            ScaleDelayTimeOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -198,6 +210,26 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			topoMgrPolicy: topologymanager.PolicyRestricted,
 			expectedErr:   false,
+		},
+		{
+			description:   "ScaleDelayTime with valid 5s",
+			policyOption:  map[string]string{ScaleDelayTimeOption: "5s"},
+			expectedErr:   false,
+		},
+		{
+			description:   "ScaleDelayTime with valid 10000ms",
+			policyOption:  map[string]string{ScaleDelayTimeOption: "10000ms"},
+			expectedErr:   false,
+		},
+		{
+			description:   "ScaleDelayTime with invalid 11s (exceeds 10s limit)",
+			policyOption:  map[string]string{ScaleDelayTimeOption: "11s"},
+			expectedErr:   true,
+		},
+		{
+			description:   "ScaleDelayTime with invalid -1s (negative value)",
+			policyOption:  map[string]string{ScaleDelayTimeOption: "-1s"},
+			expectedErr:   true,
 		},
 	}
 	for _, testCase := range testCases {
