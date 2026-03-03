@@ -29,6 +29,7 @@ import (
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
+	evictionrequestconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/evictionrequest/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
@@ -87,6 +88,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	endpointslicemirroringconfigv1alpha1.RecommendedDefaultEndpointSliceMirroringControllerConfiguration(&obj.EndpointSliceMirroringController)
 	// Use the default RecommendedDefaultEphemeralVolumeControllerConfiguration options
 	ephemeralvolumeconfigv1alpha1.RecommendedDefaultEphemeralVolumeControllerConfiguration(&obj.EphemeralVolumeController)
+	// Use the default RecommendedDefaultEvictionRequestControllerConfiguration options
+	evictionrequestconfigv1alpha1.RecommendedDefaultEvictionRequestControllerConfiguration(&obj.EvictionRequestController)
 	// Use the default RecommendedDefaultGarbageCollectorControllerConfiguration options
 	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
 	// Use the default RecommendedDefaultJobControllerConfiguration options

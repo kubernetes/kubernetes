@@ -82,6 +82,11 @@ func (in EphemeralVolumeControllerConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionRequestControllerConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kube-controller-manager.config.v1alpha1.EvictionRequestControllerConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in GarbageCollectorControllerConfiguration) OpenAPIModelName() string {
 	return "io.k8s.kube-controller-manager.config.v1alpha1.GarbageCollectorControllerConfiguration"
 }

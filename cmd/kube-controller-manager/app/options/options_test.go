@@ -60,6 +60,7 @@ import (
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -107,6 +108,7 @@ var args = []string{
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
+	"--concurrent-eviction-request-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
@@ -315,6 +317,11 @@ func TestAddFlags(t *testing.T) {
 		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
 			&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+		},
+		EvictionRequestController: &EvictionRequestControllerOptions{
+			&evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
@@ -661,6 +668,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+			EvictionRequestController: evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,

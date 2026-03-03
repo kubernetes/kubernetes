@@ -52,12 +52,7 @@ func newEvictionRequestController(ctx context.Context, controllerContext Control
 		return nil, err
 	}
 
-	// TODO(@johankj): Add EvictionRequestControllerConfiguration to ComponentConfig
-	// and use controllerContext.ComponentConfig.EvictionRequestController.ConcurrentEvictionRequestSyncs
-	// See pkg/controller/replicaset/config/ for reference.
-	const concurrentEvictionRequestSyncs = 5
-
 	return newControllerLoop(func(ctx context.Context) {
-		evictionRequestController.Run(ctx, concurrentEvictionRequestSyncs)
+		evictionRequestController.Run(ctx, int(controllerContext.ComponentConfig.EvictionRequestController.ConcurrentEvictionRequestSyncs))
 	}, controllerName), nil
 }
