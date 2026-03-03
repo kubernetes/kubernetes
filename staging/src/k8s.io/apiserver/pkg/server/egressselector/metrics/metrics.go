@@ -52,10 +52,11 @@ var (
 
 // DialMetrics instruments dials to proxy server with prometheus metrics.
 type DialMetrics struct {
-	clock     clock.Clock
-	starts    *metrics.CounterVec
-	latencies *metrics.HistogramVec
-	failures  *metrics.CounterVec
+	clock              clock.Clock
+	starts             *metrics.CounterVec
+	latencies          *metrics.HistogramVec
+	failures           *metrics.CounterVec
+	failuresDeprecated *metrics.CounterVec
 }
 
 // newDialMetrics create a new DialMetrics, configured with default metric names.
@@ -66,7 +67,7 @@ func newDialMetrics() *DialMetrics {
 			Subsystem:      subsystem,
 			Name:           "dial_start_total",
 			Help:           "Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"protocol", "transport"},
 	)
@@ -78,7 +79,7 @@ func newDialMetrics() *DialMetrics {
 			Name:           "dial_duration_seconds",
 			Help:           "Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)",
 			Buckets:        latencyBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"protocol", "transport"},
 	)
@@ -87,9 +88,21 @@ func newDialMetrics() *DialMetrics {
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "dial_failure_count",
+			Name:           "dial_failures_total",
 			Help:           "Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed",
 			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"protocol", "transport", "stage"},
+	)
+
+	failuresDeprecated := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "dial_failure_count",
+			Help:              "Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.33.0",
 		},
 		[]string{"protocol", "transport", "stage"},
 	)
@@ -97,7 +110,8 @@ func newDialMetrics() *DialMetrics {
 	legacyregistry.MustRegister(starts)
 	legacyregistry.MustRegister(latencies)
 	legacyregistry.MustRegister(failures)
-	return &DialMetrics{starts: starts, latencies: latencies, failures: failures, clock: clock.RealClock{}}
+	legacyregistry.MustRegister(failuresDeprecated)
+	return &DialMetrics{starts: starts, latencies: latencies, failures: failures, failuresDeprecated: failuresDeprecated, clock: clock.RealClock{}}
 }
 
 // Clock returns the clock.
@@ -115,6 +129,7 @@ func (m *DialMetrics) Reset() {
 	m.starts.Reset()
 	m.latencies.Reset()
 	m.failures.Reset()
+	m.failuresDeprecated.Reset()
 }
 
 // ObserveDialStart records the start of a dial attempt, labeled by protocol, transport.
@@ -130,4 +145,5 @@ func (m *DialMetrics) ObserveDialLatency(elapsed time.Duration, protocol, transp
 // ObserveDialFailure records a failed dial, labeled by protocol, transport, and the stage the dial failed at.
 func (m *DialMetrics) ObserveDialFailure(protocol, transport, stage string) {
 	m.failures.WithLabelValues(protocol, transport, stage).Inc()
+	m.failuresDeprecated.WithLabelValues(protocol, transport, stage).Inc()
 }
