@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"fmt"
-	"maps"
 	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -26,7 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	basecompatibility "k8s.io/component-base/compatibility"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
@@ -752,21 +753,29 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 	}
 
 	if isEmulation {
-		fullEtcdStorageData := maps.Clone(etcdStorageData)
-
 		for key := range etcdStorageData {
 			if strings.Contains(key.Version, "alpha") {
 				delete(etcdStorageData, key)
 			}
 		}
 
-		// match the resource to the correct storage version for emulated version
+		// Use the production storage version calculation to determine the expected
+		// storage version at this emulation version, avoiding logic duplication.
+		effectiveVersion := basecompatibility.NewEffectiveVersionFromString(v, "", "")
+		encodingConfig := serverstorage.NewDefaultResourceEncodingConfigForEffectiveVersion(legacyscheme.Scheme, effectiveVersion)
 		for key, data := range etcdStorageData {
-			storageVersion := storageVersionAtEmulationVersion(key, data.ExpectedGVK, v, fullEtcdStorageData)
-			if storageVersion == "" {
+			if data.ExpectedGVK == nil {
 				continue
 			}
-			data.ExpectedGVK.Version = storageVersion
+			example, err := legacyscheme.Scheme.New(*data.ExpectedGVK)
+			if err != nil {
+				continue
+			}
+			storageGV, err := encodingConfig.BackwardCompatibileStorageEncodingFor(key.GroupResource(), example)
+			if err != nil {
+				continue
+			}
+			data.ExpectedGVK.Version = storageGV.Version
 		}
 	}
 	validateStorageData(etcdStorageData)
@@ -792,62 +801,6 @@ func validateStorageData(etcdStorageData map[schema.GroupVersionResource]Storage
 			panic(fmt.Sprintf("Error. Non-GA resource %s must have an introduced version", key.String()))
 		}
 	}
-}
-
-// storageVersionAtEmulationVersion tries to find the correct storage version at an emulation version.
-// This mirrors the logic of emulatedStorageVersion in resource_encoding_config.go:
-// - compat: best non-alpha version introduced by minCompatVersion (for n-1 rollback safety)
-// - best: best version introduced by emulationVersion (used when only alpha is compat-safe)
-func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedGVK *schema.GroupVersionKind, emuVer string, etcdStorageData map[schema.GroupVersionResource]StorageData) string {
-	// expectedGVK is needed to find the correct GVK with the correct storage version.
-	if expectedGVK == nil {
-		return ""
-	}
-	minCompatVer := version.MustParse(emuVer).SubtractMinor(1)
-	emulationVer := version.MustParse(emuVer)
-
-	expectedGVR := gvr(expectedGVK.Group, expectedGVK.Version, key.Resource)
-	expectedGVRData, ok := etcdStorageData[expectedGVR]
-	// If expectedGVK is non-alpha and introduced before the compat version, it is already the
-	// correct compat-safe storage version.
-	if !ok || (!strings.Contains(expectedGVK.Version, "alpha") && minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion))) {
-		return ""
-	}
-
-	// Find compat (non-alpha, introduced <= compatVersion) and best (introduced <= emulationVersion).
-	var compat, best string
-	gvs := legacyscheme.Scheme.PrioritizedVersionsForGroup(key.Group)
-	for _, gv := range gvs {
-		candidateGVR := gv.WithResource(key.Resource)
-		candidateData, ok := etcdStorageData[candidateGVR]
-		if !ok {
-			continue
-		}
-		introduced := version.MustParse(candidateData.IntroducedVersion)
-		if best == "" && emulationVer.AtLeast(introduced) {
-			best = gv.Version
-		}
-		if compat == "" && !strings.Contains(gv.Version, "alpha") && minCompatVer.AtLeast(introduced) {
-			compat = gv.Version
-		}
-		if best != "" && compat != "" {
-			break
-		}
-	}
-
-	if compat != "" {
-		if compat == expectedGVK.Version {
-			return ""
-		}
-		return compat
-	}
-	if best != "" {
-		if best == expectedGVK.Version {
-			return ""
-		}
-		return best
-	}
-	return ""
 }
 
 // StorageData contains information required to create an object and verify its storage in etcd
