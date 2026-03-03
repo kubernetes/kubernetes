@@ -1244,8 +1244,17 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
-		if pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus && claim.Status.Allocation.AllocationTimestamp == nil {
-			claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
+		if pl.fts.EnableDRADeviceBindingConditions &&
+			pl.fts.EnableDRAResourceClaimDeviceStatus {
+			// Once the feature gate checks get removed, this code can be moved into an else branch
+			// for `if allocation != nil` above. For now it is kept here to avoid changing normal
+			// behavior.
+			if claim.Status.Allocation == nil {
+				return fmt.Errorf("claim %s got deallocated elsewhere in the meantime", klog.KObj(claim))
+			}
+			if claim.Status.Allocation.AllocationTimestamp == nil {
+				claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
+			}
 		}
 		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
