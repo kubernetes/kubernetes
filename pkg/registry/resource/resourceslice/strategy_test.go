@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -187,6 +188,17 @@ var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithNativeResources = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	instanceQuantity := k8sresource.MustParse("1")
+	obj.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resource.NativeResourceMapping{
+		v1.ResourceCPU: {
+			PerAllocatedUnitQuantity: &instanceQuantity,
+		},
+	}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -205,6 +217,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		bindingConditions       bool
 		deviceStatus            bool
 		consumableCapacity      bool
+		draNativeResources      bool
 		expectedValidationError bool
 		expectObj               *resource.ResourceSlice
 	}{
@@ -351,6 +364,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-native-dra-claims": {
+			obj:                sliceWithNativeResources,
+			draNativeResources: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNativeResources.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-native-dra-claims-disabled-feature": {
+			obj:                sliceWithNativeResources,
+			draNativeResources: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -361,6 +392,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRANativeResources:           tc.draNativeResources,
 			})
 
 			obj := tc.obj.DeepCopy()

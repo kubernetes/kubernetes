@@ -196,6 +196,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+	dropDisabledDRANativeResourcesFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -323,4 +324,27 @@ func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.Resour
 			}
 		}
 	}
+}
+
+func dropDisabledDRANativeResourcesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) || draNativeResourcesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].NativeResourceMappings = nil
+	}
+}
+
+func draNativeResourcesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.NativeResourceMappings) > 0 {
+			return true
+		}
+	}
+	return false
 }

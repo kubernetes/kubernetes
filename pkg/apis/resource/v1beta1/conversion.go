@@ -220,6 +220,19 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 		out.BindingConditions = basic.BindingConditions
 		out.BindingFailureConditions = basic.BindingFailureConditions
 		out.AllowMultipleAllocations = in.Basic.AllowMultipleAllocations
+
+		if basic.NativeResourceMappings != nil {
+			out.NativeResourceMappings = make(map[corev1.ResourceName]resource.NativeResourceMapping)
+			for key, value := range basic.NativeResourceMappings {
+				var outVal resource.NativeResourceMapping
+				if err := Convert_v1beta1_NativeResourceMapping_To_resource_NativeResourceMapping(&value, &outVal, s); err != nil {
+					return err
+				}
+				out.NativeResourceMappings[key] = outVal
+			}
+		} else {
+			out.NativeResourceMappings = nil
+		}
 	}
 	return nil
 }
@@ -269,6 +282,18 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 	out.Basic.BindingConditions = in.BindingConditions
 	out.Basic.BindingFailureConditions = in.BindingFailureConditions
 	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
+	if in.NativeResourceMappings != nil {
+		out.Basic.NativeResourceMappings = make(map[corev1.ResourceName]resourcev1beta1.NativeResourceMapping)
+		for key, value := range in.NativeResourceMappings {
+			var outVal resourcev1beta1.NativeResourceMapping
+			if err := Convert_resource_NativeResourceMapping_To_v1beta1_NativeResourceMapping(&value, &outVal, s); err != nil {
+				return err
+			}
+			out.Basic.NativeResourceMappings[key] = outVal
+		}
+	} else {
+		out.Basic.NativeResourceMappings = nil
+	}
 	return nil
 }
 
