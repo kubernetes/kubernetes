@@ -20,6 +20,7 @@ import (
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/equality"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
@@ -155,6 +156,42 @@ func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.
 	if !resourceclaim.PodStatusEqual(newPod.Status.ResourceClaimStatuses, oldPod.Status.ResourceClaimStatuses) ||
 		!resourceclaim.PodExtendedStatusEqual(newPod.Status.ExtendedResourceClaimStatus, oldPod.Status.ExtendedResourceClaimStatus) {
 		return fwk.UpdatePodGeneratedResourceClaim
+	}
+
+	return fwk.None
+}
+
+// PodGroupSchedulingPropertiesChange interprets the update of a PodGroup and
+// returns corresponding UpdatePodGroupXYZ event(s).
+// Once we have other PodGroup update events, we should update here as well.
+func PodGroupSchedulingPropertiesChange(newPodGroup *schedulingapi.PodGroup, oldPodGroup *schedulingapi.PodGroup) (events []fwk.ClusterEvent) {
+	r := fwk.PodGroup
+
+	var podGroupChangeExtractors []podGroupChangeExtractor
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		podGroupChangeExtractors = append(podGroupChangeExtractors, extractPodGroupGeneratedResourceClaimChange)
+	}
+
+	for _, fn := range podGroupChangeExtractors {
+		if event := fn(newPodGroup, oldPodGroup); event != fwk.None {
+			events = append(events, fwk.ClusterEvent{Resource: r, ActionType: event})
+		}
+	}
+
+	if len(events) == 0 {
+		// When no specific event is found, we use the general Update action,
+		// which should only trigger plugins registering a general PodGroup/Update event.
+		events = append(events, fwk.ClusterEvent{Resource: r, ActionType: fwk.Update})
+	}
+
+	return
+}
+
+type podGroupChangeExtractor func(newPod *schedulingapi.PodGroup, oldPod *schedulingapi.PodGroup) fwk.ActionType
+
+func extractPodGroupGeneratedResourceClaimChange(newPodGroup *schedulingapi.PodGroup, oldPodGroup *schedulingapi.PodGroup) fwk.ActionType {
+	if !resourceclaim.PodGroupStatusEqual(newPodGroup.Status.ResourceClaimStatuses, oldPodGroup.Status.ResourceClaimStatuses) {
+		return fwk.UpdatePodGroupGeneratedResourceClaim
 	}
 
 	return fwk.None

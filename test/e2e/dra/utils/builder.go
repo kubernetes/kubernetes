@@ -394,6 +394,29 @@ func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha2
 	return workload
 }
 
+// WorkloadInline creates a ResourceClaimTemplate and a Workload with one
+// PodGroupTemplate that refers to that ResourceClaimTemplate.
+func (b *Builder) WorkloadInline() (*schedulingv1alpha2.Workload, *resourceapi.ResourceClaimTemplate) {
+	workload := b.Workload()
+	podGroupClaimName := "my-inline-claim"
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:                      podGroupClaimName,
+			ResourceClaimTemplateName: new(workload.Name),
+		},
+	}
+	template := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workload.Name,
+			Namespace: workload.Namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: b.ClaimSpec(),
+		},
+	}
+	return workload, template
+}
+
 // PodGroup returns a simple PodGroup owned by the given Workload with no
 // resource claims.
 func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroup {

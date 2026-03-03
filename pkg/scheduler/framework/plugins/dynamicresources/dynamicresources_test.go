@@ -194,6 +194,12 @@ var (
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, PodGroupResourceClaim: &resourceName}).
 				PodGroupName(podGroupName).
 				Obj()
+	podWithTwoPodGroupClaims = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, PodGroupResourceClaim: &resourceName}).
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, PodGroupResourceClaim: &resourceName2}).
+					PodGroupName(podGroupName).
+					Obj()
 	scheduledPodWithPodGroup = st.MakePod().Name(podName + "-scheduled").Namespace(namespace).
 					UID(podUID + "-2").
 					Node(nodeName).
@@ -207,6 +213,11 @@ var (
 	podGroupWithClaimTemplate = st.MakePodGroup().Name(podGroupName).Namespace(namespace).
 					UID(podGroupUID).
 					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
+					Obj()
+	podGroupWithTwoClaimTemplates = st.MakePodGroup().Name(podGroupName).Namespace(namespace).
+					UID(podGroupUID).
+					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
+					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: resourceName2, ResourceClaimTemplateName: &claimName}).
 					Obj()
 	podGroupWithClaimTemplateInStatus = func() *schedulingapi.PodGroup {
 		pod := podGroupWithClaimTemplate.DeepCopy()
@@ -3593,6 +3604,87 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 			}
 			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, tc.objs, features, false, nil)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(tCtx.Logger(), tc.pod, nil, tc.obj)
+			if tc.wantErr {
+				if err == nil {
+					tCtx.Fatal("want an error, got none")
+				}
+				return
+			}
+
+			if err != nil {
+				tCtx.Fatalf("want no error, got: %v", err)
+			}
+			if tc.wantHint != gotHint {
+				tCtx.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterPodGroupChange(t *testing.T) {
+	testIsSchedulableAfterPodGroupChange(ktesting.Init(t))
+}
+func testIsSchedulableAfterPodGroupChange(tCtx ktesting.TContext) {
+	testcases := map[string]struct {
+		objs     []apiruntime.Object
+		pod      *v1.Pod
+		claims   []*resourceapi.ResourceClaim
+		obj      interface{}
+		wantHint fwk.QueueingHint
+		wantErr  bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:     podWithPodGroupClaim,
+			obj:     "not-a-podgroup",
+			wantErr: true,
+		},
+		"complete": {
+			objs:     []apiruntime.Object{pendingPodGroupClaim},
+			pod:      podWithPodGroupClaim,
+			obj:      podGroupWithClaimName,
+			wantHint: fwk.Queue,
+		},
+		"wrong-pod": {
+			objs: []apiruntime.Object{pendingPodGroupClaim},
+			pod: func() *v1.Pod {
+				pod := podWithPodGroupClaim.DeepCopy()
+				*pod.Spec.SchedulingGroup.PodGroupName += "2" // This is the relevant difference.
+				return pod
+			}(),
+			obj:      podGroupWithClaimTemplateInStatus,
+			wantHint: fwk.QueueSkip,
+		},
+		"missing-claim": {
+			objs:     nil,
+			pod:      podWithPodGroupClaim,
+			obj:      podGroupWithClaimTemplateInStatus,
+			wantHint: fwk.QueueSkip,
+		},
+		"incomplete": {
+			objs: []apiruntime.Object{pendingPodGroupClaim},
+			pod:  podWithTwoPodGroupClaims,
+			obj: func() *schedulingapi.PodGroup {
+				podGroup := podGroupWithTwoClaimTemplates.DeepCopy()
+				// Only one of two claims created.
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{{
+					Name:              podGroup.Spec.ResourceClaims[0].Name,
+					ResourceClaimName: &claimName,
+				}}
+				return podGroup
+			}(),
+			wantHint: fwk.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			features := feature.Features{
+				EnableDRASchedulerFilterTimeout: true,
+				EnableDynamicResourceAllocation: true,
+				EnableDRAWorkloadResourceClaims: true,
+			}
+			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, tc.objs, features, false, nil)
+			gotHint, err := testCtx.p.isSchedulableAfterPodGroupChange(tCtx.Logger(), tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
 					tCtx.Fatal("want an error, got none")

@@ -238,6 +238,13 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
 
+	if pl.fts.EnableDRAWorkloadResourceClaims {
+		events = append(events,
+			// Adding the ResourceClaim name to the podgroup status makes pods waiting for their ResourceClaim schedulable.
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.UpdatePodGroupGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterPodGroupChange},
+		)
+	}
+
 	return events, nil
 }
 
@@ -347,6 +354,36 @@ func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	return fwk.Queue, nil
 }
 
+// isSchedulableAfterPodGroupChange is invoked for update PodGroup events reported by
+// an informer. It checks whether that change adds the ResourceClaim(s) that the
+// pod in a group has been waiting for.
+func (pl *DynamicResources) isSchedulableAfterPodGroupChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPodGroup, err := schedutil.As[*schedulingapi.PodGroup](nil, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterPodGroupChange: %w", err)
+	}
+
+	if pod.Spec.SchedulingGroup == nil ||
+		pod.Spec.SchedulingGroup.PodGroupName == nil ||
+		pod.Namespace != modifiedPodGroup.Namespace ||
+		*pod.Spec.SchedulingGroup.PodGroupName != modifiedPodGroup.Name {
+		logger.V(7).Info("Pod is not schedulable after change in other PodGroup", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+		return fwk.QueueSkip, nil
+	}
+
+	if err := pl.foreachPodGroupResourceClaim(modifiedPodGroup, nil); err != nil {
+		// This is not an unexpected error: we know that
+		// foreachPodGroupResourceClaim only returns errors for "not
+		// schedulable".
+		logger.V(6).Info("Pod is not schedulable after PodGroup was updated", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+		return fwk.QueueSkip, nil
+	}
+
+	logger.V(5).Info("PodGroup got updated and Pod is schedulable", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+	return fwk.Queue, nil
+}
+
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *DynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.ResourceClaim, error) {
 	claims := make([]*resourceapi.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
@@ -412,6 +449,41 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podClai
 
 		if mustCheckOwner {
 			if err := resourceclaim.IsForPod(pod, podGroup, claim); err != nil {
+				return err
+			}
+		}
+		if cb != nil {
+			cb(resource, claim)
+		}
+	}
+	return nil
+}
+
+// foreachPodGroupResourceClaim checks that each ResourceClaim for the PodGroup exists.
+// It calls an optional handler for those claims that it finds.
+func (pl *DynamicResources) foreachPodGroupResourceClaim(podGroup *schedulingapi.PodGroup, cb func(podClaim schedulingapi.PodGroupResourceClaim, claim *resourceapi.ResourceClaim)) error {
+	for _, resource := range podGroup.Spec.ResourceClaims {
+		claimName, mustCheckOwner, err := resourceclaim.NameFromPodGroup(podGroup, &resource)
+		if err != nil {
+			return err
+		}
+		// The claim name might be nil if no underlying resource claim
+		// was generated for the referenced claim. There are valid use
+		// cases when this might happen, so we simply skip it.
+		if claimName == nil {
+			continue
+		}
+		claim, err := pl.draManager.ResourceClaims().Get(podGroup.Namespace, *claimName)
+		if err != nil {
+			return err
+		}
+
+		if claim.DeletionTimestamp != nil {
+			return fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
+		}
+
+		if mustCheckOwner {
+			if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
 				return err
 			}
 		}

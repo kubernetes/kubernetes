@@ -31,11 +31,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
+	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha2"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
@@ -67,15 +69,29 @@ const (
 	// which indexes by PodGroup ResourceClaim.
 	podGroupResourceClaimIndex = "podgroup-resource-claim-index"
 
+	// podGroupResourceClaimTemplateIndexKey is the lookup name for the index
+	// function which indexes only by PodGroup ResourceClaim templates.
+	podGroupResourceClaimTemplateIndexKey = "podgroup-resource-claim-template-index"
+
 	// podResourceClaimAnnotation is the special annotation that generated
 	// ResourceClaims get. Its value is the pod.spec.resourceClaims[].name
 	// for which it was generated. This is used only inside the controller
 	// and not documented as part of the Kubernetes API.
 	podResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 
+	// podGroupResourceClaimAnnotation is the special annotation that generated
+	// ResourceClaims get. Its value is the podgroup.spec.resourceClaims[].name
+	// for which it was generated. This is used only inside the controller
+	// and not documented as part of the Kubernetes API.
+	podGroupResourceClaimAnnotation = "resource.kubernetes.io/podgroup-claim-name"
+
 	// claimPodOwnerIndex is used to find ResourceClaims which have
 	// a specific pod as owner. Values for this index are the pod UID.
 	claimPodOwnerIndex = "claim-pod-owner-index"
+
+	// claimPodGroupOwnerIndex is used to find ResourceClaims which have a
+	// specific PodGroup as owner. Values for this index are the PodGroup UID.
+	claimPodGroupOwnerIndex = "claim-podgroup-owner-index"
 
 	// Field manager used to update the pod status.
 	fieldManager = "ResourceClaimController"
@@ -138,8 +154,9 @@ type Controller struct {
 }
 
 const (
-	claimKeyPrefix = "claim:"
-	podKeyPrefix   = "pod:"
+	claimKeyPrefix    = "claim:"
+	podKeyPrefix      = "pod:"
+	podGroupKeyPrefix = "podgroup:"
 )
 
 // Features defines which features should be enabled in the controller.
@@ -256,6 +273,9 @@ func NewController(
 		if err := ec.podGroupIndexer.AddIndexers(cache.Indexers{podGroupResourceClaimIndex: podGroupResourceClaimIndexFunc}); err != nil {
 			return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 		}
+		if err := ec.podGroupIndexer.AddIndexers(cache.Indexers{podGroupResourceClaimTemplateIndexKey: podGroupResourceClaimTemplateIndexFunc}); err != nil {
+			return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
+		}
 	}
 
 	// The mutation cache acts as an additional layer for the informer
@@ -268,6 +288,11 @@ func NewController(
 	claimInformerCache := claimInformer.Informer().GetIndexer()
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
+	}
+	if features.WorkloadResourceClaims {
+		if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodGroupOwnerIndex: claimPodGroupOwnerIndexFunc}); err != nil {
+			return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
+		}
 	}
 	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
@@ -322,6 +347,33 @@ func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj inter
 		ec.enqueuePod(logger, object, false)
 	}
 
+	if ec.features.WorkloadResourceClaims {
+		// Enqueue all PodGroups with this template name
+		objects, err := ec.podGroupIndexer.ByIndex(podGroupResourceClaimTemplateIndexKey, fmt.Sprintf("%s/%s", template.Namespace, template.Name))
+		if err != nil {
+			runtime.HandleErrorWithLogger(logger, err, "Unable to list PodGroups for claim template", "resourceClaimTemplate", klog.KObj(template))
+			return
+		}
+		if len(objects) == 0 {
+			logger.V(6).Info("ResourceClaimTemplate change unrelated to any known PodGroup", "resourceClaimTemplate", klog.KObj(template))
+			return
+		}
+
+		for _, object := range objects {
+			podGroup, ok1 := object.(*schedulingapi.PodGroup)
+			if !ok1 {
+				// Not a PodGroup?!
+				runtime.HandleErrorWithLogger(logger, nil, "EnqueueResourceClaimTemplate called for unexpected object", "type", fmt.Sprintf("%T", obj))
+				return
+			}
+			logger.V(4).Info(
+				"Enqueuing PodGroup due to ResourceClaim change",
+				"resourceClaimTemplate", klog.KObj(template),
+				"podgroup", klog.KObj(podGroup),
+			)
+			ec.enqueuePodGroup(logger, object, false)
+		}
+	}
 }
 
 func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
@@ -394,6 +446,12 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 			logger.V(6).Info("Process extended resource claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, claimName), "key", key, "reason", reason)
 			ec.queue.Add(key)
 		}
+	}
+
+	if podGroup != nil {
+		podGroupName := *pod.Spec.SchedulingGroup.PodGroupName
+		logger.V(6).Info("Enqueueing PodGroup", "pod", klog.KObj(pod), "podgroup", podGroupName)
+		ec.queue.Add(podGroupKeyPrefix + pod.Namespace + "/" + podGroupName)
 	}
 
 	needsWork, reason := ec.podNeedsWork(pod, podGroup)
@@ -500,7 +558,9 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, delet
 		return
 	}
 
-	// Check if PodGroup has any resource claims to process.
+	// Check if pod has any resource claims to process.
+	// Extended resource claims are stored in pod.Status.ExtendedResourceClaimStatus,
+	// not in pod.Spec.ResourceClaims, so we need to check both locations.
 	hasResourceClaims := len(podGroup.Spec.ResourceClaims) > 0
 	if !hasResourceClaims {
 		// Nothing to do for it at all.
@@ -514,7 +574,7 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, delet
 
 	logger.V(6).Info("PodGroup with resource claims changed", "podgroup", klog.KObj(podGroup), "deleted", deleted)
 
-	// Release reservations of a deleted PodGroup?
+	// Release reservations of a deleted or completed pod?
 	needsClaims, reason := podGroupNeedsClaims(podGroup, deleted)
 	if needsClaims {
 		logger.V(6).Info("Not touching claims", "podgroup", klog.KObj(podGroup), "reason", reason)
@@ -537,6 +597,14 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, delet
 			}
 		}
 	}
+
+	needsWork, reason := ec.podGroupNeedsWork(podGroup)
+	if needsWork {
+		logger.V(6).Info("Enqueueing PodGroup", "podgroup", klog.KObj(podGroup), "reason", reason)
+		ec.queue.Add(podGroupKeyPrefix + podGroup.Namespace + "/" + podGroup.Name)
+		return
+	}
+	logger.V(6).Info("Not enqueueing PodGroup", "podgroup", klog.KObj(podGroup), "reason", reason)
 }
 
 func podGroupNeedsClaims(_ *schedulingapi.PodGroup, deleted bool) (bool, string) {
@@ -545,6 +613,49 @@ func podGroupNeedsClaims(_ *schedulingapi.PodGroup, deleted bool) (bool, string)
 	}
 	// Still needs claims.
 	return true, "Pods in the PodGroup might run"
+}
+
+// podGroupNeedsWork checks whether a new or modified PodGroup needs to be processed
+// further by a worker. It returns a boolean with the result and an explanation
+// for it.
+func (ec *Controller) podGroupNeedsWork(podGroup *schedulingapi.PodGroup) (bool, string) {
+	if podGroup.DeletionTimestamp != nil {
+		// Nothing else to do for the PodGroup.
+		return false, "PodGroup is deleted"
+	}
+
+	for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
+		claimName, checkOwner, err := resourceclaim.NameFromPodGroup(podGroup, &podGroupClaim)
+		if err != nil {
+			return true, err.Error()
+		}
+		// If the claimName is nil, then it has been determined before
+		// that the claim is not needed.
+		if claimName == nil {
+			return false, "claim is not needed"
+		}
+		claim, err := ec.claimLister.ResourceClaims(podGroup.Namespace).Get(*claimName)
+		if apierrors.IsNotFound(err) {
+			if podGroupClaim.ResourceClaimTemplateName != nil {
+				return true, "must create ResourceClaim from template"
+			}
+			// User needs to create claim.
+			return false, "claim is missing and must be created by user"
+		}
+		if err != nil {
+			// Shouldn't happen.
+			return true, fmt.Sprintf("internal error while checking for claim: %v", err)
+		}
+
+		if checkOwner {
+			if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
+				// Cannot proceed with the PodGroup unless that other claim gets deleted.
+				return false, err.Error()
+			}
+		}
+	}
+
+	return false, "nothing to do"
 }
 
 func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
@@ -685,6 +796,8 @@ func (ec *Controller) syncHandler(ctx context.Context, key string) error {
 	switch prefix {
 	case podKeyPrefix:
 		return ec.syncPod(ctx, namespace, name)
+	case podGroupKeyPrefix:
+		return ec.syncPodGroup(ctx, namespace, name)
 	case claimKeyPrefix:
 		return ec.syncClaim(ctx, namespace, name)
 	default:
@@ -975,6 +1088,212 @@ func (ec *Controller) reserveFor(ctx context.Context, consumer resourceapi.Resou
 		return fmt.Errorf("reserve claim %s: %w", klog.KObj(claim), err)
 	}
 	return nil
+}
+
+func (ec *Controller) syncPodGroup(ctx context.Context, namespace, name string) error {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podgroup", klog.KRef(namespace, name))
+	ctx = klog.NewContext(ctx, logger)
+	podGroup, err := ec.podGroupLister.PodGroups(namespace).Get(name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(5).Info("Nothing to do for PodGroup, it is gone")
+			return nil
+		}
+		return err
+	}
+
+	// Ignore PodGroups which are already getting deleted.
+	if podGroup.DeletionTimestamp != nil {
+		logger.V(5).Info("Nothing to do for PodGroup, it is marked for deletion")
+		return nil
+	}
+
+	var newPodGroupClaims map[string]string
+	for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
+		if err := ec.handlePodGroupClaim(ctx, podGroup, podGroupClaim, &newPodGroupClaims); err != nil {
+			if ec.recorder != nil {
+				ec.recorder.Event(podGroup, v1.EventTypeWarning, "FailedResourceClaimCreation", fmt.Sprintf("PodGroupResourceClaim %s: %v", podGroupClaim.Name, err))
+			}
+			return fmt.Errorf("PodGroup %s/%s, PodGroupResourceClaim %s: %w", namespace, name, podGroupClaim.Name, err)
+		}
+	}
+
+	if newPodGroupClaims != nil {
+		// Patch the PodGroup status with the new information about
+		// generated ResourceClaims.
+		statuses := make([]*schedulingapply.PodGroupResourceClaimStatusApplyConfiguration, 0, len(newPodGroupClaims))
+		for podGroupClaimName, resourceClaimName := range newPodGroupClaims {
+			statuses = append(statuses, schedulingapply.PodGroupResourceClaimStatus().WithName(podGroupClaimName).WithResourceClaimName(resourceClaimName))
+		}
+		podGroupApply := schedulingapply.PodGroup(name, namespace).WithStatus(schedulingapply.PodGroupStatus().WithResourceClaimStatuses(statuses...))
+		if _, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+			return fmt.Errorf("update PodGroup %s/%s ResourceClaimStatuses: %w", namespace, name, err)
+		}
+	}
+
+	return nil
+}
+
+// handlePodGroupClaim is invoked for each resource claim of a PodGroup.
+func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedulingapi.PodGroup, podGroupClaim schedulingapi.PodGroupResourceClaim, newPodGroupClaims *map[string]string) error {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podGroupClaim", podGroupClaim.Name)
+	ctx = klog.NewContext(ctx, logger)
+	logger.V(5).Info("Checking", "podGroupClaim", podGroupClaim.Name)
+
+	// resourceclaim.Name checks for the situation that the client doesn't
+	// know some future addition to the API. Therefore it gets called here
+	// even if there is no template to work on, because if some new field
+	// gets added, the expectation might be that the controller does
+	// something for it.
+	claimName, mustCheckOwner, err := resourceclaim.NameFromPodGroup(podGroup, &podGroupClaim)
+	switch {
+	case errors.Is(err, resourceclaim.ErrClaimNotFound):
+		// Continue below.
+	case err != nil:
+		return fmt.Errorf("checking for claim before creating it: %w", err)
+	case claimName == nil:
+		// Nothing to do, no claim needed.
+		return nil
+	case *claimName != "":
+		claimName := *claimName
+		// The ResourceClaim should exist because it is recorded in the podgroup.status.resourceClaimStatuses,
+		// but perhaps it was deleted accidentally. In that case we re-create it.
+		claim, err := ec.claimLister.ResourceClaims(podGroup.Namespace).Get(claimName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if claim != nil {
+			var err error
+			if mustCheckOwner {
+				err = resourceclaim.IsForPodGroup(podGroup, claim)
+			}
+			if err == nil {
+				// Already created, nothing more to do.
+				logger.V(5).Info("Claim already created", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+				return nil
+			}
+			logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podGroupClaim.Name, "resourceClaim", claimName)
+		}
+	}
+
+	templateName := podGroupClaim.ResourceClaimTemplateName
+	if templateName == nil {
+		// Nothing to do.
+		return nil
+	}
+
+	// Before we create a new ResourceClaim, check if there is an orphaned one.
+	// This covers the case that the controller has created it, but then fails
+	// before it can update the pod status.
+	claim, err := ec.findPodGroupResourceClaim(podGroup, podGroupClaim)
+	if err != nil {
+		return fmt.Errorf("finding ResourceClaim for claim %s in PodGroup %s/%s failed: %w", podGroupClaim.Name, podGroup.Namespace, podGroup.Name, err)
+	}
+
+	if claim == nil {
+		template, err := ec.templateLister.ResourceClaimTemplates(podGroup.Namespace).Get(*templateName)
+		if err != nil {
+			return fmt.Errorf("resource claim template %q: %w", *templateName, err)
+		}
+
+		if !ec.features.AdminAccess && needsAdminAccess(template) {
+			return errors.New("admin access is requested, but the feature is disabled")
+		}
+
+		if !ec.features.PrioritizedList && hasPrioritizedList(template) {
+			return errors.New("template includes a prioritized list of subrequests, but the feature is disabled")
+		}
+
+		// Create the ResourceClaim with PodGroup as owner, with a generated name that uses
+		// <podgroup>-<claim name> as base.
+		isTrue := true
+		annotations := template.Spec.ObjectMeta.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[podGroupResourceClaimAnnotation] = podGroupClaim.Name
+		generateName := podGroup.Name + "-" + podGroupClaim.Name + "-"
+		maxBaseLen := 57 // Leave space for hyphen and 5 random characters in a name with 63 characters.
+		if len(generateName) > maxBaseLen {
+			// We could leave truncation to the apiserver, but as
+			// it removes at the end, we would loose everything
+			// from the pod group claim name when the pod group name is long.
+			// We can do better and truncate both strings,
+			// proportional to their length.
+			generateName = podGroup.Name[0:len(podGroup.Name)*maxBaseLen/len(generateName)] +
+				"-" +
+				podGroupClaim.Name[0:len(podGroupClaim.Name)*maxBaseLen/len(generateName)]
+		}
+		claim = &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: generateName,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: schedulingapi.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+						Name:       podGroup.Name,
+						UID:        podGroup.UID,
+						Controller: &isTrue,
+					},
+				},
+				Annotations: annotations,
+				Labels:      template.Spec.ObjectMeta.Labels,
+			},
+			Spec: template.Spec.Spec,
+		}
+		metricLabel := getAdminAccessMetricLabel(claim)
+		claimName := claim.Name
+		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(podGroup.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+		if err != nil {
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
+			return fmt.Errorf("create ResourceClaim %s: %w", claimName, err)
+		}
+		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
+		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(podGroup))
+		ec.claimCache.Mutation(claim)
+	}
+
+	// Remember the new ResourceClaim for a batch PodStatus update in our caller.
+	if *newPodGroupClaims == nil {
+		*newPodGroupClaims = make(map[string]string)
+	}
+	(*newPodGroupClaims)[podGroupClaim.Name] = claim.Name
+
+	return nil
+}
+
+// findPodGroupResourceClaim looks for an existing ResourceClaim with the right
+// annotation (ties it to the pod claim) and the right ownership (ties it to
+// the pod).
+func (ec *Controller) findPodGroupResourceClaim(podGroup *schedulingapi.PodGroup, podGroupClaim schedulingapi.PodGroupResourceClaim) (*resourceapi.ResourceClaim, error) {
+	// Only claims owned by the PodGroup will get returned here.
+	claims, err := ec.claimCache.ByIndex(claimPodGroupOwnerIndex, string(podGroup.UID))
+	if err != nil {
+		return nil, err
+	}
+	for _, claimObj := range claims {
+		claim, ok := claimObj.(*resourceapi.ResourceClaim)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object of type %T returned by claim cache", claimObj)
+		}
+		podGroupClaimName, ok := claim.Annotations[podGroupResourceClaimAnnotation]
+		// No annotation? Then it cannot be an automatically generated claim
+		// and we need to ignore it.
+		if !ok {
+			continue
+		}
+
+		// Not the claim for this particular PodGroup claim?
+		if podGroupClaimName != podGroupClaim.Name {
+			continue
+		}
+
+		// Pick the first one that matches. There shouldn't be more than one. If there is,
+		// then all others will be ignored until the PodGroup gets deleted. Then they also get
+		// cleaned up.
+		return claim, nil
+	}
+	return nil, nil
 }
 
 func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {
@@ -1276,6 +1595,24 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	return keys, nil
 }
 
+func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+	podGroup, ok := obj.(*schedulingapi.PodGroup)
+	if !ok {
+		return []string{}, nil
+	}
+
+	keySet := sets.NewString()
+
+	for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
+		if podGroupClaim.ResourceClaimTemplateName != nil {
+			resourceTemplate := *podGroupClaim.ResourceClaimTemplateName
+			keySet.Insert(fmt.Sprintf("%s/%s", podGroup.Namespace, resourceTemplate))
+		}
+	}
+
+	return keySet.List(), nil
+}
+
 // podGroupResourceClaimIndexFunc is an index function that returns
 // ResourceClaim keys (= namespace/name) for ResourceClaim or
 // ResourceClaimTemplates in a given PodGroup.
@@ -1323,6 +1660,30 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 	}
 	return keys, nil
 }
+
+// claimPodGroupOwnerIndexFunc is an index function that returns the PodGroup UIDs of
+// all PodGroups which own the resource claim. Should only be one, though.
+func claimPodGroupOwnerIndexFunc(obj interface{}) ([]string, error) {
+	claim, ok := obj.(*resourceapi.ResourceClaim)
+	if !ok {
+		return nil, nil
+	}
+	var keys []string
+	for _, owner := range claim.OwnerReferences {
+		ownerGV, err := schema.ParseGroupVersion(owner.APIVersion)
+		if err != nil {
+			continue
+		}
+		if owner.Controller != nil &&
+			*owner.Controller &&
+			ownerGV.Group == schedulingapi.GroupName && // ignore the version, which may change
+			owner.Kind == "PodGroup" {
+			keys = append(keys, string(owner.UID))
+		}
+	}
+	return keys, nil
+}
+
 func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
 	if claim == nil {
 		return "false"

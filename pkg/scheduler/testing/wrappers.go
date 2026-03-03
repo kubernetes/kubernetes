@@ -1636,6 +1636,12 @@ func (wrapper *PodGroupWrapper) ResourceClaims(claims ...schedulingapi.PodGroupR
 	return wrapper
 }
 
+// ResourceClaimStatuses adds resource claim statuses to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaimStatuses(statuses ...schedulingapi.PodGroupResourceClaimStatus) *PodGroupWrapper {
+	wrapper.Status.ResourceClaimStatuses = append(wrapper.Status.ResourceClaimStatuses, statuses...)
+	return wrapper
+}
+
 // PodGroupTemplateWrapper wraps a PodGroupTemplate inside.
 type PodGroupTemplateWrapper struct{ schedulingapi.PodGroupTemplate }
 

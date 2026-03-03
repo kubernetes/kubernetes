@@ -2031,6 +2031,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.Create(tCtx, workload, podGroup, claim, pod)
 			b.TestPod(tCtx, pod)
 		})
+
+		f.It("generates claims from templates for PodGroups", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			workload, template := b.WorkloadInline()
+			podGroupTemplate := workload.Spec.PodGroupTemplates[0]
+			podGroup := b.PodGroup(workload, podGroupTemplate)
+			pod := b.GroupedPodWithClaim(podGroup, podGroupTemplate.ResourceClaims[0].Name)
+			b.Create(tCtx, workload, podGroup, template, pod)
+			b.TestPod(tCtx, pod)
+		})
 	}
 
 	// It is okay to use the same context multiple times (like "control plane"),

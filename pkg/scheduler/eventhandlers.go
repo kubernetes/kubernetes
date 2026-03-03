@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -470,6 +471,38 @@ func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
+// updatePodGroup is modified after [Scheduler.updateNodeInCache] to layer in
+// the custom event types related to PodGroups.
+func (sched *Scheduler) updatePodGroup(oldObj, newObj interface{}) {
+	start := time.Now()
+	logger := sched.logger
+	oldPodGroup, ok := oldObj.(*schedulingapi.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha2.PodGroup", "oldObj", oldObj)
+		return
+	}
+	newPodGroup, ok := newObj.(*schedulingapi.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha2.PodGroup", "newObj", newObj)
+		return
+	}
+
+	logger.V(4).Info("Update event for PodGroup", "podgroup", klog.KObj(newPodGroup))
+	events := framework.PodGroupSchedulingPropertiesChange(newPodGroup, oldPodGroup)
+
+	// Save the time it takes to update the PodGroup in the cache.
+	updatingDuration := metrics.SinceInSeconds(start)
+
+	// Only requeue unschedulable pods if the PodGroup became more schedulable.
+	for _, evt := range events {
+		startMoving := time.Now()
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPodGroup, newPodGroup, nil)
+		movingDuration := metrics.SinceInSeconds(startMoving)
+
+		metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(updatingDuration + movingDuration)
+	}
+}
+
 const (
 	// syncedPollPeriod controls how often you look at the status of your sync funcs
 	syncedPollPeriod = 100 * time.Millisecond
@@ -678,9 +711,9 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		case fwk.PodGroup:
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.PodGroup),
-				); err != nil {
+				handler := buildEvtResHandler(at, fwk.PodGroup)
+				handler.UpdateFunc = sched.updatePodGroup
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(handler); err != nil {
 					return err
 				}
 				handlers = append(handlers, handlerRegistration)
