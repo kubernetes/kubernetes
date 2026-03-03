@@ -4161,6 +4161,136 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
+- name: io.k8s.api.coordination.v1alpha1.EvictionRequest
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionRequestSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionRequestStatus
+      default: {}
+- name: io.k8s.api.coordination.v1alpha1.EvictionRequestSpec
+  map:
+    fields:
+    - name: requesters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.coordination.v1alpha1.Requester
+          elementRelationship: associative
+          keys:
+          - name
+    - name: target
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionTarget
+      default: {}
+- name: io.k8s.api.coordination.v1alpha1.EvictionRequestStatus
+  map:
+    fields:
+    - name: activeInterceptors
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: interceptors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.coordination.v1alpha1.InterceptorStatus
+          elementRelationship: associative
+          keys:
+          - name
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: processedInterceptors
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: targetInterceptors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.EvictionInterceptor
+          elementRelationship: associative
+          keys:
+          - name
+- name: io.k8s.api.coordination.v1alpha1.EvictionTarget
+  map:
+    fields:
+    - name: pod
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.LocalTargetReference
+    unions:
+    - fields:
+      - fieldName: pod
+        discriminatorValue: Pod
+- name: io.k8s.api.coordination.v1alpha1.InterceptorStatus
+  map:
+    fields:
+    - name: completionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: expectedCompletionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: heartbeatTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: message
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: startTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    elementRelationship: atomic
+- name: io.k8s.api.coordination.v1alpha1.LocalTargetReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.coordination.v1alpha1.Requester
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.coordination.v1alpha2.LeaseCandidate
   map:
     fields:
@@ -5409,6 +5539,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: host
       type:
         scalar: string
+- name: io.k8s.api.core.v1.EvictionInterceptor
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ExecAction
   map:
     fields:
@@ -6955,6 +7093,14 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.EphemeralContainer
+          elementRelationship: associative
+          keys:
+          - name
+    - name: evictionInterceptors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.EvictionInterceptor
           elementRelationship: associative
           keys:
           - name

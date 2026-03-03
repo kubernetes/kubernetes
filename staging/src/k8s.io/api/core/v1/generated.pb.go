@@ -158,6 +158,8 @@ func (m *EventSeries) Reset() { *m = EventSeries{} }
 
 func (m *EventSource) Reset() { *m = EventSource{} }
 
+func (m *EvictionInterceptor) Reset() { *m = EvictionInterceptor{} }
+
 func (m *ExecAction) Reset() { *m = ExecAction{} }
 
 func (m *FCVolumeSource) Reset() { *m = FCVolumeSource{} }
@@ -4200,6 +4202,34 @@ func (m *EventSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Component)
 	copy(dAtA[i:], m.Component)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Component)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *EvictionInterceptor) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *EvictionInterceptor) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *EvictionInterceptor) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -9671,6 +9701,22 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.EvictionInterceptors) > 0 {
+		for iNdEx := len(m.EvictionInterceptors) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.EvictionInterceptors[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x2
+			i--
+			dAtA[i] = 0xda
+		}
+	}
 	if m.WorkloadRef != nil {
 		{
 			size, err := m.WorkloadRef.MarshalToSizedBuffer(dAtA[:i])
@@ -16420,6 +16466,17 @@ func (m *EventSource) Size() (n int) {
 	return n
 }
 
+func (m *EvictionInterceptor) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *ExecAction) Size() (n int) {
 	if m == nil {
 		return 0
@@ -18626,6 +18683,12 @@ func (m *PodSpec) Size() (n int) {
 	if m.WorkloadRef != nil {
 		l = m.WorkloadRef.Size()
 		n += 2 + l + sovGenerated(uint64(l))
+	}
+	if len(m.EvictionInterceptors) > 0 {
+		for _, e := range m.EvictionInterceptors {
+			l = e.Size()
+			n += 2 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -21428,6 +21491,16 @@ func (this *EventSource) String() string {
 	}, "")
 	return s
 }
+func (this *EvictionInterceptor) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&EvictionInterceptor{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ExecAction) String() string {
 	if this == nil {
 		return "nil"
@@ -23009,6 +23082,11 @@ func (this *PodSpec) String() string {
 		repeatedStringForResourceClaims += strings.Replace(strings.Replace(f.String(), "PodResourceClaim", "PodResourceClaim", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForResourceClaims += "}"
+	repeatedStringForEvictionInterceptors := "[]EvictionInterceptor{"
+	for _, f := range this.EvictionInterceptors {
+		repeatedStringForEvictionInterceptors += strings.Replace(strings.Replace(f.String(), "EvictionInterceptor", "EvictionInterceptor", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForEvictionInterceptors += "}"
 	keysForNodeSelector := make([]string, 0, len(this.NodeSelector))
 	for k := range this.NodeSelector {
 		keysForNodeSelector = append(keysForNodeSelector, k)
@@ -23072,6 +23150,7 @@ func (this *PodSpec) String() string {
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`WorkloadRef:` + strings.Replace(this.WorkloadRef.String(), "WorkloadReference", "WorkloadReference", 1) + `,`,
+		`EvictionInterceptors:` + repeatedStringForEvictionInterceptors + `,`,
 		`}`,
 	}, "")
 	return s
@@ -35955,6 +36034,88 @@ func (m *EventSource) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Host = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *EvictionInterceptor) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: EvictionInterceptor: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: EvictionInterceptor: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -55040,6 +55201,40 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 				m.WorkloadRef = &WorkloadReference{}
 			}
 			if err := m.WorkloadRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 43:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvictionInterceptors", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvictionInterceptors = append(m.EvictionInterceptors, EvictionInterceptor{})
+			if err := m.EvictionInterceptors[len(m.EvictionInterceptors)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

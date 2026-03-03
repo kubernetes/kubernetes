@@ -8093,3 +8093,359 @@ func TestPrintWorkloadList(t *testing.T) {
 		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }
+
+func TestPrintEvictionRequest(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+
+	evictionRequest := coordination.EvictionRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+			Namespace:         "ns1",
+			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+		},
+		Spec: coordination.EvictionRequestSpec{
+			Target: coordination.EvictionTarget{
+				Pod: &coordination.LocalTargetReference{
+					Name: "pod1",
+					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+				},
+			},
+			Requesters: []coordination.Requester{
+				{
+					Name: "drain.foo.com",
+				},
+			},
+		},
+		Status: coordination.EvictionRequestStatus{
+			ObservedGeneration: 1,
+			TargetInterceptors: []api.EvictionInterceptor{
+				{Name: "interceptor1"},
+				{Name: "interceptor2"},
+			},
+			ActiveInterceptors: []string{
+				"interceptor2",
+			},
+			ProcessedInterceptors: []string{
+				"interceptor1",
+			},
+			Interceptors: []coordination.InterceptorStatus{
+				{Name: "interceptor1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed message"},
+				{Name: "interceptor2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "migrating pod1 message"},
+			},
+			Conditions: []metav1.Condition{},
+		},
+	}
+
+	tests := []struct {
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			options: printers.GenerateOptions{Wide: false},
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Active Interceptor, Interceptor Status, Interceptor Expected Finish, Requesters, Age
+				{Cells: []interface{}{"3d7fdff1-3fe5-48b9-b106-1ee24b0277f6", "pod1", "Pod", "Progressing", "interceptor2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com", "5d"}},
+			},
+		},
+		{
+			options: printers.GenerateOptions{Wide: true},
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Active Interceptor, Interceptor Status, Interceptor Expected Finish, Requesters, Age, Interceptor Status Message, Interceptor Heartbeat
+				{Cells: []interface{}{"3d7fdff1-3fe5-48b9-b106-1ee24b0277f6", "pod1", "Pod", "Progressing", "interceptor2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com", "5d", "3d ago", "migrating pod1 message"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printEvictionRequest(&evictionRequest, test.options)
+		if err != nil {
+			t.Fatalf("Error generating table rows for EvictionRequest: %#v", err)
+		}
+		rows[0].Object.Object = nil
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintEvictionRequestList(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+	evictionRequestList := coordination.EvictionRequestList{
+		Items: []coordination.EvictionRequest{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bc134542-aa19-4361-8fe2-cf18f78848c0",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod1",
+							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor1"},
+					},
+					ActiveInterceptors: []string{},
+					ProcessedInterceptors: []string{
+						"interceptor1",
+					},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "migrated1"},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: "PodDeleted", Message: "Pod was successfully deleted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+					Namespace:         "ns2",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod2",
+							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor1"},
+						{Name: "interceptor2"},
+					},
+					ActiveInterceptors: []string{
+						"interceptor2",
+					},
+					ProcessedInterceptors: []string{
+						"interceptor1",
+					},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed2"},
+						{Name: "interceptor2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running2"},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "707ba618-ffd6-4797-b503-17af1c7f4d98",
+					Namespace:         "ns3",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod3",
+							UID:  "707ba618-ffd6-4797-b503-17af1c7f4d98",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "rescheduler.bar.com",
+						},
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor3"},
+						{Name: "interceptor4"},
+					},
+					ActiveInterceptors: []string{
+						"interceptor3",
+					},
+					ProcessedInterceptors: []string{},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running3"},
+						{Name: "interceptor4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					},
+
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "30741366-8d1f-4385-84ff-0f2e7ba0305f",
+					Namespace:         "ns4",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod4",
+							UID:  "30741366-8d1f-4385-84ff-0f2e7ba0305f",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor3"},
+						{Name: "interceptor4"},
+					},
+					ActiveInterceptors: []string{
+						"interceptor3",
+					},
+					ProcessedInterceptors: []string{},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+						{Name: "interceptor4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "WaitingForInterceptor", Message: "Waiting for an interceptor."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "36685829-9161-449a-b65a-2e63861fd9a8",
+					Namespace:         "ns5",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod5",
+							UID:  "36685829-9161-449a-b65a-2e63861fd9a8",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor3"},
+						{Name: "interceptor4"},
+					},
+					ActiveInterceptors:    []string{},
+					ProcessedInterceptors: []string{},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+						{Name: "interceptor4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "", Message: ""},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "9f4a1620-0e97-4246-b304-5969b2104377",
+					Namespace:         "ns6",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod6",
+							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
+						},
+					},
+					Requesters: []coordination.Requester{
+						{
+							Name: "drain.foo.com",
+						},
+					},
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: 1,
+					TargetInterceptors: []api.EvictionInterceptor{
+						{Name: "interceptor3"},
+						{Name: "interceptor4"},
+					},
+					ActiveInterceptors:    []string{},
+					ProcessedInterceptors: []string{},
+					Interceptors: []coordination.InterceptorStatus{
+						{Name: "interceptor3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+						{Name: "interceptor4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionRequestConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(coordination.EvictionRequestConditionCanceled), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "ValidationFailed", Message: "Pod pod6 was not found."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "e968f679-523b-4e63-9417-0cd9ae13a0b2",
+					Namespace:         "ns7",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionTarget{
+						Pod: &coordination.LocalTargetReference{
+							Name: "pod7",
+							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
+						},
+					},
+					Requesters: []coordination.Requester{},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Target, Target Type, Status, Active Interceptor, Interceptor Status, Interceptor Expected Finish, Requesters, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"bc134542-aa19-4361-8fe2-cf18f78848c0", "pod1", "Pod", "Evicted (PodDeleted)", "interceptor1 (1/1)", "Completed (4d ago)", "-", "drain.foo.com", "5d"}},
+		{Cells: []interface{}{"3d7fdff1-3fe5-48b9-b106-1ee24b0277f6", "pod2", "Pod", "Progressing", "interceptor2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com", "5d"}},
+		{Cells: []interface{}{"707ba618-ffd6-4797-b503-17af1c7f4d98", "pod3", "Pod", "Progressing", "interceptor3 (1/2)", "Started (3d ago)", "<unknown>", "drain.foo.com + 1 more...", "5d"}},
+		{Cells: []interface{}{"30741366-8d1f-4385-84ff-0f2e7ba0305f", "pod4", "Pod", "Progressing", "interceptor3 (1/2)", "Pending", "<unknown>", "drain.foo.com", "5d"}},
+		{Cells: []interface{}{"36685829-9161-449a-b65a-2e63861fd9a8", "pod5", "Pod", "Progressing", "<unset> (0/2)", "Pending", "<unknown>", "drain.foo.com", "5d"}},
+		{Cells: []interface{}{"9f4a1620-0e97-4246-b304-5969b2104377", "pod6", "Pod", "Canceled (ValidationFailed)", "<unset> (0/2)", "Canceled", "<unknown>", "drain.foo.com", "5d"}},
+		{Cells: []interface{}{"e968f679-523b-4e63-9417-0cd9ae13a0b2", "pod7", "Pod", "Pending", "<unset> (0/0)", "Pending", "<unknown>", "<none>", "5d"}},
+	}
+
+	rows, err := printEvictionRequestList(&evictionRequestList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for EvictionRequestList: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}

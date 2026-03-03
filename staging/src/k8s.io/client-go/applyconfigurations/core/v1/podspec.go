@@ -281,6 +281,21 @@ type PodSpecApplyConfiguration struct {
 	// may be recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
 	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
+	// EvictionInterceptors reference interceptors that respond to EvictionRequests.
+	// Interceptors should observe and communicate through the EvictionRequest API to help with
+	// the graceful termination of a pod. The interceptors are selected sequentially, in the order
+	// in which they appear in the list.
+	//
+	// Interceptors should periodically report on an eviction progress by updating the
+	// .status.interceptors[].heartbeatTime field of the EvictionRequest object. If this field is
+	// not updated within 20 minutes, the eviction request is passed over to the next interceptor at
+	// a higher index. If there is no other interceptor, the last default imperative-eviction.k8s.io
+	// interceptor will evict the pod using the imperative Eviction API (/evict endpoint).
+	//
+	// The maximum length of the interceptors list is 15.
+	// Interceptors are not supported when the pod is part of a workload (.spec.workloadRef is set).
+	// This field is immutable.
+	EvictionInterceptors []EvictionInterceptorApplyConfiguration `json:"evictionInterceptors,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -683,5 +698,18 @@ func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecA
 // If called multiple times, the WorkloadRef field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithWorkloadRef(value *WorkloadReferenceApplyConfiguration) *PodSpecApplyConfiguration {
 	b.WorkloadRef = value
+	return b
+}
+
+// WithEvictionInterceptors adds the given value to the EvictionInterceptors field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the EvictionInterceptors field.
+func (b *PodSpecApplyConfiguration) WithEvictionInterceptors(values ...*EvictionInterceptorApplyConfiguration) *PodSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithEvictionInterceptors")
+		}
+		b.EvictionInterceptors = append(b.EvictionInterceptors, *values[i])
+	}
 	return b
 }
