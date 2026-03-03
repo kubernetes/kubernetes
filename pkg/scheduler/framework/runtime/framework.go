@@ -1759,45 +1759,18 @@ func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl fwk.Re
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Unreserve, pl.Name(), fwk.Success.String(), metrics.SinceInSeconds(startTime))
 }
 
-// RunPermitPlugins runs the set of configured permit plugins. If any of these
+// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 // plugins returns a status other than "Success" or "Wait", it does not continue
 // running the remaining plugins and returns an error. Otherwise, if any of the
-// plugins returns "Wait", then this function will create and add waiting pod
-// to a map of currently waiting pods and return status with "Wait" code.
-// Pod will remain waiting pod for the minimum duration returned by the permit plugins.
-func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
-	return f.runPermitPlugins(ctx, state, pod, nodeName, func(pluginsWaitTime map[string]time.Duration, status *fwk.Status) *fwk.Status {
-		waitingPod := newWaitingPod(pod, pluginsWaitTime)
-		f.waitingPods.add(waitingPod)
-		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
-		return fwk.NewStatus(fwk.Wait, msg)
-	})
-}
-
-// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
-// plugins returns a status other than "Success" or "Wait", it does not continue
-// running the remaining plugins and returns an error. If any of the
-// plugins returns "Wait", this function will NOT create a waiting pod object,
-// but just return status with "Wait" code. It's caller's responsibility to act on that code.
-func (f *frameworkImpl) RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
-	return f.runPermitPlugins(ctx, state, pod, nodeName, func(_ map[string]time.Duration, status *fwk.Status) *fwk.Status {
-		// Return the wait status without overwriting the message and creating a waitingPod.
-		return status
-	})
-}
-
-// runPermitPlugin runs the set of configured permit plugins. If any of these
-// plugins returns a status other than "Success" or "Wait", it does not continue
-// running the remaining plugins and returns an error.
-// This is a helper function that takes an onWait callback to act on when the pod has to wait.
-// RunPermitPlugins or RunPermitPluginsWithoutWaiting should be used to run the permit plugins.
-func (f *frameworkImpl) runPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, onWait func(pluginsWaitTime map[string]time.Duration, status *fwk.Status) *fwk.Status) (status *fwk.Status) {
+// plugins returns "Wait", then this function will construct the pluginsWaitTime and return status with "Wait" code.
+// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
+func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	var waitStatus *fwk.Status
-	pluginsWaitTime := make(map[string]time.Duration)
+	pluginsWaitTime = make(map[string]time.Duration)
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -1814,7 +1787,7 @@ func (f *frameworkImpl) runPermitPlugins(ctx context.Context, state fwk.CycleSta
 		if !status.IsSuccess() {
 			if status.IsRejected() {
 				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				return status.WithPlugin(pl.Name())
+				return nil, status.WithPlugin(pl.Name())
 			}
 			if status.IsWait() {
 				// Not allowed to be greater than maxTimeout.
@@ -1826,15 +1799,16 @@ func (f *frameworkImpl) runPermitPlugins(ctx context.Context, state fwk.CycleSta
 			} else {
 				err := status.AsError()
 				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-				return fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
+				return nil, fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
 			}
 		}
 	}
 	if waitStatus.IsWait() {
 		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
-		return onWait(pluginsWaitTime, waitStatus)
+		waitStatus.AppendReason("one or more plugins asked to wait and no plugin rejected pod")
+		return pluginsWaitTime, waitStatus
 	}
-	return nil
+	return nil, nil
 }
 
 func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
@@ -1845,6 +1819,15 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 	status, timeout := pl.Permit(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Permit, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status, timeout
+}
+
+// AddWaitingPod creates a waiting pod instance and adds it to the framework.
+// It takes the pluginsWaitTime map returned by the RunPermitPlugins.
+// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
+// This method should only be called when RunPermitPlugins returns a Wait status and WaitOnPermit is expected to execute soon.
+func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]time.Duration) {
+	waitingPod := newWaitingPod(pod, pluginsWaitTime)
+	f.waitingPods.add(waitingPod)
 }
 
 func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {

@@ -1266,10 +1266,11 @@ func TestPreemptPod(t *testing.T) {
 				fwk.AddPodInPreBind(victimPod.UID, cancel)
 			}
 			if tt.addVictimToWaiting {
-				status := fwk.RunPermitPlugins(ctx, framework.NewCycleState(), victimPod, "fake-node")
+				pluginsWaitTime, status := fwk.RunPermitPlugins(ctx, framework.NewCycleState(), victimPod, "fake-node")
 				if !status.IsWait() {
 					t.Fatalf("Failed to add a pod to waiting list")
 				}
+				fwk.AddWaitingPod(victimPod, pluginsWaitTime)
 			}
 			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, &FakePreemptionScorePostFilterPlugin{}, false)
 

@@ -358,6 +358,10 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
+			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+				t.Fatalf("Unexpected error updating snapshot: %v", err)
+			}
+
 			podInfoIgnored := queuedPodInfoForPod(&v1.Pod{})
 			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfoIgnored)
 			if test.expectsErr {

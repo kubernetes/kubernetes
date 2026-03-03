@@ -21,6 +21,7 @@ package framework
 import (
 	"context"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -233,17 +234,15 @@ type Framework interface {
 	// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
 	// running the remaining plugins and returns an error. Otherwise, if any of the
-	// plugins returns "Wait", then this function will create and add waiting pod
-	// to a map of currently waiting pods and return status with "Wait" code.
-	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
-	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+	// plugins returns "Wait", then this function will construct the pluginsWaitTime and return status with "Wait" code.
+	// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
+	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status)
 
-	// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
-	// plugins returns a status other than "Success" or "Wait", it does not continue
-	// running the remaining plugins and returns an error. If any of the
-	// plugins returns "Wait", this function will NOT create a waiting pod object,
-	// but just return status with "Wait" code. It's caller's responsibility to act on that code.
-	RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
+	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.
+	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
+	// This method should only be called when RunPermitPlugins returns a Wait status and WaitOnPermit is expected to execute soon.
+	AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]time.Duration)
 
 	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
 	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
