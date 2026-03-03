@@ -477,6 +477,16 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:optional"
+            preferredmarkers:
+              markers:
+                - preferredIdentifier: "optional"
+                  equivalentIdentifiers:
+                    - identifier: "k8s:optional"
+                    - identifier: "kubebuilder:validation:Optional"
+                - preferredIdentifier: "required"
+                  equivalentIdentifiers:
+                    - identifier: "k8s:required"
+                    - identifier: "kubebuilder:validation:Required"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
