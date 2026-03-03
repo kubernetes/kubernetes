@@ -132,6 +132,10 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 	return d.Authorizer.Authorize(ctx, a)
 }
 
+func (d *noxuDelayingAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // TestConcurrencyIsolation tests the concurrency isolation between priority levels.
 // The test defines two priority levels for this purpose, and corresponding flow schemas.
 // To one priority level, this test sends many more concurrent requests than the configuration

@@ -33,6 +33,10 @@ func (alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionAllow(""), nil
 }
 
+func (alwaysAllowAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (alwaysAllowAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{
 			&authorizer.DefaultResourceRuleInfo{
@@ -61,6 +65,10 @@ func (alwaysDenyAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 	return authorizer.DecisionNoOpinion("Everything is forbidden."), nil
 }
 
+func (alwaysDenyAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (alwaysDenyAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{}, []authorizer.NonResourceRuleInfo{}, false, nil
 }
@@ -85,6 +93,10 @@ func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authoriz
 		}
 	}
 	return authorizer.DecisionNoOpinion(""), nil
+}
+
+func (r *privilegedGroupAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // NewPrivilegedGroups is for use in loopback scenarios

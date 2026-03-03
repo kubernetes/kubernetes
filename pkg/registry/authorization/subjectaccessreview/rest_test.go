@@ -45,6 +45,10 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 	return f.decision, f.err
 }
 
+func (f *fakeAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestCreate(t *testing.T) {
 	testcases := map[string]struct {
 		spec     authorizationapi.SubjectAccessReviewSpec

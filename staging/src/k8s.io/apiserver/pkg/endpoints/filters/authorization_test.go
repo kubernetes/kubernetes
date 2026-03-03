@@ -234,6 +234,10 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 	return f.decision, f.err
 }
 
+func (f fakeAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestAuditAnnotation(t *testing.T) {
 	testcases := map[string]struct {
 		authorizer         fakeAuthorizer

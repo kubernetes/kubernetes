@@ -100,6 +100,10 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 	return authorizer.DecisionAllow(""), nil
 }
 
+func (fakeAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
 func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	// the pods/status endpoint is ignored by this plugin since old kubelets

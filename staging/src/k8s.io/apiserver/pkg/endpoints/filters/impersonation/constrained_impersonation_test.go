@@ -96,6 +96,10 @@ func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authoriz
 	return authorizer.DecisionNoOpinion("deny by default"), nil
 }
 
+func (c *constrainedImpersonationTest) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (c *constrainedImpersonationTest) echoUserInfoHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		c.echoCalled = true

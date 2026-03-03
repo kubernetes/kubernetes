@@ -807,6 +807,10 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion("I can't allow that.  Go ask alice."), nil
 }
 
+func (impersonateAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonateIsForbidden(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -1490,6 +1494,10 @@ type trackingAuthorizer struct {
 func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, error) {
 	a.requestAttributes = append(a.requestAttributes, attributes)
 	return authorizer.DecisionAllow(""), nil
+}
+
+func (a *trackingAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly

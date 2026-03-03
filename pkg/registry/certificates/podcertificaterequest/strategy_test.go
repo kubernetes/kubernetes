@@ -501,3 +501,7 @@ type FakeAuthorizer struct {
 func (f *FakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	return f.authorized, f.err
 }
+
+func (f *FakeAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}

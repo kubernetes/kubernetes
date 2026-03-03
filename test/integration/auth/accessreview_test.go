@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -45,6 +46,10 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 	}
 
 	return authorizer.DecisionAllow("you're not dave"), nil
+}
+
+func (sarAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
@@ -143,7 +148,7 @@ func TestSubjectAccessReview(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
 			continue
 		}
-		if response.Status != test.expectedStatus {
+		if !reflect.DeepEqual(response.Status, test.expectedStatus) {
 			t.Errorf("%s: expected %v, got %v", test.name, test.expectedStatus, response.Status)
 			continue
 		}
@@ -244,7 +249,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
 			continue
 		}
-		if response.Status != test.expectedStatus {
+		if !reflect.DeepEqual(response.Status, test.expectedStatus) {
 			t.Errorf("%s: expected %v, got %v", test.name, test.expectedStatus, response.Status)
 			continue
 		}
@@ -365,7 +370,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
 			continue
 		}
-		if response.Status != test.expectedStatus {
+		if !reflect.DeepEqual(response.Status, test.expectedStatus) {
 			t.Errorf("%s: expected %#v, got %#v", test.name, test.expectedStatus, response.Status)
 			continue
 		}

@@ -126,6 +126,10 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 	return authorizer.DecisionNoOpinion(reason), nil
 }
 
+func (r *RBACAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo

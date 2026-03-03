@@ -143,6 +143,9 @@ func (d *defaultAttributes) GetFieldSelector() (fields.Requirements, error) {
 func (d *defaultAttributes) GetLabelSelector() (labels.Requirements, error) {
 	panic("not supported for RBAC")
 }
+func (d *defaultAttributes) GetConditionsMode() authorizer.ConditionsMode {
+	return authorizer.ConditionsModeNone
+}
 
 func TestAuthorizer(t *testing.T) {
 	tests := []struct {

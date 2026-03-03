@@ -152,6 +152,10 @@ func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return authorizer.DecisionNoOpinion(""), nil
 }
 
+func (t *TestAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestRESTMapperAdmissionPlugin(t *testing.T) {
 	initializer := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil, &doNothingRESTMapper{})
 	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}

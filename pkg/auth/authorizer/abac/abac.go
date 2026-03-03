@@ -33,7 +33,7 @@ import (
 
 	// Import latest API for init/side-effects
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
-	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	v0 "k8s.io/kubernetes/pkg/apis/abac/v0"
 )
 
 type policyLoadError struct {
@@ -223,6 +223,10 @@ func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 		}
 	}
 	return false
+}
+
+func (pl PolicyList) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // Authorize implements authorizer.Authorize

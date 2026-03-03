@@ -849,6 +849,10 @@ func (dummyAuthorizerImpl) Authorize(ctx context.Context, a authorizer.Attribute
 	return authorizer.DecisionAllow(""), nil
 }
 
+func (dummyAuthorizerImpl) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 type dummyServiceResolverImpl struct{}
 
 func (dummyServiceResolverImpl) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {

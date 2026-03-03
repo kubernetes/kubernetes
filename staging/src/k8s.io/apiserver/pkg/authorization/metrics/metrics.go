@@ -90,3 +90,8 @@ func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes autho
 	}
 	return decision, err
 }
+
+func (a *instrumentedAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	// TODO(luxas): Add instrumentation
+	return a.delegate.EvaluateConditions(ctx, decision, data)
+}

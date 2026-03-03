@@ -1581,6 +1581,10 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 	return f.defaultResult.decision, f.defaultResult.err
 }
 
+func (f fakeAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func endpointCreateAttributes() admission.Attributes {
 	name := "endpoints1"
 	namespace := "default"

@@ -102,6 +102,10 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion("deny by default"), nil
 }
 
+func (impersonateAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonationFilter(t *testing.T) {
 	testCases := []struct {
 		name                    string
