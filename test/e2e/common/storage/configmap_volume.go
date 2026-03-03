@@ -45,7 +45,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume", f.WithNodeConformance(), func(ctx context.Context) {
-		doConfigMapE2EWithoutMappings(ctx, f, false, 0, nil)
+		doConfigMapE2EWithoutMappings(ctx, f, false, 0, nil, nil)
 	})
 
 	/*
@@ -56,14 +56,21 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0400)
-		doConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
+		doConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode, nil)
 	})
 
 	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, &defaultMode)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, &defaultMode, nil)
+	})
+
+	f.It("should be consumable from pods in volume as non-root with defaultUser set [LinuxOnly]", func(ctx context.Context) {
+		// Windows does not support setting file ownership for virtualized container accounts.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+		defaultUser := int64(1000)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil, &defaultUser)
 	})
 
 	/*
@@ -72,13 +79,13 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root", f.WithNodeConformance(), func(ctx context.Context) {
-		doConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 0, nil, nil)
 	})
 
 	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil, nil)
 	})
 
 	/*
@@ -87,7 +94,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings", f.WithNodeConformance(), func(ctx context.Context) {
-		doConfigMapE2EWithMappings(ctx, f, false, 0, nil)
+		doConfigMapE2EWithMappings(ctx, f, false, 0, nil, nil)
 	})
 
 	/*
@@ -98,7 +105,14 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		mode := int32(0400)
-		doConfigMapE2EWithMappings(ctx, f, false, 0, &mode)
+		doConfigMapE2EWithMappings(ctx, f, false, 0, &mode, nil)
+	})
+
+	f.It("should be consumable from pods in volume with mappings and Item user set [LinuxOnly]", func(ctx context.Context) {
+		// Windows does not support setting file ownership for virtualized container accounts.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+		user := int64(1000)
+		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil, &user)
 	})
 
 	/*
@@ -107,13 +121,13 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root", f.WithNodeConformance(), func(ctx context.Context) {
-		doConfigMapE2EWithMappings(ctx, f, true, 0, nil)
+		doConfigMapE2EWithMappings(ctx, f, true, 0, nil, nil)
 	})
 
 	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
+		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil, nil)
 	})
 
 	/*
@@ -586,9 +600,7 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
-	groupID := int64(fsGroup)
-
+func doConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32, defaultUser *int64) {
 	var (
 		name            = "configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -602,8 +614,11 @@ func doConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, 
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
-		"--file_content=/etc/configmap-volume/data-1", "--file_mode=/etc/configmap-volume/data-1")
+	mounttestArgs := []string{"--file_content=/etc/configmap-volume/data-1", "--file_mode=/etc/configmap-volume/data-1"}
+	if defaultUser != nil {
+		mounttestArgs = append(mounttestArgs, "--file_owner=/etc/configmap-volume/data-1")
+	}
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath, mounttestArgs...)
 	one := int64(1)
 	pod.Spec.TerminationGracePeriodSeconds = &one
 
@@ -611,25 +626,24 @@ func doConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, 
 		setPodNonRootUser(pod)
 	}
 
-	if groupID != 0 {
-		pod.Spec.SecurityContext.FSGroup = &groupID
+	if fsGroup != 0 {
+		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	if defaultMode != nil {
-		pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
-	}
-
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultUser = defaultUser
 	fileModeRegexp := getFileModeRegex("/etc/configmap-volume/data-1", defaultMode)
 	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
+	if defaultUser != nil {
+		output = append(output, fmt.Sprintf("owner UID of \"/etc/configmap-volume/data-1\": %d", *defaultUser))
+	}
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
-func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
-	groupID := int64(fsGroup)
-
+func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32, itemUser *int64) {
 	var (
 		name            = "configmap-test-volume-map-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -644,27 +658,27 @@ func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asU
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
-		"--file_content=/etc/configmap-volume/path/to/data-2", "--file_mode=/etc/configmap-volume/path/to/data-2")
+	mounttestArgs := []string{"--file_content=/etc/configmap-volume/path/to/data-2", "--file_mode=/etc/configmap-volume/path/to/data-2"}
+	if itemUser != nil {
+		mounttestArgs = append(mounttestArgs, "--file_owner=/etc/configmap-volume/path/to/data-2")
+	}
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath, mounttestArgs...)
 	one := int64(1)
 	pod.Spec.TerminationGracePeriodSeconds = &one
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items = []v1.KeyToPath{
 		{
 			Key:  "data-2",
 			Path: "path/to/data-2",
+			Mode: itemMode,
+			User: itemUser,
 		},
 	}
 
 	if asUser {
 		setPodNonRootUser(pod)
 	}
-
-	if groupID != 0 {
-		pod.Spec.SecurityContext.FSGroup = &groupID
-	}
-
-	if itemMode != nil {
-		pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
+	if fsGroup != 0 {
+		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
 	// Just check file mode if fsGroup is not set. If fsGroup is set, the
@@ -675,6 +689,9 @@ func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asU
 	if fsGroup == 0 {
 		fileModeRegexp := getFileModeRegex("/etc/configmap-volume/path/to/data-2", itemMode)
 		output = append(output, fileModeRegexp)
+	}
+	if itemUser != nil {
+		output = append(output, fmt.Sprintf("owner UID of \"/etc/configmap-volume/path/to/data-2\": %d", *itemUser))
 	}
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }

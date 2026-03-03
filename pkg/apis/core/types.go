@@ -1178,6 +1178,9 @@ type SecretVolumeSource struct {
 	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
+	// The owner UID of the created files by default.
+	// +optional
+	DefaultUser *int64
 }
 
 // SecretProjection adapts a secret into a projected volume.
@@ -1477,6 +1480,9 @@ type DownwardAPIVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// The owner UID of the created files by default.
+	// +optional
+	DefaultUser *int64
 }
 
 // DownwardAPIVolumeFile represents a single file containing information from the downward API
@@ -1496,6 +1502,9 @@ type DownwardAPIVolumeFile struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32
+	// The owner UID of the created file.
+	// +optional
+	User *int64
 }
 
 // DownwardAPIProjection represents downward API info for projecting into a projected volume.
@@ -1774,6 +1783,9 @@ type ConfigMapVolumeSource struct {
 	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
+	// The owner UID of the created files by default.
+	// +optional
+	DefaultUser *int64
 }
 
 // ConfigMapProjection adapts a ConfigMap into a projected volume.
@@ -1819,6 +1831,9 @@ type ServiceAccountTokenProjection struct {
 	// Path is the path relative to the mount point of the file to project the
 	// token into.
 	Path string
+	// The owner UID of the created file.
+	// +optional
+	User *int64
 }
 
 // ClusterTrustBundleProjection allows a pod to access the
@@ -1842,6 +1857,10 @@ type ClusterTrustBundleProjection struct {
 
 	// Relative path from the volume root to write the bundle.
 	Path string
+
+	// The owner UID of the created file.
+	// +optional
+	User *int64
 }
 
 // PodCertificateProjection provides a private key and X.509 certificate in
@@ -1912,6 +1931,10 @@ type PodCertificateProjection struct {
 	// Signers should document the keys and values they support. Signers should
 	// deny requests that contain keys they do not recognize.
 	UserAnnotations map[string]string
+
+	// The owner UID of the created file.
+	// +optional
+	User *int64
 }
 
 // ProjectedVolumeSource represents a projected volume source
@@ -1925,6 +1948,9 @@ type ProjectedVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// The owner UID of the created files by default.
+	// +optional
+	DefaultUser *int64
 }
 
 // VolumeProjection that may be projected along with other supported volume types
@@ -1961,6 +1987,9 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32
+	// The owner UID of the created file.
+	// +optional
+	User *int64
 }
 
 // LocalVolumeSource represents directly-attached storage with node affinity

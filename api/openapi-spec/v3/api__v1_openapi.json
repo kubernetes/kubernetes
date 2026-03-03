@@ -754,6 +754,11 @@
           "signerName": {
             "description": "Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.",
             "type": "string"
+          },
+          "user": {
+            "description": "user is Optional: The owner UID of the created file. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -1084,6 +1089,11 @@
           "defaultMode": {
             "description": "defaultMode is optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "type": "integer"
+          },
+          "defaultUser": {
+            "description": "defaultUser is Optional: The owner UID of the created files by default. Default is implementation-defined.",
+            "format": "int64",
             "type": "integer"
           },
           "items": {
@@ -1793,6 +1803,11 @@
               }
             ],
             "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+          },
+          "user": {
+            "description": "user is Optional: The owner UID of the created file. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -1806,6 +1821,11 @@
           "defaultMode": {
             "description": "Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "type": "integer"
+          },
+          "defaultUser": {
+            "description": "defaultUser is Optional: The owner UID of the created files by default. Default is implementation-defined.",
+            "format": "int64",
             "type": "integer"
           },
           "items": {
@@ -3174,6 +3194,11 @@
             "default": "",
             "description": "path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
             "type": "string"
+          },
+          "user": {
+            "description": "user is Optional: The owner UID of the created file. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -5339,6 +5364,11 @@
             "description": "Kubelet's generated CSRs will be addressed to this signer.",
             "type": "string"
           },
+          "user": {
+            "description": "user is Optional: The owner UID of the created file. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
+          },
           "userAnnotations": {
             "additionalProperties": {
               "default": "",
@@ -6510,6 +6540,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "defaultUser": {
+            "description": "defaultUser is Optional: The owner UID of the created files by default. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
+          },
           "sources": {
             "description": "sources is the list of volume projections. Each entry in this list handles one source.",
             "items": {
@@ -7565,6 +7600,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "defaultUser": {
+            "description": "defaultUser is Optional: The owner UID of the created files by default. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
+          },
           "items": {
             "description": "items If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
             "items": {
@@ -7839,6 +7879,11 @@
             "default": "",
             "description": "path is the path relative to the mount point of the file to project the token into.",
             "type": "string"
+          },
+          "user": {
+            "description": "user is Optional: The owner UID of the created file. Default is implementation-defined.",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
