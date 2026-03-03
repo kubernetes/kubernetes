@@ -892,8 +892,7 @@ type ExactDeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional
@@ -1535,8 +1534,7 @@ type DeviceRequestAllocationResult struct {
 	// administrative access. See the corresponding request field
 	// for a definition of mode.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional

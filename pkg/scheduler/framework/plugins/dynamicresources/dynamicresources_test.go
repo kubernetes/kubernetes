@@ -41,6 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -1049,8 +1050,8 @@ type testPluginCase struct {
 	// Invoke Filter with a canceled context.
 	cancelFilter bool
 
-	// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
-	enableDRAAdminAccess bool
+	// disableDRAAdminAccess is set to true to test behavior with the DRAAdminAccess feature gate disabled (emulates v1.35).
+	disableDRAAdminAccess bool
 	// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
 	enableDRADeviceBindingConditions bool
 	// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
@@ -1494,7 +1495,6 @@ func testPlugin(tCtx ktesting.TContext) {
 					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
 				},
 			},
-			enableDRAAdminAccess: true,
 		},
 		"request-admin-access-without-DRAAdminAccess-featuregate": {
 			// When the DRAAdminAccess feature gate is disabled,
@@ -1511,7 +1511,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 			},
-			enableDRAAdminAccess: false,
+			disableDRAAdminAccess: true,
 		},
 
 		"structured-ignore-allocated-admin-access": {
@@ -2607,7 +2607,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				nodes = []*v1.Node{workerNode}
 			}
 			feats := feature.Features{
-				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
+				EnableDRAAdminAccess:               !tc.disableDRAAdminAccess,
 				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
 				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
 				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
@@ -2617,6 +2617,10 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
 
+			if tc.disableDRAAdminAccess {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
 			for _, claim := range tc.inFlightClaims {
