@@ -26,6 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -44,8 +47,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -112,6 +113,9 @@ type Controller struct {
 	// so it is okay to not do a deep copy of it when reading it. Only reading
 	// the pointer itself must be protected by a read lock.
 	resources *DriverResources
+
+	// Optional pool name to reconcile.
+	reconcileOnlyPoolName string
 }
 
 // +k8s:deepcopy-gen=true
@@ -249,6 +253,16 @@ type Options struct {
 	// The default is [utilruntime.HandleErrorWithContext] which just logs
 	// the problem.
 	ErrorHandler func(ctx context.Context, err error, msg string)
+
+	// ReconcileOnlyPoolName limits reconciliation to a single pool.
+	//
+	// If set, the controller enqueues only ResourceSlices with a matching
+	// Spec.Pool.Name and does not set Spec.NodeName (even for Node owners).
+	// This enables node-owned slices that remain cluster-visible via
+	// NodeSelector or AllNodes.
+	//
+	// Empty means the default behavior.
+	ReconcileOnlyPoolName string
 }
 
 // DroppedFieldsError is reported through the ErrorHandler in [Options] if
@@ -332,7 +346,7 @@ func (c *Controller) Stop() {
 // The controller is doing a deep copy, so the caller may update
 // the instance once Update returns. Nil is valid and the same
 // as an empty resources struct.
-func (c *Controller) Update(resources *DriverResources) {
+func (c *Controller) Update(resources *DriverResources) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -346,6 +360,14 @@ func (c *Controller) Update(resources *DriverResources) {
 	if resources == nil {
 		c.resources = &DriverResources{}
 	} else {
+		if c.reconcileOnlyPoolName != "" {
+			_, ok := resources.Pools[c.reconcileOnlyPoolName]
+			if (ok && len(resources.Pools) > 1) || !ok && len(resources.Pools) > 0 {
+				return fmt.Errorf("reconcileOnlyPoolName is set to %q, but other pools found (%d total)",
+					c.reconcileOnlyPoolName, len(resources.Pools))
+			}
+		}
+
 		c.resources = resources.DeepCopy()
 		roundTaintTimeAdded(c.resources)
 	}
@@ -354,6 +376,8 @@ func (c *Controller) Update(resources *DriverResources) {
 	for poolName := range c.resources.Pools {
 		c.queue.Add(poolName)
 	}
+
+	return nil
 }
 
 // roundTaintTimeAdded rounds all timestamps to seconds because that is all
@@ -404,16 +428,17 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Controller{
-		cancel:           cancel,
-		resourceClient:   draclient.New(options.KubeClient),
-		coreClient:       options.KubeClient.CoreV1(),
-		driverName:       options.DriverName,
-		owner:            options.Owner.DeepCopy(),
-		queue:            options.Queue,
-		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
-		syncDelay:        ptr.Deref(options.SyncDelay, DefaultSyncDelay),
-		errorHandler:     options.ErrorHandler,
-		lastAddByPool:    make(map[string]time.Time),
+		cancel:                cancel,
+		resourceClient:        draclient.New(options.KubeClient),
+		coreClient:            options.KubeClient.CoreV1(),
+		driverName:            options.DriverName,
+		owner:                 options.Owner.DeepCopy(),
+		queue:                 options.Queue,
+		mutationCacheTTL:      ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
+		syncDelay:             ptr.Deref(options.SyncDelay, DefaultSyncDelay),
+		errorHandler:          options.ErrorHandler,
+		lastAddByPool:         make(map[string]time.Time),
+		reconcileOnlyPoolName: options.ReconcileOnlyPoolName,
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -430,7 +455,9 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 		return nil, err
 	}
 
-	c.Update(options.Resources)
+	if err := c.Update(options.Resources); err != nil {
+		return nil, fmt.Errorf("failed to update resources: %w", err)
+	}
 
 	return c, nil
 }
@@ -444,7 +471,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		resourceapi.ResourceSliceSelectorDriver:   c.driverName,
 		resourceapi.ResourceSliceSelectorNodeName: "",
 	}
-	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
+	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcileOnlyPoolName == "" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
 	tweakListOptions := func(options *metav1.ListOptions) {
@@ -469,12 +496,22 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				} else {
 					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 				}
+
+				if c.reconcileOnlyPoolName != "" {
+					return onlyPoolFilter(slices, c.reconcileOnlyPoolName), nil
+				}
+
 				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptions(&options)
 				w, err := c.resourceClient.ResourceSlices().Watch(ctx, options)
 				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
+
+				if c.reconcileOnlyPoolName != "" {
+					return onlyPoolWatcher(ctx, w, c.reconcileOnlyPoolName), nil
+				}
+
 				return w, err
 			},
 		}, c.resourceClient),
@@ -628,7 +665,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	// the controller runs.
 	var nodeName string
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
-		nodeName = c.owner.Name
+		if c.reconcileOnlyPoolName == "" {
+			nodeName = c.owner.Name
+		}
 		if c.owner.UID == "" {
 			node, err := c.coreClient.Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
 			if err != nil {
@@ -722,7 +761,10 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		Generation:         generation, // May get updated later.
 		ResourceSliceCount: int64(resourceSliceCount),
 	}
-	desiredAllNodes := pool.NodeSelector == nil && nodeName == ""
+	desiredAllNodes := func(perDeviceNodeSelection *bool) bool {
+		// allNodes is true if the pool has no nodeSelector, nodeName or perDeviceNodeSelection.
+		return pool.NodeSelector == nil && nodeName == "" && !ptr.Deref(perDeviceNodeSelection, false)
+	}
 
 	// Now for each desired slice, figure out which of them are changed.
 	changedDesiredSlices := sets.New[int]()
@@ -731,7 +773,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// entries are the same.
 		if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
-			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes ||
+			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection) ||
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
@@ -781,7 +823,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		//
 		// When adding new fields here, then also extend sliceStored.
 		slice.Spec.NodeSelector = pool.NodeSelector
-		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes)
+		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection))
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
@@ -829,7 +871,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				Pool:                   desiredPool,
 				NodeName:               refIfNotZero(nodeName),
 				NodeSelector:           pool.NodeSelector,
-				AllNodes:               refIfNotZero(desiredAllNodes),
+				AllNodes:               refIfNotZero(desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection)),
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
@@ -1062,4 +1104,22 @@ func refIfNotZero[T comparable](t T) *T {
 		return nil
 	}
 	return &t
+}
+
+func onlyPoolFilter(sliceList *resourceapi.ResourceSliceList, poolName string) *resourceapi.ResourceSliceList {
+	var newItems []resourceapi.ResourceSlice
+	for _, slice := range sliceList.Items {
+		if slice.Spec.Pool.Name == poolName {
+			newItems = append(newItems, slice)
+		}
+	}
+	sliceList.Items = newItems
+	return sliceList
+}
+
+func onlyPoolWatcher(ctx context.Context, w watch.Interface, poolName string) watch.Interface {
+	return newWrapWatcher(ctx, w, func(event watch.Event) bool {
+		resourceSlice, ok := event.Object.(*resourceapi.ResourceSlice)
+		return ok && resourceSlice.Spec.Pool.Name == poolName
+	})
 }
