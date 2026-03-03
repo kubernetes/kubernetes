@@ -34,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -49,10 +51,18 @@ type constrainedImpersonationTest struct {
 	constrainedImpersonationHandler *constrainedImpersonationHandler
 	checkedAttrs                    []authorizer.Attributes
 	echoCalled                      bool
+	auditEvents                     []*auditinternal.Event
 
 	attemptMode          string
 	attemptDecision      string
 	authorizationMetrics map[string]int // "mode/decision" -> count
+}
+
+func (c *constrainedImpersonationTest) ProcessEvents(evs ...*auditinternal.Event) bool {
+	for _, e := range evs {
+		c.auditEvents = append(c.auditEvents, e.DeepCopy()) // event is mutated in place so capture its current state
+	}
+	return true
 }
 
 func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -174,9 +184,11 @@ func (c *constrainedImpersonationTest) handler() http.Handler {
 	addImpersonation := WithConstrainedImpersonation(c.echoUserInfoHandler(), c, serializer.NewCodecFactory(s))
 	c.constrainedImpersonationHandler = addImpersonation.(*constrainedImpersonationHandler)
 
-	c.constrainedImpersonationHandler.recordAttempt = func(mode, decision string, _ time.Duration) {
+	recordAttempt := c.constrainedImpersonationHandler.recordAttempt
+	c.constrainedImpersonationHandler.recordAttempt = func(ctx context.Context, mode, decision string, duration time.Duration) {
 		c.attemptMode = mode
 		c.attemptDecision = decision
+		recordAttempt(ctx, mode, decision, duration)
 	}
 	c.constrainedImpersonationHandler.metricsAuthorizer.recordAuthorizationCall = func(mode, decision string, _ time.Duration) {
 		if c.authorizationMetrics == nil {
@@ -185,9 +197,20 @@ func (c *constrainedImpersonationTest) handler() http.Handler {
 		c.authorizationMetrics[mode+"/"+decision]++
 	}
 
-	addAuthentication := c.authenticationHandler(addImpersonation)
-	addRequestInfo := c.requestInfoHandler(addAuthentication)
-	return addRequestInfo
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+
+	// follow the same handler chain order as DefaultBuildHandlerChain
+	addAudit := filters.WithAudit(addImpersonation, c, fakeRuleEvaluator, nil)
+	addAuthentication := c.authenticationHandler(addAudit)
+	addLatencyTrackers := filters.WithLatencyTrackers(addAuthentication)
+	addRequestInfo := c.requestInfoHandler(addLatencyTrackers)
+	// set received timestamp >500ms in the past so audit annotations are emitted
+	addReceivedTimestamp := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req = req.WithContext(request.WithReceivedTimestamp(req.Context(), time.Now().Add(-time.Hour)))
+		addRequestInfo.ServeHTTP(w, req)
+	})
+	addAuditInit := filters.WithAuditInit(addReceivedTimestamp)
+	return addAuditInit
 }
 
 type testRoundTripper struct {
@@ -250,6 +273,25 @@ func comparableAttributes(attributes authorizer.Attributes) authorizer.Attribute
 	}
 }
 
+func comparableAuditUser(u *authenticationv1.UserInfo) *user.DefaultInfo {
+	if u == nil {
+		return nil
+	}
+	var extra map[string][]string
+	if len(u.Extra) > 0 {
+		extra = make(map[string][]string, len(u.Extra))
+		for k, v := range u.Extra {
+			extra[k] = v
+		}
+	}
+	return &user.DefaultInfo{
+		Name:   u.Username,
+		UID:    u.UID,
+		Groups: u.Groups,
+		Extra:  extra,
+	}
+}
+
 func comparableUser(u user.Info) *user.DefaultInfo {
 	return &user.DefaultInfo{
 		Name:   u.GetName(),
@@ -278,6 +320,36 @@ func (c *constrainedImpersonationTest) assertMetrics(r testRequest) {
 	require.Equal(c.t, r.expectedAttemptMode, attemptMode, "unexpected attempt mode")
 	require.Equal(c.t, r.expectedAttemptDecision, attemptDecision, "unexpected attempt decision")
 	require.Equal(c.t, r.expectedAuthorizationMetrics, authorizationMetrics, "unexpected authorization metrics")
+}
+
+func (c *constrainedImpersonationTest) assertAuditEvents(r testRequest) {
+	c.t.Helper()
+
+	events := c.auditEvents
+	c.auditEvents = nil
+
+	require.Len(c.t, events, 2)
+
+	requestReceived := events[0]
+	responseComplete := events[1]
+
+	require.Empty(c.t, requestReceived.Annotations["apiserver.latency.k8s.io/impersonation"])
+	require.Regexp(c.t, "^[0-9.]+[µnm]s$", responseComplete.Annotations["apiserver.latency.k8s.io/impersonation"])
+
+	require.Nil(c.t, requestReceived.ImpersonatedUser)
+	require.Equal(c.t, r.expectedImpersonatedUser, comparableAuditUser(responseComplete.ImpersonatedUser))
+
+	require.Nil(c.t, requestReceived.ResponseStatus)
+	require.Equal(c.t, r.expectedMessage, responseComplete.ResponseStatus.Message)
+
+	require.Nil(c.t, requestReceived.AuthenticationMetadata)
+	var expectedAuthenticationMetadata *auditinternal.AuthenticationMetadata
+	if r.expectedCode == http.StatusOK && r.expectedAttemptMode != "legacy" {
+		expectedAuthenticationMetadata = &auditinternal.AuthenticationMetadata{
+			ImpersonationConstraint: "impersonate:" + r.expectedAttemptMode,
+		}
+	}
+	require.Equal(c.t, expectedAuthenticationMetadata, responseComplete.AuthenticationMetadata)
 }
 
 func (c *constrainedImpersonationTest) assertCache(r testRequest) {
@@ -1222,6 +1294,7 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 				test.assertAttributes(r)
 				test.assertCache(r)
 				test.assertMetrics(r)
+				test.assertAuditEvents(r)
 			}
 		})
 	}
