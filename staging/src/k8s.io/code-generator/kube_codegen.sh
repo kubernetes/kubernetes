@@ -179,6 +179,22 @@ function kube::codegen::gen_helpers() {
           | LC_ALL=C sort -u
     )
 
+
+    # This list needs to cover all of the types used transitively from the
+    # main API types. Validations defined on types in these packages will be
+    # used, but not regenerated, unless they are also listed as a "regular"
+    # input on the command-line.
+    #
+    # This list is the same as in kubernetes/kubernetes hack/update-codegen.sh
+    local validation_readonly_pkgs=(
+        k8s.io/apimachinery/pkg/apis/meta/v1
+        k8s.io/apimachinery/pkg/api/resource
+        k8s.io/apimachinery/pkg/runtime
+        k8s.io/apimachinery/pkg/types
+        k8s.io/apimachinery/pkg/util/intstr
+        time
+    )
+
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating validation code for ${#input_pkgs[@]} targets"
 
@@ -191,6 +207,7 @@ function kube::codegen::gen_helpers() {
         "${GOBIN}/validation-gen" \
             -v "${v}" \
             --output-file zz_generated.validations.go \
+            "$(printf -- " --readonly-pkg %s" "${validation_readonly_pkgs[@]}")" \
             --go-header-file "${boilerplate}" \
             "${input_pkgs[@]}"
     fi
