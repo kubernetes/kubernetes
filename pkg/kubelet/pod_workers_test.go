@@ -50,7 +50,7 @@ import (
 type fakePodWorkers struct {
 	lock      sync.Mutex
 	syncPodFn syncPodFnType
-	cache     kubecontainer.Cache
+	cache     kubecontainer.ROCache
 	t         TestingInterface
 
 	triggeredDeletion []types.UID

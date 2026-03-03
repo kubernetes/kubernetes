@@ -311,7 +311,8 @@ func newTestKubeletWithImageList(
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
-	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
+	podCache := containertest.NewFakeCache(kubelet.containerRuntime)
+	kubelet.podCache = podCache
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: kubelet.SyncPod,
 		cache:     kubelet.podCache,
@@ -381,7 +382,7 @@ func newTestKubeletWithImageList(
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(logger, fakeRuntime, make(chan *pleg.PodLifecycleEvent, 100), &pleg.RelistDuration{RelistPeriod: time.Hour, RelistThreshold: genericPlegRelistThreshold}, kubelet.podCache, clock.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(logger, fakeRuntime, make(chan *pleg.PodLifecycleEvent, 100), &pleg.RelistDuration{RelistPeriod: time.Hour, RelistThreshold: genericPlegRelistThreshold}, podCache, clock.RealClock{})
 	kubelet.clock = fakeClock
 
 	nodeRef := &v1.ObjectReference{

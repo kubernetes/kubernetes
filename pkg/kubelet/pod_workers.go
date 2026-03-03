@@ -602,7 +602,7 @@ type podWorkers struct {
 	resyncInterval time.Duration
 
 	// podCache stores kubecontainer.PodStatus for all pods.
-	podCache kubecontainer.Cache
+	podCache kubecontainer.ROCache
 
 	// allocationManager is used to allocate resources for pods
 	allocationManager allocation.Manager
@@ -616,7 +616,7 @@ func newPodWorkers(
 	recorder record.EventRecorder,
 	workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration,
-	podCache kubecontainer.Cache,
+	podCache kubecontainer.ROCache,
 	allocationManager allocation.Manager,
 ) PodWorkers {
 	return &podWorkers{

@@ -32,21 +32,26 @@ import (
 // has no states known by the runtime, Cache returns an empty PodStatus object
 // with ID populated.
 //
-// Cache provides two methods to retrieve the PodStatus: the non-blocking Get()
-// and the blocking GetNewerThan() method. The component responsible for
-// populating the cache is expected to call Delete() to explicitly free the
-// cache entries.
+// The component responsible for populating the cache is expected to call
+// Delete() to explicitly free the cache entries.
 type Cache interface {
-	Get(types.UID) (*PodStatus, error)
+	ROCache
 	// Set updates the cache by setting the PodStatus for the pod only
 	// if the data is newer than the cache based on the provided
 	// time stamp. Returns if the cache was updated.
 	Set(types.UID, *PodStatus, error, time.Time) (updated bool)
+	Delete(types.UID)
+	UpdateTime(time.Time)
+}
+
+// ROCache is a read-only interface to the pod status cache. It provides two
+// methods to retrieve the PodStatus: the non-blocking Get() and the blocking
+// GetNewerThan() method.
+type ROCache interface {
+	Get(types.UID) (*PodStatus, error)
 	// GetNewerThan is a blocking call that only returns the status
 	// when it is newer than the given time.
 	GetNewerThan(types.UID, time.Time) (*PodStatus, error)
-	Delete(types.UID)
-	UpdateTime(time.Time)
 }
 
 type data struct {
