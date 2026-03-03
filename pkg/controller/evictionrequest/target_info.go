@@ -22,39 +22,22 @@ import (
 
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // targetInfo abstracts over the eviction target so that callers can ask
 // semantic questions ("is the target valid?", "is it gone?") rather than
-// reaching into pod-specific fields. It wraps both the spec-level target
-// reference and the looked-up runtime object.
-//
-// When Workload targets are added to EvictionTarget, each method gains a
-// second branch instead of every caller changing.
+// reaching into pod-specific fields.
 type targetInfo struct {
 	spec coordinationv1alpha1.EvictionTarget
 	pod  *v1.Pod
-	err  error
 }
 
-// newTargetInfo looks up the target for the given EvictionRequest and returns
-// a targetInfo that wraps the result. The caller must check the returned error
-// for transient lookup failures; not-found errors are captured inside
-// targetInfo and surfaced via isGone() / isValidTarget().
-func newTargetInfo(evictionRequest *coordinationv1alpha1.EvictionRequest, podLister corelisters.PodLister) (targetInfo, error) {
-	t := targetInfo{spec: evictionRequest.Spec.Target}
-	if t.spec.Pod != nil {
-		pod, err := podLister.Pods(evictionRequest.Namespace).Get(t.spec.Pod.Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return targetInfo{}, err
-		}
-		t.pod = pod
-		t.err = err
-	}
-	return t, nil
+// newTargetInfo creates a targetInfo from the resolved target.
+// The caller is responsible for looking up the target object beforehand;
+// a nil pod with a non-nil spec.Pod means the pod was not found.
+func newTargetInfo(spec coordinationv1alpha1.EvictionTarget, pod *v1.Pod) targetInfo {
+	return targetInfo{spec: spec, pod: pod}
 }
 
 // isGone reports whether the original target no longer exists. This is true
@@ -64,7 +47,7 @@ func (t targetInfo) isGone() bool {
 	switch {
 	case t.spec.Pod != nil:
 		if t.pod == nil {
-			return errors.IsNotFound(t.err)
+			return true
 		}
 		return string(t.pod.UID) != t.spec.Pod.UID
 	}
@@ -77,13 +60,13 @@ func (t targetInfo) isGone() bool {
 func (t targetInfo) isValidTarget() (bool, string) {
 	switch {
 	case t.spec.Pod != nil:
-		if t.pod == nil && errors.IsNotFound(t.err) {
+		if t.pod == nil {
 			return false, "Target pod not found"
 		}
-		if t.pod != nil && string(t.pod.UID) != t.spec.Pod.UID {
+		if string(t.pod.UID) != t.spec.Pod.UID {
 			return false, fmt.Sprintf("Pod UID mismatch: expected %s, got %s", t.spec.Pod.UID, string(t.pod.UID))
 		}
-		if t.pod != nil && t.pod.Spec.WorkloadRef != nil {
+		if t.pod.Spec.WorkloadRef != nil {
 			return false, fmt.Sprintf("Target pod %s is part of a Workload. Eviction of such pods is currently not supported.", t.pod.Name)
 		}
 	}

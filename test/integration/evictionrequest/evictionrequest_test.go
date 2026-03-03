@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	coordinationapply "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func setup(ctx context.Context, t *testing.T, extraServerFlags ...string) (
@@ -233,8 +234,8 @@ func TestValidation_PodNotFound(t *testing.T) {
 	// Wait for Canceled condition
 	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, nonexistentUID, "Canceled", metav1.ConditionTrue)
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != evictionrequest.ValidationFailedReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.ValidationFailedReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
 	}
 }
 
@@ -284,8 +285,8 @@ func TestValidation_UIDMismatch(t *testing.T) {
 	// Wait for Canceled condition
 	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, wrongUID, "Canceled", metav1.ConditionTrue)
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != evictionrequest.ValidationFailedReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.ValidationFailedReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
 	}
 }
 
@@ -319,7 +320,7 @@ func TestInitializeTargetInterceptors(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	expectedNames := []string{"first.example.com", "second.example.com", evictionrequest.ImperativeEvictionInterceptor}
+	expectedNames := []string{"first.example.com", "second.example.com", string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)}
 
 	// Wait for target interceptors and interceptor statuses to be initialized
 	updated := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
@@ -381,11 +382,11 @@ func TestSelectFirstInterceptor(t *testing.T) {
 	if len(updated.Status.TargetInterceptors) != 1 {
 		t.Fatalf("expected 1 target interceptor, got %d", len(updated.Status.TargetInterceptors))
 	}
-	if updated.Status.TargetInterceptors[0].Name != evictionrequest.ImperativeEvictionInterceptor {
+	if updated.Status.TargetInterceptors[0].Name != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
 		t.Errorf("expected only imperative target interceptor, got %s", updated.Status.TargetInterceptors[0].Name)
 	}
 
-	if updated.Status.ActiveInterceptors[0] != evictionrequest.ImperativeEvictionInterceptor {
+	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
 		t.Errorf("expected active interceptor to be imperative, got %s", updated.Status.ActiveInterceptors[0])
 	}
 
@@ -447,8 +448,8 @@ func TestPodDeleted_Evicted(t *testing.T) {
 		"Evicted", metav1.ConditionTrue)
 
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Evicted")
-	if cond.Reason != evictionrequest.TargetDeletedReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.TargetDeletedReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted), cond.Reason)
 	}
 
 	// Should NOT have Canceled condition
@@ -653,8 +654,8 @@ func TestValidation_WorkloadRef(t *testing.T) {
 		"Canceled", metav1.ConditionTrue)
 
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != evictionrequest.ValidationFailedReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.ValidationFailedReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
 	}
 }
 
@@ -721,8 +722,8 @@ func TestTerminalStateIdempotent(t *testing.T) {
 	if cond == nil || cond.Status != metav1.ConditionTrue {
 		t.Error("expected Canceled condition to remain True after re-sync")
 	}
-	if cond.Reason != evictionrequest.ValidationFailedReason {
-		t.Errorf("expected reason to remain %s, got %s", evictionrequest.ValidationFailedReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
+		t.Errorf("expected reason to remain %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
 	}
 
 	// ObservedGeneration should not have been bumped by re-processing
@@ -771,8 +772,8 @@ func TestPodTerminal_Evicted(t *testing.T) {
 		"Evicted", metav1.ConditionTrue)
 
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Evicted")
-	if cond.Reason != evictionrequest.TargetTerminalReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.TargetTerminalReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal), cond.Reason)
 	}
 
 	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Canceled") {
@@ -815,30 +816,46 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 		"waiting for first interceptor to become active",
 	)
 
-	// Simulate interceptor completion
+	// Simulate interceptor completion via SSA with the interceptor's own field manager.
+	// The interceptor must include startTime (set by the controller) to prevent SSA
+	// from removing it, since the immutability validation would reject that.
 	now := metav1.Now()
-	updated, err := cs.CoordinationV1alpha1().EvictionRequests(ns.Name).Get(tCtx, string(pod.UID), metav1.GetOptions{})
+	current, err := cs.CoordinationV1alpha1().EvictionRequests(ns.Name).Get(tCtx, string(pod.UID), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get EvictionRequest: %v", err)
 	}
-	for i := range updated.Status.Interceptors {
-		if updated.Status.Interceptors[i].Name == "first.example.com" {
-			updated.Status.Interceptors[i].HeartbeatTime = &now
-			updated.Status.Interceptors[i].CompletionTime = &now
-			updated.Status.Interceptors[i].Message = "eviction completed successfully"
+	var startTime metav1.Time
+	for _, is := range current.Status.Interceptors {
+		if is.Name == "first.example.com" && is.StartTime != nil {
+			startTime = *is.StartTime
 			break
 		}
 	}
-	_, err = cs.CoordinationV1alpha1().EvictionRequests(ns.Name).UpdateStatus(tCtx, updated, metav1.UpdateOptions{})
+	interceptorApply := coordinationapply.EvictionRequest(string(pod.UID), ns.Name).
+		WithStatus(coordinationapply.EvictionRequestStatus().
+			WithInterceptors(
+				coordinationapply.InterceptorStatus().
+					WithName("first.example.com").
+					WithStartTime(startTime).
+					WithHeartbeatTime(now).
+					WithCompletionTime(now).
+					WithMessage("eviction completed successfully"),
+			),
+		)
+	_, err = cs.CoordinationV1alpha1().EvictionRequests(ns.Name).
+		ApplyStatus(tCtx, interceptorApply, metav1.ApplyOptions{
+			FieldManager: "first.example.com",
+			Force:        true,
+		})
 	if err != nil {
-		t.Fatalf("Failed to update EvictionRequest status: %v", err)
+		t.Fatalf("Failed to apply interceptor status: %v", err)
 	}
 
 	// Wait for controller to advance to imperative interceptor
 	final := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
 			return len(er.Status.ActiveInterceptors) == 1 &&
-				er.Status.ActiveInterceptors[0] == evictionrequest.ImperativeEvictionInterceptor
+				er.Status.ActiveInterceptors[0] == string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)
 		},
 		"waiting for advancement to imperative interceptor",
 	)
@@ -934,7 +951,7 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 	}
 
 	completeActiveInterceptor("first.example.com")
-	completeActiveInterceptor(evictionrequest.ImperativeEvictionInterceptor)
+	completeActiveInterceptor(string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
 
 	// Wait for all interceptors to be processed
 	final := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
@@ -946,8 +963,8 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 	)
 
 	expectedProcessed := map[string]bool{
-		"first.example.com":                          false,
-		evictionrequest.ImperativeEvictionInterceptor: false,
+		"first.example.com": false,
+		string(coordinationv1alpha1.EvictionInterceptorImperativeEviction): false,
 	}
 	for _, name := range final.Status.ProcessedInterceptors {
 		expectedProcessed[name] = true
@@ -1005,8 +1022,8 @@ func TestRequestersRemovedDuringProcessing(t *testing.T) {
 		"Canceled", metav1.ConditionTrue)
 
 	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != evictionrequest.NoRequestersReason {
-		t.Errorf("expected reason %s, got %s", evictionrequest.NoRequestersReason, cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters), cond.Reason)
 	}
 
 	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Evicted") {

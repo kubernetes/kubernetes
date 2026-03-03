@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/evictionrequest/metrics"
 	"k8s.io/utils/clock"
 )
 
@@ -59,19 +59,6 @@ const (
 	// a pod is deleted or terminal while an active interceptor hasn't reported completion.
 	// This gives the interceptor time to report its final status.
 	GracefulCompletionDelay = 5 * time.Second
-
-	// ValidationFailedReason is set when the EvictionRequest is not valid.
-	ValidationFailedReason = "ValidationFailed"
-	// TargetDeletedReason is set when the target has been deleted.
-	TargetDeletedReason = "TargetDeleted"
-	// TargetTerminalReason is set when the target has reached a terminal state.
-	TargetTerminalReason = "TargetTerminal"
-	// NoRequestersReason is set when the EvictionRequest has no requesters.
-	NoRequestersReason = "NoRequesters"
-
-	// ImperativeEvictionInterceptor is the name of the default interceptor that
-	// evicts the pod using the imperative Eviction API (/evict endpoint).
-	ImperativeEvictionInterceptor = "imperative-eviction.k8s.io"
 )
 
 // EvictionRequestController is the eviction request controller implementation.
@@ -88,7 +75,8 @@ const (
 // 3. Label synchronization - sync pod labels to EvictionRequest
 // 4. Observation of target lifecycle (Pod) and status reporting
 type EvictionRequestController struct {
-	kubeClient clientset.Interface
+	controllerName string
+	kubeClient     clientset.Interface
 
 	evictionRequestLister       coordinationlisters.EvictionRequestLister
 	evictionRequestListerSynced cache.InformerSynced
@@ -129,7 +117,10 @@ func NewController(
 ) (*EvictionRequestController, error) {
 	logger := klog.FromContext(ctx)
 
+	metrics.Register()
+
 	c := &EvictionRequestController{
+		controllerName:              controllerName,
 		kubeClient:                  kubeClient,
 		evictionRequestLister:       evictionRequestInformer.Lister(),
 		evictionRequestListerSynced: evictionRequestInformer.Informer().HasSynced,
@@ -168,15 +159,10 @@ func NewController(
 	}
 
 	// Watch Pod changes to trigger reconciliation for associated EvictionRequests.
-	// - Creates trigger label sync (e.g. on controller restart)
 	// - Label changes trigger label sync
 	// - Terminal phase transitions trigger main reconciliation to detect eviction completion
 	// - Deletions trigger main reconciliation to detect eviction completion
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			pod := obj.(*v1.Pod)
-			c.enqueueLabelSync(logger, pod)
-		},
 		UpdateFunc: func(old, new any) {
 			oldPod := old.(*v1.Pod)
 			newPod := new.(*v1.Pod)
@@ -184,8 +170,7 @@ func NewController(
 				c.enqueueLabelSync(logger, newPod)
 			}
 			if !podutil.IsPodTerminal(oldPod) && podutil.IsPodTerminal(newPod) {
-				evictionRequestKey := newPod.Namespace + "/" + string(newPod.UID)
-				c.queue.Add(evictionRequestKey)
+				c.queue.Add(evictionRequestKeyForPod(newPod))
 			}
 		},
 		DeleteFunc: func(obj any) {
@@ -203,11 +188,11 @@ func (c *EvictionRequestController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting eviction request controller")
+	logger.Info("Starting controller", "controller", c.controllerName)
 
 	var wg sync.WaitGroup
 	defer func() {
-		logger.Info("Shutting down eviction request controller")
+		logger.Info("Shutting down controller", "controller", c.controllerName)
 		c.queue.ShutDown()
 		c.labelSyncQueue.ShutDown()
 		wg.Wait()
@@ -255,7 +240,7 @@ func (c *EvictionRequestController) deletePod(logger klog.Logger, obj any) {
 			return
 		}
 	}
-	evictionRequestKey := pod.Namespace + "/" + string(pod.UID)
+	evictionRequestKey := evictionRequestKeyForPod(pod)
 	c.queue.Add(evictionRequestKey)
 }
 
@@ -353,10 +338,25 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 		return nil
 	}
 
-	target, err := newTargetInfo(evictionRequest, c.podLister)
-	if err != nil {
-		return err
+	// Resolve target pod
+	var targetPod *v1.Pod
+	if evictionRequest.Spec.Target.Pod != nil {
+		pod, err := c.podLister.Pods(namespace).Get(evictionRequest.Spec.Target.Pod.Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		targetPod = pod
+	} else {
+		// Non-pod targets are not supported yet, so cancel the eviction request
+		statusApply := coordinationapply.EvictionRequestStatus().
+			WithObservedGeneration(evictionRequest.Generation).
+			WithConditions(newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
+				metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed),
+				"Unsupported target type"))
+		return c.applyStatus(ctx, evictionRequest, statusApply)
 	}
+
+	target := newTargetInfo(evictionRequest.Spec.Target, targetPod)
 	logger.V(4).Info("Syncing EvictionRequest", "evictionRequest", klog.KObj(evictionRequest), "target", target.name())
 
 	statusApply, resyncAfter := c.computeStatus(ctx, evictionRequest, target)
@@ -388,6 +388,10 @@ func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) 
 		return err
 	}
 
+	if len(pod.Labels) == 0 {
+		return nil
+	}
+
 	// EvictionRequest name must match pod UID
 	evictionRequest, err := c.evictionRequestLister.EvictionRequests(namespace).Get(string(pod.UID))
 	if errors.IsNotFound(err) {
@@ -402,7 +406,7 @@ func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) 
 	// Pod labels take precedence over EvictionRequest labels
 	desired := maps.Clone(evictionRequest.Labels)
 	if desired == nil {
-		desired = make(map[string]string)
+		desired = make(map[string]string, len(pod.Labels))
 	}
 	maps.Copy(desired, pod.Labels)
 
@@ -414,7 +418,7 @@ func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) 
 
 	_, err = c.kubeClient.CoordinationV1alpha1().
 		EvictionRequests(namespace).
-		Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: names.EvictionRequestController, Force: true})
+		Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: c.controllerName, Force: true})
 	if err != nil {
 		logger.Error(err, "Failed to patch EvictionRequest labels", "evictionRequest", klog.KObj(evictionRequest), "pod", klog.KObj(pod))
 		return err
@@ -443,8 +447,22 @@ func (c *EvictionRequestController) computeStatus(
 	}
 
 	targetInterceptors := computeTargetInterceptors(evictionRequest, target)
-	completionCondition, completionResync := computeCompletion(evictionRequest, target, c.clock)
+
+	completionResync := shouldDeferCompletion(evictionRequest, target, c.clock)
+	var completionCondition *metav1ac.ConditionApplyConfiguration
+	if completionResync == 0 {
+		completionCondition = computeCompletionCondition(evictionRequest, target)
+	}
+
 	active, processed, progressionResync := computeInterceptorProgression(evictionRequest, targetInterceptors, completionCondition != nil, c.clock)
+
+	// Report metrics per KEP-4563
+	if len(active) > 0 {
+		metrics.ActiveInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, active[0]).Set(1)
+	}
+	metrics.ProcessedInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(processed)))
+	metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(evictionRequest.Spec.Requesters)))
+	metrics.PodInterceptors.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(targetInterceptors)))
 
 	resyncAfter := progressionResync
 	if completionResync > 0 {
@@ -467,14 +485,20 @@ func (c *EvictionRequestController) computeStatus(
 			"evictionRequest", klog.KObj(evictionRequest), "resyncAfter", completionResync)
 	}
 
-	// Initialize interceptor statuses for the target interceptors and ensure the active interceptor has a StartTime.
+	// Include interceptor entries for all target interceptors so SSA doesn't
+	// remove them. Only set Name and StartTime — other fields (HeartbeatTime,
+	// CompletionTime, Message) are owned by the interceptors via their own
+	// field manager.
 	for _, ti := range targetInterceptors {
+		isApply := coordinationapply.InterceptorStatus().WithName(ti)
+
 		existing := findInterceptorStatus(evictionRequest.Status.Interceptors, ti)
-		isApply := toInterceptorStatusApply(existing, ti)
-		activeAndNoStartTime := len(active) > 0 && ti == active[0] && isApply.StartTime == nil
-		if activeAndNoStartTime {
+		if existing != nil && existing.StartTime != nil {
+			isApply.WithStartTime(*existing.StartTime)
+		} else if len(active) > 0 && ti == active[0] {
 			isApply.WithStartTime(metav1.NewTime(c.clock.Now()))
 		}
+
 		statusApply.WithInterceptors(isApply)
 	}
 
@@ -493,7 +517,7 @@ func (c *EvictionRequestController) applyStatus(
 	_, err := c.kubeClient.CoordinationV1alpha1().
 		EvictionRequests(evictionRequest.Namespace).
 		ApplyStatus(ctx, applyConfig, metav1.ApplyOptions{
-			FieldManager: names.EvictionRequestController,
+			FieldManager: c.controllerName,
 			Force:        true,
 		})
 	return err
@@ -512,25 +536,10 @@ func computePreconditionFailure(
 
 	if valid, message := target.isValidTarget(); !valid {
 		return newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
-			metav1.ConditionTrue, ValidationFailedReason, message)
+			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), message)
 	}
 
 	return nil
-}
-
-// computeCompletion determines whether the eviction has completed, and takes into account deferral logic.
-// It returns the completion condition and a resync duration.
-// When completion is deferred, the condition is nil and resyncAfter is positive.
-func computeCompletion(
-	evictionRequest *coordinationv1alpha1.EvictionRequest,
-	target targetInfo,
-	clock clock.PassiveClock,
-) (*metav1ac.ConditionApplyConfiguration, time.Duration) {
-	if shouldDefer, resyncAfter := shouldDeferCompletion(evictionRequest, target, clock); shouldDefer {
-		return nil, resyncAfter
-	}
-	condition := computeCompletionCondition(evictionRequest, target)
-	return condition, 0
 }
 
 // computeCompletionCondition checks for eviction completion after processing has started.
@@ -538,49 +547,49 @@ func computeCompletion(
 func computeCompletionCondition(evictionRequest *coordinationv1alpha1.EvictionRequest, target targetInfo) *metav1ac.ConditionApplyConfiguration {
 	if target.isGone() {
 		return newCondition(coordinationv1alpha1.EvictionRequestConditionEvicted,
-			metav1.ConditionTrue, TargetDeletedReason, "Target pod has been deleted")
+			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted), "Target pod has been deleted")
 	}
 
 	if target.isTerminal() {
 		return newCondition(coordinationv1alpha1.EvictionRequestConditionEvicted,
-			metav1.ConditionTrue, TargetTerminalReason, "Pod has reached terminal state")
+			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal), "Pod has reached terminal state")
 	}
 
 	if len(evictionRequest.Spec.Requesters) == 0 {
 		return newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
-			metav1.ConditionTrue, NoRequestersReason, "Requesters list is empty")
+			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters), "Requesters list is empty")
 	}
 
 	return nil
 }
 
-// shouldDeferCompletion returns whether to defer setting the completion condition
-// and how long to wait, giving the active interceptor time to report its final
-// status before the eviction is finalized.
+// shouldDeferCompletion returns how long to wait before setting the completion
+// condition, giving the active interceptor time to report its final status
+// before the eviction is finalized. Returns 0 when no deferral is needed.
 func shouldDeferCompletion(
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
 	target targetInfo,
 	clock clock.PassiveClock,
-) (bool, time.Duration) {
+) time.Duration {
 	if len(evictionRequest.Status.ActiveInterceptors) == 0 {
-		return false, 0
+		return 0
 	}
 
 	activeInterceptor := evictionRequest.Status.ActiveInterceptors[0]
 	interceptorStatus := findInterceptorStatus(evictionRequest.Status.Interceptors, activeInterceptor)
 	if interceptorStatus != nil && interceptorStatus.CompletionTime != nil {
-		return false, 0
+		return 0
 	}
 
 	deletionTimestamp := target.deletionTimestamp()
 	if deletionTimestamp.IsZero() {
-		return false, 0
+		return 0
 	}
 
 	if remaining := GracefulCompletionDelay - clock.Since(deletionTimestamp); remaining > 0 {
-		return true, remaining
+		return remaining
 	}
-	return false, 0
+	return 0
 }
 
 // computeTargetInterceptors computes the target interceptors list.
@@ -610,13 +619,12 @@ func computeTargetInterceptors(
 		targets = append(targets, ei.Name)
 	}
 	// Default imperative-eviction interceptor triggers actual pod eviction
-	targets = append(targets, ImperativeEvictionInterceptor)
+	targets = append(targets, string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
 	return targets
 }
 
 // computeInterceptorProgression computes the active and processed interceptors.
 // When isComplete is true, moves any active interceptor to processed and clears active.
-// Returns (activeInterceptors, processedInterceptors, resyncAfter).
 func computeInterceptorProgression(evictionRequest *coordinationv1alpha1.EvictionRequest, targetInterceptors []string, isComplete bool, clock clock.PassiveClock) (active []string, processed []string, resyncAfter time.Duration) {
 	processed = slices.Clone(evictionRequest.Status.ProcessedInterceptors)
 
@@ -687,9 +695,9 @@ func shouldAdvanceInterceptor(status *coordinationv1alpha1.InterceptorStatus, cl
 		return true, 0
 	}
 
-	t := status.HeartbeatTime
-	if t == nil {
-		t = status.StartTime
+	t := status.StartTime
+	if status.HeartbeatTime != nil {
+		t = status.HeartbeatTime
 	}
 
 	if t != nil {
@@ -704,4 +712,10 @@ func shouldAdvanceInterceptor(status *coordinationv1alpha1.InterceptorStatus, cl
 
 	// Should not be reached, as an active interceptor is initialized with a StartTime
 	return false, 0
+}
+
+// evictionRequestKeyForPod returns the work queue key for an EvictionRequest
+// that targets the given pod. EvictionRequests are named after their target pod's UID.
+func evictionRequestKeyForPod(pod *v1.Pod) string {
+	return pod.Namespace + "/" + string(pod.UID)
 }
