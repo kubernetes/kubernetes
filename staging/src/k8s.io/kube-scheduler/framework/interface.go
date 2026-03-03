@@ -285,6 +285,16 @@ type PluginScore struct {
 	Score int64
 }
 
+// PlacementPluginScores stores scores for a given placement.
+type PlacementPluginScores struct {
+	// Placement is the placement info that can be used to identify a specific placement.
+	Placement *Placement
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+}
+
 const (
 	// MaxNodeScore is the maximum score a Score plugin is expected to return.
 	MaxNodeScore int64 = 100
@@ -715,6 +725,37 @@ type SignPlugin interface {
 	//     proceeds with scheduling this pod without opportunistic batching optimization like Unschedulable,
 	//     but just report errors to logs.
 	SignPod(ctx context.Context, pod *v1.Pod) ([]SignFragment, *Status)
+}
+
+// PlacementScore stores result of a placement score plugin to be later used for normalization.
+type PlacementScore struct {
+	// Placement is the placement for which the score was computed
+	Placement *Placement
+	// Score is the score for a given placement, which is used to rank the placements and pick the best one.
+	Score int64
+}
+
+// PlacementScoreExtensions is an interface for PlacementScore extended functionality.
+type PlacementScoreExtensions interface {
+	// NormalizePlacementScore is called for all placement scores produced by the same plugin's "ScorePlacement"
+	// method. A successful run of NormalizePlacementScore will update the scores list and return
+	// a success status.
+	NormalizePlacementScore(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placementScores []PlacementScore) *Status
+}
+
+// PlacementScorePlugin is an interface for plugins that score feasible Placements.
+type PlacementScorePlugin interface {
+	Plugin
+
+	// ScorePlacement calculates a score for a given Placement.
+	// This function is called only for Placements that have been deemed feasible for the sufficient number of pods in the PodGroup scheduling cycle.
+	// The PodGroupAssignments indicates the node assigned to each pod within this Placement.
+	// The returned score is a int64 with higher scores generally indicating more preferable Placements.
+	// Plugins can implement various scoring strategies, such as bin packing to minimize resource fragmentation.
+	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
+
+	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
+	PlacementScoreExtensions() PlacementScoreExtensions
 }
 
 // Handle provides data and some tools that plugins can use. It is

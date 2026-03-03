@@ -176,6 +176,9 @@ type Plugins struct {
 
 	// MultiPoint is a simplified config field for enabling plugins for all valid extension points
 	MultiPoint PluginSet
+
+	// PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.
+	PlacementScore PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -189,11 +192,11 @@ type PluginSet struct {
 	Disabled []Plugin
 }
 
-// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.
+// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score and PlacementScore plugins.
 type Plugin struct {
 	// Name defines the name of plugin
 	Name string
-	// Weight defines the weight of plugin, only used for Score plugins.
+	// Weight defines the weight of plugin, only used for Score and PlacementScore plugins.
 	Weight int32
 }
 
@@ -244,6 +247,7 @@ func (p *Plugins) Names() []string {
 		p.PostBind,
 		p.Permit,
 		p.QueueSort,
+		p.PlacementScore,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {
