@@ -67,11 +67,11 @@ func Validate_EvictionRequest(ctx context.Context, op operation.Operation, fldPa
 			// call field-attached validations
 			func() { // cohort generateName
 				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.ForbiddenValue); len(e) != 0 {
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.ForbiddenValue).MarkAlpha(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
@@ -124,7 +124,7 @@ func Validate_EvictionRequestSpec(ctx context.Context, op operation.Operation, f
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

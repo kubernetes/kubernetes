@@ -4271,7 +4271,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: startTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    elementRelationship: atomic
+    elementRelationship: separable
 - name: io.k8s.api.coordination.v1alpha1.LocalTargetReference
   map:
     fields:

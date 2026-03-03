@@ -54,7 +54,7 @@ message EvictionRequest {
   // eviction request's target. The labels of the target have a preference.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  // +k8s:subfield(generateName)=+k8s:forbidden
+  // +k8s:alpha(since:"1.36")=+k8s:subfield(generateName)=+k8s:forbidden
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the eviction request specification.
@@ -86,7 +86,7 @@ message EvictionRequestSpec {
   // Target UID must be the same as the EvictionRequest's .metadata.name.
   // This field is immutable.
   // +required
-  // +k8s:immutable
+  // +k8s:alpha(since:"1.36")=+k8s:immutable
   optional EvictionTarget target = 1;
 
   // Requesters allow you to identify entities, that requested the eviction of the target.
@@ -229,7 +229,7 @@ message EvictionTarget {
 
 // InterceptorStatus represents the last observed status of the eviction process of the interceptor.
 // It should be only updated by the designated interceptor whose name is .name field.
-// +structType=atomic
+// +structType=granular
 message InterceptorStatus {
   // Name must be a fully qualified domain name of at most 253 characters in length, consisting
   // only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com).

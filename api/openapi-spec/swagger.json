@@ -5945,7 +5945,7 @@
         "name"
       ],
       "type": "object",
-      "x-kubernetes-map-type": "atomic"
+      "x-kubernetes-map-type": "granular"
     },
     "io.k8s.api.coordination.v1alpha1.LocalTargetReference": {
       "description": "LocalTargetReference contains enough information to locate the referenced target inside the same namespace.",

@@ -62,7 +62,7 @@ type EvictionRequest struct {
 	// eviction request's target. The labels of the target have a preference.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	// +k8s:subfield(generateName)=+k8s:forbidden
+	// +k8s:alpha(since:"1.36")=+k8s:subfield(generateName)=+k8s:forbidden
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the eviction request specification.
@@ -83,7 +83,7 @@ type EvictionRequestSpec struct {
 	// Target UID must be the same as the EvictionRequest's .metadata.name.
 	// This field is immutable.
 	// +required
-	// +k8s:immutable
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	Target EvictionTarget `json:"target" protobuf:"bytes,1,opt,name=target"`
 
 	// Requesters allow you to identify entities, that requested the eviction of the target.
@@ -279,7 +279,7 @@ const (
 
 // InterceptorStatus represents the last observed status of the eviction process of the interceptor.
 // It should be only updated by the designated interceptor whose name is .name field.
-// +structType=atomic
+// +structType=granular
 type InterceptorStatus struct {
 	// Name must be a fully qualified domain name of at most 253 characters in length, consisting
 	// only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com).
