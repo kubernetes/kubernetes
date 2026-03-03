@@ -155,8 +155,16 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 		return schema.GroupVersion{}, fmt.Errorf("object %T has no GVKs registered in scheme", example)
 	}
 
-	// VersionsForGroupKind returns versions in priority order
+	// VersionsForGroupKind returns versions in priority order.
+	// Use the kind's priority version as the fallback instead of the group's,
+	// because the kind may not exist in the group's top version.
 	versions := scheme.VersionsForGroupKind(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind})
+	for _, gv := range versions {
+		if gv.Version != runtime.APIVersionInternal {
+			binaryVersionOfResource = gv
+			break
+		}
+	}
 
 	compatibilityVersion := effectiveVersion.MinCompatibilityVersion()
 	emulationVersion := effectiveVersion.EmulationVersion()

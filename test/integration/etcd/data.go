@@ -795,28 +795,57 @@ func validateStorageData(etcdStorageData map[schema.GroupVersionResource]Storage
 }
 
 // storageVersionAtEmulationVersion tries to find the correct storage version at an emulation version.
-// If a GVK is introduced after the min compatibility version, we need to use an earlier version in storage.
+// This mirrors the logic of emulatedStorageVersion in resource_encoding_config.go:
+// - compat: best non-alpha version introduced by minCompatVersion (for n-1 rollback safety)
+// - best: best version introduced by emulationVersion (used when only alpha is compat-safe)
 func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedGVK *schema.GroupVersionKind, emuVer string, etcdStorageData map[schema.GroupVersionResource]StorageData) string {
 	// expectedGVK is needed to find the correct GVK with the correct storage version.
 	if expectedGVK == nil {
 		return ""
 	}
 	minCompatVer := version.MustParse(emuVer).SubtractMinor(1)
+	emulationVer := version.MustParse(emuVer)
+
 	expectedGVR := gvr(expectedGVK.Group, expectedGVK.Version, key.Resource)
 	expectedGVRData, ok := etcdStorageData[expectedGVR]
-	// expectedGVK is introduced before the emulation version, no need to change.
-	if !ok || minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
+	// If expectedGVK is non-alpha and introduced before the compat version, it is already the
+	// correct compat-safe storage version.
+	if !ok || (!strings.Contains(expectedGVK.Version, "alpha") && minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion))) {
 		return ""
 	}
-	// go through the prioritized version list to find the first version introduced before the emulation version.
+
+	// Find compat (non-alpha, introduced <= compatVersion) and best (introduced <= emulationVersion).
+	var compat, best string
 	gvs := legacyscheme.Scheme.PrioritizedVersionsForGroup(key.Group)
 	for _, gv := range gvs {
-		expectedGVR := gv.WithResource(key.Resource)
-		if expectedGVRData, ok := etcdStorageData[expectedGVR]; ok {
-			if minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
-				return gv.Version
-			}
+		candidateGVR := gv.WithResource(key.Resource)
+		candidateData, ok := etcdStorageData[candidateGVR]
+		if !ok {
+			continue
 		}
+		introduced := version.MustParse(candidateData.IntroducedVersion)
+		if best == "" && emulationVer.AtLeast(introduced) {
+			best = gv.Version
+		}
+		if compat == "" && !strings.Contains(gv.Version, "alpha") && minCompatVer.AtLeast(introduced) {
+			compat = gv.Version
+		}
+		if best != "" && compat != "" {
+			break
+		}
+	}
+
+	if compat != "" {
+		if compat == expectedGVK.Version {
+			return ""
+		}
+		return compat
+	}
+	if best != "" {
+		if best == expectedGVK.Version {
+			return ""
+		}
+		return best
 	}
 	return ""
 }

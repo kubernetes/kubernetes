@@ -638,6 +638,13 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 			example:          &fakeLifecycler[Workload, Internal]{},
 			expectedVersion:  schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
 		},
+		{
+			// kind not yet introduced at emulation version: should fall back to
+			// the kind's highest-priority version (not the group's priority version)
+			effectiveVersion: "1.30.0",
+			example:          &fakeLifecycler[LeaseCandidate, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "coordination.k8s.io", Version: "v1beta1"},
+		},
 	}
 
 	for _, tc := range testcases {
