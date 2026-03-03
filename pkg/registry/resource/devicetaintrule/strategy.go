@@ -18,6 +18,7 @@ package devicetaintrule
 
 import (
 	"context"
+	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,6 +86,23 @@ func (*deviceTaintRuleStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	rule := obj.(*resource.DeviceTaintRule)
 	oldRule := old.(*resource.DeviceTaintRule)
 	rule.Status = oldRule.Status
+
+	// Automatically bump the TimeAdded when the effect changes and the
+	// client hasn't already changed it. This makes the TimeAdded track
+	// "when was this *effect* added" instead of "when was this
+	// *DeviceTaintRule* added". This is relevant for computing the
+	// toleration duration of affected claims.
+	//
+	// The downside is that clients cannot keep the old time even if that
+	// is what they want - this seems extremely unlikely compared to "I
+	// want TimeAdded to work automatically".
+	if rule.Spec.Taint.Effect != oldRule.Spec.Taint.Effect &&
+		rule.Spec.Taint.TimeAdded.Equal(oldRule.Spec.Taint.TimeAdded) {
+		// Encoding only has seconds as resolution, so don't even
+		// generate something which does not survive encode/decode (can cause
+		// random unit test failures).
+		rule.Spec.Taint.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
+	}
 
 	// Any changes to the spec increment the generation number.
 	if !apiequality.Semantic.DeepEqual(oldRule.Spec, rule.Spec) {

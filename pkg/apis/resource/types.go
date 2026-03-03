@@ -652,8 +652,12 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
 	//
 	// +optional
 	TimeAdded *metav1.Time
