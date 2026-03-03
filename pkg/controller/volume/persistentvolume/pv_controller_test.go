@@ -85,29 +85,16 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name:            "5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
-			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
+			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
 			expectedVolumes: volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			initialClaims:   withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
+			initialClaims:   noclaims,
 			expectedClaims:  withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				// Wait until volume5-2 is in ctrl.volumes.store AND has been
-				// processed by syncVolume (i.e. it has a ClaimRef=nil but
-				// Status.Phase is set to Available by syncVolume).
-				// Then force the claim to re-sync so findBestMatchForClaim
-				// can find the volume.
-				return wait.PollImmediate(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					_, found, err := ctrl.volumes.store.GetByKey("volume5-2")
-					if err != nil {
-						return false, err
-					}
-					if !found {
-						return false, nil
-					}
-					ctrl.claimQueue.Add("default/claim5-2")
-					return true, nil
-				})
+				claim := withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil))[0]
+				reactor.AddClaimEvent(claim)
+				return nil
 			},
 		},
 		{
