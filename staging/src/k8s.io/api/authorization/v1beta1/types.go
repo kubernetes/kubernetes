@@ -168,6 +168,9 @@ type SubjectAccessReviewSpec struct {
 	// uid information about the requesting user.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// +optional
+	ConditionalAuthorization *authorizationv1.ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,7,opt,name=conditionalAuthorization"`
 }
 
 // ExtraValue masks the value so protobuf can generate
@@ -188,6 +191,9 @@ type SelfSubjectAccessReviewSpec struct {
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// +optional
+	ConditionalAuthorization *authorizationv1.ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,3,opt,name=conditionalAuthorization"`
 }
 
 // SubjectAccessReviewStatus
@@ -208,6 +214,17 @@ type SubjectAccessReviewStatus struct {
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	// +optional
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
+	// conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+	// At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+	// When evaluating the conditions, the first condition set must be evaluated
+	// as a whole first, and only if that condition set evaluates to NoOpinion,
+	// can the subsequent condition sets be evaluated.
+	//
+	// When conditionalDecisionChain is non-null, allowed and denied must be false.
+	//
+	// +optional
+	// +listType=atomic
+	ConditionalDecisionChain []authorizationv1.SubjectAccessReviewAuthorizationDecision `json:"conditionalDecisionChain,omitempty" protobuf:"bytes,5,rep,name=conditionalDecisionChain"`
 }
 
 // +genclient

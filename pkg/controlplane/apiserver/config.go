@@ -21,12 +21,14 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,12 +52,15 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	apiregistrationclientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	apiregistrationinformers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -158,6 +163,14 @@ func BuildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
 
+	apiextensionsExternalClient, err := apiregistrationclientset.NewForConfig(kubeClientConfig)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to create real apiextensions external clientset: %w", err)
+		return
+	}
+	// 5 minutes matches what's in kube-aggregators. Sadly, it doesn't seem easy to re-use kube-aggregators informer here, as this is constructed before the kube-aggregator
+	apiextensionsInformers := apiregistrationinformers.NewSharedInformerFactoryWithOptions(apiextensionsExternalClient, 5*time.Minute, apiregistrationinformers.WithTransform(trim))
+
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
@@ -229,6 +242,50 @@ func BuildGenericConfig(
 	}
 	if s.Authorization != nil && !enablesRBAC {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
+	}
+
+	// the verbs admission control generally applies to
+	admissionVerbs := sets.New("create", "update", "patch", "delete", "deletecollection")
+	genericConfig.Authorization.ConditionalAuthorizationRequestClassifier = func(attrs authorizer.Attributes) bool {
+		// Make sure there is exactly one GVR matched
+		if len(attrs.GetResource()) == 0 || attrs.GetResource() == "*" {
+			return false
+		}
+		if attrs.GetAPIGroup() == "*" {
+			return false
+		}
+		if len(attrs.GetAPIVersion()) == 0 || attrs.GetAPIVersion() == "*" {
+			return false
+		}
+		gr := schema.GroupResource{
+			Group:    attrs.GetAPIGroup(),
+			Resource: attrs.GetResource(),
+		}
+		// if the GroupResource is excluded from admission, we cannot enforce conditions
+		if slices.Contains(exclusion.Excluded(), gr) {
+			return false
+		}
+		// If the verb falls into the common write request categories
+		if admissionVerbs.Has(attrs.GetVerb()) {
+			return true
+		}
+
+		// TODO: Do we need this even? What is the likelihood that someone wants conditional authz
+		// through the kube-apiserver on a non-standard verb?
+		apiserviceName := fmt.Sprintf("%s.%s", attrs.GetAPIVersion(), attrs.GetAPIGroup())
+		apiservice, err := apiextensionsInformers.Apiregistration().V1().APIServices().Lister().Get(apiserviceName)
+		if err != nil {
+			return false // no conditional authorization support
+		}
+		// We rely on aggregated API servers to run their complete own authorization chain, and specifically,
+		// use the kube-apiserver (which acts as this front-proxy) as the webhook authorizer.
+		if apiservice.Spec.Service != nil {
+			return true
+		}
+
+		// TODO: Aggregated API server requests
+		// TODO: Connect requests
+		return false
 	}
 
 	lastErr = s.Audit.ApplyTo(genericConfig)

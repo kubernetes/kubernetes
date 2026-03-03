@@ -50,6 +50,7 @@ var excluded = []schema.GroupResource{
 	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
 	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
 	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
+	{Group: "authorization.k8s.io", Resource: "authorizationconditionsreviews"},
 	// END interception of these non-persisted resources may break the cluster
 }
 

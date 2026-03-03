@@ -64,6 +64,7 @@ var _ authorizer.Attributes = (interface {
 	GetPath() string
 	GetFieldSelector() (fields.Requirements, error)
 	GetLabelSelector() (labels.Requirements, error)
+	GetConditionsMode() authorizer.ConditionsMode
 })(nil)
 
 // The user info accessors known to cache key construction. If this fails to compile, the cache
@@ -94,6 +95,7 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 			Name:            a.GetName(),
 			ResourceRequest: a.IsResourceRequest(),
 			Path:            a.GetPath(),
+			ConditionsMode:  a.GetConditionsMode(),
 		},
 	}
 	// in the error case, we won't honor this field selector, so the cache doesn't need it.
@@ -150,4 +152,8 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	}
 
 	return authorized, err
+}
+
+func (ca *cachingAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.Decision, data authorizer.ConditionData) (authorizer.Decision, error) {
+	return authorizer.DecisionDeny(), authorizer.ErrorConditionEvaluationNotSupported
 }

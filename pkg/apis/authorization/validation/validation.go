@@ -44,6 +44,19 @@ func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSp
 	return allErrs
 }
 
+// ValidateAuthorizationConditionsRequest validates a AuthorizationConditionsRequest and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsRequest(req authorizationapi.AuthorizationConditionsRequest, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if req.WriteRequest == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, req, `at least one type of conditions data (options: [writeRequest]) must be set`))
+	}
+
+	// The supplied decision is (for now) validated during deserialization only, to avoid having to do it twice
+	return allErrs
+}
+
 // ValidateSelfSubjectAccessReviewSpec validates a SelfSubjectAccessReviewSpec and returns an
 // ErrorList with any errors.
 func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
@@ -68,6 +81,29 @@ func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) fiel
 	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
 	}
+	// TODO(luxas): Do we need to validate the conditionsmode, or shall we keep it an open enum? I guess open enum.
+	return allErrs
+}
+
+// ValidateAuthorizationConditionsReview validates a AuthorizationConditionsReview and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsReview(acr *authorizationapi.AuthorizationConditionsReview) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO: Do we need a nil pointer check here?
+	objectMetaShallowCopy := acr.ObjectMeta
+	objectMetaShallowCopy.ManagedFields = nil
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), acr.ObjectMeta, `must be empty`))
+	}
+	if acr.Request == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("request"), "must be set"))
+	} else {
+		allErrs = append(allErrs, ValidateAuthorizationConditionsRequest(*acr.Request, field.NewPath("request"))...)
+	}
+	if acr.Response != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("response"), acr.Response, "must not be set"))
+	}
+	// Validation of
 	return allErrs
 }
 

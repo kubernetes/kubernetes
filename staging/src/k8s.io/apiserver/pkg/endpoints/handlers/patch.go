@@ -212,6 +212,9 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			Namespace:       namespace,
 			Name:            name,
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+			createAuthorizerAttributes.ConditionsMode = authorizer.ConditionsModeOptimized
+		}
 
 		p := patcher{
 			namer:               scope.Namer,
@@ -229,7 +232,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 			hubGroupVersion: scope.HubGroupVersion,
 
-			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, scope), scope.Authorizer, createAuthorizerAttributes),
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, scope), scope.Authorizer, createAuthorizerAttributes, staticCreateAttributes, scope),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, scope),
 			admissionCheck:   mutatingAdmission,
 

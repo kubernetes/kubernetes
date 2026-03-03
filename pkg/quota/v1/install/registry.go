@@ -48,14 +48,15 @@ func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i inform
 // ignoredResources are ignored by quota by default
 var ignoredResources = map[schema.GroupResource]struct{}{
 	// virtual resources that aren't stored and shouldn't be quota-ed
-	{Group: "", Resource: "bindings"}:                                       {},
-	{Group: "", Resource: "componentstatuses"}:                              {},
-	{Group: authentication.GroupName, Resource: "tokenreviews"}:             {},
-	{Group: authentication.GroupName, Resource: "selfsubjectreviews"}:       {},
-	{Group: authorization.GroupName, Resource: "subjectaccessreviews"}:      {},
-	{Group: authorization.GroupName, Resource: "selfsubjectaccessreviews"}:  {},
-	{Group: authorization.GroupName, Resource: "localsubjectaccessreviews"}: {},
-	{Group: authorization.GroupName, Resource: "selfsubjectrulesreviews"}:   {},
+	{Group: "", Resource: "bindings"}:                                            {},
+	{Group: "", Resource: "componentstatuses"}:                                   {},
+	{Group: authentication.GroupName, Resource: "tokenreviews"}:                  {},
+	{Group: authentication.GroupName, Resource: "selfsubjectreviews"}:            {},
+	{Group: authorization.GroupName, Resource: "subjectaccessreviews"}:           {},
+	{Group: authorization.GroupName, Resource: "selfsubjectaccessreviews"}:       {},
+	{Group: authorization.GroupName, Resource: "localsubjectaccessreviews"}:      {},
+	{Group: authorization.GroupName, Resource: "selfsubjectrulesreviews"}:        {},
+	{Group: authorization.GroupName, Resource: "authorizationconditionsreviews"}: {},
 
 	// events haven't been quota-ed before
 	{Group: "", Resource: "events"}:                {},

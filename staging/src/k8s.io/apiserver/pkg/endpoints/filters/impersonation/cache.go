@@ -139,6 +139,7 @@ var _ authorizer.Attributes = (interface {
 	GetPath() string
 	GetFieldSelector() (fields.Requirements, error)
 	GetLabelSelector() (labels.Requirements, error)
+	GetConditionsMode() authorizer.ConditionsMode
 })(nil)
 
 // The user info accessors known to cache key construction. If this fails to compile, the cache
@@ -231,7 +232,8 @@ func buildKey(wantedUser *user.DefaultInfo, attributes authorizer.Attributes) (s
 			addString(attributes.GetAPIGroup()).
 			addString(attributes.GetAPIVersion()).
 			addBool(attributes.IsResourceRequest()).
-			addString(attributes.GetPath())
+			addString(attributes.GetPath()).
+			addString(string(attributes.GetConditionsMode()))
 	})
 
 	b.addLengthPrefixed(func(b *cacheKeyBuilder) {

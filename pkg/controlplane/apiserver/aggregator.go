@@ -324,6 +324,7 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 		{Group: "authentication.k8s.io", Version: "v1beta1"}:         {Group: 17700, Version: 9},
 		{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {Group: 17700, Version: 1},
 		{Group: "authorization.k8s.io", Version: "v1"}:               {Group: 17600, Version: 15},
+		{Group: "authorization.k8s.io", Version: "v1alpha1"}:         {Group: 17600, Version: 1},
 		{Group: "certificates.k8s.io", Version: "v1"}:                {Group: 17300, Version: 15},
 		{Group: "certificates.k8s.io", Version: "v1beta1"}:           {Group: 17300, Version: 9},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"}:          {Group: 17300, Version: 1},

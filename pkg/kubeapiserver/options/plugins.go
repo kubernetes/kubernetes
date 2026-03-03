@@ -22,6 +22,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 
@@ -105,6 +106,7 @@ var AllOrderedPlugins = []string{
 
 	mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
 	mutatingwebhook.PluginName,           // MutatingAdmissionWebhook
+	conditionsenforcer.PluginName,        // AuthorizationConditionsEnforcer
 	validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
 	validatingwebhook.PluginName,         // ValidatingAdmissionWebhook
 	resourcequota.PluginName,             // ResourceQuota
@@ -176,6 +178,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          // DefaultIngressClass
 		podsecurity.PluginName,                  // PodSecurity
+		conditionsenforcer.PluginName,           // AuthorizationConditionsEnforcer, will switch to default on when stable
 		podtopologylabels.PluginName,            // PodTopologyLabels, only active when feature gate PodTopologyLabelsAdmission is enabled.
 		mutatingadmissionpolicy.PluginName,      // Mutatingadmissionpolicy, only active when feature gate MutatingAdmissionpolicy is enabled
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled

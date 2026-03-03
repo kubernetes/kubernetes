@@ -42,19 +42,31 @@ const (
 	reasonAnnotationKey   = "authorization.k8s.io/reason"
 
 	// Annotation values set in advanced audit
-	decisionAllow  = "allow"
-	decisionForbid = "forbid"
-	reasonError    = "internal error"
+	decisionAllow            = "allow"
+	decisionConditionalAllow = "conditional_allow"
+	decisionForbid           = "forbid"
+	reasonError              = "internal error"
 )
+
+// TODO(luxas): Update tests for WithAuthorization
 
 type recordAuthorizationMetricsFunc func(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time)
 
+// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization
+type ConditionalAuthorizationRequestClassifier func(attrs authorizer.Attributes) bool
+
 // WithAuthorization passes all authorized requests on to handler, and returns a forbidden error otherwise.
 func WithAuthorization(hhandler http.Handler, auth authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
-	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics)
+	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics, nil)
 }
 
-func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer, metrics recordAuthorizationMetricsFunc) http.Handler {
+// WithAuthorizationAndConditionsSupport passes all authorized requests on to handler, and returns a forbidden error otherwise.
+// If conditionalAuthzClassifier returns true, it also allows conditionally authorized requests through.
+func WithAuthorizationAndConditionsSupport(hhandler http.Handler, auth authorizer.Authorizer, s runtime.NegotiatedSerializer, conditionalAuthzClassifier ConditionalAuthorizationRequestClassifier) http.Handler {
+	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics, conditionalAuthzClassifier)
+}
+
+func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer, metrics recordAuthorizationMetricsFunc, conditionalAuthzClassifier ConditionalAuthorizationRequestClassifier) http.Handler {
 	if a == nil {
 		klog.Warning("Authorization is disabled")
 		return handler
@@ -68,6 +80,12 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 			responsewriters.InternalError(w, req, err)
 			return
 		}
+
+		// Specifically opt-in to Conditional Authorization for this Authorize call.
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+			attributes.(*authorizer.AttributesRecord).ConditionsMode = authorizer.ConditionsModeOptimized
+		}
+
 		authorized, err := a.Authorize(ctx, attributes)
 		reason := authorized.Reason()
 
@@ -84,6 +102,25 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 				reasonAnnotationKey, reason)
 			handler.ServeHTTP(w, req)
 			return
+		}
+		// Only let conditionally authorized requests through when the feature gate is enabled, and for requests that could become allowed
+		// when the conditions are evaluated. This means that there must be at least one Allow condition present.
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) && authorized.CanBecomeAllowed() {
+			// Protect against authorizers that return conditional responses for request types that do not support conditional authorization
+			// Only requests that are
+			// a) subject to admission (write + connect requests), or
+			// b) handled by an aggregated API server (which in turn is responsible for properly authorizing the request)
+			// should be let through here.
+			// TODO: How do we know what types skip admission (such as SAR)?
+			if conditionalAuthzClassifier != nil && conditionalAuthzClassifier(attributes) {
+				ctx = request.WithConditionallyAuthorizedDecision(ctx, a, authorized)
+				req = req.WithContext(ctx)
+				audit.AddAuditAnnotations(ctx,
+					decisionAnnotationKey, decisionConditionalAllow,
+					reasonAnnotationKey, reason)
+				handler.ServeHTTP(w, req)
+				return
+			}
 		}
 		if err != nil {
 			audit.AddAuditAnnotation(ctx, reasonAnnotationKey, reasonError)

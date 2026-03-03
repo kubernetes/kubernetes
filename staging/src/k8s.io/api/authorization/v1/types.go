@@ -190,6 +190,123 @@ type NonResourceAttributes struct {
 	Verb string `json:"verb,omitempty" protobuf:"bytes,2,opt,name=verb"`
 }
 
+// ConditionsMode specifies how, if at all, the client wants conditions to be
+// returned by the authorizer. The default (empty string) means conditions are
+// not supported by the caller.
+type ConditionsMode string
+
+const (
+	// ConditionsModeNone indicates that the client does not support conditions.
+	ConditionsModeNone ConditionsMode = ""
+
+	// ConditionsModeHumanReadable indicates that the client wants a
+	// human-readable condition and description, if possible.
+	ConditionsModeHumanReadable ConditionsMode = "HumanReadable"
+
+	// ConditionsModeOptimized indicates that the client wants an
+	// optimized conditions encoding without description, if possible.
+	ConditionsModeOptimized ConditionsMode = "Optimized"
+)
+
+// ConditionalAuthorizationOptions contains options for requesting conditional authorization.
+type ConditionalAuthorizationOptions struct {
+	// conditionsMode specifies how conditions should be returned.
+	// +optional
+	ConditionsMode ConditionsMode `json:"conditionsMode,omitempty" protobuf:"bytes,1,opt,name=conditionsMode"`
+}
+
+// SubjectAccessReviewConditionEffect specifies how a condition evaluating to
+// true should be treated.
+type SubjectAccessReviewConditionEffect string
+
+const (
+	// SubjectAccessReviewConditionEffectAllow means that if this condition
+	// evaluates to true, the ConditionSet evaluates to Allow, unless any
+	// Deny/NoOpinion condition also evaluates to true.
+	SubjectAccessReviewConditionEffectAllow SubjectAccessReviewConditionEffect = "Allow"
+
+	// SubjectAccessReviewConditionEffectDeny means that if this condition
+	// evaluates to true, the ConditionSet necessarily evaluates to Deny.
+	// No further authorizers are consulted.
+	SubjectAccessReviewConditionEffectDeny SubjectAccessReviewConditionEffect = "Deny"
+
+	// SubjectAccessReviewConditionEffectNoOpinion means that if this condition
+	// evaluates to true, the given authorizer's ConditionSet cannot evaluate
+	// to Allow anymore, but necessarily Deny or NoOpinion.
+	SubjectAccessReviewConditionEffectNoOpinion SubjectAccessReviewConditionEffect = "NoOpinion"
+)
+
+// SubjectAccessReviewCondition represents a single condition to be evaluated
+// against admission attributes.
+type SubjectAccessReviewCondition struct {
+	// ID uniquely identifies this condition within the scope of the authorizer
+	// that authored it. Validated as a Kubernetes label key.
+	ID string `json:"id" protobuf:"bytes,1,opt,name=id"`
+
+	// Effect specifies how the condition evaluating to "true" should be treated.
+	Effect SubjectAccessReviewConditionEffect `json:"effect" protobuf:"bytes,2,opt,name=effect"`
+
+	// Condition is an opaque string that represents the condition to be evaluated.
+	// It is a pure, deterministic function from condition data to a Boolean.
+	Condition string `json:"condition" protobuf:"bytes,3,opt,name=condition"`
+
+	// Description is an optional human-friendly description that can be shown
+	// as an error message or for debugging.
+	// +optional
+	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
+}
+
+// SubjectAccessReviewAuthorizationDecision represents one authorizer's decision in
+// the authorizer chain. It models a single authorization decision, which must be as follows:
+// Exactly one of the following groups of fields must be set:
+// - allowed (unconditional allow)
+// - denied (unconditional deny)
+// - conditionsType + conditions (conditional decision)
+// - conditionalDecisionChain (composite/nested decisions)
+type SubjectAccessReviewAuthorizationDecision struct {
+	// allowed specifies whether this element is unconditionally allowed.
+	// Mutually exclusive with denied, conditions, and conditionalDecisionChain.
+	// +optional
+	Allowed bool `json:"allowed,omitempty" protobuf:"varint,1,opt,name=allowed"`
+
+	// denied specifies whether this element is unconditionally denied.
+	// Mutually exclusive with allowed, conditions, and conditionalDecisionChain.
+	// +optional
+	Denied bool `json:"denied,omitempty" protobuf:"varint,2,opt,name=denied"`
+
+	// conditionsType describes the type (format/encoding/language) of all conditions
+	// in the conditions slice. It does not apply to nested conditions in conditionalDecisionChain.
+	// Mutually exclusive with allowed, denied, and conditionalDecisionChain.
+	// +optional
+	ConditionsType string `json:"conditionsType,omitempty" protobuf:"bytes,3,opt,name=conditionsType"`
+
+	// conditions is an unordered set of conditions that should be evaluated
+	// against admission attributes, to determine whether this authorizer allows
+	// the request.
+	// Mutually exclusive with allowed, denied, and conditionalDecisionChain.
+	// +listType=map
+	// +listMapKey=id
+	// +optional
+	Conditions []SubjectAccessReviewCondition `json:"conditions,omitempty" protobuf:"bytes,4,rep,name=conditions"`
+
+	// conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+	// At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+	// When evaluating the conditions, the first condition set must be evaluated
+	// as a whole first, and only if that condition set evaluates to NoOpinion,
+	// can the subsequent condition sets be evaluated.
+	//
+	// Mutually exclusive with allowed, denied and conditions.
+	//
+	// +optional
+	// +listType=atomic
+	ConditionalDecisionChain []SubjectAccessReviewAuthorizationDecision `json:"conditionalDecisionChain,omitempty" protobuf:"bytes,5,rep,name=conditionalDecisionChain"`
+
+	// reason is optional. It indicates why a request was allowed or denied
+	// by this authorizer.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,6,opt,name=reason"`
+}
+
 // SubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes
 // and nonResourceAttributes must be set
 type SubjectAccessReviewSpec struct {
@@ -215,6 +332,9 @@ type SubjectAccessReviewSpec struct {
 	// uid information about the requesting user.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// +optional
+	ConditionalAuthorization *ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,7,opt,name=conditionalAuthorization"`
 }
 
 // ExtraValue masks the value so protobuf can generate
@@ -235,6 +355,9 @@ type SelfSubjectAccessReviewSpec struct {
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// +optional
+	ConditionalAuthorization *ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,3,opt,name=conditionalAuthorization"`
 }
 
 // SubjectAccessReviewStatus
@@ -255,6 +378,17 @@ type SubjectAccessReviewStatus struct {
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	// +optional
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
+	// conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+	// At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+	// When evaluating the conditions, the first condition set must be evaluated
+	// as a whole first, and only if that condition set evaluates to NoOpinion,
+	// can the subsequent condition sets be evaluated.
+	//
+	// When conditionalDecisionChain is non-null, allowed and denied must be false.
+	//
+	// +optional
+	// +listType=atomic
+	ConditionalDecisionChain []SubjectAccessReviewAuthorizationDecision `json:"conditionalDecisionChain,omitempty" protobuf:"bytes,5,rep,name=conditionalDecisionChain"`
 }
 
 // +genclient

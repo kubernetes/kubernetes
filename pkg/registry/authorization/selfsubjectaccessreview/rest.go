@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,6 +33,8 @@ import (
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
+
+// TODO(luxas): Add unit and integration tests for showing conditions in (Self)SAR
 
 type REST struct {
 	authorizer authorizer.Authorizer
@@ -73,6 +76,9 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 			selfSAR.Spec.ResourceAttributes.LabelSelector = nil
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		selfSAR.Spec.ConditionalAuthorization = nil
+	}
 	if errs := authorizationvalidation.ValidateSelfSubjectAccessReview(selfSAR); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(selfSAR.Kind), "", errs)
 	}
@@ -94,14 +100,15 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		authorizationAttributes = authorizationutil.NonResourceAttributesFrom(userToCheck, *selfSAR.Spec.NonResourceAttributes)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		if selfSAR.Spec.ConditionalAuthorization != nil {
+			authorizationAttributes.ConditionsMode = authorizer.ConditionsMode(selfSAR.Spec.ConditionalAuthorization.ConditionsMode)
+		}
+	}
+
 	decision, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
-	selfSAR.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: decision.IsAllowed(),
-		Denied:  decision.IsDenied(),
-		Reason:  decision.Reason(),
-	}
-	selfSAR.Status.EvaluationError = authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes)
+	selfSAR.Status = authorizationutil.AuthorizerDecisionToSARStatus(authorizationAttributes, decision, evaluationErr)
 
 	return selfSAR, nil
 }

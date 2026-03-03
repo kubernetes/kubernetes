@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -73,7 +74,9 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 			localSubjectAccessReview.Spec.ResourceAttributes.LabelSelector = nil
 		}
 	}
-
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		localSubjectAccessReview.Spec.ConditionalAuthorization = nil
+	}
 	if errs := authorizationvalidation.ValidateLocalSubjectAccessReview(localSubjectAccessReview); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(localSubjectAccessReview.Kind), "", errs)
 	}
@@ -94,12 +97,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(localSubjectAccessReview.Spec)
 	decision, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
-	localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: decision.IsAllowed(),
-		Denied:  decision.IsDenied(),
-		Reason:  decision.Reason(),
-	}
-	localSubjectAccessReview.Status.EvaluationError = authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes)
+	localSubjectAccessReview.Status = authorizationutil.AuthorizerDecisionToSARStatus(authorizationAttributes, decision, evaluationErr)
 
 	return localSubjectAccessReview, nil
 }

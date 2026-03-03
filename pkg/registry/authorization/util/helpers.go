@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
@@ -208,11 +209,18 @@ func AuthorizationAttributesFrom(spec authorizationapi.SubjectAccessReviewSpec) 
 		authorizationAttributes = NonResourceAttributesFrom(userToCheck, *spec.NonResourceAttributes)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		if spec.ConditionalAuthorization != nil {
+			authorizationAttributes.ConditionsMode = authorizer.ConditionsMode(spec.ConditionalAuthorization.ConditionsMode)
+		}
+	}
+
 	return authorizationAttributes
 }
 
 // matchAllVersionIfEmpty returns a "*" if the version is unspecified
 func matchAllVersionIfEmpty(version string) string {
+	// TODO(luxas): Could this cause issues?
 	if len(version) == 0 {
 		return "*"
 	}
@@ -241,4 +249,73 @@ func BuildEvaluationError(evaluationError error, attrs authorizer.AttributesReco
 		}
 	}
 	return strings.Join(evaluationErrors, "; ")
+}
+
+// conditionSetToInternalAPIDecision turns a ConditionSet into the Decision struct of the internal authorization API types.
+func conditionSetToInternalAPIDecision(conditionSet *authorizer.ConditionSet) authorizationapi.SubjectAccessReviewAuthorizationDecision {
+	if conditionSet == nil {
+		return authorizationapi.SubjectAccessReviewAuthorizationDecision{} // NoOpinion
+	}
+	conds := []authorizationapi.SubjectAccessReviewCondition{}
+	for id, condition := range conditionSet.Conditions() {
+		conds = append(conds, authorizationapi.SubjectAccessReviewCondition{
+			ID:          id,
+			Effect:      authorizationapi.SubjectAccessReviewConditionEffect(condition.Effect),
+			Condition:   condition.Condition,
+			Description: condition.Description,
+		})
+	}
+
+	return authorizationapi.SubjectAccessReviewAuthorizationDecision{
+		Conditions:     conds,
+		ConditionsType: string(conditionSet.Type()),
+	}
+}
+
+func authorizerDecisionToInternalAPIDecision(decision authorizer.Decision) authorizationapi.SubjectAccessReviewAuthorizationDecision {
+	if decision.IsAllowed() {
+		return authorizationapi.SubjectAccessReviewAuthorizationDecision{Allowed: true, Reason: decision.Reason()}
+	}
+	if decision.IsDenied() {
+		return authorizationapi.SubjectAccessReviewAuthorizationDecision{Denied: true, Reason: decision.Reason()}
+	}
+
+	if decision.IsConditional() {
+		d := conditionSetToInternalAPIDecision(decision.ConditionSet())
+		d.Reason = decision.Reason()
+		return d
+	}
+	if decision.IsConditionalChain() {
+		subDecisions := make([]authorizationapi.SubjectAccessReviewAuthorizationDecision, 0, len(decision.ConditionalChain()))
+		for _, subDecision := range decision.ConditionalChain() {
+			subDecisions = append(subDecisions, authorizerDecisionToInternalAPIDecision(subDecision))
+		}
+		return authorizationapi.SubjectAccessReviewAuthorizationDecision{
+			ConditionalDecisionChain: subDecisions,
+			Reason:                   decision.Reason(),
+		}
+	}
+	// no opinion
+	return authorizationapi.SubjectAccessReviewAuthorizationDecision{Reason: decision.Reason()}
+}
+
+// AuthorizerDecisionToSARStatus converts the authorization decision to SubjectAccessReviewStatus
+func AuthorizerDecisionToSARStatus(attrs authorizer.AttributesRecord, decision authorizer.Decision, evaluationErr error) authorizationapi.SubjectAccessReviewStatus {
+	serializedDecision := authorizerDecisionToInternalAPIDecision(decision)
+
+	status := authorizationapi.SubjectAccessReviewStatus{
+		Allowed:         decision.IsAllowed(),
+		Denied:          decision.IsDenied(),
+		Reason:          decision.Reason(),
+		EvaluationError: BuildEvaluationError(evaluationErr, attrs),
+	}
+
+	// TODO(luxas): Can we make this flow a bit cleaner?
+	if decision.IsConditional() {
+		status.ConditionalDecisionChain = append(status.ConditionalDecisionChain, serializedDecision)
+	}
+	if decision.IsConditionalChain() {
+		status.ConditionalDecisionChain = serializedDecision.ConditionalDecisionChain
+	}
+	return status
 }

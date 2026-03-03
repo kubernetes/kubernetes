@@ -73,7 +73,7 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 		c.NewCoreGenericConfig(),
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.Generic.Authentication.Authenticator, APIAudiences: c.Generic.Authentication.APIAudiences},
-		authorizationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, RuleResolver: c.Generic.RuleResolver},
+		authorizationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, RuleResolver: c.Generic.RuleResolver, Serializer: c.Generic.Serializer},
 		certificatesrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer},

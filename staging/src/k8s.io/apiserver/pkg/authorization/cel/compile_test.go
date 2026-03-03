@@ -226,6 +226,15 @@ func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name 
 			return nil
 		}
 		return apiservercel.NewListType(requirementType, -1)
+	case reflect.TypeOf(&v1.ConditionalAuthorizationOptions{}):
+		conditionalAuthorizationDeclType := buildConditionalAuthorizationType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeOf(v1.ConditionalAuthorizationOptions{}), conditionalAuthorizationDeclType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return conditionalAuthorizationDeclType
+	case reflect.TypeOf(v1.ConditionsMode("")):
+		return apiservercel.StringType
 	default:
 		t.Fatalf("unsupported type %v", nativeType)
 	}

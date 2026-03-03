@@ -85,6 +85,9 @@ func TestResourceAttributesFrom(t *testing.T) {
 		"ResourceRequest",
 		"Path",
 		"Verb",
+
+		// Fields we set in AuthorizationAttributesFrom
+		"ConditionsMode",
 	)
 	reflect.TypeOf(authorizer.AttributesRecord{}).FieldByNameFunc(func(name string) bool {
 		if !knownAttributesRecordFieldNames.Has(name) {

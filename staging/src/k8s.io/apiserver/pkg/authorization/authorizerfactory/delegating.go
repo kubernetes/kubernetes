@@ -25,6 +25,7 @@ import (
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
+	authorizationv1alpha1client "k8s.io/client-go/kubernetes/typed/authorization/v1alpha1"
 )
 
 // DelegatingAuthorizerConfig is the minimal configuration needed to create an authorizer
@@ -46,6 +47,10 @@ type DelegatingAuthorizerConfig struct {
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
+
+	// AuthorizationConditionsReviewClient points to client interface for the authorization.k8s.io API version
+	// that supports AuthorizationConditionsReview.
+	AuthorizationConditionsReviewClient authorizationv1alpha1client.AuthorizationV1alpha1Interface
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
@@ -65,5 +70,6 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		authorizer.DecisionNoOpinion(""),
 		NewDelegatingAuthorizerMetrics(),
 		compiler,
+		c.AuthorizationConditionsReviewClient,
 	)
 }

@@ -207,6 +207,7 @@ func mustBuildEnv(baseEnv *environment.EnvSet) *environment.EnvSet {
 func buildRequestType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	resourceAttributesType := buildResourceAttributesType(field, fields)
 	nonResourceAttributesType := buildNonResourceAttributesType(field, fields)
+	conditionalAuthorizationType := buildConditionalAuthorizationType(field, fields)
 	return apiservercel.NewObjectType("kubernetes.SubjectAccessReviewSpec", fields(
 		field("resourceAttributes", resourceAttributesType, false),
 		field("nonResourceAttributes", nonResourceAttributesType, false),
@@ -214,6 +215,13 @@ func buildRequestType(field func(name string, declType *apiservercel.DeclType, r
 		field("groups", apiservercel.NewListType(apiservercel.StringType, -1), false),
 		field("extra", apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewListType(apiservercel.StringType, -1), -1), false),
 		field("uid", apiservercel.StringType, false),
+		field("conditionalAuthorization", conditionalAuthorizationType, false),
+	))
+}
+
+func buildConditionalAuthorizationType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
+	return apiservercel.NewObjectType("kubernetes.ConditionalAuthorizationOptions", fields(
+		field("conditionsMode", apiservercel.StringType, false),
 	))
 }
 
@@ -278,6 +286,11 @@ func convertObjectToUnstructured(obj *authorizationv1.SubjectAccessReviewSpec, i
 		"groups": obj.Groups,
 		"uid":    string(obj.UID),
 		"extra":  extra,
+	}
+	if obj.ConditionalAuthorization != nil {
+		ret["conditionalAuthorization"] = map[string]interface{}{
+			"conditionsMode": string(obj.ConditionalAuthorization.ConditionsMode),
+		}
 	}
 	if obj.ResourceAttributes != nil {
 		resourceAttributes := map[string]interface{}{

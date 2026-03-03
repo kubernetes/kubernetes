@@ -28,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
@@ -205,6 +208,22 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		admissionVerbs := sets.New("create", "update", "patch", "delete", "deletecollection")
+		serverConfig.Authorization.ConditionalAuthorizationRequestClassifier = func(attrs authorizer.Attributes) bool {
+			// Make sure there is exactly one GVR matched
+			if len(attrs.GetResource()) == 0 || attrs.GetResource() == "*" {
+				return false
+			}
+			if attrs.GetAPIGroup() == "*" {
+				return false
+			}
+			if len(attrs.GetAPIVersion()) == 0 || attrs.GetAPIVersion() == "*" {
+				return false
+			}
+			return admissionVerbs.Has(attrs.GetVerb())
+		}
+	}
 
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Wardle"

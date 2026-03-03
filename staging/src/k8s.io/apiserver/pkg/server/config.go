@@ -54,6 +54,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
+	"k8s.io/apiserver/pkg/endpoints/filters"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/filters/impersonation"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -387,6 +388,9 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+
+	// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization
+	ConditionalAuthorizationRequestClassifier filters.ConditionalAuthorizationRequestClassifier
 }
 
 func init() {
@@ -1029,7 +1033,12 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := apiHandler
 
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		handler = genericapifilters.WithAuthorizationAndConditionsSupport(handler, c.Authorization.Authorizer, c.Serializer, c.Authorization.ConditionalAuthorizationRequestClassifier)
+	} else {
+		handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	}
+
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {

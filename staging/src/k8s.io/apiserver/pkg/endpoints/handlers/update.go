@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
@@ -41,8 +42,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -201,18 +204,25 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			Namespace:       namespace,
 			Name:            name,
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+			createAuthorizerAttributes.ConditionsMode = authorizer.ConditionsModeOptimized
+		}
 
 		span.AddEvent("About to store object in database")
 		wasCreated := false
 		requestFunc := func() (runtime.Object, error) {
+			createAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo)
 			obj, created, err := r.Update(
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				withAuthorization(rest.AdmissionToValidateObjectFunc(
-					admit,
-					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope),
-					scope.Authorizer, createAuthorizerAttributes),
+				withAuthorization(
+					rest.AdmissionToValidateObjectFunc(admit, createAdmissionAttributes, scope),
+					scope.Authorizer,
+					createAuthorizerAttributes,
+					createAdmissionAttributes,
+					scope,
+				),
 				rest.AdmissionToValidateObjectUpdateFunc(
 					admit,
 					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope),
@@ -255,7 +265,12 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 	}
 }
 
-func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
+func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, authzAttrs authorizer.Attributes, admissionAttrs admission.Attributes, o admission.ObjectInterfaces) rest.ValidateObjectFunc {
+
+	builtinEvaluators := []authorizer.BuiltinConditionSetEvaluator{
+		conditionsenforcer.NewCELBuiltinConditionSetEvaluator(a, nil, nil),
+	}
+
 	var once sync.Once
 	var authorizerDecision authorizer.Decision
 	var authorizerErr error
@@ -264,19 +279,42 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
 		}
 		once.Do(func() {
-			authorizerDecision, authorizerErr = a.Authorize(ctx, attributes)
+			authorizerDecision, authorizerErr = a.Authorize(ctx, authzAttrs)
 		})
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorizerDecision.IsAllowed() {
 			// Continue to validating admission
 			return validate(ctx, obj)
 		}
+		// If the create is authorized conditionally, directly evaluate the conditions before running the create admission chain
+		if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+			if authorizerDecision.CanBecomeAllowed() {
+				// Build admission attributes with the actual object for conditions evaluation.
+				// The original admissionAttrs was created before the object was known.
+				admissionAttrsWithObj := admission.NewAttributesRecord(
+					obj, nil, admissionAttrs.GetKind(),
+					admissionAttrs.GetNamespace(), admissionAttrs.GetName(),
+					admissionAttrs.GetResource(), admissionAttrs.GetSubresource(),
+					admissionAttrs.GetOperation(), admissionAttrs.GetOperationOptions(),
+					admissionAttrs.IsDryRun(), admissionAttrs.GetUserInfo(),
+				)
+				// TODO(luxas): Should we wrap this in sync.Once too?
+				err := conditionsenforcer.EnforceConditions(ctx, admissionAttrsWithObj, o, a, authzAttrs, authorizerDecision, builtinEvaluators...)
+				if err != nil {
+					return err // Returns a Forbidden error with a clear reason why the create was not conditionally authorized
+				}
+				// Compound authorization check was successful, the user can also create this object
+				// Continue to normal validating admission
+				return validate(ctx, obj)
+			}
+		}
+
 		if authorizerErr != nil {
 			return errors.NewInternalError(authorizerErr)
 		}
 
 		// The user is not authorized to perform this action, so we need to build the error response
-		return responsewriters.ForbiddenStatusError(attributes, authorizerDecision.Reason())
+		return responsewriters.ForbiddenStatusError(authzAttrs, authorizerDecision.Reason())
 	}
 }
 

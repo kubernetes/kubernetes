@@ -19,11 +19,17 @@ package authorizer
 import (
 	"context"
 	"fmt"
+	"iter"
 	"net/http"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Attributes is an interface used by an Authorizer to get information about a request
@@ -75,6 +81,22 @@ type Attributes interface {
 	// It returns an error if the label selector cannot be parsed.
 	// The returned requirements must be treated as readonly and not modified.
 	GetLabelSelector() (labels.Requirements, error)
+
+	// GetConditionsMode returns the conditions mode that the caller has requested.
+	// If the caller does not support conditions, this returns ConditionsModeNone (empty string).
+	GetConditionsMode() ConditionsMode
+}
+
+type BuiltinConditionSetEvaluator interface {
+	// BuiltinEvaluateConditions evaluates a condition set given more information in ConditionData.
+	// The resulting Decision may be concrete (Allow/Deny/NoOpinion), or again conditional, if the
+	// data in ConditionData is partial.
+	// If the builtin evaluator does not know how to evaluate the given decision, it should just
+	// return unevaluated, false, nil.
+	// A builtin evaluator might also evaluate the decision DAG partially, in which it can return
+	// evaluated != unevaluated, but fullyEvaluated == false.
+	// TODO: Change all no-op implementations to just return decision, false, nil.
+	BuiltinEvaluateConditions(ctx context.Context, conditionSet *ConditionSet, data ConditionData) (fullyEvaluatedDecision *Decision, err error)
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -83,13 +105,21 @@ type Attributes interface {
 // whether that error is critical or not.
 type Authorizer interface {
 	Authorize(ctx context.Context, a Attributes) (Decision, error)
+
+	// TODO: Should this also return a boolean, or I guess the assumption is that fullyEvaluated == true always?
+	EvaluateConditions(ctx context.Context, decision Decision, data ConditionData) (Decision, error)
 }
 
 // AuthorizerFunc implements Authorizer using a function.
+// It does not support conditional authorization.
 type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, error)
 
 func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, error) {
 	return f(ctx, a)
+}
+
+func (f AuthorizerFunc) EvaluateConditions(ctx context.Context, decision Decision, data ConditionData) (Decision, error) {
+	return DecisionDeny(), ErrorConditionEvaluationNotSupported
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
@@ -102,6 +132,24 @@ type RuleResolver interface {
 type RequestAttributesGetter interface {
 	GetRequestAttributes(user.Info, *http.Request) Attributes
 }
+
+// ConditionsMode specifies how, if at all, the client wants conditions to be
+// returned by the authorizer. The default (empty string) means conditions are
+// not supported by the caller.
+type ConditionsMode string
+
+const (
+	// ConditionsModeNone indicates that the client does not support conditions.
+	ConditionsModeNone ConditionsMode = ""
+
+	// ConditionsModeHumanReadable indicates that the client wants a
+	// human-readable condition and description, if possible.
+	ConditionsModeHumanReadable ConditionsMode = "HumanReadable"
+
+	// ConditionsModeOptimized indicates that the client wants an
+	// optimized conditions encoding without description, if possible.
+	ConditionsModeOptimized ConditionsMode = "Optimized"
+)
 
 // AttributesRecord implements Attributes interface.
 type AttributesRecord struct {
@@ -120,6 +168,9 @@ type AttributesRecord struct {
 	FieldSelectorParsingErr   error
 	LabelSelectorRequirements labels.Requirements
 	LabelSelectorParsingErr   error
+
+	// ConditionsMode indicates how conditions should be returned. Defaults to ConditionsModeNone.
+	ConditionsMode ConditionsMode
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -174,48 +225,287 @@ func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
 	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
 }
 
-// decision is the internal enum type backing Decision.
-type decision int
+func (a AttributesRecord) GetConditionsMode() ConditionsMode {
+	return a.ConditionsMode
+}
+
+// unconditionalDecision is the internal enum type backing Decision.
+type unconditionalDecision int
 
 const (
-	decisionDeny decision = iota
+	decisionDeny unconditionalDecision = iota
 	decisionAllow
 	decisionNoOpinion
 )
 
 // Decision models an authorization decision. It can be Allow, Deny, or NoOpinion.
-// The zero value is equivalent to DecisionDeny("").
+// The zero value (Decision{}) is equivalent to DecisionDeny("").
 // A Decision is passed by value.
 // Decision equality must be checked with Decision.Equal, not reflect.DeepEqual.
 type Decision struct {
-	decision decision
+	unconditionalDecision unconditionalDecision
+
+	conditionSet *ConditionSet
+
+	decisionChain ConditionalDecisionChain
+
 	// each reasons element should be a non-empty string
 	reasons []string
 }
 
 // DecisionAllow constructs an Allow decision with the given reason.
 func DecisionAllow(reasons ...string) Decision {
-	return Decision{decision: decisionAllow, reasons: nil}.WithAdditionalReasons(reasons...)
+	return Decision{
+		unconditionalDecision: decisionAllow,
+		// on purpose nil
+		conditionSet:  nil,
+		decisionChain: nil,
+		reasons:       nil,
+	}.WithAdditionalReasons(reasons...)
 }
 
 // DecisionDeny constructs a Deny decision with the given reason.
 func DecisionDeny(reasons ...string) Decision {
-	return Decision{decision: decisionDeny, reasons: nil}.WithAdditionalReasons(reasons...)
+	return Decision{
+		unconditionalDecision: decisionDeny,
+		// on purpose nil
+		conditionSet:  nil,
+		decisionChain: nil,
+		reasons:       nil,
+	}.WithAdditionalReasons(reasons...)
 }
 
 // DecisionNoOpinion constructs a NoOpinion decision with the given reason.
 func DecisionNoOpinion(reasons ...string) Decision {
-	return Decision{decision: decisionNoOpinion, reasons: nil}.WithAdditionalReasons(reasons...)
+	return Decision{
+		unconditionalDecision: decisionNoOpinion,
+		// on purpose nil
+		conditionSet:  nil,
+		decisionChain: nil,
+		reasons:       nil,
+	}.WithAdditionalReasons(reasons...)
 }
 
-// IsAllowed returns true if the decision is Allow.
-func (d Decision) IsAllowed() bool { return d.decision == decisionAllow }
+// TODO: Should reason be encoded on the Decision struct in the SAR API?
 
-// IsDenied returns true if the decision is Deny.
-func (d Decision) IsDenied() bool { return d.decision == decisionDeny }
+// TODO: How to build the Decision type from the serialized SAR when one needs to provide the authorizer?
+func DecisionConditional(attrs Attributes, conditionType ConditionType, conditionsIter iter.Seq2[string, Condition], reasons ...string) (Decision, error) {
+	conditionSet := map[string]Condition{}
+	seenIDs := sets.New[string]()
+	errlist := []error{}
+	failClosedError := DecisionNoOpinion()
+	for id, condition := range conditionsIter {
+		if condition.Effect == ConditionEffectDeny {
+			failClosedError = DecisionDeny()
+		}
+		if seenIDs.Has(id) {
+			errlist = append(errlist, fmt.Errorf("duplicate condition ID %q", id))
+			continue
+		}
+		if err := condition.Validate(id); err != nil {
+			errlist = append(errlist, err)
+			continue
+		}
+		conditionSet[id] = condition
+		// defensively stop directly when having seen too many conditions
+		if len(conditionSet) > MaxConditionsPerSet {
+			return DecisionDeny(), fmt.Errorf("too many conditions: %d exceeds maximum of %d", len(conditionSet), MaxConditionsPerSet)
+		}
+	}
+
+	// Do not allow constructing Conditional decisions when the feature gate is off
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		return failClosedError, fmt.Errorf("cannot construct conditional decision: the ConditionalAuthorization feature gate is disabled")
+	}
+
+	// check errors before len(conditionSet) == 0, as some errors might have made the map be empty
+	// although there were items in the iterator
+	if err := utilerrors.NewAggregate(errlist); err != nil {
+		// the error is returned first here, not in the loop, to make sure we saw all conditions,
+		// and fail closed with deny if there were any deny conditions
+		return failClosedError, err
+	}
+
+	// an empty conditionset always evaluates to NoOpinion
+	// ignore conditionType being invalid in this case, as it does not matter
+	if len(conditionSet) == 0 {
+		return DecisionNoOpinion("empty ConditionSet"), nil
+	}
+
+	if err := conditionType.Validate(); err != nil {
+		return failClosedError, err
+	}
+
+	// Protect against authorizers that forget to fail closed for clients that aren't conditions-aware
+	if attrs == nil || attrs.GetConditionsMode() == ConditionsModeNone {
+		return failClosedError.
+			WithAdditionalReasons("client does not support conditions, but authorizer tried to return a conditional response"), nil
+	}
+
+	return Decision{
+		unconditionalDecision: 0,
+		conditionSet: &ConditionSet{
+			conditionType: conditionType,
+			conditions:    conditionSet,
+		},
+		decisionChain: nil,
+		reasons:       nil,
+	}.WithAdditionalReasons(reasons...), nil
+}
+
+// ConditionalDecisionChain is an aggregate Decision type. Order of decisions matter.
+type ConditionalDecisionChain []Decision
+
+func (chain ConditionalDecisionChain) CanBecomeAllowed() bool {
+	for _, subDecision := range chain {
+		if subDecision.IsDenied() {
+			return false
+		}
+		if subDecision.IsAllowed() {
+			return true
+		}
+		if subDecision.IsConditional() && subDecision.CanBecomeAllowed() {
+			return true
+		}
+		if subDecision.IsConditionalChain() && subDecision.CanBecomeAllowed() {
+			return true
+		}
+	}
+	return false
+}
+
+func (chain ConditionalDecisionChain) FailClosedDecision() Decision {
+	for _, subDecision := range chain {
+		if subDecision.FailClosedDecision().IsDenied() {
+			return DecisionDeny()
+		}
+	}
+	return DecisionNoOpinion()
+}
+
+func (chain ConditionalDecisionChain) HasConcreteResponse() bool {
+	for _, subDecision := range chain {
+		if subDecision.HasConcreteResponse() {
+			return true
+		}
+	}
+	return false
+}
+
+// TODO: Make sure one cannot build a cyclic graph here.
+func DecisionConditionalChain(decisions ...Decision) Decision {
+	if len(decisions) == 0 {
+		return DecisionNoOpinion()
+	}
+	if len(decisions) == 1 {
+		d := decisions[0]
+		if d.IsAllowed() || d.IsDenied() || d.IsNoOpinion() {
+			return d
+		}
+		// else, wrap the conditional response in a chain, so that the caller knows which
+		// authorizer authored the condition
+	}
+	// Everything is NoOpinion => NoOpinion
+	if allItems(decisions, func(d Decision) bool { return d.IsNoOpinion() }) {
+		// TODO: Gather errors here
+		return DecisionNoOpinion()
+	}
+	// There is at least one decision that is not NoOpinion. If this is the last one, return it
+	if allItems(decisions[:len(decisions)-1], func(d Decision) bool { return d.IsNoOpinion() }) {
+		d := decisions[len(decisions)-1] // last item of the slice is the only non-NoOpinion
+		if d.IsAllowed() || d.IsDenied() || d.IsNoOpinion() {
+			return d
+		}
+	}
+
+	return Decision{
+		unconditionalDecision: 0,
+		conditionSet:          nil,
+		decisionChain:         decisions,
+		reasons:               nil,
+	}
+}
+
+func allItems(decisions []Decision, pred func(d Decision) bool) bool {
+	for _, d := range decisions {
+		if !pred(d) {
+			return false
+		}
+	}
+	return true
+}
+
+// INVARIANT: Exactly one of IsAllowed, IsNoOpinion, IsConditional and IsDenied must
+// always be true.
+
+// IsAllowed returns true if the decision is Allow.
+func (d Decision) IsAllowed() bool {
+	return d.unconditionalDecision == decisionAllow
+}
 
 // IsNoOpinion returns true if the decision is NoOpinion.
-func (d Decision) IsNoOpinion() bool { return d.decision == decisionNoOpinion }
+func (d Decision) IsNoOpinion() bool {
+	return d.unconditionalDecision == decisionNoOpinion
+}
+
+func (d Decision) IsConditional() bool {
+	return d.conditionSet != nil
+}
+
+func (d Decision) IsConditionalChain() bool {
+	return d.decisionChain != nil
+}
+
+func (d Decision) CanBecomeAllowed() bool {
+	if d.IsAllowed() {
+		return true
+	}
+	if d.IsDenied() || d.IsNoOpinion() {
+		return false
+	}
+	if d.IsConditional() {
+		return d.conditionSet.CanBecomeAllowed()
+	}
+	if d.IsConditionalChain() {
+		return d.decisionChain.CanBecomeAllowed()
+	}
+	return false
+}
+
+func (d Decision) HasConcreteResponse() bool {
+	if d.IsAllowed() || d.IsDenied() {
+		return true
+	}
+	if d.IsNoOpinion() || d.IsConditional() {
+		return false
+	}
+	return d.decisionChain.HasConcreteResponse()
+}
+
+// IsDenied returns true if the decision is Deny.
+func (d Decision) IsDenied() bool {
+	// The decision is a Deny whenever none of the other modes apply
+	// NOTE: A Conditional decision is encoded as
+	// d.unconditionalDecision == 0 == decisionDeny && d.conditionSet != nil, so it
+	// is not enough to check d.unconditionalDecision == decisionDeny
+	// This is because the zero value of the struct must be a Deny
+	return !d.IsAllowed() && !d.IsNoOpinion() && !d.IsConditional() && !d.IsConditionalChain()
+}
+
+// IsConcrete is true if d is Allowed, Denied or NoOpinion.
+func (d Decision) IsConcrete() bool {
+	return d.IsAllowed() || d.IsDenied() || d.IsNoOpinion()
+}
+
+func (d Decision) FailClosedDecision() Decision {
+	if d.IsConditional() {
+		return d.conditionSet.FailClosedDecision()
+	}
+	if d.IsConditionalChain() {
+		return d.decisionChain.FailClosedDecision()
+	}
+	return DecisionNoOpinion()
+}
 
 // Reason returns the reason string associated with this decision.
 func (d Decision) Reason() string {
@@ -233,7 +523,37 @@ func (d Decision) Reason() string {
 // "do the two decisions yield the same final outcome (request allowed/denied), for any input?"
 // Note that this equality notion does not take reason into account.
 func (d Decision) Equal(other Decision) bool {
-	return d.decision == other.decision
+	if d.IsAllowed() && other.IsAllowed() {
+		return true
+	}
+	if d.IsDenied() && other.IsDenied() {
+		return true
+	}
+	if d.IsNoOpinion() && other.IsNoOpinion() {
+		return true
+	}
+	if d.IsConditional() && other.IsConditional() {
+		return d.conditionSet.Equal(other.conditionSet)
+	}
+	if d.IsConditionalChain() && other.IsConditionalChain() {
+		if len(d.decisionChain) != len(other.decisionChain) {
+			return false
+		}
+		for i := range d.decisionChain {
+			if !d.decisionChain[i].Equal(other.decisionChain[i]) {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+func (d Decision) ConditionSet() *ConditionSet {
+	return d.conditionSet
+}
+
+func (d Decision) ConditionalChain() ConditionalDecisionChain {
+	return d.decisionChain
 }
 
 // WithAdditionalReasons creates a new Decision with additional reasons
@@ -249,21 +569,31 @@ func (d Decision) WithAdditionalReasons(additionalReasons ...string) Decision {
 		}
 	}
 	return Decision{
-		decision: d.decision,
-		reasons:  append(d.reasons, nonEmptyReasons...),
+		unconditionalDecision: d.unconditionalDecision,
+		reasons:               append(d.reasons, nonEmptyReasons...),
 	}
 }
 
 // String returns a human-readable representation of the decision.
 func (d Decision) String() string {
-	switch d.decision {
-	case decisionDeny:
-		return "Deny"
-	case decisionAllow:
+	if d.IsAllowed() {
 		return "Allow"
-	case decisionNoOpinion:
-		return "NoOpinion"
-	default:
-		return fmt.Sprintf("Unknown (%d)", int(d.decision))
 	}
+	if d.IsDenied() {
+		return "Deny"
+	}
+	if d.IsNoOpinion() {
+		return "NoOpinion"
+	}
+	if d.IsConditional() {
+		return fmt.Sprintf("Conditional(type=%q, len=%d)", d.conditionSet.conditionType, len(d.conditionSet.conditions))
+	}
+	if d.IsConditionalChain() {
+		subdecisionStrings := make([]string, 0, len(d.decisionChain))
+		for _, subDecision := range d.decisionChain {
+			subdecisionStrings = append(subdecisionStrings, subDecision.String())
+		}
+		return fmt.Sprintf("ConditionalChain[%s]", strings.Join(subdecisionStrings, ", "))
+	}
+	return "Unknown" // should never happen, according to our invariant
 }

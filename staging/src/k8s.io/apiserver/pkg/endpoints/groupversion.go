@@ -89,6 +89,7 @@ type APIGroupVersion struct {
 	// Authorizer determines whether a user is allowed to make a certain request. The Handler does a preliminary
 	// authorization check using the request URI but it may be necessary to make additional checks, such as in
 	// the create-on-update case
+	// TODO(luxas): Might need to add the fully-assembled ConditionsEnforcer here too.
 	Authorizer authorizer.Authorizer
 
 	Admit admission.Interface

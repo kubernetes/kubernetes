@@ -56,6 +56,7 @@ func ensureAuthorizedForVerb(ctx context.Context, a authorizer.Authorizer, verb 
 	if err != nil {
 		return err
 	}
+	// TODO(luxas): Evaluate Conditional Authz here
 	if !authorized.IsAllowed() {
 		return apierrors.NewForbidden(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name, errors.New(authorized.Reason()))
 	}
