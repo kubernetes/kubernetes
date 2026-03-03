@@ -3203,7 +3203,15 @@ func (pp *kubeletPodsProvider) GetPods() []*v1.Pod {
 }
 
 func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
-	return pp.kl.podManager.GetPodByName(namespace, name)
+	pod, found := pp.kl.podManager.GetPodByName(namespace, name)
+	if !found {
+		return nil, false
+	}
+	// use the same filtering logic as GetActivePods
+	if pp.kl.isPodInactive(pod) {
+		return nil, false
+	}
+	return pod, true
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service

@@ -1126,20 +1126,29 @@ func (kl *Kubelet) PodIsFinished(pod *v1.Pod) bool {
 func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 	filteredPods := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
-		// if a pod is fully terminated by UID, it should be excluded from the
-		// list of pods
-		if kl.podWorkers.IsPodKnownTerminated(p.UID) {
+		if kl.isPodInactive(p) {
 			continue
 		}
-
-		// terminal pods are considered inactive UNLESS they are actively terminating
-		if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
-			continue
-		}
-
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
+}
+
+// isPodInactive returns true if the pod is in a terminal phase
+// or is known to be fully terminated. This method should only be used
+// when the pod being processed is upstream of the pod worker, i.e.
+// the pods the pod manager is aware of.
+func (kl *Kubelet) isPodInactive(p *v1.Pod) bool {
+	// if a pod is fully terminated by UID, it should be excluded from the
+	// list of pods
+	if kl.podWorkers.IsPodKnownTerminated(p.UID) {
+		return true
+	}
+	// terminal pods are considered inactive UNLESS they are actively terminating
+	if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
+		return true
+	}
+	return false
 }
 
 // isAdmittedPodTerminal returns true if the provided config source pod is in

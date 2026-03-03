@@ -24,7 +24,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -497,26 +496,6 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 	}
 
 	deletePodsAsync(ctx, f, podMap)
-}
-
-func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
-	var wg sync.WaitGroup
-	for _, pod := range podMap {
-		wg.Add(1)
-		go func(podNS, podName string) {
-			defer ginkgo.GinkgoRecover()
-			defer wg.Done()
-			deletePodSyncAndWait(ctx, f, podNS, podName)
-		}(pod.Namespace, pod.Name)
-	}
-	wg.Wait()
-}
-
-func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
-	framework.Logf("deleting pod: %s/%s", podNS, podName)
-	deletePodSyncByName(ctx, f, podName)
-	waitForAllContainerRemoval(ctx, podName, podNS)
-	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }
 
 func runTopologyManagerNegativeTest(ctx context.Context, f *framework.Framework, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
