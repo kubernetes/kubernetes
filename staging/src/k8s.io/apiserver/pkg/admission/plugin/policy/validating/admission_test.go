@@ -359,6 +359,7 @@ func setupTestCommon(
 	matcher generic.PolicyMatcher,
 	shouldStartInformers bool,
 ) *generic.PolicyTestContext[*validating.Policy, *validating.PolicyBinding, validating.Validator] {
+	t.Cleanup(generic.SetPolicyRefreshIntervalForTests(10 * time.Millisecond))
 	testContext, testContextCancel, err := generic.NewPolicyTestContext(
 		validating.NewValidatingAdmissionPolicyAccessor,
 		validating.NewValidatingAdmissionPolicyBindingAccessor,
@@ -1510,7 +1511,6 @@ func TestParamRef(t *testing.T) {
 						}
 
 						t.Run(name, func(t *testing.T) {
-							t.Parallel()
 							// Test creating a policy with a cluster or namesapce-scoped param
 							// and binding with the provided configuration. Test will ensure
 							// that the provided configuration is capable of matching
