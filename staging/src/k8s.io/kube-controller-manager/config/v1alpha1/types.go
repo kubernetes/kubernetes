@@ -122,6 +122,9 @@ type KubeControllerManagerConfiguration struct {
 	// EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController
 	// related features.
 	EphemeralVolumeController EphemeralVolumeControllerConfiguration
+	// EvictionRequestControllerConfiguration holds configuration for
+	// EvictionRequestController related features.
+	EvictionRequestController EvictionRequestControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -309,6 +312,13 @@ type EphemeralVolumeControllerConfiguration struct {
 	// that will be done concurrently. Larger number = faster ephemeral volume updating,
 	// but more CPU (and network) load.
 	ConcurrentEphemeralVolumeSyncs int32
+}
+
+// EvictionRequestControllerConfiguration contains elements describing EvictionRequestController.
+type EvictionRequestControllerConfiguration struct {
+	// ConcurrentEvictionRequestSyncs is the number of eviction requests that are
+	// allowed to sync concurrently.
+	ConcurrentEvictionRequestSyncs int32
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.

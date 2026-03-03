@@ -29,6 +29,7 @@ import (
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -93,6 +94,9 @@ type KubeControllerManagerConfiguration struct {
 	// EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController
 	// related features.
 	EphemeralVolumeController ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration
+	// EvictionRequestControllerConfiguration holds configuration for
+	// EvictionRequestController related features.
+	EvictionRequestController evictionrequestconfig.EvictionRequestControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration
