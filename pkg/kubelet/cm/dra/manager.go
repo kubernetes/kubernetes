@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -473,6 +474,16 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 	return nil
 }
 
+// truncateHealthMessage truncates a health message to the maximum allowed length.
+// If the message exceeds v1.ResourceHealthMessageMaxLength, it is truncated to
+// (maxLength - 3) characters and "..." is appended.
+func truncateHealthMessage(message string) string {
+	if len(message) <= v1.ResourceHealthMessageMaxLength {
+		return message
+	}
+	return message[:v1.ResourceHealthMessageMaxLength-3] + "..."
+}
+
 // GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
 func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
@@ -830,10 +841,26 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 		// Iterate through the claims requested by this specific container.
 		for _, claim := range containerSpec.Resources.Claims {
 			// Find the actual name of the ResourceClaim object.
+			// Try the O(1) map lookup first, then fall back to resolving
+			// from the pod spec. The fallback is needed because
+			// ResourceClaimStatuses may not be populated yet when a
+			// health update triggers an early status sync.
 			actualClaimName := podClaimStatusMap[claim.Name]
 
 			if actualClaimName == "" {
-				logger.V(4).Info("Could not find generated name for resource claim in pod status", "container", containerSpec.Name, "claimName", claim.Name)
+				for i := range pod.Spec.ResourceClaims {
+					if pod.Spec.ResourceClaims[i].Name == claim.Name {
+						claimNamePtr, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+						if err == nil && claimNamePtr != nil {
+							actualClaimName = *claimNamePtr
+						}
+						break
+					}
+				}
+			}
+
+			if actualClaimName == "" {
+				logger.V(4).Info("Could not find generated name for resource claim", "container", containerSpec.Name, "claimName", claim.Name)
 				continue
 			}
 
@@ -871,26 +898,53 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 				// Clear previous health entries before adding current ones.
 				resStatus.Resources = []v1.ResourceHealth{}
 
+				// Use a map to track resourceIDs we've already added to avoid duplicates.
+				// Multiple devices in claimInfo.DriverState may have the same resourceID
+				// (e.g., when using the same CDI device ID), so we need to deduplicate.
+				seenResourceIDs := make(map[v1.ResourceID]bool)
+
 				for driverName, driverState := range claimInfo.DriverState {
 					for _, device := range driverState.Devices {
-						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						// Skip devices that don't match the request we're reporting for.
+						// Use BaseRequestRef to handle subrequests (e.g., "request/subrequest" -> "request")
+						// since device.RequestNames are stored with subrequest suffixes stripped.
+						if claim.Request != "" && len(device.RequestNames) > 0 && !slices.Contains(device.RequestNames, resourceclaim.BaseRequestRef(claim.Request)) {
+							continue
+						}
+
+						healthInfo := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
 
 						var health v1.ResourceHealthStatus
-						switch healthStr {
-						case "Healthy":
+						switch healthInfo.Health {
+						case state.DeviceHealthStatusHealthy:
 							health = v1.ResourceHealthStatusHealthy
-						case "Unhealthy":
+						case state.DeviceHealthStatusUnhealthy:
 							health = v1.ResourceHealthStatusUnhealthy
 						default:
 							health = v1.ResourceHealthStatusUnknown
 						}
 
-						resourceHealth := v1.ResourceHealth{Health: health}
+						// Create the ResourceHealth entry
+						resourceHealth := v1.ResourceHealth{
+							Health: health,
+						}
+						if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage) && len(healthInfo.Message) > 0 {
+							resourceHealth.Message = &healthInfo.Message
+						}
+
+						// Use first CDI device ID as ResourceID, with fallback
 						if len(device.CDIDeviceIDs) > 0 {
 							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
 						} else {
 							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
 						}
+
+						// Skip if we've already added this resourceID
+						if seenResourceIDs[resourceHealth.ResourceID] {
+							continue
+						}
+						seenResourceIDs[resourceHealth.ResourceID] = true
+
 						resStatus.Resources = append(resStatus.Resources, resourceHealth)
 					}
 				}
@@ -973,6 +1027,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 				Health:             health,
 				LastUpdated:        time.Unix(d.GetLastUpdatedTime(), 0),
 				HealthCheckTimeout: timeout,
+				Message:            truncateHealthMessage(d.GetMessage()),
 			}
 		}
 
