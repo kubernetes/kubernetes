@@ -28,6 +28,8 @@ import (
 )
 
 func TestEnableHiddenMetrics(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	currentVersion := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
@@ -198,6 +200,8 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 }
 
 func TestShowHiddenMetric(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	registry := newKubeRegistry(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "15",
@@ -212,7 +216,6 @@ func TestShowHiddenMetric(t *testing.T) {
 	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 
 	showHidden.Store(true)
-	defer showHidden.Store(false)
 	registry.MustRegister(NewCounter(
 		&CounterOpts{
 			Namespace:         "some_namespace",
@@ -231,6 +234,8 @@ func TestShowHiddenMetric(t *testing.T) {
 }
 
 func TestDisabledMetrics(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	o := NewOptions()
 	o.DisabledMetrics = []string{"should_be_disabled", "should_be_disabled"} // should be deduplicated (disabled_metrics_total == 1)
 	currentVersion := apimachineryversion.Info{

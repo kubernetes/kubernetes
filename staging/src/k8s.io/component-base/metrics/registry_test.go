@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver/v4"
@@ -26,6 +27,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
+
+// resetMetricsGlobalState resets all global state used by metrics tests.
+// NOTE: This should be called at the start of tests and in cleanup to ensure test isolation.
+func resetMetricsGlobalState(t *testing.T) {
+	resetter := func() {
+		hiddenMetricsTotal.Reset()
+		disabledMetricsTotal.Reset()
+
+		showHidden.Store(false)
+		showHiddenOnce = sync.Once{}
+
+		alphaCounter.ClearState()
+		alphaDeprecatedCounter.ClearState()
+		betaDeprecatedCounter.ClearState()
+		alphaHiddenCounter.ClearState()
+
+		disabledMetricsLock.Lock()
+		disabledMetrics = map[string]struct{}{}
+		disabledMetricsLock.Unlock()
+	}
+
+	// Reset at the start of tests
+	resetter()
+
+	// Register cleanup to reset again after test completes
+	t.Cleanup(resetter)
+}
 
 var (
 	v115         = semver.MustParse("1.15.0")
@@ -265,6 +293,8 @@ func TestShouldHide(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	var tests = []struct {
 		desc                    string
 		metrics                 []*Counter
@@ -334,6 +364,8 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMustRegister(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	var tests = []struct {
 		desc            string
 		metrics         []*Counter
