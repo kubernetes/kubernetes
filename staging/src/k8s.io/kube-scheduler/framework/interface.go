@@ -801,7 +801,7 @@ type Handle interface {
 	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
 
-	// PodGroupManager returns the scheduler's podgroup state manager.
+	// PodGroupManager provides an interface for runtime information about pod groups from scheduler's cache.
 	PodGroupManager() PodGroupManager
 
 	// Sign a pod.

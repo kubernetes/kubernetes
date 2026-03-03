@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/utils/ptr"
 )
 
@@ -53,6 +52,10 @@ func (pgk PodGroupKey) GetNamespace() string {
 	return pgk.namespace
 }
 
+func (pgk PodGroupKey) String() string {
+	return pgk.namespace + "/" + pgk.GetName()
+}
+
 var _ klog.KMetadata = &PodGroupKey{}
 
 func NewPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) PodGroupKey {
@@ -73,7 +76,7 @@ type podGroupState struct {
 	// allPods tracks all pods belonging to the group that are known to the scheduler.
 	allPods map[types.UID]*v1.Pod
 	// unscheduledPods tracks all pods that are unscheduled for this group,
-	// i.e., are neither assumed nor scheduled.
+	// i.e., are neither assumed nor assigned.
 	unscheduledPods sets.Set[types.UID]
 	// assumedPods tracks pods that have reached the Reserve stage and are waiting
 	// for the rest of the gang to arrive before being allowed to bind.
@@ -94,9 +97,9 @@ func newPodGroupState() *podGroupState {
 	}
 }
 
-// AddPod adds the pod to this group.
+// addPod adds the pod to this group.
 // Depending on the NodeName, it can insert the pod to assignedPods set.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) addPod(pod *v1.Pod) {
 	pgs.generation++
 	pgs.allPods[pod.UID] = pod
@@ -107,9 +110,9 @@ func (pgs *podGroupState) addPod(pod *v1.Pod) {
 	}
 }
 
-// UpdatePod updates the pod in this group.
+// updatePod updates the pod in this group.
 // In case of binding, it moves the pod to assignedPods.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 	pgs.generation++
 	pgs.allPods[newPod.UID] = newPod
@@ -122,7 +125,7 @@ func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 }
 
 // Clone returns a deep copy of the live pod group state.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) Clone() *podGroupStateSnapshot {
 	var deadline *time.Time
 	if pgs.schedulingDeadline != nil {
@@ -139,8 +142,8 @@ func (pgs *podGroupState) Clone() *podGroupStateSnapshot {
 	}
 }
 
-// DeletePod completely deletes the pod from this group.
-// It is called under the cache lock.
+// deletePod completely deletes the pod from this group.
+// It must be called under the cache lock.
 func (pgs *podGroupState) deletePod(podUID types.UID) {
 	pgs.generation++
 	delete(pgs.allPods, podUID)
@@ -150,7 +153,7 @@ func (pgs *podGroupState) deletePod(podUID types.UID) {
 }
 
 // Empty returns true when the group is empty.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) Empty() bool {
 	return len(pgs.allPods) == 0
 }
@@ -211,7 +214,7 @@ func (pgs *podGroupState) SchedulingTimeout() time.Duration {
 }
 
 // AssumePod marks a pod as having reached the Reserve stage.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) AssumePod(podUID types.UID) {
 	pgs.generation++
 	pgs.assumedPods.Insert(podUID)
@@ -219,14 +222,12 @@ func (pgs *podGroupState) AssumePod(podUID types.UID) {
 }
 
 // ForgetPod removes a pod from the assumed state.
-// It is called under the cache lock.
+// It must be called under the cache lock.
 func (pgs *podGroupState) ForgetPod(podUID types.UID) {
 	pgs.generation++
 	pgs.unscheduledPods.Insert(podUID)
 	pgs.assumedPods.Delete(podUID)
 }
-
-var _ fwk.PodGroupState = &podGroupStateSnapshot{}
 
 // podGroupStateSnapshot is an immutable, point-in-time copy of a podGroupState.
 type podGroupStateSnapshot struct {
@@ -263,30 +264,28 @@ func (s *podGroupStateSnapshot) AssignedPods() sets.Set[types.UID] {
 	return s.assignedPods
 }
 
-// TODO: look into it.
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
-// Unlike the live podGroupState, this does not create a new deadline.
+// A new deadline is created if one doesn't exist, or if the previous one has expired.
 func (s *podGroupStateSnapshot) SchedulingTimeout() time.Duration {
-	if s.schedulingDeadline == nil {
-		return DefaultSchedulingTimeoutDuration
+	now := time.Now()
+	// A new deadline is set if one doesn't exist, or if the old one has passed.
+	// This allows a new attempt to form a gang after a previous attempt timed out.
+	if s.schedulingDeadline == nil || s.schedulingDeadline.Before(now) {
+		s.schedulingDeadline = ptr.To(now.Add(DefaultSchedulingTimeoutDuration))
 	}
-	remaining := time.Until(*s.schedulingDeadline)
-	if remaining < 0 {
-		return 0
-	}
-	return remaining
+	return s.schedulingDeadline.Sub(now)
 }
 
-// AssumePod marks a pod as having reached the Reserve stage.
-// It is called under the cache lock.
+// assumePod marks a pod as having reached the Reserve stage.
+// It must be called under the cache lock.
 func (s *podGroupStateSnapshot) assumePod(podUID types.UID) {
 	s.generation++
 	s.assumedPods.Insert(podUID)
 	s.unscheduledPods.Delete(podUID)
 }
 
-// ForgetPod removes a pod from the assumed state.
-// It is called under the cache lock.
+// forgetPod removes a pod from the assumed state.
+// It must be called under the cache lock.
 func (s *podGroupStateSnapshot) forgetPod(podUID types.UID) {
 	s.generation++
 	s.unscheduledPods.Insert(podUID)

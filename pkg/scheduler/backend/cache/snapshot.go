@@ -65,6 +65,8 @@ type Snapshot struct {
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
 	// This field should be cleared once the pod group has been checked for the placement.
 	placementNodes *placementNodes
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
+	genericWorkloadEnabled bool
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -72,10 +74,11 @@ var _ fwk.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap:    make(map[string]*framework.NodeInfo),
-		usedPVCSet:     sets.New[string](),
-		assumedPods:    make(map[string]*v1.Pod),
-		podGroupStates: make(map[PodGroupKey]*podGroupStateSnapshot),
+		nodeInfoMap:            make(map[string]*framework.NodeInfo),
+		usedPVCSet:             sets.New[string](),
+		assumedPods:            make(map[string]*v1.Pod),
+		podGroupStates:         make(map[PodGroupKey]*podGroupStateSnapshot),
+		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
 }
 
@@ -191,15 +194,23 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
-// PodGroupStatesInfos returns a PodGroupStateLister.
-func (s *Snapshot) PodGroupStatesInfos() fwk.PodGroupStateLister {
-	return s
+// PodGroupStates returns a PodGroupStateLister backed by this snapshot's pod group states.
+func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
+	return &snapshotPodGroupStateLister{podGroupStates: s.podGroupStates}
 }
 
-func (s *Snapshot) GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
-	state, ok := s.podGroupStates[NewPodGroupKey(namespace, workloadRef)]
+var _ fwk.PodGroupStateLister = &snapshotPodGroupStateLister{}
+
+type snapshotPodGroupStateLister struct {
+	podGroupStates map[PodGroupKey]*podGroupStateSnapshot
+}
+
+// Get returns the pod group state from the snapshot for the given pod group.
+func (l *snapshotPodGroupStateLister) Get(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+	key := NewPodGroupKey(namespace, workloadRef)
+	state, ok := l.podGroupStates[key]
 	if !ok {
-		return nil, fmt.Errorf("pod group state not found for workload %s/%s", namespace, workloadRef.Name)
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
 	}
 	return state, nil
 }
@@ -269,11 +280,12 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && pod.Spec.WorkloadRef != nil {
-		pgKey := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-		if pgs, ok := s.podGroupStates[pgKey]; ok {
-			pgs.assumePod(pod.UID)
-		}
+	if !s.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return nil
+	}
+	pgKey := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	if pgs, ok := s.podGroupStates[pgKey]; ok {
+		pgs.assumePod(pod.UID)
 	}
 	return nil
 }
@@ -291,7 +303,7 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	}
 	delete(s.assumedPods, key)
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && assumedPod.Spec.WorkloadRef != nil {
+	if s.genericWorkloadEnabled && assumedPod.Spec.WorkloadRef != nil {
 		pgKey := NewPodGroupKey(assumedPod.Namespace, assumedPod.Spec.WorkloadRef)
 		if pgs, ok := s.podGroupStates[pgKey]; ok {
 			pgs.forgetPod(assumedPod.UID)

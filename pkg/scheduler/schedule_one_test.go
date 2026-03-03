@@ -1029,18 +1029,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotBinding *v1.Binding
 		var gotNominatingInfo *fwk.NominatingInfo
 
-		if scheduleAsPodGroup {
-			ref := &v1.WorkloadReference{
-				Name:     "workload",
-				PodGroup: "pg",
-			}
-			// When scheduling a pod as a pod group, set workloadRef to all relevant pods.
-			item.sendPod = withWorkloadRef(item.sendPod, ref)
-			item.expectErrorPod = withWorkloadRef(item.expectErrorPod, ref)
-			item.expectPodInBackoffQ = withWorkloadRef(item.expectPodInBackoffQ, ref)
-			item.expectPodInUnschedulable = withWorkloadRef(item.expectPodInUnschedulable, ref)
-		}
-
 		client := clientsetfake.NewClientset(item.sendPod)
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 		client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -1060,6 +1048,15 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		internalCache := internalcache.New(ctx, apiDispatcher)
 		if scheduleAsPodGroup {
+			ref := &v1.WorkloadReference{
+				Name:     "workload",
+				PodGroup: "pg",
+			}
+			// When scheduling a pod as a pod group, set workloadRef to all relevant pods.
+			item.sendPod = withWorkloadRef(item.sendPod, ref)
+			item.expectErrorPod = withWorkloadRef(item.expectErrorPod, ref)
+			item.expectPodInBackoffQ = withWorkloadRef(item.expectPodInBackoffQ, ref)
+			item.expectPodInUnschedulable = withWorkloadRef(item.expectPodInUnschedulable, ref)
 			internalCache.AddPodInGroup(item.sendPod)
 		}
 		cache := &fakecache.Cache{

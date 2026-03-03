@@ -291,20 +291,24 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		return errors.New(errMsg)
 	}
 
-	// Take a snapshot of podgroup states for this scheduling cycle.
+	// Take a snapshot of pod group states for this scheduling cycle.
 	cache.updatePodGroupStateSnapshot(nodeSnapshot)
 
 	return nil
 }
 
+// updatePodGroupStateSnapshot updates the pod group state portion of the given snapshot.
+// It assumes that the cache lock is already held.
+// It removes entries that no longer exist in the live cache
+// and clones entries whose generation has advanced since the last snapshot.
 func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
-	// Remove podgroup states from snapshot that no longer exist in cache.
+	// Remove pod group states from snapshot that no longer exist in cache.
 	for key := range snapshot.podGroupStates {
 		if _, exists := cache.podGroupStates[key]; !exists {
 			delete(snapshot.podGroupStates, key)
 		}
 	}
-	// Clone only podgroup states that changed since the last snapshot.
+	// Clone only pod group states that changed since the last snapshot.
 	for key, podGroupState := range cache.podGroupStates {
 		if existing, ok := snapshot.podGroupStates[key]; ok && existing.generation == podGroupState.generation {
 			continue
@@ -450,6 +454,12 @@ func (cache *cacheImpl) addPod(logger klog.Logger, pod *v1.Pod, assumePod bool) 
 	cache.podStates[key] = ps
 	if assumePod {
 		cache.assumedPods.Insert(key)
+	}
+
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return nil
+	}
+	if assumePod {
 		cache.assumePodInGroup(pod)
 	} else {
 		cache.addPodInGroup(pod)
@@ -492,6 +502,9 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, forgetPod boo
 	delete(cache.podStates, key)
 	delete(cache.assumedPods, key)
 
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return nil
+	}
 	if forgetPod {
 		cache.forgetPodInGroup(pod)
 	} else {
@@ -750,32 +763,42 @@ func (cache *cacheImpl) updateMetrics() {
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 }
 
+// AddPodInGroup registers the pod to its pod group state in the cache.
 func (cache *cacheImpl) AddPodInGroup(pod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return
+	}
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
 	cache.addPodInGroup(pod)
 }
 
+// UpdatePodInGroup updates a pod's entry inside its pod group state in the cache.
 func (cache *cacheImpl) UpdatePodInGroup(logger klog.Logger, oldPod, newPod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || newPod.Spec.WorkloadRef == nil {
+		return
+	}
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
 	cache.updatePodInGroup(logger, oldPod, newPod)
 }
 
+// RemovePodFromGroup removes the pod from its pod group state in the cache.
 func (cache *cacheImpl) RemovePodFromGroup(pod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return
+	}
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
 	cache.removePodFromGroup(pod)
 }
 
+// addPodInGroup adds the pod to its pod group state, creating the group entry if it doesn't exist yet.
+// Assumes that the cache lock is already held.
 func (cache *cacheImpl) addPodInGroup(pod *v1.Pod) {
-	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
-		return
-	}
-
 	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
@@ -786,11 +809,9 @@ func (cache *cacheImpl) addPodInGroup(pod *v1.Pod) {
 	podGroupState.addPod(pod)
 }
 
+// updatePodInGroup updates the pod entry inside its pod group state.
+// Assumes that the cache lock is already held.
 func (cache *cacheImpl) updatePodInGroup(logger klog.Logger, oldPod, newPod *v1.Pod) {
-	if !cache.genericWorkloadEnabled || newPod.Spec.WorkloadRef == nil {
-		return
-	}
-
 	key := NewPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
@@ -802,11 +823,9 @@ func (cache *cacheImpl) updatePodInGroup(logger klog.Logger, oldPod, newPod *v1.
 	podGroupState.updatePod(oldPod, newPod)
 }
 
+// removePodFromGroup removes the pod from its pod group state, deleting the group entry when empty.
+// Assumes that the cache lock is already held.
 func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
-	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
-		return
-	}
-
 	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
@@ -818,35 +837,39 @@ func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
 	}
 }
 
+// assumePodInGroup marks the pod as assumed in its pod group state.
+// Assumes that the cache lock is already held.
 func (cache *cacheImpl) assumePodInGroup(pod *v1.Pod) {
-	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
-		return
-	}
-
 	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	if pgs, exists := cache.podGroupStates[key]; exists {
 		pgs.AssumePod(pod.UID)
 	}
 }
 
+// forgetPodInGroup moves the pod back from assumed to unscheduled in its pod group state.
+// Assumes that the cache lock is already held.
 func (cache *cacheImpl) forgetPodInGroup(pod *v1.Pod) {
-	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
-		return
-	}
-
 	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	if pgs, exists := cache.podGroupStates[key]; exists {
 		pgs.ForgetPod(pod.UID)
 	}
 }
 
-func (cache *cacheImpl) GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+// PodGroupStates returns the PodGroupStateLister for this cache.
+// It is used by PodGroupManager to get access to run time pod group states in the cache.
+func (cache *cacheImpl) PodGroupStates() fwk.PodGroupStateLister {
+	return cache
+}
+
+// Get returns the live pod group state for the given pod group.
+func (cache *cacheImpl) Get(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	podGroupState, exists := cache.podGroupStates[NewPodGroupKey(namespace, workloadRef)]
+	key := NewPodGroupKey(namespace, workloadRef)
+	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
-		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's workload")
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
 	}
 	return podGroupState, nil
 }

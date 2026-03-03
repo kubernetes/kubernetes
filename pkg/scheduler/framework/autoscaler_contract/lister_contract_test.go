@@ -76,13 +76,13 @@ func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 	return nil
 }
 
-func (c *shareListerContract) PodGroupStatesInfos() fwk.PodGroupStateLister {
+func (c *shareListerContract) PodGroupStates() fwk.PodGroupStateLister {
 	return nil
 }
 
 type podGroupStateListerContract struct{}
 
-func (c *podGroupStateListerContract) GetPodGroupState(_ string, _ *v1.WorkloadReference) (fwk.PodGroupState, error) {
+func (c *podGroupStateListerContract) Get(_ string, _ *v1.WorkloadReference) (fwk.PodGroupState, error) {
 	return nil, nil
 }
 

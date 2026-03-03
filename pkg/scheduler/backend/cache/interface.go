@@ -109,8 +109,8 @@ type Cache interface {
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 	BindPod(binding *v1.Binding) (<-chan error, error)
 
-	// GetPodGroupState returns the live pod group state for a pod's workload.
-	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error)
+	// PodGroupStates returns a PodGroupStateLister backed by the live cache.
+	PodGroupStates() fwk.PodGroupStateLister
 
 	// AddPodInGroup adds a pod to its pod group state.
 	AddPodInGroup(pod *v1.Pod)

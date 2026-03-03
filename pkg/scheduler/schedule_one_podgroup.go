@@ -120,7 +120,7 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 	logger := klog.FromContext(ctx)
 
 	// Get the actual pod group state
-	podGroupState, err := sched.Cache.GetPodGroupState(pInfo.Pod.Namespace, pInfo.Pod.Spec.WorkloadRef)
+	podGroupState, err := sched.Cache.PodGroupStates().Get(pInfo.Pod.Namespace, pInfo.Pod.Spec.WorkloadRef)
 	if err != nil {
 		return nil, fmt.Errorf("error while retrieving pod group state: %w", err)
 	}
@@ -193,10 +193,10 @@ func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Po
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
-	// Marks this cycle as a pod-group scheduling cycle.
+	// Marks this cycle as a pod group scheduling cycle.
 	// It indicates that Permit plugin should look at the snapshotted PodGroupState.
 	// Otherwise the Permit plugin looks at the live PodGroupState.
-	state.Write(framework.PermitPodGroupModeKey, &framework.PermitPodGroupMode{})
+	state.SetPodGroupScheduling(true)
 
 	return &podSchedulingContext{
 		logger:         logger,
@@ -419,9 +419,8 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			case podGroupFeasible:
 				// Pod no longer needs a pod group scheduling cycle. Setting it to false to disable any checks in further functions.
 				pInfo.NeedsPodGroupScheduling = false
-				// Remove the PermitPodGroupModeKey, to consider the pod as a regular one in
-				// the binding cycle where Permit reads from the live PodGroupState.
-				podCtx.state.Delete(framework.PermitPodGroupModeKey)
+				// Disable pod group scheduling in cycle state before binding, so that Permit reads PodGroupState from the live state.
+				podCtx.state.SetPodGroupScheduling(false)
 				// Schedule result is applied for pod and its binding cycle executes.
 				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 				if !status.IsSuccess() {

@@ -35,8 +35,14 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
+
+func init() {
+	// This is required for tests where cache is initialized, and cache attempts to update metrics.
+	metrics.Register()
+}
 
 func Test_isSchedulableAfterPodAdded(t *testing.T) {
 	tests := []struct {

@@ -50,12 +50,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
-	PodGroupStatesInfos() PodGroupStateLister
+	PodGroupStates() PodGroupStateLister
 }
 
+// PodGroupStateLister provides read access to pod group states.
 type PodGroupStateLister interface {
-	// GetPodGroupState returns the PodGroupState of the given workload.
-	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+	// Get returns the PodGroupState of the given pod group.
+	Get(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -152,12 +153,13 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// PodGroupManager provides an interface for accessing the state of pod groups.
+// PodGroupManager provides an interface for runtime information about pod groups in the scheduler cache.
 type PodGroupManager interface {
-	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+	// PodGroupStates returns the PodGroupStateLister backed by the live scheduler cache.
+	PodGroupStates() PodGroupStateLister
 }
 
-// PodGroupState provides an interface to view and modify the state of a single pod group.
+// PodGroupState provides an interface to view the state of a single pod group.
 type PodGroupState interface {
 	// AllPods returns the UIDs of all pods known to the scheduler for this group.
 	AllPods() sets.Set[types.UID]

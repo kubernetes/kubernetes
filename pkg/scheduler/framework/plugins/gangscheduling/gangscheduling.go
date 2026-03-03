@@ -28,7 +28,6 @@ import (
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	schedframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -139,7 +138,7 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return nil
 	}
 
-	podGroupState, err := pl.handle.PodGroupManager().GetPodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.handle.PodGroupManager().PodGroupStates().Get(namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -208,12 +207,10 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 
 // getPodGroupState returns the pod group state appropriate for the current scheduling mode.
 // In pod group scheduling mode, it reads from the snapshot.
-// otherwise it reads from the live state.
+// Otherwise, it reads runtime state from the cache.
 func (pl *GangScheduling) getPodGroupState(state fwk.CycleState, namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
-	if state != nil {
-		if _, err := state.Read(schedframework.PermitPodGroupModeKey); err == nil {
-			return pl.handle.SnapshotSharedLister().PodGroupStatesInfos().GetPodGroupState(namespace, workloadRef)
-		}
+	if state != nil && state.IsPodGroupScheduling() {
+		return pl.handle.SnapshotSharedLister().PodGroupStates().Get(namespace, workloadRef)
 	}
-	return pl.handle.PodGroupManager().GetPodGroupState(namespace, workloadRef)
+	return pl.handle.PodGroupManager().PodGroupStates().Get(namespace, workloadRef)
 }

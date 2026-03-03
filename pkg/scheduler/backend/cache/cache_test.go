@@ -748,7 +748,7 @@ func Test_AddPodInGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetPodGroupState(tt.pod.Namespace, tt.pod.Spec.WorkloadRef)
+			podGroupState, err := cache.PodGroupStates().Get(tt.pod.Namespace, tt.pod.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -863,7 +863,7 @@ func Test_UpdatePodInGroup(t *testing.T) {
 			cache := newCache(context.Background(), time.Second, nil)
 			cache.genericWorkloadEnabled = tt.genericWorkloadEnabled
 
-			cache.addPodInGroup(tt.oldPod)
+			cache.AddPodInGroup(tt.oldPod)
 			if tt.isAssumedPod {
 				if err := cache.AssumePod(logger, tt.oldPod); err != nil {
 					t.Fatalf("Assume Pod failed: %v", err)
@@ -889,7 +889,7 @@ func Test_UpdatePodInGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetPodGroupState(newPod.Namespace, newPod.Spec.WorkloadRef)
+			podGroupState, err := cache.PodGroupStates().Get(newPod.Namespace, newPod.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -982,7 +982,7 @@ func Test_RemovePodFromGroup(t *testing.T) {
 				return
 			}
 
-			podGroupState, err := cache.GetPodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
+			podGroupState, err := cache.PodGroupStates().Get(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}

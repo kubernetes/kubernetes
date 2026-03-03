@@ -82,7 +82,7 @@ func (s sharedLister) StorageInfos() fwk.StorageInfoLister {
 	return &storageInfoListerContract{}
 }
 
-func (s sharedLister) PodGroupStatesInfos() fwk.PodGroupStateLister {
+func (s sharedLister) PodGroupStates() fwk.PodGroupStateLister {
 	return nil
 }
 
