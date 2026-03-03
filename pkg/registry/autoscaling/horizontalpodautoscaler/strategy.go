@@ -235,7 +235,8 @@ func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
 		}
 
 		if newHPA.Spec.Metrics != nil {
-			for _, metric := range newHPA.Spec.Metrics {
+			for i := range newHPA.Spec.Metrics {
+				metric := &newHPA.Spec.Metrics[i]
 				if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
 					metric.External.Fallback = nil
 				}
