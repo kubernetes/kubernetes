@@ -80,11 +80,11 @@ var (
 	defaultShapePoint = []config.UtilizationShapePoint{
 		{
 			Utilization: 0,
-			Score:       0,
+			Score:       int32(config.MaxCustomPriorityScore),
 		},
 		{
 			Utilization: 100,
-			Score:       int32(config.MaxCustomPriorityScore),
+			Score:       0,
 		},
 	}
 )
@@ -366,7 +366,7 @@ func TestVolumeBinding(t *testing.T) {
 				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
-				25,
+				75,
 				50,
 				0,
 			},
@@ -475,8 +475,8 @@ func TestVolumeBinding(t *testing.T) {
 				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
-				38,
-				75,
+				63,
+				25,
 				0,
 			},
 		},
@@ -590,8 +590,8 @@ func TestVolumeBinding(t *testing.T) {
 				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
-				25,
-				25,
+				75,
+				75,
 				50,
 				50,
 				0,
@@ -770,9 +770,9 @@ func TestVolumeBinding(t *testing.T) {
 				nil,
 			},
 			wantScores: []int64{
-				10,
-				20,
-				100,
+				90,
+				80,
+				0,
 			},
 		},
 		{
@@ -880,7 +880,7 @@ func TestVolumeBinding(t *testing.T) {
 				nil,
 			},
 			wantScores: []int64{
-				100,
+				0,
 			},
 		},
 		{
@@ -901,6 +901,19 @@ func TestVolumeBinding(t *testing.T) {
 			},
 			fts: feature.Features{
 				EnableStorageCapacityScoring: true,
+			},
+			args: &config.VolumeBindingArgs{
+				BindTimeoutSeconds: 300,
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 0,
+						Score:       0,
+					},
+					{
+						Utilization: 100,
+						Score:       int32(config.MaxCustomPriorityScore),
+					},
+				},
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -945,16 +958,7 @@ func TestVolumeBinding(t *testing.T) {
 			},
 			args: &config.VolumeBindingArgs{
 				BindTimeoutSeconds: 300,
-				Shape: []config.UtilizationShapePoint{
-					{
-						Utilization: 0,
-						Score:       int32(config.MaxCustomPriorityScore),
-					},
-					{
-						Utilization: 100,
-						Score:       0,
-					},
-				},
+				Shape:              defaultShapePoint,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
