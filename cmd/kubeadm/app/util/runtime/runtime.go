@@ -157,7 +157,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
 		var lastErr error
-		for i := 0; i < constants.RemoveContainerRetry; i++ {
+		for range constants.RemoveContainerRetry {
 			klog.V(5).Infof("Attempting to remove container %v", container)
 
 			ctx, cancel := defaultContext()
@@ -189,7 +189,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) (err error) {
-	for i := 0; i < constants.PullImageRetry; i++ {
+	for range constants.PullImageRetry {
 		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
@@ -235,7 +235,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 		}()
 	}
 
-	for i := 0; i < len(images); i++ {
+	for range images {
 		if err := <-errChan; err != nil {
 			errs = append(errs, err)
 		}
