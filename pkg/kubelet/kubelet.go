@@ -2934,15 +2934,8 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 	hasResize := false
 
 	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(oldContainer, containerType) {
-			continue
-		}
-
 		var newContainer *v1.Container
 		for new, newType := range podutil.ContainerIter(&newPod.Spec, podutil.InitContainers|podutil.Containers) {
-			if !allocation.IsResizableContainer(new, newType) {
-				continue
-			}
 			if new.Name == oldContainer.Name && containerType == newType {
 				newContainer = new
 			}

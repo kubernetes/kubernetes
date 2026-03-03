@@ -1119,9 +1119,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 			changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 
 		case kubecontainer.ContainerStateRunning:
-			if !podutil.IsRestartableInitContainer(container) {
-				break
-			} else { // If container is restartable
+			if podutil.IsRestartableInitContainer(container) { // If container is restartable
 				if container.StartupProbe != nil {
 					startup, found := m.startupManager.Get(status.ID)
 					if !found {
@@ -1186,12 +1184,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 						break
 					}
 				}
-
-				if !m.computePodResizeAction(ctx, pod, i, true, status, changes) {
-					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
-					break
-				}
 			}
+
+			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
+			_ = m.computePodResizeAction(ctx, pod, i, true, status, changes)
 
 		// If the init container failed and the restart policy is Never, the pod is terminal.
 		// Otherwise, restart the init container.
