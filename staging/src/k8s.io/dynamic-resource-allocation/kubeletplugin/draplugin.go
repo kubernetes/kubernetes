@@ -31,9 +31,11 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -208,11 +210,11 @@ type Device struct {
 	// to expose to workloads via CDI bind-mounted JSON files.
 	//
 	// When the metadata feature is enabled (via [EnableDeviceMetadata]),
-	// the framework always writes a metadata file containing claim and
-	// device information (claim name, namespace, generation, request name,
-	// device name, driver, pool). If Metadata is set, the attributes and
-	// network data are included immediately. If nil, the driver can
-	// populate them later via [MetadataUpdater.UpdateRequestMetadata]
+	// the framework writes a metadata file for each configured API version
+	// containing claim and device information (claim name, namespace,
+	// generation, request name, device name, driver, pool). If Metadata is
+	// set, the attributes and network data are included immediately. If nil,
+	// the driver can populate them later via [Helper.UpdateRequestMetadata]
 	// before the pod starts (e.g., from an NRI hook after CNI).
 	Metadata *DeviceMetadata
 }
@@ -514,17 +516,42 @@ func DRAService(enabled bool) Option {
 }
 
 // EnableDeviceMetadata enables the device metadata feature. When enabled,
-// the framework writes a versioned JSON metadata file per request under the
-// plugin data directory and a CDI spec per request under the CDI directory
-// (see [CDIDirectory]) that bind-mounts the metadata file read-only into
-// containers at
-// /var/run/dra-device-attributes/{claimName}/{requestName}/{driverName}-metadata.json.
-// The metadata file contains claim identity, request name, and per-device
-// details (driver, pool, device name, attributes, and network data when
-// available).
+// the framework writes a metadata file per request under the plugin data
+// directory and a CDI spec per request under the CDI directory (see
+// [CDIDirectory]) that bind-mounts the metadata file read-only into containers
+// at /var/run/dra-device-attributes/{claimName}/{requestName}/{driverName}-metadata.json.
+//
+// Each metadata file is a JSON stream: the same data encoded once per
+// configured API version (newest first). A consumer reads through the stream
+// and uses the first object whose apiVersion it understands, similar to how
+// clients negotiate API versions with the API server.
+//
+// By default, metadata is encoded for all API versions registered in the
+// metadata scheme (currently v1alpha1). Use [MetadataVersions] to restrict
+// which versions are included.
 func EnableDeviceMetadata(enabled bool) Option {
 	return func(o *options) error {
 		o.enableDeviceMetadata = enabled
+		return nil
+	}
+}
+
+// MetadataVersions restricts which API versions are written when the device
+// metadata feature is enabled. If not called, the framework defaults to all
+// versions registered in the metadata scheme (currently v1alpha1).
+//
+// Drivers can expose this as a CLI flag to let operators control which
+// versions are written during a version transition:
+//
+//	helper, err := kubeletplugin.Start(ctx, driver,
+//	    kubeletplugin.EnableDeviceMetadata(true),
+//	    kubeletplugin.MetadataVersions(v1alpha1.SchemeGroupVersion),
+//	)
+//
+// This has no effect unless [EnableDeviceMetadata] is also set to true.
+func MetadataVersions(versions ...schema.GroupVersion) Option {
+	return func(o *options) error {
+		o.metadataVersions = versions
 		return nil
 	}
 }
@@ -543,6 +570,13 @@ func CDIDirectory(path string) Option {
 		o.cdiDir = path
 		return nil
 	}
+}
+
+// defaultMetadataVersions returns all external API versions registered in the
+// metadata scheme. When new versions are added to the scheme in the future,
+// they are automatically included here.
+func defaultMetadataVersions() []schema.GroupVersion {
+	return []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 }
 
 type options struct {
@@ -567,6 +601,7 @@ type options struct {
 	draService                 bool
 	healthService              *bool
 	enableDeviceMetadata       bool
+	metadataVersions           []schema.GroupVersion
 	cdiDir                     string
 }
 
@@ -674,7 +709,11 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		if cdiDir == "" {
 			cdiDir = DefaultCDIDir
 		}
-		d.metadataWriter = newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir)
+		versions := o.metadataVersions
+		if len(versions) == 0 {
+			versions = defaultMetadataVersions()
+		}
+		d.metadataWriter = newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir, versions)
 	}
 
 	// Stop calls cancel and therefore both cancellation

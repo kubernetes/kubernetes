@@ -17,6 +17,7 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -27,7 +28,9 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/utils/ptr"
@@ -60,7 +63,7 @@ func newTestWriter(t *testing.T) (*metadataWriter, string, string) {
 	t.Helper()
 	pluginDir := t.TempDir()
 	cdiDir := t.TempDir()
-	w := newMetadataWriter(testDriverName, pluginDir, cdiDir)
+	w := newMetadataWriter(testDriverName, pluginDir, cdiDir, defaultMetadataVersions())
 	return w, pluginDir, cdiDir
 }
 
@@ -70,11 +73,11 @@ func readMetadataFile(t *testing.T, path string) *v1alpha1.DeviceMetadata {
 	if err != nil {
 		t.Fatalf("read metadata file: %v", err)
 	}
-	dm, err := DecodeMetadataToV1Alpha1(data)
-	if err != nil {
+	var dm v1alpha1.DeviceMetadata
+	if err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(data)), &dm); err != nil {
 		t.Fatalf("decode metadata file: %v", err)
 	}
-	return dm
+	return &dm
 }
 
 func stringAttrs(attrs map[string]string) *DeviceMetadata {
@@ -496,6 +499,85 @@ func TestUpdateRequestMetadata(t *testing.T) {
 				testClaimNS+"_"+testClaimName, baseReq, "metadata.json")
 			dm := readMetadataFile(t, metadataPath)
 			if diff := cmp.Diff(expected, dm); diff != "" {
+				t.Errorf("metadata mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDecodeMetadataFromStream(t *testing.T) {
+	w, _, _ := newTestWriter(t)
+
+	ref := claimRef{
+		namespace: testClaimNS,
+		name:      testClaimName,
+		uid:       testClaimUID,
+	}
+	devices := []Device{{
+		Requests:   []string{testRequest},
+		PoolName:   "node-1",
+		DeviceName: "gpu-0",
+		Metadata:   stringAttrs(map[string]string{"model": "A100"}),
+	}}
+	internalDM := w.buildDeviceMetadata(ref, 1, testRequest, devices)
+	streamData, err := w.encodeMetadataStream(internalDM)
+	if err != nil {
+		t.Fatalf("encodeMetadataStream: %v", err)
+	}
+
+	unknownVersionJSON := `{"apiVersion":"metadata.k8s.io/v99","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+
+	testcases := map[string]struct {
+		streamInput []byte
+		dest        runtime.Object
+		expected    runtime.Object
+		expectError string
+	}{
+		"decode-to-v1alpha1": {
+			streamInput: streamData,
+			dest:        &v1alpha1.DeviceMetadata{},
+			expected:    expectedRequestMetadata(testRequest, devices),
+		},
+		"decode-to-internal": {
+			streamInput: streamData,
+			dest:        &metadata.DeviceMetadata{},
+			expected:    internalDM,
+		},
+		"empty-stream": {
+			streamInput: nil,
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "no compatible metadata version",
+		},
+		"invalid-json": {
+			streamInput: []byte("{not-json"),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "read metadata object from stream",
+		},
+		"skips-unknown-version": {
+			streamInput: append([]byte(unknownVersionJSON), streamData...),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expected:    expectedRequestMetadata(testRequest, devices),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), tc.dest)
+
+			if tc.expectError != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.expectError)
+				}
+				if !strings.Contains(err.Error(), tc.expectError) {
+					t.Fatalf("expected error containing %q, got: %v", tc.expectError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("DecodeMetadataFromStream: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.expected, tc.dest); diff != "" {
 				t.Errorf("metadata mismatch (-want +got):\n%s", diff)
 			}
 		})

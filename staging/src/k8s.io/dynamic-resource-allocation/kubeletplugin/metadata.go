@@ -17,6 +17,8 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,22 +27,22 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/dynamic-resource-allocation/api/metadata/install"
-	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 )
 
-// metadataScheme has both internal and v1alpha1 metadata types registered.
+// metadataScheme has both internal and versioned metadata types registered.
 // metadataCodecFactory provides serializers and deserializers derived from
-// the scheme. The encoder automatically sets apiVersion/kind from the scheme
-// when encoding, so TypeMeta never needs to be hardcoded.
+// the scheme. Per-version encoders are created in newMetadataWriter so
+// that each writer can target exactly the versions it was configured for.
 var (
 	metadataScheme       = install.NewScheme()
 	metadataCodecFactory = runtimeserializer.NewCodecFactory(metadataScheme)
-	metadataEncoder      runtime.Encoder
-	metadataDecoder      = metadataCodecFactory.UniversalDecoder(v1alpha1.SchemeGroupVersion)
+	metadataSerializer   runtime.Serializer
 )
 
 func init() {
@@ -48,22 +50,17 @@ func init() {
 	if !ok {
 		panic("no JSON serializer registered for metadata scheme")
 	}
-	metadataEncoder = metadataCodecFactory.EncoderForVersion(info.PrettySerializer, v1alpha1.SchemeGroupVersion)
+	metadataSerializer = info.PrettySerializer
 }
 
-// DecodeMetadataToV1Alpha1 decodes metadata JSON bytes into a
-// v1alpha1.DeviceMetadata object. This can be used by drivers and tests
-// to read metadata files written by the framework.
-func DecodeMetadataToV1Alpha1(data []byte) (*v1alpha1.DeviceMetadata, error) {
-	obj, _, err := metadataDecoder.Decode(data, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("decode device metadata: %w", err)
+// decodeFirstMetadata reads a metadata stream and decodes the first
+// compatible object into the internal DeviceMetadata type.
+func decodeFirstMetadata(data []byte) (*metadata.DeviceMetadata, error) {
+	var dm metadata.DeviceMetadata
+	if err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(data)), &dm); err != nil {
+		return nil, err
 	}
-	dm, ok := obj.(*v1alpha1.DeviceMetadata)
-	if !ok {
-		return nil, fmt.Errorf("expected *v1alpha1.DeviceMetadata, got %T", obj)
-	}
-	return dm, nil
+	return &dm, nil
 }
 
 // CDI JSON types for metadata bind-mount specs. These mirror the CDI spec
@@ -135,19 +132,32 @@ func newClaimRef(claim *resourceapi.ResourceClaim) claimRef {
 }
 
 // metadataWriter handles writing metadata files and CDI specs for the
-// device metadata feature. All state is derived from files on disk.
+// device metadata feature. Each metadata file is a JSON stream containing
+// the same data encoded once per configured API version (newest first).
+// A consumer reads through the stream and uses the first object whose
+// apiVersion it understands, similar to API server content negotiation.
+// All state is derived from files on disk.
 type metadataWriter struct {
 	driverName    string
 	pluginDataDir string
 	cdiDir        string
+	versions      []schema.GroupVersion
+	encoders      map[schema.GroupVersion]runtime.Encoder
 }
 
-// newMetadataWriter creates a new metadataWriter.
-func newMetadataWriter(driverName, pluginDataDir, cdiDir string) *metadataWriter {
+// newMetadataWriter creates a new metadataWriter that writes metadata files
+// for each of the specified API versions.
+func newMetadataWriter(driverName, pluginDataDir, cdiDir string, versions []schema.GroupVersion) *metadataWriter {
+	encoders := make(map[schema.GroupVersion]runtime.Encoder, len(versions))
+	for _, gv := range versions {
+		encoders[gv] = metadataCodecFactory.EncoderForVersion(metadataSerializer, gv)
+	}
 	return &metadataWriter{
 		driverName:    driverName,
 		pluginDataDir: pluginDataDir,
 		cdiDir:        cdiDir,
+		versions:      versions,
+		encoders:      encoders,
 	}
 }
 
@@ -210,10 +220,10 @@ func (w *metadataWriter) cleanupClaim(claimNamespace, claimName string, claimUID
 }
 
 // updateRequestMetadata overwrites the metadata file for a specific request.
-// It reads the existing file to obtain the current generation, increments it,
-// and writes back the updated metadata. This is used by drivers during NRI
-// hooks when device details (e.g., network info) become available after
-// PrepareResourceClaims.
+// It reads the existing stream to obtain the current generation, increments
+// it, and writes back the updated metadata as a new stream. This is used by
+// drivers during NRI hooks when device details (e.g., network info) become
+// available after PrepareResourceClaims.
 //
 // requestName may include a subrequest name (e.g. "gpu/high-memory"); the
 // base request name is used for the file path.
@@ -233,7 +243,7 @@ func (w *metadataWriter) updateRequestMetadata(
 		return fmt.Errorf("read metadata file: %w", err)
 	}
 
-	prev, err := DecodeMetadataToV1Alpha1(existing)
+	prev, err := decodeFirstMetadata(existing)
 	if err != nil {
 		return fmt.Errorf("decode existing metadata: %w", err)
 	}
@@ -243,9 +253,9 @@ func (w *metadataWriter) updateRequestMetadata(
 	generation := prev.Generation + 1
 	dm := w.buildDeviceMetadata(ref, generation, requestName, devices)
 
-	data, err := runtime.Encode(metadataEncoder, dm)
+	data, err := w.encodeMetadataStream(dm)
 	if err != nil {
-		return fmt.Errorf("encode metadata: %w", err)
+		return err
 	}
 
 	if err := os.WriteFile(filePath, data, metadataFilePerms); err != nil {
@@ -255,9 +265,11 @@ func (w *metadataWriter) updateRequestMetadata(
 	return nil
 }
 
-// writeMetadataFile writes the metadata JSON for one request in a claim.
-// baseRequestName is used for the file path; requestRef (which may include
-// a subrequest name) is recorded in the metadata content.
+// writeMetadataFile writes a single metadata file for one request in a claim.
+// The file is a JSON stream containing the metadata encoded once per
+// configured API version. baseRequestName is used for the file path;
+// requestRef (which may include a subrequest name) is recorded in the
+// metadata content.
 func (w *metadataWriter) writeMetadataFile(
 	ref claimRef,
 	baseRequestName string,
@@ -266,9 +278,9 @@ func (w *metadataWriter) writeMetadataFile(
 ) error {
 	dm := w.buildDeviceMetadata(ref, 1, requestRef, devices)
 
-	data, err := runtime.Encode(metadataEncoder, dm)
+	data, err := w.encodeMetadataStream(dm)
 	if err != nil {
-		return fmt.Errorf("encode metadata: %w", err)
+		return err
 	}
 
 	filePath := w.metadataFilePath(ref.namespace, ref.name, baseRequestName)
@@ -283,17 +295,18 @@ func (w *metadataWriter) writeMetadataFile(
 	return nil
 }
 
-// buildDeviceMetadata constructs the v1alpha1 DeviceMetadata from claim info
-// and device data.
+// buildDeviceMetadata constructs the internal DeviceMetadata from claim info
+// and device data. The internal type is version-agnostic; per-version
+// encoders handle conversion to the target API version during serialization.
 func (w *metadataWriter) buildDeviceMetadata(
 	ref claimRef,
 	generation int64,
 	requestName string,
 	devices []Device,
-) *v1alpha1.DeviceMetadata {
-	metadataDevices := make([]v1alpha1.Device, 0, len(devices))
+) *metadata.DeviceMetadata {
+	metadataDevices := make([]metadata.Device, 0, len(devices))
 	for _, dev := range devices {
-		d := v1alpha1.Device{
+		d := metadata.Device{
 			Driver: w.driverName,
 			Pool:   dev.PoolName,
 			Name:   dev.DeviceName,
@@ -310,7 +323,7 @@ func (w *metadataWriter) buildDeviceMetadata(
 		metadataDevices = append(metadataDevices, d)
 	}
 
-	return &v1alpha1.DeviceMetadata{
+	return &metadata.DeviceMetadata{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       ref.name,
 			Namespace:  ref.namespace,
@@ -318,13 +331,30 @@ func (w *metadataWriter) buildDeviceMetadata(
 			Generation: generation,
 		},
 		PodClaimName: ref.podClaimName,
-		Requests: []v1alpha1.DeviceMetadataRequest{
+		Requests: []metadata.DeviceMetadataRequest{
 			{
 				Name:    requestName,
 				Devices: metadataDevices,
 			},
 		},
 	}
+}
+
+// encodeMetadataStream encodes the internal metadata object once per configured
+// version and concatenates the results into a JSON stream. Versions are written
+// in the order configured (typically newest first) so that a consumer scanning
+// the stream picks up the best version it understands.
+func (w *metadataWriter) encodeMetadataStream(dm *metadata.DeviceMetadata) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, gv := range w.versions {
+		data, err := runtime.Encode(w.encoders[gv], dm)
+		if err != nil {
+			return nil, fmt.Errorf("encode metadata for %s: %w", gv, err)
+		}
+		buf.Write(data)
+		buf.WriteByte('\n')
+	}
+	return buf.Bytes(), nil
 }
 
 // writeCDISpec writes a CDI spec that bind-mounts the metadata file into the
@@ -368,7 +398,6 @@ func (w *metadataWriter) writeCDISpec(
 		return "", fmt.Errorf("write CDI spec file: %w", err)
 	}
 
-	// CDI device ID: {driverName}/metadata={claimUID}_{requestName}
 	return w.driverName + "/metadata=" + deviceName, nil
 }
 
@@ -396,4 +425,32 @@ func (w *metadataWriter) cdiSpecFilePath(claimUID types.UID, requestName string)
 // Format: /var/run/dra-device-attributes/{claimName}/{requestName}/{driverName}-metadata.json
 func (w *metadataWriter) containerFilePath(claimName, requestName string) string {
 	return filepath.Join(containerMetadataDir, claimName, requestName, w.driverName+"-metadata.json")
+}
+
+// UpdateRequestMetadata overwrites the metadata file for a specific
+// request in a prepared claim, incrementing the metadata generation number.
+//
+// This is intended for drivers whose device attributes (e.g. IP addresses,
+// interface names) only become known after pod sandbox creation. The driver
+// initially returns devices without Metadata during PrepareResourceClaims,
+// then calls UpdateRequestMetadata once the information is available.
+//
+// The devices slice should match the original PrepareResult for this request,
+// now with their Metadata field populated.
+func (d *Helper) UpdateRequestMetadata(
+	ctx context.Context,
+	claimNamespace, claimName string,
+	claimUID types.UID,
+	requestName string,
+	devices []Device,
+) error {
+	if d.metadataWriter == nil {
+		return fmt.Errorf("device metadata is not enabled")
+	}
+	ref := claimRef{
+		namespace: claimNamespace,
+		name:      claimName,
+		uid:       claimUID,
+	}
+	return d.metadataWriter.updateRequestMetadata(ref, requestName, devices)
 }
