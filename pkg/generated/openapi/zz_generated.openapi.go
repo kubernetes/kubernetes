@@ -35,6 +35,7 @@ import (
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -329,6 +330,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authenticationv1beta1.TokenReviewSpec{}.OpenAPIModelName():                                                      schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref),
 		authenticationv1beta1.TokenReviewStatus{}.OpenAPIModelName():                                                    schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref),
 		authenticationv1beta1.UserInfo{}.OpenAPIModelName():                                                             schema_k8sio_api_authentication_v1beta1_UserInfo(ref),
+		authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName():                                            schema_k8sio_api_authorization_v1_ConditionalAuthorizationOptions(ref),
 		authorizationv1.FieldSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref),
 		authorizationv1.LabelSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_LabelSelectorAttributes(ref),
 		authorizationv1.LocalSubjectAccessReview{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref),
@@ -341,9 +343,17 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authorizationv1.SelfSubjectRulesReview{}.OpenAPIModelName():                                                     schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref),
 		authorizationv1.SelfSubjectRulesReviewSpec{}.OpenAPIModelName():                                                 schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref),
 		authorizationv1.SubjectAccessReview{}.OpenAPIModelName():                                                        schema_k8sio_api_authorization_v1_SubjectAccessReview(ref),
+		authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName():                                   schema_k8sio_api_authorization_v1_SubjectAccessReviewAuthorizationDecision(ref),
+		authorizationv1.SubjectAccessReviewCondition{}.OpenAPIModelName():                                               schema_k8sio_api_authorization_v1_SubjectAccessReviewCondition(ref),
 		authorizationv1.SubjectAccessReviewSpec{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref),
 		authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref),
 		authorizationv1.SubjectRulesReviewStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref),
+		authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName():                                       schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref),
+		authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName():                                      schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref),
+		authorizationv1alpha1.AuthorizationConditionsReview{}.OpenAPIModelName():                                        schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref),
+		authorizationv1alpha1.AuthorizationConditionsWriteRequest{}.OpenAPIModelName():                                  schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsWriteRequest(ref),
+		authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName():                             schema_k8sio_api_authorization_v1alpha1_SubjectAccessReviewAuthorizationDecision(ref),
+		authorizationv1alpha1.SubjectAccessReviewCondition{}.OpenAPIModelName():                                         schema_k8sio_api_authorization_v1alpha1_SubjectAccessReviewCondition(ref),
 		authorizationv1beta1.LocalSubjectAccessReview{}.OpenAPIModelName():                                              schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref),
 		authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName():                                                 schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref),
 		authorizationv1beta1.NonResourceRule{}.OpenAPIModelName():                                                       schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref),
@@ -12647,6 +12657,26 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_authorization_v1_ConditionalAuthorizationOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionalAuthorizationOptions contains options for requesting conditional authorization.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditionsMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsMode specifies how conditions should be returned.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -13101,11 +13131,17 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 							Ref:         ref(authorizationv1.NonResourceAttributes{}.OpenAPIModelName()),
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13231,6 +13267,135 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 	}
 }
 
+func schema_k8sio_api_authorization_v1_SubjectAccessReviewAuthorizationDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubjectAccessReviewAuthorizationDecision represents one authorizer's decision in the authorizer chain. It models a single authorization decision, which must be as follows: Exactly one of the following groups of fields must be set: - allowed (unconditional allow) - denied (unconditional deny) - conditionsType + conditions (conditional decision) - conditionalDecisionChain (composite/nested decisions)",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"allowed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowed specifies whether this element is unconditionally allowed. Mutually exclusive with denied, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"denied": {
+						SchemaProps: spec.SchemaProps{
+							Description: "denied specifies whether this element is unconditionally denied. Mutually exclusive with allowed, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"conditionsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsType describes the type (format/encoding/language) of all conditions in the conditions slice. It does not apply to nested conditions in conditionalDecisionChain. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is an unordered set of conditions that should be evaluated against admission attributes, to determine whether this authorizer allows the request. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.SubjectAccessReviewCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditionalDecisionChain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers. At least one of the Decisions is known to be Conditional, that is, have non-null Conditions. When evaluating the conditions, the first condition set must be evaluated as a whole first, and only if that condition set evaluates to NoOpinion, can the subsequent condition sets be evaluated.\n\nMutually exclusive with allowed, denied and conditions.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is optional. It indicates why a request was allowed or denied by this authorizer.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName(), authorizationv1.SubjectAccessReviewCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_SubjectAccessReviewCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubjectAccessReviewCondition represents a single condition to be evaluated against admission attributes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ID uniquely identifies this condition within the scope of the authorizer that authored it. Validated as a Kubernetes label key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect specifies how the condition evaluating to \"true\" should be treated.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"condition": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Condition is an opaque string that represents the condition to be evaluated. It is a pure, deterministic function from condition data to a Boolean.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is an optional human-friendly description that can be shown as an error message or for debugging.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"id", "effect", "condition"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -13307,11 +13472,17 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 							Format:      "",
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13351,10 +13522,31 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 							Format:      "",
 						},
 					},
+					"conditionalDecisionChain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers. At least one of the Decisions is known to be Conditional, that is, have non-null Conditions. When evaluating the conditions, the first condition set must be evaluated as a whole first, and only if that condition set evaluates to NoOpinion, can the subsequent condition sets be evaluated.\n\nWhen conditionalDecisionChain is non-null, allowed and denied must be false.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"allowed"},
 			},
 		},
+		Dependencies: []string{
+			authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()},
 	}
 }
 
@@ -13424,6 +13616,468 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 		},
 		Dependencies: []string{
 			authorizationv1.NonResourceRule{}.OpenAPIModelName(), authorizationv1.ResourceRule{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsRequest describes the authorization conditions request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+						},
+					},
+					"writeRequest": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(authorizationv1alpha1.AuthorizationConditionsWriteRequest{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.AuthorizationConditionsWriteRequest{}.OpenAPIModelName(), authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsResponse describes an authorization conditions response.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"allowed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowed specifies whether this element is unconditionally allowed. Mutually exclusive with denied, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"denied": {
+						SchemaProps: spec.SchemaProps{
+							Description: "denied specifies whether this element is unconditionally denied. Mutually exclusive with allowed, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"conditionsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsType describes the type (format/encoding/language) of all conditions in the conditions slice. It does not apply to nested conditions in conditionalDecisionChain. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is an unordered set of conditions that should be evaluated against admission attributes, to determine whether this authorizer allows the request. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1alpha1.SubjectAccessReviewCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditionalDecisionChain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers. At least one of the Decisions is known to be Conditional, that is, have non-null Conditions. When evaluating the conditions, the first condition set must be evaluated as a whole first, and only if that condition set evaluates to NoOpinion, can the subsequent condition sets be evaluated.\n\nMutually exclusive with allowed, denied and conditions.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is optional. It indicates why a request was allowed or denied by this authorizer.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UID is an identifier for the individual request/response. This must be copied over from the corresponding AuthorizationConditionsRequest.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Result contains extra details into why an authorization conditions request was denied. This field IS NOT consulted in any way if \"Allowed\" is \"true\".",
+							Ref:         ref(metav1.Status{}.OpenAPIModelName()),
+						},
+					},
+					"auditAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AuditAnnotations is an unstructured key value map set by remote admission controller (e.g. error=image-blacklisted). MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission controller will prefix the keys with admission webhook name (e.g. imagepolicy.example.com/error=image-blacklisted). AuditAnnotations will be provided by the admission webhook to add additional context to the audit log for this request.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"warnings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "warnings is a list of warning messages to return to the requesting API client. Warning messages describe a problem the client making the API request should correct or be aware of. Limit warnings to 120 characters if possible. Warnings over 256 characters and large numbers of warnings may be truncated.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"uid"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName(), authorizationv1alpha1.SubjectAccessReviewCondition{}.OpenAPIModelName(), metav1.Status{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsReview describes a request to evaluate authorization conditions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata. In AuthorizationConditionsReview, it must be an empty struct. F0227 11:04:00.026163   99872 lister.go:76] unable to find ObjectMeta for any types in package k8s.io/api/authorization/v1alpha1 !!! [0227 11:04:00] Call tree: !!! [0227 11:04:00]  1: hack/update-codegen.sh:1036 codegen::listers(...) More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"request": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Request describes the attributes for the authorization conditions request.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName()),
+						},
+					},
+					"response": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Response describes the attributes for the authorization conditions response.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName(), authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsWriteRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UID is an identifier for the individual request/response. It allows us to distinguish instances of requests which are otherwise identical (parallel requests, requests when earlier requests did not modify etc) The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request. It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is the fully-qualified type of object being submitted (for example, v1.Pod or autoscaling.v1.Scale)",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is the fully-qualified resource being requested (for example, v1.pods)",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.GroupVersionResource{}.OpenAPIModelName()),
+						},
+					},
+					"subResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SubResource is the subresource being requested, if any (for example, \"status\" or \"scale\")",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"requestKind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestKind is the fully-qualified type of the original API request (for example, v1.Pod or autoscaling.v1.Scale). If this is specified and differs from the value in \"kind\", an equivalent match and conversion was performed.\n\nFor example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of `apiGroups:[\"apps\"], apiVersions:[\"v1\"], resources: [\"deployments\"]` and `matchPolicy: Equivalent`, an API request to apps/v1beta1 deployments would be converted and sent to the webhook with `kind: {group:\"apps\", version:\"v1\", kind:\"Deployment\"}` (matching the rule the webhook registered for), and `requestKind: {group:\"apps\", version:\"v1beta1\", kind:\"Deployment\"}` (indicating the kind of the original API request).\n\nSee documentation for the \"matchPolicy\" field in the webhook configuration type for more details.",
+							Ref:         ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
+						},
+					},
+					"requestResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestResource is the fully-qualified resource of the original API request (for example, v1.pods). If this is specified and differs from the value in \"resource\", an equivalent match and conversion was performed.\n\nFor example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of `apiGroups:[\"apps\"], apiVersions:[\"v1\"], resources: [\"deployments\"]` and `matchPolicy: Equivalent`, an API request to apps/v1beta1 deployments would be converted and sent to the webhook with `resource: {group:\"apps\", version:\"v1\", resource:\"deployments\"}` (matching the resource the webhook registered for), and `requestResource: {group:\"apps\", version:\"v1beta1\", resource:\"deployments\"}` (indicating the resource of the original API request).\n\nSee documentation for the \"matchPolicy\" field in the webhook configuration type.",
+							Ref:         ref(metav1.GroupVersionResource{}.OpenAPIModelName()),
+						},
+					},
+					"requestSubResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestSubResource is the name of the subresource of the original API request, if any (for example, \"status\" or \"scale\") If this is specified and differs from the value in \"subResource\", an equivalent match and conversion was performed. See documentation for the \"matchPolicy\" field in the webhook configuration type.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and rely on the server to generate the name.  If that is the case, this field will contain an empty string.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace is the namespace associated with the request (if any).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Operation is the operation being performed. This may be different than the operation requested. e.g. a patch can result in either a CREATE or UPDATE Operation.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"authorizationVerb": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"userInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserInfo is information about the requesting user",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Object is the object from the incoming request.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"oldObject": {
+						SchemaProps: spec.SchemaProps{
+							Description: "OldObject is the existing object. Only populated for DELETE and UPDATE requests.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"dryRun": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"options": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Options is the operation option structure of the operation being performed. e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be different than the options the caller provided. e.g. for a patch request the performed Operation might be a CREATE, in which case the Options will a `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"uid", "kind", "resource", "operation", "authorizationVerb", "userInfo"},
+			},
+		},
+		Dependencies: []string{
+			authenticationv1.UserInfo{}.OpenAPIModelName(), metav1.GroupVersionKind{}.OpenAPIModelName(), metav1.GroupVersionResource{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_SubjectAccessReviewAuthorizationDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubjectAccessReviewAuthorizationDecision represents one authorizer's decision in the authorizer chain. It models a single authorization decision, which must be as follows: Exactly one of the following groups of fields must be set: - allowed (unconditional allow) - denied (unconditional deny) - conditionsType + conditions (conditional decision) - conditionalDecisionChain (composite/nested decisions)",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"allowed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowed specifies whether this element is unconditionally allowed. Mutually exclusive with denied, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"denied": {
+						SchemaProps: spec.SchemaProps{
+							Description: "denied specifies whether this element is unconditionally denied. Mutually exclusive with allowed, conditions, and conditionalDecisionChain.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"conditionsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsType describes the type (format/encoding/language) of all conditions in the conditions slice. It does not apply to nested conditions in conditionalDecisionChain. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is an unordered set of conditions that should be evaluated against admission attributes, to determine whether this authorizer allows the request. Mutually exclusive with allowed, denied, and conditionalDecisionChain.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1alpha1.SubjectAccessReviewCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditionalDecisionChain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers. At least one of the Decisions is known to be Conditional, that is, have non-null Conditions. When evaluating the conditions, the first condition set must be evaluated as a whole first, and only if that condition set evaluates to NoOpinion, can the subsequent condition sets be evaluated.\n\nMutually exclusive with allowed, denied and conditions.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is optional. It indicates why a request was allowed or denied by this authorizer.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName(), authorizationv1alpha1.SubjectAccessReviewCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_SubjectAccessReviewCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubjectAccessReviewCondition represents a single condition to be evaluated against admission attributes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ID uniquely identifies this condition within the scope of the authorizer that authored it. Validated as a Kubernetes label key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect specifies how the condition evaluating to \"true\" should be treated.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"condition": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Condition is an opaque string that represents the condition to be evaluated. It is a pure, deterministic function from condition data to a Boolean.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is an optional human-friendly description that can be shown as an error message or for debugging.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"id", "effect", "condition"},
+			},
+		},
 	}
 }
 
@@ -13799,11 +14453,17 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref comm
 							Ref:         ref(authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName()),
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -14005,11 +14665,17 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.R
 							Format:      "",
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -14049,10 +14715,31 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 							Format:      "",
 						},
 					},
+					"conditionalDecisionChain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers. At least one of the Decisions is known to be Conditional, that is, have non-null Conditions. When evaluating the conditions, the first condition set must be evaluated as a whole first, and only if that condition set evaluates to NoOpinion, can the subsequent condition sets be evaluated.\n\nWhen conditionalDecisionChain is non-null, allowed and denied must be false.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"allowed"},
 			},
 		},
+		Dependencies: []string{
+			authorizationv1.SubjectAccessReviewAuthorizationDecision{}.OpenAPIModelName()},
 	}
 }
 

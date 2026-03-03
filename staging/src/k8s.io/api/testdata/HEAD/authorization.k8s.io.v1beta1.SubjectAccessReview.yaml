@@ -33,6 +33,8 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  conditionalAuthorization:
+    conditionsMode: conditionsModeValue
   extra:
     extraKey:
     - extraValue
@@ -67,6 +69,16 @@ spec:
   user: userValue
 status:
   allowed: true
+  conditionalDecisionChain:
+  - allowed: true
+    conditions:
+    - condition: conditionValue
+      description: descriptionValue
+      effect: effectValue
+      id: idValue
+    conditionsType: conditionsTypeValue
+    denied: true
+    reason: reasonValue
   denied: true
   evaluationError: evaluationErrorValue
   reason: reasonValue

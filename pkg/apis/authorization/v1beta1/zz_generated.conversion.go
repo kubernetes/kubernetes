@@ -344,6 +344,7 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessR
 func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *authorizationv1beta1.SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
 	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
 	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	out.ConditionalAuthorization = (*authorization.ConditionalAuthorizationOptions)(unsafe.Pointer(in.ConditionalAuthorization))
 	return nil
 }
 
@@ -355,6 +356,7 @@ func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAcc
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *authorizationv1beta1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
 	out.ResourceAttributes = (*authorizationv1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
 	out.NonResourceAttributes = (*authorizationv1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	out.ConditionalAuthorization = (*v1.ConditionalAuthorizationOptions)(unsafe.Pointer(in.ConditionalAuthorization))
 	return nil
 }
 
@@ -454,6 +456,7 @@ func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessR
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	out.Extra = *(*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
 	out.UID = in.UID
+	out.ConditionalAuthorization = (*authorization.ConditionalAuthorizationOptions)(unsafe.Pointer(in.ConditionalAuthorization))
 	return nil
 }
 
@@ -469,6 +472,7 @@ func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessR
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	out.Extra = *(*map[string]authorizationv1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
 	out.UID = in.UID
+	out.ConditionalAuthorization = (*v1.ConditionalAuthorizationOptions)(unsafe.Pointer(in.ConditionalAuthorization))
 	return nil
 }
 
@@ -482,6 +486,7 @@ func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAcces
 	out.Denied = in.Denied
 	out.Reason = in.Reason
 	out.EvaluationError = in.EvaluationError
+	out.ConditionalDecisionChain = *(*[]authorization.SubjectAccessReviewAuthorizationDecision)(unsafe.Pointer(&in.ConditionalDecisionChain))
 	return nil
 }
 
@@ -495,6 +500,7 @@ func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAcces
 	out.Denied = in.Denied
 	out.Reason = in.Reason
 	out.EvaluationError = in.EvaluationError
+	out.ConditionalDecisionChain = *(*[]v1.SubjectAccessReviewAuthorizationDecision)(unsafe.Pointer(&in.ConditionalDecisionChain))
 	return nil
 }
 

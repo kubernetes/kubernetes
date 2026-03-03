@@ -28,6 +28,13 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/authorization/v1";
 
+// ConditionalAuthorizationOptions contains options for requesting conditional authorization.
+message ConditionalAuthorizationOptions {
+  // conditionsMode specifies how conditions should be returned.
+  // +optional
+  optional string conditionsMode = 1;
+}
+
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -227,6 +234,10 @@ message SelfSubjectAccessReviewSpec {
   // nonResourceAttributes describes information for a non-resource access request
   // +optional
   optional NonResourceAttributes nonResourceAttributes = 2;
+
+  // conditionalAuthorization contains options for requesting conditional authorization.
+  // +optional
+  optional ConditionalAuthorizationOptions conditionalAuthorization = 3;
 }
 
 // SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
@@ -270,6 +281,77 @@ message SubjectAccessReview {
   optional SubjectAccessReviewStatus status = 3;
 }
 
+// SubjectAccessReviewAuthorizationDecision represents one authorizer's decision in
+// the authorizer chain. It models a single authorization decision, which must be as follows:
+// Exactly one of the following groups of fields must be set:
+// - allowed (unconditional allow)
+// - denied (unconditional deny)
+// - conditionsType + conditions (conditional decision)
+// - conditionalDecisionChain (composite/nested decisions)
+message SubjectAccessReviewAuthorizationDecision {
+  // allowed specifies whether this element is unconditionally allowed.
+  // Mutually exclusive with denied, conditions, and conditionalDecisionChain.
+  // +optional
+  optional bool allowed = 1;
+
+  // denied specifies whether this element is unconditionally denied.
+  // Mutually exclusive with allowed, conditions, and conditionalDecisionChain.
+  // +optional
+  optional bool denied = 2;
+
+  // conditionsType describes the type (format/encoding/language) of all conditions
+  // in the conditions slice. It does not apply to nested conditions in conditionalDecisionChain.
+  // Mutually exclusive with allowed, denied, and conditionalDecisionChain.
+  // +optional
+  optional string conditionsType = 3;
+
+  // conditions is an unordered set of conditions that should be evaluated
+  // against admission attributes, to determine whether this authorizer allows
+  // the request.
+  // Mutually exclusive with allowed, denied, and conditionalDecisionChain.
+  // +listType=map
+  // +listMapKey=id
+  // +optional
+  repeated SubjectAccessReviewCondition conditions = 4;
+
+  // conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+  // At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+  // When evaluating the conditions, the first condition set must be evaluated
+  // as a whole first, and only if that condition set evaluates to NoOpinion,
+  // can the subsequent condition sets be evaluated.
+  //
+  // Mutually exclusive with allowed, denied and conditions.
+  //
+  // +optional
+  // +listType=atomic
+  repeated SubjectAccessReviewAuthorizationDecision conditionalDecisionChain = 5;
+
+  // reason is optional. It indicates why a request was allowed or denied
+  // by this authorizer.
+  // +optional
+  optional string reason = 6;
+}
+
+// SubjectAccessReviewCondition represents a single condition to be evaluated
+// against admission attributes.
+message SubjectAccessReviewCondition {
+  // ID uniquely identifies this condition within the scope of the authorizer
+  // that authored it. Validated as a Kubernetes label key.
+  optional string id = 1;
+
+  // Effect specifies how the condition evaluating to "true" should be treated.
+  optional string effect = 2;
+
+  // Condition is an opaque string that represents the condition to be evaluated.
+  // It is a pure, deterministic function from condition data to a Boolean.
+  optional string condition = 3;
+
+  // Description is an optional human-friendly description that can be shown
+  // as an error message or for debugging.
+  // +optional
+  optional string description = 4;
+}
+
 // SubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes
 // and nonResourceAttributes must be set
 message SubjectAccessReviewSpec {
@@ -299,6 +381,10 @@ message SubjectAccessReviewSpec {
   // uid information about the requesting user.
   // +optional
   optional string uid = 6;
+
+  // conditionalAuthorization contains options for requesting conditional authorization.
+  // +optional
+  optional ConditionalAuthorizationOptions conditionalAuthorization = 7;
 }
 
 // SubjectAccessReviewStatus
@@ -322,6 +408,18 @@ message SubjectAccessReviewStatus {
   // For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
   // +optional
   optional string evaluationError = 3;
+
+  // conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+  // At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+  // When evaluating the conditions, the first condition set must be evaluated
+  // as a whole first, and only if that condition set evaluates to NoOpinion,
+  // can the subsequent condition sets be evaluated.
+  //
+  // When conditionalDecisionChain is non-null, allowed and denied must be false.
+  //
+  // +optional
+  // +listType=atomic
+  repeated SubjectAccessReviewAuthorizationDecision conditionalDecisionChain = 5;
 }
 
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on

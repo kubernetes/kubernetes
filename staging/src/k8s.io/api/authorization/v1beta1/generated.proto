@@ -174,6 +174,10 @@ message SelfSubjectAccessReviewSpec {
   // nonResourceAttributes describes information for a non-resource access request
   // +optional
   optional NonResourceAttributes nonResourceAttributes = 2;
+
+  // conditionalAuthorization contains options for requesting conditional authorization.
+  // +optional
+  optional .k8s.io.api.authorization.v1.ConditionalAuthorizationOptions conditionalAuthorization = 3;
 }
 
 // SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
@@ -246,6 +250,10 @@ message SubjectAccessReviewSpec {
   // uid information about the requesting user.
   // +optional
   optional string uid = 6;
+
+  // conditionalAuthorization contains options for requesting conditional authorization.
+  // +optional
+  optional .k8s.io.api.authorization.v1.ConditionalAuthorizationOptions conditionalAuthorization = 7;
 }
 
 // SubjectAccessReviewStatus
@@ -269,6 +277,18 @@ message SubjectAccessReviewStatus {
   // For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
   // +optional
   optional string evaluationError = 3;
+
+  // conditionalDecisionChain is an ordered list of Decisions from a chain of authorizers.
+  // At least one of the Decisions is known to be Conditional, that is, have non-null Conditions.
+  // When evaluating the conditions, the first condition set must be evaluated
+  // as a whole first, and only if that condition set evaluates to NoOpinion,
+  // can the subsequent condition sets be evaluated.
+  //
+  // When conditionalDecisionChain is non-null, allowed and denied must be false.
+  //
+  // +optional
+  // +listType=atomic
+  repeated .k8s.io.api.authorization.v1.SubjectAccessReviewAuthorizationDecision conditionalDecisionChain = 5;
 }
 
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on

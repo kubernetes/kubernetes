@@ -433,6 +433,18 @@ func (m *SelfSubjectAccessReviewSpec) MarshalToSizedBuffer(dAtA []byte) (int, er
 	_ = i
 	var l int
 	_ = l
+	if m.ConditionalAuthorization != nil {
+		{
+			size, err := m.ConditionalAuthorization.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.NonResourceAttributes != nil {
 		{
 			size, err := m.NonResourceAttributes.MarshalToSizedBuffer(dAtA[:i])
@@ -614,6 +626,18 @@ func (m *SubjectAccessReviewSpec) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	_ = i
 	var l int
 	_ = l
+	if m.ConditionalAuthorization != nil {
+		{
+			size, err := m.ConditionalAuthorization.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x3a
+	}
 	i -= len(m.UID)
 	copy(dAtA[i:], m.UID)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UID)))
@@ -709,6 +733,20 @@ func (m *SubjectAccessReviewStatus) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	_ = i
 	var l int
 	_ = l
+	if len(m.ConditionalDecisionChain) > 0 {
+		for iNdEx := len(m.ConditionalDecisionChain) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ConditionalDecisionChain[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
 	i--
 	if m.Denied {
 		dAtA[i] = 1
@@ -970,6 +1008,10 @@ func (m *SelfSubjectAccessReviewSpec) Size() (n int) {
 		l = m.NonResourceAttributes.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.ConditionalAuthorization != nil {
+		l = m.ConditionalAuthorization.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1047,6 +1089,10 @@ func (m *SubjectAccessReviewSpec) Size() (n int) {
 	}
 	l = len(m.UID)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.ConditionalAuthorization != nil {
+		l = m.ConditionalAuthorization.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1062,6 +1108,12 @@ func (m *SubjectAccessReviewStatus) Size() (n int) {
 	l = len(m.EvaluationError)
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
+	if len(m.ConditionalDecisionChain) > 0 {
+		for _, e := range m.ConditionalDecisionChain {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -1179,6 +1231,7 @@ func (this *SelfSubjectAccessReviewSpec) String() string {
 	s := strings.Join([]string{`&SelfSubjectAccessReviewSpec{`,
 		`ResourceAttributes:` + strings.Replace(this.ResourceAttributes.String(), "ResourceAttributes", "ResourceAttributes", 1) + `,`,
 		`NonResourceAttributes:` + strings.Replace(this.NonResourceAttributes.String(), "NonResourceAttributes", "NonResourceAttributes", 1) + `,`,
+		`ConditionalAuthorization:` + strings.Replace(fmt.Sprintf("%v", this.ConditionalAuthorization), "ConditionalAuthorizationOptions", "v11.ConditionalAuthorizationOptions", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1238,6 +1291,7 @@ func (this *SubjectAccessReviewSpec) String() string {
 		`Groups:` + fmt.Sprintf("%v", this.Groups) + `,`,
 		`Extra:` + mapStringForExtra + `,`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
+		`ConditionalAuthorization:` + strings.Replace(fmt.Sprintf("%v", this.ConditionalAuthorization), "ConditionalAuthorizationOptions", "v11.ConditionalAuthorizationOptions", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1246,11 +1300,17 @@ func (this *SubjectAccessReviewStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForConditionalDecisionChain := "[]SubjectAccessReviewAuthorizationDecision{"
+	for _, f := range this.ConditionalDecisionChain {
+		repeatedStringForConditionalDecisionChain += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForConditionalDecisionChain += "}"
 	s := strings.Join([]string{`&SubjectAccessReviewStatus{`,
 		`Allowed:` + fmt.Sprintf("%v", this.Allowed) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`EvaluationError:` + fmt.Sprintf("%v", this.EvaluationError) + `,`,
 		`Denied:` + fmt.Sprintf("%v", this.Denied) + `,`,
+		`ConditionalDecisionChain:` + repeatedStringForConditionalDecisionChain + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2519,6 +2579,42 @@ func (m *SelfSubjectAccessReviewSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConditionalAuthorization", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ConditionalAuthorization == nil {
+				m.ConditionalAuthorization = &v11.ConditionalAuthorizationOptions{}
+			}
+			if err := m.ConditionalAuthorization.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -3246,6 +3342,42 @@ func (m *SubjectAccessReviewSpec) Unmarshal(dAtA []byte) error {
 			}
 			m.UID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConditionalAuthorization", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ConditionalAuthorization == nil {
+				m.ConditionalAuthorization = &v11.ConditionalAuthorizationOptions{}
+			}
+			if err := m.ConditionalAuthorization.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -3400,6 +3532,40 @@ func (m *SubjectAccessReviewStatus) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Denied = bool(v != 0)
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConditionalDecisionChain", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ConditionalDecisionChain = append(m.ConditionalDecisionChain, v11.SubjectAccessReviewAuthorizationDecision{})
+			if err := m.ConditionalDecisionChain[len(m.ConditionalDecisionChain)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
