@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:openapi-gen=true
-// +k8s:openapi-model-package=io.k8s.apiserver.pkg.server.statusz.api.v1alpha1
+// +k8s:openapi-model-package=io.k8s.apiserver.pkg.server.statusz.api.v1beta1
 
-// Package v1alpha1 contains API Schema definitions for the statusz v1alpha1 API group
-package v1alpha1
+// Package v1beta1 contains API Schema definitions for the statusz v1beta1 API group
+package v1beta1

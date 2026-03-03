@@ -41,6 +41,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	v1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 )
 
 const wantTmpl = `
@@ -87,7 +88,7 @@ func TestHandleStatusz(t *testing.T) {
 		registry           fakeRegistry
 		wantStatusCode     int
 		wantBody           string
-		wantStructuredBody *v1alpha1.Statusz
+		wantStructuredBody interface{}
 		wantWarning        bool
 	}{
 		{
@@ -114,7 +115,7 @@ func TestHandleStatusz(t *testing.T) {
 		},
 		{
 			name:          "valid request for application/json",
-			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:  "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
@@ -125,10 +126,10 @@ func TestHandleStatusz(t *testing.T) {
 				deprecated:   map[string]bool{},
 			},
 			wantStatusCode: http.StatusOK,
-			wantStructuredBody: &v1alpha1.Statusz{
+			wantStructuredBody: &v1beta1.Statusz{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       Kind,
-					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+					Kind:       "Statusz",
+					APIVersion: "config.k8s.io/v1beta1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-server",
@@ -198,7 +199,7 @@ func TestHandleStatusz(t *testing.T) {
 		},
 		{
 			name:           "application/json with missing as",
-			acceptHeader:   "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader:   "application/json;v=v1beta1;g=config.k8s.io",
 			componentName:  "test-server",
 			wantStatusCode: http.StatusNotAcceptable,
 		},
@@ -247,7 +248,7 @@ func TestHandleStatusz(t *testing.T) {
 			),
 		},
 		{
-			name:          "deprecated version request",
+			name:          "deprecated v1alpha1 request",
 			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
@@ -256,15 +257,13 @@ func TestHandleStatusz(t *testing.T) {
 				binaryVer:    fakeBinaryVersion,
 				emulationVer: fakeEmulationVersion,
 				listedPaths:  fakeListedPaths,
-				deprecated: map[string]bool{
-					"v1alpha1": true,
-				},
+				deprecated:   map[string]bool{"v1alpha1": true},
 			},
 			wantStatusCode: http.StatusOK,
 			wantStructuredBody: &v1alpha1.Statusz{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       Kind,
-					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+					Kind:       "Statusz",
+					APIVersion: "config.k8s.io/v1alpha1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-server",
@@ -280,7 +279,7 @@ func TestHandleStatusz(t *testing.T) {
 		},
 		{
 			name:          "valid request for application/yaml",
-			acceptHeader:  "application/yaml;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:  "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
@@ -291,10 +290,10 @@ func TestHandleStatusz(t *testing.T) {
 				deprecated:   map[string]bool{},
 			},
 			wantStatusCode: http.StatusOK,
-			wantStructuredBody: &v1alpha1.Statusz{
+			wantStructuredBody: &v1beta1.Statusz{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       Kind,
-					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+					Kind:       "Statusz",
+					APIVersion: "config.k8s.io/v1beta1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-server",
@@ -309,7 +308,7 @@ func TestHandleStatusz(t *testing.T) {
 		},
 		{
 			name:          "valid request for application/cbor",
-			acceptHeader:  "application/cbor;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:  "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
@@ -320,10 +319,10 @@ func TestHandleStatusz(t *testing.T) {
 				deprecated:   map[string]bool{},
 			},
 			wantStatusCode: http.StatusOK,
-			wantStructuredBody: &v1alpha1.Statusz{
+			wantStructuredBody: &v1beta1.Statusz{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       Kind,
-					APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+					Kind:       "Statusz",
+					APIVersion: "config.k8s.io/v1beta1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-server",
@@ -361,9 +360,17 @@ func TestHandleStatusz(t *testing.T) {
 
 			if tt.wantStatusCode == http.StatusOK {
 				if tt.wantStructuredBody != nil {
-					var got v1alpha1.Statusz
-					unmarshalResponse(t, w.Header().Get("Content-Type"), w.Body.Bytes(), &got)
-					if diff := cmp.Diff(*tt.wantStructuredBody, got, timeEqual()); diff != "" {
+					var got interface{}
+					switch tt.wantStructuredBody.(type) {
+					case *v1alpha1.Statusz:
+						got = &v1alpha1.Statusz{}
+					case *v1beta1.Statusz:
+						got = &v1beta1.Statusz{}
+					default:
+						t.Fatalf("unexpected type for wantStructuredBody: %T", tt.wantStructuredBody)
+					}
+					unmarshalResponse(t, w.Header().Get("Content-Type"), w.Body.Bytes(), got)
+					if diff := cmp.Diff(tt.wantStructuredBody, got, timeEqual()); diff != "" {
 						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
 					}
 					if tt.wantWarning {
@@ -381,7 +388,7 @@ func TestHandleStatusz(t *testing.T) {
 	}
 }
 
-func unmarshalResponse(t *testing.T, contentType string, body []byte, got *v1alpha1.Statusz) {
+func unmarshalResponse(t *testing.T, contentType string, body []byte, got interface{}) {
 	t.Helper()
 	switch {
 	case strings.Contains(contentType, "application/json"):
@@ -457,6 +464,7 @@ func TestNewStatuszCodecFactory(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
 
 	_, err := newStatuszCodecFactory(scheme, "", nil)
 	if err != nil {
