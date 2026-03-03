@@ -17,6 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"strconv"
+
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 )
@@ -113,4 +116,24 @@ func IsDirectComparable(t *types.Type) bool {
 		return IsDirectComparable(t.Underlying)
 	}
 	return false
+}
+
+// ParseInt strictly parses an int from a string input,
+// ensuring that when converted back to a string, the resulting
+// int and the input string have the exact same representation.
+// This prevents scenarios where an input like `0100` parses
+// as 100 and would be re-stringed as `100`.
+func ParseInt(val string) (int, error) {
+	intVal, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	strVal := strconv.Itoa(intVal)
+	if strVal != val {
+		err := fmt.Errorf("parsed int %d converted to a string value of %q which does not match the input string", intVal, strVal)
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	return intVal, nil
 }

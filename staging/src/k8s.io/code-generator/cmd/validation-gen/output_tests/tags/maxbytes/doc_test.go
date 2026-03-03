@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package maxlength
+package maxbytes
 
 import (
 	"strings"
@@ -73,18 +73,18 @@ func Test(t *testing.T) {
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
 	}
 	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.TooLongCharacters(field.NewPath("max0Field"), "", 0),
-		field.TooLongCharacters(field.NewPath("max0PtrField"), "", 0),
-		field.TooLongCharacters(field.NewPath("max10Field"), "", 10),
-		field.TooLongCharacters(field.NewPath("max10PtrField"), "", 10),
-		field.TooLongCharacters(field.NewPath("max0UnvalidatedTypedefField"), "", 0),
-		field.TooLongCharacters(field.NewPath("max0UnvalidatedTypedefPtrField"), "", 0),
-		field.TooLongCharacters(field.NewPath("max10UnvalidatedTypedefField"), "", 10),
-		field.TooLongCharacters(field.NewPath("max10UnvalidatedTypedefPtrField"), "", 10),
-		field.TooLongCharacters(field.NewPath("max0ValidatedTypedefField"), "", 0),
-		field.TooLongCharacters(field.NewPath("max0ValidatedTypedefPtrField"), "", 0),
-		field.TooLongCharacters(field.NewPath("max10ValidatedTypedefField"), "", 10),
-		field.TooLongCharacters(field.NewPath("max10ValidatedTypedefPtrField"), "", 10),
+		field.TooLong(field.NewPath("max0Field"), "", 0),
+		field.TooLong(field.NewPath("max0PtrField"), "", 0),
+		field.TooLong(field.NewPath("max10Field"), "", 10),
+		field.TooLong(field.NewPath("max10PtrField"), "", 10),
+		field.TooLong(field.NewPath("max0UnvalidatedTypedefField"), "", 0),
+		field.TooLong(field.NewPath("max0UnvalidatedTypedefPtrField"), "", 0),
+		field.TooLong(field.NewPath("max10UnvalidatedTypedefField"), "", 10),
+		field.TooLong(field.NewPath("max10UnvalidatedTypedefPtrField"), "", 10),
+		field.TooLong(field.NewPath("max0ValidatedTypedefField"), "", 0),
+		field.TooLong(field.NewPath("max0ValidatedTypedefPtrField"), "", 0),
+		field.TooLong(field.NewPath("max10ValidatedTypedefField"), "", 10),
+		field.TooLong(field.NewPath("max10ValidatedTypedefPtrField"), "", 10),
 	})
 
 	// Test validation ratcheting

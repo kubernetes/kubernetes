@@ -1394,6 +1394,45 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			deviceStatusFeatureGate: true,
 		},
+		"valid-network-device-status-with-multi-byte-interface-name-and-hardware-address": {
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						Data: &runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName:   strings.Repeat("𝄞", 256/4), // the G clef unicode character is exactly 4 bytes so repeating this 256/4 times means that it is exactly 256 bytes worth of length and should be valid.
+							HardwareAddress: strings.Repeat("𝄞", 128/4), // the G clef unicode character is exactly 4 bytes so repeating this 128/4 times means that it is exactly 128 bytes worth of length and should be valid.
+							IPs: []string{
+								"10.9.8.0/24",
+								"2001:db8::/64",
+								"10.9.8.1/24",
+								"2001:db8::1/64",
+								"10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24",
+								"10.9.8.8/24", "10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
 		"invalid-device-status-duplicate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64").MarkCoveredByDeclarative(),
@@ -1471,6 +1510,36 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						NetworkData: &resource.NetworkDeviceData{
 							InterfaceName:   strings.Repeat("x", resource.NetworkDeviceDataInterfaceNameMaxLength+1),
 							HardwareAddress: strings.Repeat("x", resource.NetworkDeviceDataHardwareAddressMaxLength+1),
+							IPs: []string{
+								"300.9.8.0/24",
+								"010.009.008.000/24",
+								"2001:0db8::1/64",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-network-device-status-with-multi-byte-interface-name-and-hardware-address": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative(),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(0), "300.9.8.0/24", "must be a valid address in CIDR form, (e.g. 10.9.8.7/24 or 2001:db8::1/64)"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "010.009.008.000/24", "must be in canonical form (\"10.9.8.0/24\")"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(2), "2001:0db8::1/64", "must be in canonical form (\"2001:db8::1/64\")"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName:   strings.Repeat("𝄞", resource.NetworkDeviceDataInterfaceNameMaxLength),   // the G clef unicode character is exactly 4 bytes in length and should exceed the byte length limit for this field by a factor of 4
+							HardwareAddress: strings.Repeat("𝄞", resource.NetworkDeviceDataHardwareAddressMaxLength), // the G clef unicode character is exactly 4 bytes in length and should exceed the byte length limit for this field by a factor of 4
 							IPs: []string{
 								"300.9.8.0/24",
 								"010.009.008.000/24",

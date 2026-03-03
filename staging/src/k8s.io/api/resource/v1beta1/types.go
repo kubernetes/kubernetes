@@ -2023,11 +2023,11 @@ type NetworkDeviceData struct {
 	// the allocated device. This might be the name of a physical or virtual
 	// network interface being configured in the pod.
 	//
-	// Must not be longer than 256 characters.
+	// Must not be longer than 256 bytes.
 	//
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:maxLength=256
+	// +k8s:alpha(since: "1.36")=+k8s:maxBytes=256
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
 	// IPs lists the network addresses assigned to the device's network interface.
@@ -2048,10 +2048,10 @@ type NetworkDeviceData struct {
 
 	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
-	// Must not be longer than 128 characters.
+	// Must not be longer than 128 bytes.
 	//
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:maxLength=128
+	// +k8s:alpha(since: "1.36")=+k8s:maxBytes=128
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }
