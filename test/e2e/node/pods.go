@@ -695,7 +695,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			// Set the pod image to something that doesn't exist to induce a pull error
 			// to start with.
 			agnImage := pod.Spec.Containers[0].Image
-			pod.Spec.Containers[0].Image = "some-image-that-doesnt-exist"
+			pod.Spec.Containers[0].Image = "localhost/some-image-that-doesnt-exist"
 
 			ginkgo.By("submitting the pod to kubernetes")
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
