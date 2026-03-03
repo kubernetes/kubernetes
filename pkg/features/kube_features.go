@@ -64,6 +64,12 @@ const (
 	// deprecated feature.
 	AllowServiceExternalIPs featuregate.Feature = "AllowServiceExternalIPs"
 
+	// owner: @gavinkflam
+	// kep: https://kep.k8s.io/5936
+	//
+	// Add user fields to control atomic write volumes file owner UID
+	AtomicWriteVolumeUserFields featuregate.Feature = "AtomicWriteVolumeUserFields"
+
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1209,6 +1215,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 	},
 
+	AtomicWriteVolumeUserFields: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	AuthorizePodWebsocketUpgradeCreatePermission: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2249,6 +2259,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AllowOverwriteTerminationGracePeriodSeconds: {},
 
 	AllowServiceExternalIPs: {},
+
+	AtomicWriteVolumeUserFields: {},
 
 	AuthorizePodWebsocketUpgradeCreatePermission: {},
 
