@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -72,9 +73,9 @@ type VolumeGroupSnapshotResource struct {
 func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VolumeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, groupName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured) {
 	defer ginkgo.GinkgoRecover()
 	var err error
-	if pattern.SnapshotType != VolumeGroupSnapshot {
-		err = fmt.Errorf("SnapshotType must be set to VolumeGroupSnapshot")
-		framework.ExpectNoError(err, "SnapshotType is set to VolumeGroupSnapshot")
+	if pattern.SnapshotType != VolumeGroupSnapshot && pattern.SnapshotType != PreprovisionedCreatedVolumeGroupSnapshot {
+		err = fmt.Errorf("SnapshotType must be set to either VolumeGroupSnapshot or PreprovisionedCreatedVolumeGroupSnapshot")
+		framework.ExpectNoError(err, "SnapshotType is set to VolumeGroupSnapshot or PreprovisionedCreatedVolumeGroupSnapshot")
 	}
 	dc := config.Framework.DynamicClient
 
@@ -318,12 +319,13 @@ func (r *VolumeGroupSnapshotResource) CleanupVGS(ctx context.Context, timeouts *
 // CleanupVGSClass deletes the VolumeGroupSnapshotClass.
 func (r *VolumeGroupSnapshotResource) CleanupVGSClass(ctx context.Context, timeouts *framework.TimeoutContext) error {
 	if r.VGSClass == nil {
+		framework.Logf("VGSClass is nil, skipping cleanup")
 		return nil
 	}
 
 	dc := r.Config.Framework.DynamicClient
 	vgsClassName := r.VGSClass.GetName()
-	framework.Logf("deleting groupSnapshotClass %q", vgsClassName)
+	framework.Logf("deleting VolumeGroupSnapshotClass %q", vgsClassName)
 
 	err := dc.Resource(utils.VolumeGroupSnapshotClassGVR).Delete(ctx, vgsClassName, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -331,10 +333,11 @@ func (r *VolumeGroupSnapshotResource) CleanupVGSClass(ctx context.Context, timeo
 	}
 
 	if err = utils.WaitForGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotClassGVR, vgsClassName, framework.Poll, timeouts.SnapshotDelete); err != nil {
-		return fmt.Errorf("failed waiting for groupSnapshotClass %q deletion: %w", vgsClassName, err)
+		return fmt.Errorf("failed waiting for VolumeGroupSnapshotClass %q deletion: %w", vgsClassName, err)
 	}
 
-	framework.Logf("successfully deleted groupSnapshotClass %q", vgsClassName)
+	framework.Logf("successfully deleted VolumeGroupSnapshotClass %q", vgsClassName)
+	r.VGSClass = nil
 	return nil
 }
 
@@ -356,13 +359,288 @@ func (r *VolumeGroupSnapshotResource) CleanupResource(ctx context.Context, timeo
 
 // CreateVolumeGroupSnapshotResource creates a VolumeGroupSnapshotResource object with the given parameters.
 func CreateVolumeGroupSnapshotResource(ctx context.Context, sDriver VolumeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *VolumeGroupSnapshotResource {
+	var err error
 	vgsClass, snapshot, vgsc := CreateVolumeGroupSnapshot(ctx, sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
-	vgs := &VolumeGroupSnapshotResource{
+	r := &VolumeGroupSnapshotResource{
 		Config:     config,
 		Pattern:    pattern,
 		VGS:        snapshot,
 		VGSClass:   vgsClass,
 		VGSContent: vgsc,
 	}
-	return vgs
+
+	dc := config.Framework.DynamicClient
+
+	if pattern.SnapshotType == PreprovisionedCreatedVolumeGroupSnapshot {
+		// prepare a pre-provisioned VolumeGroupSnapshotContent with certain data
+		// Because this could be run with an external CSI driver, we have no way
+		// to pre-provision the group snapshot as we normally would using their API.
+		// We instead dynamically take a group snapshot (above step), delete the old snapshot,
+		// and create another snapshot using the first snapshot's group snapshot handle.
+
+		// Only update to Retain if the pattern specifies Delete policy
+		if pattern.SnapshotDeletionPolicy == DeleteSnapshot {
+			ginkgo.By("updating the group snapshot content deletion policy to retain")
+			patchData := []byte(`{"spec":{"deletionPolicy":"Retain"}}`)
+			vgsc, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Patch(ctx, vgsc.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("recording properties of the pre-provisioned group snapshot")
+		vgscStatus := vgsc.Object["status"].(map[string]interface{})
+		groupSnapshotHandle := vgscStatus["volumeGroupSnapshotHandle"].(string)
+		framework.Logf("Recording group snapshot content handle: %s", groupSnapshotHandle)
+
+		// Extract individual volume snapshot handles from volumeSnapshotInfoList
+		volumeSnapshotInfoList := vgscStatus["volumeSnapshotInfoList"].([]interface{})
+		volumeSnapshotHandles := make([]string, 0, len(volumeSnapshotInfoList))
+		for _, info := range volumeSnapshotInfoList {
+			infoMap := info.(map[string]interface{})
+			snapshotHandle := infoMap["snapshotHandle"].(string)
+			volumeSnapshotHandles = append(volumeSnapshotHandles, snapshotHandle)
+		}
+		framework.Logf("Recording %d volume snapshot handles", len(volumeSnapshotHandles))
+
+		vgscAnnotations := vgsc.GetAnnotations()
+		framework.Logf("Recording group snapshot content annotations: %v", vgscAnnotations)
+		csiDriverName := vgsClass.Object["driver"].(string)
+		framework.Logf("Recording snapshot driver: %s", csiDriverName)
+
+		// Get all VolumeSnapshotContent names owned by this VGS before deletion
+		vgsUID := snapshot.GetUID()
+		contentNamesSet, err := r.getVolumeSnapshotContentNames(ctx, dc, pvcNamespace, vgsUID)
+		framework.ExpectNoError(err)
+
+		// Get annotations from one of the VolumeSnapshotContents
+		// Note: We don't need VolumeSnapshotClass for pre-provisioned VolumeSnapshotContent
+		var snapshotContentAnnotations map[string]string
+		if len(contentNamesSet) > 0 {
+			firstContentName := contentNamesSet.UnsortedList()[0]
+			firstVSC, err := dc.Resource(utils.SnapshotContentGVR).Get(ctx, firstContentName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			snapshotContentAnnotations = firstVSC.GetAnnotations()
+			framework.Logf("Recording VolumeSnapshotContent annotations: %v", snapshotContentAnnotations)
+		}
+
+		// Update all VolumeSnapshotContents to Retain policy BEFORE deleting VGS
+		// This prevents them from being deleted when their VolumeSnapshots are cascade-deleted
+		// Only needed when the pattern specifies Delete policy
+		if pattern.SnapshotDeletionPolicy == DeleteSnapshot {
+			ginkgo.By("updating VolumeSnapshotContents deletion policy to Retain")
+			for _, contentName := range contentNamesSet.UnsortedList() {
+				patchData := []byte(`{"spec":{"deletionPolicy":"Retain"}}`)
+				_, err := dc.Resource(utils.SnapshotContentGVR).Patch(ctx, contentName, types.MergePatchType, patchData, metav1.PatchOptions{})
+				framework.ExpectNoError(err)
+			}
+		}
+
+		// If the deletion policy is retain on vgsc:
+		// when vgs is deleted vgsc will not be deleted
+		// when the vgsc is manually deleted then the underlying group snapshot resource will not be deleted.
+		// We exploit this to create a group snapshot resource from which we can create a preprovisioned snapshot
+		ginkgo.By("deleting the group snapshot")
+		err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(ctx, snapshot.GetName(), metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("checking the VolumeGroupSnapshot has been deleted")
+		err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotGVR, snapshot.GetName(), snapshot.GetNamespace(), framework.Poll, timeouts.SnapshotDelete)
+		framework.ExpectNoError(err)
+
+		// Wait for VolumeSnapshots owned by this VGS to be cascade-deleted
+		ginkgo.By("waiting for owned VolumeSnapshots to be deleted")
+		err = utils.WaitForOwnedResourcesDeleted(ctx, dc, utils.SnapshotGVR, pvcNamespace, vgsUID, framework.Poll, timeouts.SnapshotDelete)
+		framework.ExpectNoError(err)
+
+		// Delete the VolumeSnapshotContents (with Retain policy, so physical snapshots remain)
+		ginkgo.By("deleting VolumeSnapshotContents")
+		for _, contentName := range contentNamesSet.UnsortedList() {
+			err := dc.Resource(utils.SnapshotContentGVR).Delete(ctx, contentName, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.ExpectNoError(err)
+			}
+		}
+
+		// Wait for VolumeSnapshotContents to be deleted
+		for _, contentName := range contentNamesSet.UnsortedList() {
+			err := utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, contentName, framework.Poll, timeouts.SnapshotDelete)
+			framework.ExpectNoError(err)
+		}
+
+		// Delete the VolumeGroupSnapshotContent (with Retain policy, so physical group snapshot remains)
+		err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Delete(ctx, vgsc.GetName(), metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("checking the VolumeGroupSnapshotContent has been deleted")
+		err = utils.WaitForGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, vgsc.GetName(), framework.Poll, timeouts.SnapshotDelete)
+		framework.ExpectNoError(err)
+
+		// Create new pre-provisioned VGSContent with the extracted group snapshot handle
+		ginkgo.By("creating a new pre-provisioned VolumeGroupSnapshotContent with the group snapshot handle")
+		vgsUUID := uuid.NewUUID()
+
+		vgsName := getPreProvisionedVolumeGroupSnapshotName(vgsUUID)
+		vgscName := getPreProvisionedVolumeGroupSnapshotContentName(vgsUUID)
+
+		r.VGSContent = getPreProvisionedVolumeGroupSnapshotContent(vgscName, vgscAnnotations, vgsName, pvcNamespace, groupSnapshotHandle, volumeSnapshotHandles, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
+		r.VGSContent, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Create(ctx, r.VGSContent, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("creating a pre-provisioned VGS with that VGSContent")
+		r.VGS = getPreProvisionedVolumeGroupSnapshot(vgsName, pvcNamespace, vgscName)
+		r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Create(ctx, r.VGS, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		err = utils.WaitForVolumeGroupSnapshotReady(ctx, dc, r.VGS.GetNamespace(), r.VGS.GetName(), framework.Poll, timeouts.SnapshotCreate*10)
+		framework.ExpectNoError(err)
+
+		// Get the new VGS UID for owner references
+		r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Get(ctx, r.VGS.GetName(), metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		newVgsUID := r.VGS.GetUID()
+		vgsAPIVersion := r.VGS.GetAPIVersion()
+		vgsKind := r.VGS.GetKind()
+
+		// Create new pre-provisioned VolumeSnapshotContents and VolumeSnapshots
+		// The VolumeSnapshots need to be owned by the VGS so the controller can discover them
+		ginkgo.By("creating pre-provisioned VolumeSnapshotContents and VolumeSnapshots owned by the VGS")
+
+		for i, snapshotHandle := range volumeSnapshotHandles {
+			// Generate unique names for the pre-provisioned VolumeSnapshotContent and VolumeSnapshot
+			// Using VGS UUID + index to make names predictable and associated with parent VGS
+			snapName := fmt.Sprintf("pre-provisioned-vs-%s-%d", string(vgsUUID), i)
+			snapContentName := fmt.Sprintf("pre-provisioned-vsc-%s-%d", string(vgsUUID), i)
+
+			// Create pre-provisioned VolumeSnapshotContent first
+			// Note: volumeSnapshotClassName is not required for pre-provisioned VolumeSnapshotContent
+			vsc := getPreProvisionedVolumeSnapshotContent(snapContentName, snapshotContentAnnotations, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
+			_, err := dc.Resource(utils.SnapshotContentGVR).Create(ctx, vsc, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Create pre-provisioned VolumeSnapshot
+			preProvisionedVS := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "VolumeSnapshot",
+					"apiVersion": utils.SnapshotAPIVersion,
+					"metadata": map[string]interface{}{
+						"name":      snapName,
+						"namespace": pvcNamespace,
+						"ownerReferences": []interface{}{
+							map[string]interface{}{
+								"apiVersion": vgsAPIVersion,
+								"kind":       vgsKind,
+								"name":       r.VGS.GetName(),
+								"uid":        newVgsUID,
+							},
+						},
+					},
+					"spec": map[string]interface{}{
+						"source": map[string]interface{}{
+							"volumeSnapshotContentName": snapContentName,
+						},
+					},
+				},
+			}
+
+			_, err = dc.Resource(utils.SnapshotGVR).Namespace(pvcNamespace).Create(ctx, preProvisionedVS, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Wait for the VolumeSnapshot to be ready
+			err = utils.WaitForSnapshotReady(ctx, dc, pvcNamespace, snapName, framework.Poll, timeouts.SnapshotCreate)
+			framework.ExpectNoError(err)
+
+			framework.Logf("Created pre-provisioned VolumeSnapshotContent %s and VolumeSnapshot %s (%d/%d)", snapContentName, snapName, i+1, len(volumeSnapshotHandles))
+		}
+
+		ginkgo.By("getting the group snapshot and group snapshot content")
+		r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Get(ctx, r.VGS.GetName(), metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		r.VGSContent, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, r.VGSContent.GetName(), metav1.GetOptions{})
+		framework.ExpectNoError(err)
+	}
+
+	return r
+}
+
+func getPreProvisionedVolumeGroupSnapshot(vgsName, ns, vgscName string) *unstructured.Unstructured {
+	snapshot := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeGroupSnapshot",
+			"apiVersion": utils.VolumeGroupSnapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":      vgsName,
+				"namespace": ns,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"volumeGroupSnapshotContentName": vgscName,
+				},
+			},
+		},
+	}
+
+	return snapshot
+}
+
+func getPreProvisionedVolumeGroupSnapshotName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-vgs-%s", string(uuid))
+}
+
+func getPreProvisionedVolumeGroupSnapshotContentName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-vgsc-%s", string(uuid))
+}
+
+func getPreProvisionedVolumeGroupSnapshotContent(vgscName string, vgscAnnotations map[string]string, vgsName, vgsNamespace, groupSnapshotHandle string, volumeSnapshotHandles []string, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+	snapshotContent := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeGroupSnapshotContent",
+			"apiVersion": utils.VolumeGroupSnapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":        vgscName,
+				"annotations": vgscAnnotations,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"groupSnapshotHandles": map[string]interface{}{
+						"volumeGroupSnapshotHandle": groupSnapshotHandle,
+						"volumeSnapshotHandles":     volumeSnapshotHandles,
+					},
+				},
+				"volumeGroupSnapshotRef": map[string]interface{}{
+					"name":      vgsName,
+					"namespace": vgsNamespace,
+				},
+				"driver":         csiDriverName,
+				"deletionPolicy": deletionPolicy,
+			},
+		},
+	}
+
+	return snapshotContent
+}
+
+func getPreProvisionedVolumeSnapshotContent(snapcontentName string, snapshotContentAnnotations map[string]string, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+	snapshotContent := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotContent",
+			"apiVersion": utils.SnapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":        snapcontentName,
+				"annotations": snapshotContentAnnotations,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"snapshotHandle": snapshotHandle,
+				},
+				"volumeSnapshotRef": map[string]interface{}{
+					"name":      snapshotName,
+					"namespace": snapshotNamespace,
+				},
+				"driver":         csiDriverName,
+				"deletionPolicy": deletionPolicy,
+			},
+		},
+	}
+
+	return snapshotContent
 }

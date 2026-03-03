@@ -39,6 +39,7 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -61,6 +62,8 @@ func InitVolumeGroupSnapshottableTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
 		storageframework.VolumeGroupSnapshotDelete,
 		storageframework.VolumeGroupSnapshotRetain,
+		storageframework.PreprovisionedVolumeGroupSnapshotDelete,
+		storageframework.PreprovisionedVolumeGroupSnapshotRetain,
 	}
 	return InitCustomGroupSnapshottableTestSuite(patterns)
 }
@@ -289,62 +292,126 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				ginkgo.By("verifying the snapshots in the group are ready to use")
 				status := snapshot.VGS.Object["status"]
 				gomega.Expect(status).ShouldNot(gomega.BeNil(), "failed to get status of group snapshot")
-				volumeListMap := snapshot.VGSContent.Object["status"].(map[string]interface{})
-				gomega.Expect(volumeListMap).ShouldNot(gomega.BeNil(), "failed to get group snapshot list")
-				volumeSnapshotInfoList := volumeListMap["volumeSnapshotInfoList"].([]interface{})
-				gomega.Expect(volumeSnapshotInfoList).ShouldNot(gomega.BeNil(), "failed to get group snapshot handle list")
-				gomega.Expect(volumeSnapshotInfoList).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify snapshot handle list length")
+
+				var volumeSnapshotInfoList []interface{}
+				// For dynamic snapshots, verify volumeSnapshotInfoList is populated
+				// For pre-provisioned snapshots, this field won't be populated by the controller
+				if pattern.SnapshotType == storageframework.VolumeGroupSnapshot {
+					volumeListMap := snapshot.VGSContent.Object["status"].(map[string]interface{})
+					gomega.Expect(volumeListMap).ShouldNot(gomega.BeNil(), "failed to get group snapshot list")
+					volumeSnapshotInfoList = volumeListMap["volumeSnapshotInfoList"].([]interface{})
+					gomega.Expect(volumeSnapshotInfoList).ShouldNot(gomega.BeNil(), "failed to get group snapshot handle list")
+					gomega.Expect(volumeSnapshotInfoList).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify snapshot handle list length")
+				}
 				claimSize := s.GetTestSuiteInfo().SupportedSizeRange.Min
 
 				ginkgo.By("creating restored PVCs from snapshots")
 				restoredPVCs := []*v1.PersistentVolumeClaim{}
-				volumeHandleToPVCName := make(map[string]string)
 
-				// First, create mapping from volume handles to original PVC names for StatefulSet
-				for i := 0; i < groupTest.numReplicas; i++ {
-					pvcName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
-					pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, pvcName, metav1.GetOptions{})
-					framework.ExpectNoError(err, "failed to get PVC %s", pvcName)
+				if pattern.SnapshotType == storageframework.VolumeGroupSnapshot {
+					// For dynamic snapshots, use volumeSnapshotInfoList
+					volumeHandleToPVCName := make(map[string]string)
 
-					pv, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
-					framework.ExpectNoError(err, "failed to get PV for PVC %s", pvcName)
-					volumeHandle := pv.Spec.CSI.VolumeHandle
-					volumeHandleToPVCName[volumeHandle] = pvcName
-				}
+					// First, create mapping from volume handles to original PVC names for StatefulSet
+					for i := 0; i < groupTest.numReplicas; i++ {
+						pvcName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
+						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, pvcName, metav1.GetOptions{})
+						framework.ExpectNoError(err, "failed to get PVC %s", pvcName)
 
-				for _, info := range volumeSnapshotInfoList {
-					// Create a PVC from the snapshot
-					volumeHandle := info.(map[string]interface{})["volumeHandle"].(string)
-					if volumeHandle == "" {
-						framework.Failf("volumeHandle missing for volume snapshot %v", info)
+						pv, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+						framework.ExpectNoError(err, "failed to get PV for PVC %s", pvcName)
+						volumeHandle := pv.Spec.CSI.VolumeHandle
+						volumeHandleToPVCName[volumeHandle] = pvcName
 					}
 
-					uid := snapshot.VGS.Object["metadata"].(map[string]interface{})["uid"].(string)
-					gomega.Expect(uid).NotTo(gomega.BeNil(), "failed to get uuid from content")
-					volumeSnapshotName := fmt.Sprintf("snapshot-%x", sha256.Sum256([]byte(
-						uid+volumeHandle)))
+					for _, info := range volumeSnapshotInfoList {
+						// Create a PVC from the snapshot
+						volumeHandle := info.(map[string]interface{})["volumeHandle"].(string)
+						if volumeHandle == "" {
+							framework.Failf("volumeHandle missing for volume snapshot %v", info)
+						}
 
-					// Use original PVC name as base for restored PVC name
-					originalPVCName := volumeHandleToPVCName[volumeHandle]
-					restoredPVCName := fmt.Sprintf("restored-%s", originalPVCName)
+						uid := snapshot.VGS.Object["metadata"].(map[string]interface{})["uid"].(string)
+						gomega.Expect(uid).NotTo(gomega.BeNil(), "failed to get uuid from content")
+						volumeSnapshotName := fmt.Sprintf("snapshot-%x", sha256.Sum256([]byte(
+							uid+volumeHandle)))
 
-					pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-						StorageClassName: &groupTest.volumeResources[0].Sc.Name,
-						ClaimSize:        claimSize,
-						Name:             restoredPVCName,
-					}, f.Namespace.Name)
+						// Use original PVC name as base for restored PVC name
+						originalPVCName := volumeHandleToPVCName[volumeHandle]
+						restoredPVCName := fmt.Sprintf("restored-%s", originalPVCName)
 
-					group := "snapshot.storage.k8s.io"
+						pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+							StorageClassName: &groupTest.volumeResources[0].Sc.Name,
+							ClaimSize:        claimSize,
+							Name:             restoredPVCName,
+						}, f.Namespace.Name)
 
-					pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
-						APIGroup: &group,
-						Kind:     "VolumeSnapshot",
-						Name:     volumeSnapshotName,
+						group := "snapshot.storage.k8s.io"
+
+						pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
+							APIGroup: &group,
+							Kind:     "VolumeSnapshot",
+							Name:     volumeSnapshotName,
+						}
+
+						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
+						framework.ExpectNoError(err, "failed to create PVC from snapshot")
+						restoredPVCs = append(restoredPVCs, pvc)
 					}
+				} else {
+					// For pre-provisioned snapshots, query VolumeSnapshots owned by the VGS
+					dc := f.DynamicClient
+					vgsList, err := dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+					framework.ExpectNoError(err, "failed to list VolumeGroupSnapshots")
 
-					pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
-					framework.ExpectNoError(err, "failed to create PVC from snapshot")
-					restoredPVCs = append(restoredPVCs, pvc)
+					var vgsUID string
+					for _, vgs := range vgsList.Items {
+						if vgs.GetName() == snapshot.VGS.GetName() {
+							vgsUID = string(vgs.GetUID())
+							break
+						}
+					}
+					gomega.Expect(vgsUID).NotTo(gomega.BeEmpty(), "failed to get VGS UID")
+
+					// List VolumeSnapshots owned by this VGS
+					vss, err := dc.Resource(utils.SnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+					framework.ExpectNoError(err, "failed to list VolumeSnapshots")
+
+					var preProvisionedSnapshots []string
+					for _, vs := range vss.Items {
+						for _, owner := range vs.GetOwnerReferences() {
+							if owner.Kind == "VolumeGroupSnapshot" && string(owner.UID) == vgsUID {
+								preProvisionedSnapshots = append(preProvisionedSnapshots, vs.GetName())
+								break
+							}
+						}
+					}
+					gomega.Expect(preProvisionedSnapshots).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify pre-provisioned snapshot count")
+
+					// Map snapshot index to original PVC name (snapshots are created in the same order as PVCs)
+					for i, vsName := range preProvisionedSnapshots {
+						// Original PVC name for StatefulSet
+						originalPVCName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
+						restoredPVCName := fmt.Sprintf("restored-%s", originalPVCName)
+
+						pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+							StorageClassName: &groupTest.volumeResources[0].Sc.Name,
+							ClaimSize:        claimSize,
+							Name:             restoredPVCName,
+						}, f.Namespace.Name)
+
+						group := "snapshot.storage.k8s.io"
+
+						pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
+							APIGroup: &group,
+							Kind:     "VolumeSnapshot",
+							Name:     vsName,
+						}
+
+						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
+						framework.ExpectNoError(err, "failed to create PVC from snapshot")
+						restoredPVCs = append(restoredPVCs, pvc)
+					}
 				}
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
