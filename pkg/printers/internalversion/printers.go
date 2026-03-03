@@ -3279,7 +3279,7 @@ func printResourcePoolStatusRequest(obj *resource.ResourcePoolStatusRequest, opt
 	var totalMatchingPools int32
 	if obj.Status != nil {
 		for _, cond := range obj.Status.Conditions {
-			if cond.Type == "Complete" && cond.Status == metav1.ConditionTrue {
+			if cond.Type == resource.ResourcePoolStatusRequestConditionComplete && cond.Status == metav1.ConditionTrue {
 				status = "Complete"
 				break
 			}

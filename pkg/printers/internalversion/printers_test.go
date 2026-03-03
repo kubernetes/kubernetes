@@ -8128,7 +8128,7 @@ func TestPrintResourcePoolStatusRequest(t *testing.T) {
 					TotalMatchingPools: ptr.To(int32(3)),
 					Conditions: []metav1.Condition{
 						{
-							Type:   "Complete",
+							Type:   resourceapis.ResourcePoolStatusRequestConditionComplete,
 							Status: metav1.ConditionTrue,
 						},
 					},

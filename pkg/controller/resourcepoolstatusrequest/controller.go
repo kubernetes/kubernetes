@@ -343,12 +343,15 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	var pools []resourcev1alpha1.PoolStatus
 	for key, info := range poolData {
 		allocatedDevices := allocationData[key]
-		availableDevices := max(0, info.totalDevices-allocatedDevices)
+		// UnavailableDevices is currently always 0 in Alpha because the controller
+		// does not yet inspect device conditions/taints. This will be computed from
+		// real data when device health tracking is wired in.
+		unavailDevices := int32(0)
+		availableDevices := max(0, info.totalDevices-allocatedDevices-unavailDevices)
 
 		totalDevices := info.totalDevices
 		allocDevices := allocatedDevices
 		availDevices := availableDevices
-		unavailDevices := int32(0)
 		generation := info.generation
 		pool := resourcev1alpha1.PoolStatus{
 			Driver:             info.driver,
