@@ -21,6 +21,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // Type defines the policy type
@@ -31,17 +32,17 @@ type Policy interface {
 	Name() string
 	Start(logger klog.Logger, s state.State) error
 	// Allocate call is idempotent
-	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error
+	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 	// RemoveContainer call is idempotent
 	RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string)
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory(s state.State) []state.Block
 }

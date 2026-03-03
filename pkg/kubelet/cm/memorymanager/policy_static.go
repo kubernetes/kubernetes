@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -95,7 +96,7 @@ func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	// allocate the memory only for guaranteed pods
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
 	qos := v1qos.GetPodQOS(pod)
@@ -401,7 +402,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
@@ -436,7 +437,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {

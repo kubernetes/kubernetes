@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -246,7 +247,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(&tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -297,7 +298,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+		podHints := m.GetPodTopologyHints(&tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
@@ -479,7 +480,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				sourcesReady:      &sourcesReadyStub{},
 			}
 
-			podHints := m.GetPodTopologyHints(&testCase.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(&testCase.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})

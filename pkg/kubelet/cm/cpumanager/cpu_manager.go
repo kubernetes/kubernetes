@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -62,7 +63,7 @@ type Manager interface {
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
 	// e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
@@ -79,7 +80,7 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 
 	// GetExclusiveCPUs implements the podresources.CPUsProvider interface to provide
 	// exclusively allocated cpus for the container
@@ -88,7 +89,7 @@ type Manager interface {
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
@@ -256,7 +257,7 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	return nil
 }
 
-func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
+func (m *manager) Allocate(p *v1.Pod, c *v1.Container, operation lifecycle.Operation) error {
 	logger := klog.TODO() // until we move topology manager to contextual logging
 
 	// Garbage collect any stranded resources before allocating CPUs.
@@ -266,7 +267,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(logger, m.state, p, c)
+	err := m.policy.Allocate(logger, m.state, p, c, operation)
 	if err != nil {
 		logger.Error(err, "policy error")
 		return err
@@ -327,20 +328,20 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(logger, m.state, pod, container)
+	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
 }
 
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(logger, m.state, pod)
+	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {

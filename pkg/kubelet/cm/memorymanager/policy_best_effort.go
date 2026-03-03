@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // On Windows we want to use the same logic as the StaticPolicy to compute the memory topology hints
@@ -60,20 +61,20 @@ func (p *bestEffortPolicy) Start(logger logr.Logger, s state.State) error {
 	return p.static.Start(logger, s)
 }
 
-func (p *bestEffortPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	return p.static.Allocate(logger, s, pod, container)
+func (p *bestEffortPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
+	return p.static.Allocate(logger, s, pod, container, operation)
 }
 
 func (p *bestEffortPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID string, containerName string) {
 	p.static.RemoveContainer(logger, s, podUID, containerName)
 }
 
-func (p *bestEffortPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	return p.static.GetPodTopologyHints(logger, s, pod)
+func (p *bestEffortPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	return p.static.GetPodTopologyHints(logger, s, pod, operation)
 }
 
-func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	return p.static.GetTopologyHints(logger, s, pod, container)
+func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	return p.static.GetTopologyHints(logger, s, pod, container, operation)
 }
 
 func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {

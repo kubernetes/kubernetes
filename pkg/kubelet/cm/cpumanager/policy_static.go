@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
@@ -53,7 +54,21 @@ const (
 	ErrorGetOriginalCPUSet = "getOriginalCPUSetError"
 	// ErrorResizeAllocateCPUs represents the type of a ResizeAllocateCPUsError
 	ErrorResizeAllocateCPUs = "ResizeAllocateCPUsError"
+	// ErrorUnsupportedLifecycleOperation represents the type of a UnsupportedLifecycleOperationError
+	ErrorUnsupportedLifecycleOperation = "UnsupportedLifecycleOperationError"
 )
+
+type UnsupportedLifecycleOperationError struct {
+	Operation lifecycle.Operation
+}
+
+func (e UnsupportedLifecycleOperationError) Error() string {
+	return fmt.Sprintf("Unsupported Lifecycle Operation Error: %s is neither AddOperation nor ResizeOperation", e.Operation)
+}
+
+func (e UnsupportedLifecycleOperationError) Type() string {
+	return ErrorUnsupportedLifecycleOperation
+}
 
 // SMTAlignmentError represents an error due to SMT alignment
 type SMTAlignmentError struct {
@@ -424,152 +439,251 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
-func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "operation", operation)
 	logger.Info("Allocate start") // V=0 for backward compatibility
 	defer logger.V(2).Info("Allocate end")
 
-	numCPUs := p.guaranteedCPUs(logger, pod, container)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// During a pod resize, handle corner cases
-		err := p.isFeasibleResize(logger, s, pod, container)
+	if operation == lifecycle.AddOperation {
+
+		numCPUs := p.guaranteedCPUs(logger, pod, container)
+
+		if numCPUs == 0 {
+			// container belongs in the shared pool (nothing to do; use default cpuset)
+			return nil
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+			logger.Info("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy")
+			return nil
+		}
+
+		logger.Info("Static policy: Allocate")
+
+		// container belongs in an exclusively allocated pool
+		metrics.CPUManagerPinningRequestsTotal.Inc()
+		defer func() {
+			if rerr != nil {
+				metrics.CPUManagerPinningErrorsTotal.Inc()
+				if p.options.FullPhysicalCPUsOnly {
+					metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+				}
+				return
+			}
+			// TODO: move in updateMetricsOnAllocate
+			if p.options.FullPhysicalCPUsOnly {
+				// increment only if we know we allocate aligned resources
+				metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			}
+		}()
+
+		if p.options.FullPhysicalCPUsOnly {
+			if (numCPUs % p.cpuGroupSize) != 0 {
+				// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
+				// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
+				// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
+				// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
+				// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
+				// the pod would be placed on a node where there are enough physical cores available to be allocated.
+				// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
+				// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
+				// CPUs on a physical core. Allocation of individual threads would never have to occur.
+				return SMTAlignmentError{
+					RequestedCPUs:        numCPUs,
+					CpusPerCore:          p.cpuGroupSize,
+					CausedByPhysicalCPUs: false,
+				}
+			}
+
+			availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
+
+			// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
+			// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
+			// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
+			// This way, by construction all possible CPUs allocation whose number is multiple of the SMT level are now correct again.
+			if numCPUs > availablePhysicalCPUs {
+				return SMTAlignmentError{
+					RequestedCPUs:         numCPUs,
+					CpusPerCore:           p.cpuGroupSize,
+					AvailablePhysicalCPUs: availablePhysicalCPUs,
+					CausedByPhysicalCPUs:  true,
+				}
+			}
+		}
+		if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+			p.updateCPUsToReuse(pod, container, cset)
+			logger.Info("Static policy: container already present in state, skipping")
+			return nil
+		}
+
+		// Call Topology Manager to get the aligned socket affinity across all hint providers.
+		hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+		logger.Info("Topology Affinity", "affinity", hint)
+
+		// Allocate CPUs according to the NUMA affinity contained in the hint.
+		cpuAllocation, err := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], nil, nil)
 		if err != nil {
-			logger.Error(err, "Static policy: Unfeasible to resize allocated CPUs,", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
+			logger.Error(err, "Unable to allocate CPUs", "numCPUs", numCPUs)
 			return err
 		}
-	}
 
-	if numCPUs == 0 {
-		// container belongs in the shared pool (nothing to do; use default cpuset)
+		s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
+		p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
+		p.updateMetricsOnAllocate(logger, s, cpuAllocation)
+
+		logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
 		return nil
+
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		logger.Info("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy")
-		return nil
-	}
+	if operation == lifecycle.ResizeOperation {
 
-	logger.Info("Static policy: Allocate")
-
-	// container belongs in an exclusively allocated pool
-	metrics.CPUManagerPinningRequestsTotal.Inc()
-	defer func() {
-		if rerr != nil {
-			metrics.CPUManagerPinningErrorsTotal.Inc()
-			if p.options.FullPhysicalCPUsOnly {
-				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
-			}
-			return
-		}
-		// TODO: move in updateMetricsOnAllocate
-		if p.options.FullPhysicalCPUsOnly {
-			// increment only if we know we allocate aligned resources
-			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
-		}
-	}()
-
-	if p.options.FullPhysicalCPUsOnly {
-		if (numCPUs % p.cpuGroupSize) != 0 {
-			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
-			// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
-			// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
-			// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
-			// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
-			// the pod would be placed on a node where there are enough physical cores available to be allocated.
-			// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
-			// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
-			// CPUs on a physical core. Allocation of individual threads would never have to occur.
-			return SMTAlignmentError{
-				RequestedCPUs:        numCPUs,
-				CpusPerCore:          p.cpuGroupSize,
-				CausedByPhysicalCPUs: false,
-			}
-		}
-
-		availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
-
+		numCPUs := p.guaranteedCPUs(logger, pod, container)
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			if cs, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); found {
-				cpuAllocatedQuantity := cs.AllocatedResources[v1.ResourceCPU]
-				availablePhysicalCPUs += int(cpuAllocatedQuantity.Value())
-			}
-		}
-		// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
-		// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
-		// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
-		// This way, by construction all possible CPUs allocation whose number is multiple of the SMT level are now correct again.
-		if numCPUs > availablePhysicalCPUs {
-			return SMTAlignmentError{
-				RequestedCPUs:         numCPUs,
-				CpusPerCore:           p.cpuGroupSize,
-				AvailablePhysicalCPUs: availablePhysicalCPUs,
-				CausedByPhysicalCPUs:  true,
-			}
-		}
-	}
-	if cpusInUseByPodContainer, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			logger.Info("Static policy: container already present in state, attempting InPlacePodVerticalScaling", "pod", klog.KObj(pod), "containerName", container.Name)
-			// Call Topology Manager to get the aligned socket affinity across all hint providers.
-			hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
-			logger.Info("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
-			// Attempt new allocation ( reusing allocated CPUs ) according to the NUMA affinity contained in the hint
-			// Since NUMA affinity container in the hint is unmutable already allocated CPUs pass the criteria
-			mustKeepCPUsForResize, ok := s.GetOriginalCPUSet(string(pod.UID), container.Name)
-			if !ok {
-				err := getOriginalCPUSetError{
-					PodUID:        string(pod.UID),
-					ContainerName: container.Name,
-				}
+			// During a pod resize, handle corner cases
+			err := p.isFeasibleResize(logger, s, pod, container)
+			if err != nil {
+				logger.Error(err, "Static policy: Unfeasible to resize allocated CPUs,", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 				return err
 			}
-			// Allocate CPUs according to the NUMA affinity contained in the hint.
-			newallocatedcpuset, witherr := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainer, &mustKeepCPUsForResize)
-			if witherr != nil {
-				err := ResizeAllocateCPUsError{
-					PodUID:        string(pod.UID),
-					ContainerName: container.Name,
-					TopologyError: witherr.Error(),
-				}
-				return err
-			}
+		}
 
-			// Allocation successful, update the current state
-			s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
-			p.updateCPUsToReuse(pod, container, newallocatedcpuset.CPUs)
-			p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
-			logger.Info("Allocated exclusive CPUs after InPlacePodVerticalScaling attempt", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", newallocatedcpuset.CPUs.String())
-			// Updated state to the checkpoint file will be stored during
-			// the reconcile loop. TODO is this a problem? I don't believe
-			// because if kubelet will be terminated now, anyhow it will be
-			// needed the state to be cleaned up, an error will appear requiring
-			// the node to be drained. I think we are safe. All computations are
-			// using state_mem and not the checkpoint.
-			return nil
-		} else {
-			p.updateCPUsToReuse(pod, container, cpusInUseByPodContainer)
-			logger.Info("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+		if numCPUs == 0 {
+			// container belongs in the shared pool (nothing to do; use default cpuset)
 			return nil
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+			logger.Info("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy")
+			return nil
+		}
+
+		logger.Info("Static policy: Allocate")
+
+		// container belongs in an exclusively allocated pool
+		metrics.CPUManagerPinningRequestsTotal.Inc()
+		defer func() {
+			if rerr != nil {
+				metrics.CPUManagerPinningErrorsTotal.Inc()
+				if p.options.FullPhysicalCPUsOnly {
+					metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+				}
+				return
+			}
+			// TODO: move in updateMetricsOnAllocate
+			if p.options.FullPhysicalCPUsOnly {
+				// increment only if we know we allocate aligned resources
+				metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			}
+		}()
+
+		if p.options.FullPhysicalCPUsOnly {
+			if (numCPUs % p.cpuGroupSize) != 0 {
+				// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
+				// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
+				// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
+				// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
+				// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
+				// the pod would be placed on a node where there are enough physical cores available to be allocated.
+				// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
+				// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
+				// CPUs on a physical core. Allocation of individual threads would never have to occur.
+				return SMTAlignmentError{
+					RequestedCPUs:        numCPUs,
+					CpusPerCore:          p.cpuGroupSize,
+					CausedByPhysicalCPUs: false,
+				}
+			}
+
+			availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				if cs, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); found {
+					cpuAllocatedQuantity := cs.AllocatedResources[v1.ResourceCPU]
+					availablePhysicalCPUs += int(cpuAllocatedQuantity.Value())
+				}
+			}
+			// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
+			// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
+			// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
+			// This way, by construction all possible CPUs allocation whose number is multiple of the SMT level are now correct again.
+			if numCPUs > availablePhysicalCPUs {
+				return SMTAlignmentError{
+					RequestedCPUs:         numCPUs,
+					CpusPerCore:           p.cpuGroupSize,
+					AvailablePhysicalCPUs: availablePhysicalCPUs,
+					CausedByPhysicalCPUs:  true,
+				}
+			}
+		}
+		if cpusInUseByPodContainer, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				logger.Info("Static policy: container already present in state, attempting InPlacePodVerticalScaling", "pod", klog.KObj(pod), "containerName", container.Name)
+				// Call Topology Manager to get the aligned socket affinity across all hint providers.
+				hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+				logger.Info("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
+				// Attempt new allocation ( reusing allocated CPUs ) according to the NUMA affinity contained in the hint
+				// Since NUMA affinity container in the hint is unmutable already allocated CPUs pass the criteria
+				mustKeepCPUsForResize, ok := s.GetOriginalCPUSet(string(pod.UID), container.Name)
+				if !ok {
+					err := getOriginalCPUSetError{
+						PodUID:        string(pod.UID),
+						ContainerName: container.Name,
+					}
+					return err
+				}
+				// Allocate CPUs according to the NUMA affinity contained in the hint.
+				newallocatedcpuset, witherr := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainer, &mustKeepCPUsForResize)
+				if witherr != nil {
+					err := ResizeAllocateCPUsError{
+						PodUID:        string(pod.UID),
+						ContainerName: container.Name,
+						TopologyError: witherr.Error(),
+					}
+					return err
+				}
+
+				// Allocation successful, update the current state
+				s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+				p.updateCPUsToReuse(pod, container, newallocatedcpuset.CPUs)
+				p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
+				logger.Info("Allocated exclusive CPUs after InPlacePodVerticalScaling attempt", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", newallocatedcpuset.CPUs.String())
+				// Updated state to the checkpoint file will be stored during
+				// the reconcile loop. TODO is this a problem? I don't believe
+				// because if kubelet will be terminated now, anyhow it will be
+				// needed the state to be cleaned up, an error will appear requiring
+				// the node to be drained. I think we are safe. All computations are
+				// using state_mem and not the checkpoint.
+				return nil
+			} else {
+				p.updateCPUsToReuse(pod, container, cpusInUseByPodContainer)
+				logger.Info("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+				return nil
+			}
+		}
+
+		// Call Topology Manager to get the aligned socket affinity across all hint providers.
+		hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+		logger.Info("Topology Affinity", "affinity", hint)
+
+		// Allocate CPUs according to the NUMA affinity contained in the hint.
+		cpuAllocation, err := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], nil, nil)
+		if err != nil {
+			logger.Error(err, "Unable to allocate CPUs", "numCPUs", numCPUs)
+			return err
+		}
+
+		s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
+		p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
+		p.updateMetricsOnAllocate(logger, s, cpuAllocation)
+
+		logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
+		return nil
+	}
+	return UnsupportedLifecycleOperationError{
+		Operation: operation,
 	}
 
-	// Call Topology Manager to get the aligned socket affinity across all hint providers.
-	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
-	logger.Info("Topology Affinity", "affinity", hint)
-
-	// Allocate CPUs according to the NUMA affinity contained in the hint.
-	cpuAllocation, err := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], nil, nil)
-	if err != nil {
-		logger.Error(err, "Unable to allocate CPUs", "numCPUs", numCPUs)
-		return err
-	}
-
-	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
-	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
-	p.updateMetricsOnAllocate(logger, s, cpuAllocation)
-
-	logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
-	return nil
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
@@ -769,7 +883,7 @@ func (p *staticPolicy) takeByTopology(logger logr.Logger, availableCPUs cpuset.C
 	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption, reusableCPUsForResize, mustKeepCPUsForResize)
 }
 
-func (p *staticPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 
 	// Get a count of how many guaranteed CPUs have been requested.
@@ -846,7 +960,7 @@ func (p *staticPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *
 	}
 }
 
-func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// Get a count of how many guaranteed CPUs have been requested by Pod.
