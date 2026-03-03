@@ -20,7 +20,6 @@ import (
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	coordinationapply "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -38,37 +37,9 @@ func newCondition(
 		WithLastTransitionTime(metav1.Now())
 }
 
-// isTerminal returns true if the EvictionRequest has reached a terminal state
-// (Canceled or Evicted condition is True). Terminal EvictionRequests don't need
-// further processing.
+// isTerminal returns true if the EvictionRequest has reached
+// a terminal state (Canceled or Evicted condition is True).
 func isTerminal(evictionRequest *coordinationv1alpha1.EvictionRequest) bool {
 	return meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionCanceled)) ||
 		meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionEvicted))
-}
-
-// toInterceptorStatusApply converts an InterceptorStatus to its apply configuration.
-// If the status is nil, returns a new apply configuration with only the name set.
-// InterceptorStatus is atomic (+structType=atomic), so all populated fields must be
-// included to prevent SSA from removing them.
-func toInterceptorStatusApply(is *coordinationv1alpha1.InterceptorStatus, name string) *coordinationapply.InterceptorStatusApplyConfiguration {
-	a := coordinationapply.InterceptorStatus().WithName(name)
-	if is == nil {
-		return a
-	}
-	if is.HeartbeatTime != nil {
-		a.WithHeartbeatTime(*is.HeartbeatTime)
-	}
-	if is.StartTime != nil {
-		a.WithStartTime(*is.StartTime)
-	}
-	if is.CompletionTime != nil {
-		a.WithCompletionTime(*is.CompletionTime)
-	}
-	if is.ExpectedCompletionTime != nil {
-		a.WithExpectedCompletionTime(*is.ExpectedCompletionTime)
-	}
-	if is.Message != "" {
-		a.WithMessage(is.Message)
-	}
-	return a
 }
