@@ -694,6 +694,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.TopologySpreadConstraint{}.OpenAPIModelName():                                                            schema_k8sio_api_core_v1_TopologySpreadConstraint(ref),
 		corev1.TypedLocalObjectReference{}.OpenAPIModelName():                                                           schema_k8sio_api_core_v1_TypedLocalObjectReference(ref),
 		corev1.TypedObjectReference{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_TypedObjectReference(ref),
+		corev1.Ulimit{}.OpenAPIModelName():                                                                              schema_k8sio_api_core_v1_Ulimit(ref),
+		corev1.Ulimits{}.OpenAPIModelName():                                                                             schema_k8sio_api_core_v1_Ulimits(ref),
 		corev1.Volume{}.OpenAPIModelName():                                                                              schema_k8sio_api_core_v1_Volume(ref),
 		corev1.VolumeDevice{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_VolumeDevice(ref),
 		corev1.VolumeMount{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_VolumeMount(ref),
@@ -31036,11 +31038,17 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 							Ref:         ref(corev1.AppArmorProfile{}.OpenAPIModelName()),
 						},
 					},
+					"ulimits": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The ulimits to be applied to the container. Note that this field cannot be set when spec.os.name is windows.",
+							Ref:         ref(corev1.Ulimits{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
+			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.Ulimits{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
 	}
 }
 
@@ -32274,6 +32282,85 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 				Required: []string{"kind", "name"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_core_v1_Ulimit(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Ulimit corresponds to a single Linux system ulimit setting.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"hard": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hard is the hard limit for the ulimit. The hard limit acts as a ceiling for the soft limit. A process without CAP_SYS_RESOURCE may only set its soft limit to a value between 0 and the hard limit, and may only lower (never raise) its hard limit. This field must be specified when the Ulimit is set.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"soft": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Soft is the soft limit for the ulimit. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value. This field must be specified when the Ulimit is set.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"hard", "soft"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_Ulimits(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Ulimits corresponds to Linux system ulimit settings.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nofile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nofile configures the \"nofile\" ulimit, which controls the maximum number of open file descriptors. Valid values are -1 or 256 through 65536. A value of -1 means unlimited; 0 is not valid.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+					"memlock": {
+						SchemaProps: spec.SchemaProps{
+							Description: "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+					"core": {
+						SchemaProps: spec.SchemaProps{
+							Description: "core configures the \"core\" ulimit, which controls the maximum size of a core dump file, in bytes. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 means core dumps are disabled.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+					"nice": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+					"rtprio": {
+						SchemaProps: spec.SchemaProps{
+							Description: "rtprio configures the \"rtprio\" ulimit, which controls the maximum real-time scheduling priority. Valid values are -1 or 0 through 99. A value of -1 means unlimited; 0 means real-time scheduling priority is not allowed.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+					"stack": {
+						SchemaProps: spec.SchemaProps{
+							Description: "stack configures the \"stack\" ulimit, which controls the maximum process stack size, in bytes. Valid values are -1 or 262144 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			corev1.Ulimit{}.OpenAPIModelName()},
 	}
 }
 

@@ -7912,6 +7912,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: seccompProfile
       type:
         namedType: io.k8s.api.core.v1.SeccompProfile
+    - name: ulimits
+      type:
+        namedType: io.k8s.api.core.v1.Ulimits
     - name: windowsOptions
       type:
         namedType: io.k8s.api.core.v1.WindowsSecurityContextOptions
@@ -8293,6 +8296,36 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+- name: io.k8s.api.core.v1.Ulimit
+  map:
+    fields:
+    - name: hard
+      type:
+        scalar: numeric
+    - name: soft
+      type:
+        scalar: numeric
+- name: io.k8s.api.core.v1.Ulimits
+  map:
+    fields:
+    - name: core
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
+    - name: memlock
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
+    - name: nice
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
+    - name: nofile
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
+    - name: rtprio
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
+    - name: stack
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
 - name: io.k8s.api.core.v1.Volume
   map:
     fields:

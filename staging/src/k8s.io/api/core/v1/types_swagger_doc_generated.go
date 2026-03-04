@@ -2486,6 +2486,7 @@ var map_SecurityContext = map[string]string{
 	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default value is Default which uses the container runtime defaults for readonly paths and masked paths. Note that this field cannot be set when spec.os.name is windows.",
 	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.",
 	"appArmorProfile":          "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows.",
+	"ulimits":                  "The ulimits to be applied to the container. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -2761,6 +2762,30 @@ var map_TypedObjectReference = map[string]string{
 
 func (TypedObjectReference) SwaggerDoc() map[string]string {
 	return map_TypedObjectReference
+}
+
+var map_Ulimit = map[string]string{
+	"":     "Ulimit corresponds to a single Linux system ulimit setting.",
+	"hard": "Hard is the hard limit for the ulimit. The hard limit acts as a ceiling for the soft limit. A process without CAP_SYS_RESOURCE may only set its soft limit to a value between 0 and the hard limit, and may only lower (never raise) its hard limit. This field must be specified when the Ulimit is set.",
+	"soft": "Soft is the soft limit for the ulimit. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value. This field must be specified when the Ulimit is set.",
+}
+
+func (Ulimit) SwaggerDoc() map[string]string {
+	return map_Ulimit
+}
+
+var map_Ulimits = map[string]string{
+	"":        "Ulimits corresponds to Linux system ulimit settings.",
+	"nofile":  "nofile configures the \"nofile\" ulimit, which controls the maximum number of open file descriptors. Valid values are -1 or 256 through 65536. A value of -1 means unlimited; 0 is not valid.",
+	"memlock": "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+	"core":    "core configures the \"core\" ulimit, which controls the maximum size of a core dump file, in bytes. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 means core dumps are disabled.",
+	"nice":    "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment.",
+	"rtprio":  "rtprio configures the \"rtprio\" ulimit, which controls the maximum real-time scheduling priority. Valid values are -1 or 0 through 99. A value of -1 means unlimited; 0 means real-time scheduling priority is not allowed.",
+	"stack":   "stack configures the \"stack\" ulimit, which controls the maximum process stack size, in bytes. Valid values are -1 or 262144 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+}
+
+func (Ulimits) SwaggerDoc() map[string]string {
+	return map_Ulimits
 }
 
 var map_Volume = map[string]string{

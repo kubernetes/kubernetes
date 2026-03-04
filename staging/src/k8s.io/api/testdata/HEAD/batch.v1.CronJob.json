@@ -900,6 +900,32 @@
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "ulimits": {
+                    "nofile": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "memlock": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "core": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "nice": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "rtprio": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "stack": {
+                      "hard": 1,
+                      "soft": 2
+                    }
                   }
                 },
                 "stdin": true,
@@ -1214,6 +1240,32 @@
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "ulimits": {
+                    "nofile": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "memlock": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "core": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "nice": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "rtprio": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "stack": {
+                      "hard": 1,
+                      "soft": 2
+                    }
                   }
                 },
                 "stdin": true,
@@ -1528,6 +1580,32 @@
                   "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "ulimits": {
+                    "nofile": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "memlock": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "core": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "nice": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "rtprio": {
+                      "hard": 1,
+                      "soft": 2
+                    },
+                    "stack": {
+                      "hard": 1,
+                      "soft": 2
+                    }
                   }
                 },
                 "stdin": true,
