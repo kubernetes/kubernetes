@@ -120,6 +120,9 @@ var allowedEphemeralContainerFields = map[string]bool{
 // In future, they can be expanded to values from
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
+var supportedUlimitNames = sets.New("nofile", "memlock", "core", "nice", "rtprio", "stack")
+
+const maxNofileUlimitValue int64 = 1048576
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -3912,7 +3915,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
-	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers)...)
+	allErrs = append(allErrs, validateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts)...)
 	return allErrs
 }
 
@@ -4483,6 +4486,8 @@ type PodValidationOptions struct {
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
 	// Allows containers to consume environment variables via environment variable files.
 	AllowEnvFilesValidation bool
+	// Allows containers to consume ulimits settings from securityContext.
+	AllowContainerUlimitsValidation bool
 	// Allows containers have restart policy and restart policy rules.
 	AllowContainerRestartPolicyRules bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
@@ -4947,6 +4952,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 			}
 			if sc.RunAsGroup != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsGroup"), "cannot be set for a windows pod"))
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) && len(sc.Ulimits) > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("ulimits"), "cannot be set for a windows pod"))
 			}
 		}
 		return true
@@ -8379,6 +8387,12 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 
 // ValidateSecurityContext ensures the security context contains valid settings
 func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers bool) field.ErrorList {
+	return validateSecurityContext(sc, fldPath, hostUsers, PodValidationOptions{
+		AllowContainerUlimitsValidation: utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits),
+	})
+}
+
+func validateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers bool, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// this should only be true for testing since SecurityContext is defaulted by the core
 	if sc == nil {
@@ -8429,7 +8443,36 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	if len(sc.Ulimits) > 0 {
+		if !opts.AllowContainerUlimitsValidation {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ulimits"), "may not be set when ContainerUlimits feature gate is disabled"))
+		} else {
+			allErrs = append(allErrs, validateUlimits(sc.Ulimits, fldPath.Child("ulimits"))...)
+		}
+	}
 
+	return allErrs
+}
+
+func validateUlimits(ulimits []core.Ulimit, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ulimit := range ulimits {
+		ulimitPath := fldPath.Index(i)
+		if !supportedUlimitNames.Has(ulimit.Name) {
+			allErrs = append(allErrs, field.NotSupported(ulimitPath.Child("name"), ulimit.Name, sets.List(supportedUlimitNames)))
+		}
+		if ulimit.Soft > ulimit.Hard {
+			allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), ulimit.Soft, "must be less than or equal to `hard`"))
+		}
+		if ulimit.Name == "nofile" {
+			if ulimit.Hard > maxNofileUlimitValue {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("hard"), ulimit.Hard, fmt.Sprintf("must be less than or equal to %d for `nofile`", maxNofileUlimitValue)))
+			}
+			if ulimit.Soft > maxNofileUlimitValue {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), ulimit.Soft, fmt.Sprintf("must be less than or equal to %d for `nofile`", maxNofileUlimitValue)))
+			}
+		}
+	}
 	return allErrs
 }
 

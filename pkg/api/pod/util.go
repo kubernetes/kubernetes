@@ -439,6 +439,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
+	opts.AllowContainerUlimitsValidation = useAllowContainerUlimitsValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
@@ -586,6 +587,15 @@ func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
 	}
 
 	return false
+}
+
+func useAllowContainerUlimitsValidation(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) {
+		return true
+	}
+
+	return containerUlimitsInUse(oldPodSpec)
 }
 
 func hasEnvFileKeyRef(envs []api.EnvVar) bool {
@@ -807,6 +817,7 @@ func dropDisabledFields(
 	}
 
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
+	dropContainerUlimitsInUse(podSpec, oldPodSpec)
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
@@ -836,6 +847,19 @@ func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {
 	})
 }
 
+func dropContainerUlimitsInUse(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) || containerUlimitsInUse(oldPodSpec) {
+		return
+	}
+
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.SecurityContext != nil && len(c.SecurityContext.Ulimits) > 0 {
+			c.SecurityContext.Ulimits = nil
+		}
+		return true
+	})
+}
+
 func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -848,6 +872,22 @@ func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
+		}
+		return true
+	})
+	return inUse
+}
+
+func containerUlimitsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.SecurityContext != nil && len(c.SecurityContext.Ulimits) > 0 {
+			inUse = true
+			return false
 		}
 		return true
 	})
