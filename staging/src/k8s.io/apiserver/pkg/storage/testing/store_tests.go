@@ -206,7 +206,6 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	}}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2263,7 +2262,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2689,7 +2687,6 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 	}}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2817,10 +2814,8 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	}
 
 	for _, listType := range listTypes {
-		listType := listType
 		t.Run(listType.name, func(t *testing.T) {
 			for _, tt := range tests {
-				tt := tt
 				t.Run(tt.name, func(t *testing.T) {
 					out := &example.PodList{}
 					storageOpts := storage.ListOptions{

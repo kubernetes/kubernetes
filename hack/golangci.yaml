@@ -542,11 +542,6 @@ linters:
         # should only be updated in old code
         # where it really matters.
         - fmtappendf
-        # Remove redundant re-declaration of loop variables.
-        #
-        # A useful hint that this is no longer necessary with
-        # the Go version that Kubernetes depends on.
-        - forvar
         # Replace explicit loops over maps with calls to maps package.
         #
         # Completely disabled because the benefit

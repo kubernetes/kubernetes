@@ -220,7 +220,6 @@ func (l ConcurrentVisitorList) Visit(fn VisitorFunc) error {
 	g.SetLimit(concurrency)
 
 	for i := range l.visitors {
-		i := i
 		g.Go(func() error {
 			return l.visitors[i].Visit(fn)
 		})

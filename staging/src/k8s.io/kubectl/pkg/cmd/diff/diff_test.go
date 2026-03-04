@@ -612,7 +612,6 @@ func TestMasker(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc // capture range variable
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			m, err := NewMasker(tc.input.from, tc.input.to)
