@@ -6873,6 +6873,14 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+
+	// Conditions based on pressure at system level cgroup.
+	NodeSystemMemoryContentionPressure NodeConditionType = "SystemMemoryContentionPressure"
+	NodeSystemDiskContentionPressure   NodeConditionType = "SystemDiskContentionPressure"
+
+	// Conditions based on pressure at kubepods level cgroup.
+	NodeKubepodsMemoryContentionPressure NodeConditionType = "KubepodsMemoryContentionPressure"
+	NodeKubepodsDiskContentionPressure   NodeConditionType = "KubepodsDiskContentionPressure"
 )
 
 // NodeCondition contains condition information for a node.
