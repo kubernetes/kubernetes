@@ -2476,7 +2476,7 @@ var map_SecurityContext = map[string]string{
 	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default value is Default which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.",
 	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.",
 	"appArmorProfile":          "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows.",
-	"ulimits":                  "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
+	"ulimits":                  "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. Supported names and behavior: - \"nofile\": maximum number of open file descriptors. - \"memlock\": maximum bytes of memory that may be locked into RAM. - \"core\": maximum size of a core dump file, in bytes. - \"nice\": maximum nice priority adjustment a process may apply. - \"rtprio\": maximum real-time scheduling priority. - \"stack\": maximum process stack size, in bytes. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -2756,7 +2756,7 @@ func (TypedObjectReference) SwaggerDoc() map[string]string {
 
 var map_Ulimit = map[string]string{
 	"":     "Ulimit corresponds to a ulimit setting on a Linux system.",
-	"name": "Name of the ulimit to be set. Must be one of the supported ulimit names (e.g., \"nofile\", \"memlock\", \"core\").",
+	"name": "Name of the ulimit to be set. Must be one of: \"nofile\", \"memlock\", \"core\", \"nice\", \"rtprio\", or \"stack\".",
 	"hard": "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. A process without CAP_SYS_RESOURCE may only set its soft limit to a value between 0 and the hard limit, and may only lower (never raise) its hard limit.",
 	"soft": "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value.",
 }

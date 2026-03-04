@@ -6901,6 +6901,13 @@ type SecurityContext struct {
 	AppArmorProfile *AppArmorProfile
 	// The ulimits to be applied to the container.
 	// Each element in this list maps to a system ulimit setting.
+	// Supported names and behavior:
+	// - "nofile": maximum number of open file descriptors.
+	// - "memlock": maximum bytes of memory that may be locked into RAM.
+	// - "core": maximum size of a core dump file, in bytes.
+	// - "nice": maximum nice priority adjustment a process may apply.
+	// - "rtprio": maximum real-time scheduling priority.
+	// - "stack": maximum process stack size, in bytes.
 	// If unspecified, the container runtime default ulimits will be used.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
@@ -6912,7 +6919,7 @@ type SecurityContext struct {
 // Ulimit corresponds to a ulimit setting on a Linux system.
 type Ulimit struct {
 	// Name of the ulimit to be set.
-	// Must be one of the supported ulimit names (e.g., "nofile", "memlock", "core").
+	// Must be one of: "nofile", "memlock", "core", "nice", "rtprio", or "stack".
 	Name string
 
 	// Hard is the hard limit for the ulimit type.

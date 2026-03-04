@@ -24,7 +24,7 @@ package v1
 // Ulimit corresponds to a ulimit setting on a Linux system.
 type UlimitApplyConfiguration struct {
 	// Name of the ulimit to be set.
-	// Must be one of the supported ulimit names (e.g., "nofile", "memlock", "core").
+	// Must be one of: "nofile", "memlock", "core", "nice", "rtprio", or "stack".
 	Name *string `json:"name,omitempty"`
 	// Hard is the hard limit for the ulimit type.
 	// The hard limit acts as a ceiling for the soft limit.
