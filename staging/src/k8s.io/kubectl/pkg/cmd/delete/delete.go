@@ -160,7 +160,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete(f))
 		},
-		SuggestFor: []string{"rm"},
+		SuggestFor: []string{"rm", "remove"},
 	}
 
 	deleteFlags.AddFlags(cmd)
