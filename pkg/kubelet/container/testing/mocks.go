@@ -766,8 +766,8 @@ func (_c *MockRuntime_GetPod_Call) RunAndReturn(run func(ctx context.Context, po
 }
 
 // GetPodStatus provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error) {
-	ret := _mock.Called(ctx, uid, name, namespace)
+func (_mock *MockRuntime) GetPodStatus(ctx context.Context, pod *container.Pod) (*container.PodStatus, error) {
+	ret := _mock.Called(ctx, pod)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPodStatus")
@@ -775,18 +775,18 @@ func (_mock *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name 
 
 	var r0 *container.PodStatus
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID, string, string) (*container.PodStatus, error)); ok {
-		return returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Pod) (*container.PodStatus, error)); ok {
+		return returnFunc(ctx, pod)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.UID, string, string) *container.PodStatus); ok {
-		r0 = returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Pod) *container.PodStatus); ok {
+		r0 = returnFunc(ctx, pod)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.PodStatus)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.UID, string, string) error); ok {
-		r1 = returnFunc(ctx, uid, name, namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Pod) error); ok {
+		r1 = returnFunc(ctx, pod)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -800,36 +800,24 @@ type MockRuntime_GetPodStatus_Call struct {
 
 // GetPodStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uid types.UID
-//   - name string
-//   - namespace string
-func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, uid interface{}, name interface{}, namespace interface{}) *MockRuntime_GetPodStatus_Call {
-	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, uid, name, namespace)}
+//   - pod *container.Pod
+func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, pod interface{}) *MockRuntime_GetPodStatus_Call {
+	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, pod)}
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid types.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, pod *container.Pod)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.UID
+		var arg1 *container.Pod
 		if args[1] != nil {
-			arg1 = args[1].(types.UID)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg1 = args[1].(*container.Pod)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
-			arg3,
 		)
 	})
 	return _c
@@ -840,7 +828,7 @@ func (_c *MockRuntime_GetPodStatus_Call) Return(podStatus *container.PodStatus, 
 	return _c
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(ctx context.Context, pod *container.Pod) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

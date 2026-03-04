@@ -641,20 +641,14 @@ func (m *kubeGenericRuntimeManager) getSandboxes(ctx context.Context, opts listO
 }
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
-func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, pod *kubecontainer.Pod, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
 	logger := klog.FromContext(ctx)
-	// Select all containers of the given pod.
-	containers, err := m.getContainers(ctx, listOptions{podUID: uid})
-	if err != nil {
-		logger.Error(err, "ListContainers error")
-		return nil, nil, err
-	}
 
 	statuses := []*kubecontainer.Status{}
 	activeContainerStatuses := []*kubecontainer.Status{}
 	// TODO: optimization: set maximum number of containers per container name to examine.
-	for _, c := range containers {
-		resp, err := m.runtimeService.ContainerStatus(ctx, c.Id, false)
+	for _, c := range pod.Containers {
+		resp, err := m.runtimeService.ContainerStatus(ctx, c.ID.ID, false)
 		// Between List (ListContainers) and check (ContainerStatus) another thread might remove a container, and that is normal.
 		// The previous call (ListContainers) never fails due to a pod container not existing.
 		// Therefore, this method should not either, but instead act as if the previous call failed,
@@ -664,16 +658,16 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		}
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
-			logger.V(4).Info("ContainerStatus return error", "containerID", c.Id, "err", err)
+			logger.V(4).Info("ContainerStatus return error", "containerID", c.ID.ID, "err", err)
 			return nil, nil, err
 		}
 		status := resp.GetStatus()
 		if status == nil {
 			return nil, nil, remote.ErrContainerStatusNil
 		}
-		cStatus := m.convertToKubeContainerStatus(ctx, uid, status)
+		cStatus := m.convertToKubeContainerStatus(ctx, pod.ID, status)
 		statuses = append(statuses, cStatus)
-		if c.PodSandboxId == activePodSandboxID {
+		if c.PodSandboxID == activePodSandboxID {
 			activeContainerStatuses = append(activeContainerStatuses, cStatus)
 		}
 	}

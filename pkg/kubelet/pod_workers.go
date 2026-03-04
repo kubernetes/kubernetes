@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -1309,7 +1310,7 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 
 		var phaseTransition bool
 		switch {
-		case err == context.Canceled:
+		case errors.Is(err, context.Canceled):
 			// when the context is cancelled we expect an update to already be queued
 			logger.V(2).Info("Sync exited with context cancellation error", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
 

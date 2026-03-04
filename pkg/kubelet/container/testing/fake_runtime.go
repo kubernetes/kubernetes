@@ -324,7 +324,7 @@ func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse
 	return &status
 }
 
-func (f *FakeRuntime) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (f *FakeRuntime) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 

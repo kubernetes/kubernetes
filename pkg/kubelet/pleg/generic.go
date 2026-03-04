@@ -419,7 +419,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 
 	timestamp := g.clock.Now()
 
-	status, err := g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)
+	status, err := g.runtime.GetPodStatus(ctx, pod)
 	if err != nil {
 		// nolint:logcheck // Not using the result of klog.V inside the
 		// if branch is okay, we just use it to determine whether the

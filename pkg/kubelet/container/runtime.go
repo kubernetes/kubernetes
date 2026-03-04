@@ -113,7 +113,7 @@ type Runtime interface {
 	KillPod(ctx context.Context, pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
-	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*PodStatus, error)
+	GetPodStatus(ctx context.Context, pod *Pod) (*PodStatus, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to

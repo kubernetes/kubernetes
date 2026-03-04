@@ -60,7 +60,8 @@ type handlerRunner struct {
 }
 
 type podStatusProvider interface {
-	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+	GetPod(ctx context.Context, podUID types.UID) (*kubecontainer.Pod, error)
+	GetPodStatus(ctx context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error)
 }
 
 // NewHandlerRunner returns a configured lifecycle handler for a container.
@@ -129,10 +130,13 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	host := handler.HTTPGet.Host
 	podIP := host
 	if len(host) == 0 {
-		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+		runtimePod, err := hr.containerManager.GetPod(ctx, pod.UID)
 		if err != nil {
-			logger.Error(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
-			return err
+			return fmt.Errorf("unable to get pod, event handlers may be invalid: %w", err)
+		}
+		status, err := hr.containerManager.GetPodStatus(ctx, runtimePod)
+		if err != nil {
+			return fmt.Errorf("unable to get pod status, event handlers may be invalid: %w", err)
 		}
 		if len(status.IPs) == 0 {
 			return fmt.Errorf("failed to find networking container: %v", status)

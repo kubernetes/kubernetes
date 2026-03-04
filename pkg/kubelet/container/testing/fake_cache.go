@@ -33,7 +33,11 @@ func NewFakeCache(runtime container.Runtime) container.Cache {
 }
 
 func (c *fakeCache) Get(id types.UID) (*container.PodStatus, error) {
-	return c.runtime.GetPodStatus(context.TODO(), id, "", "")
+	pod, err := c.runtime.GetPod(context.TODO(), id)
+	if err != nil {
+		pod = &container.Pod{ID: id}
+	}
+	return c.runtime.GetPodStatus(context.TODO(), pod)
 }
 
 func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*container.PodStatus, error) {

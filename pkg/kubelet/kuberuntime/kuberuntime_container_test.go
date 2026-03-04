@@ -563,16 +563,21 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
-	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-		return &kubecontainer.PodStatus{
-			ID:        uid,
-			Name:      name,
-			Namespace: namespace,
+	fakePodStatusProvider := fakePodStatusProvider{
+		pod: &kubecontainer.Pod{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
+		},
+		status: &kubecontainer.PodStatus{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
 			IPs: []string{
 				"127.0.0.1",
 			},
-		}, nil
-	})
+		},
+	}
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
@@ -1032,8 +1037,10 @@ func TestUpdateContainerResources(t *testing.T) {
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
-	cStatus, _, err := m.getPodContainerStatuses(tCtx, pod.UID, pod.Name, pod.Namespace, "")
-	assert.NoError(t, err)
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	cStatus, _, err := m.getPodContainerStatuses(tCtx, runtimePod, "")
+	require.NoError(t, err)
 	containerID := cStatus[0].ID
 
 	err = m.updateContainerResources(tCtx, pod, &pod.Spec.Containers[0], containerID)
