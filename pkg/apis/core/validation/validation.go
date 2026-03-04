@@ -979,6 +979,11 @@ func validateSecretVolumeSource(secretSource *core.SecretVolumeSource, fldPath *
 	if secretMode != nil && (*secretMode > 0777 || *secretMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *secretMode, fileModeErrorMsg))
 	}
+	if secretSource.DefaultUser != nil {
+		for _, msg := range validation.IsValidUserID(*secretSource.DefaultUser) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultUser"), *secretSource.DefaultUser, msg))
+		}
+	}
 
 	itemsPath := fldPath.Child("items")
 	for i, kp := range secretSource.Items {
@@ -997,6 +1002,11 @@ func validateConfigMapVolumeSource(configMapSource *core.ConfigMapVolumeSource, 
 	configMapMode := configMapSource.DefaultMode
 	if configMapMode != nil && (*configMapMode > 0777 || *configMapMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *configMapMode, fileModeErrorMsg))
+	}
+	if configMapSource.DefaultUser != nil {
+		for _, msg := range validation.IsValidUserID(*configMapSource.DefaultUser) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultUser"), *configMapSource.DefaultUser, msg))
+		}
 	}
 
 	itemsPath := fldPath.Child("items")
@@ -1018,6 +1028,11 @@ func validateKeyToPath(kp *core.KeyToPath, fldPath *field.Path) field.ErrorList 
 	allErrs = append(allErrs, ValidateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
 	if kp.Mode != nil && (*kp.Mode > 0777 || *kp.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, fileModeErrorMsg))
+	}
+	if kp.User != nil {
+		for _, msg := range validation.IsValidUserID(*kp.User) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), *kp.User, msg))
+		}
 	}
 
 	return allErrs
@@ -1138,6 +1153,11 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 	if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, fileModeErrorMsg))
 	}
+	if file.User != nil {
+		for _, msg := range validation.IsValidUserID(*file.User) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), *file.User, msg))
+		}
+	}
 
 	return allErrs
 }
@@ -1148,6 +1168,11 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *core.DownwardAPIVolumeSo
 	downwardAPIMode := downwardAPIVolume.DefaultMode
 	if downwardAPIMode != nil && (*downwardAPIMode > 0777 || *downwardAPIMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *downwardAPIMode, fileModeErrorMsg))
+	}
+	if downwardAPIVolume.DefaultUser != nil {
+		for _, msg := range validation.IsValidUserID(*downwardAPIVolume.DefaultUser) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultUser"), *downwardAPIVolume.DefaultUser, msg))
+		}
 	}
 
 	for _, file := range downwardAPIVolume.Items {
@@ -1228,6 +1253,11 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			} else if !opts.AllowNonLocalProjectedTokenPath {
 				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ServiceAccountToken.Path, fldPath.Child("path"))...)
 			}
+			if source.ServiceAccountToken.User != nil {
+				for _, msg := range validation.IsValidUserID(*source.ServiceAccountToken.User) {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("user"), *source.ServiceAccountToken.User, msg))
+				}
+			}
 		}
 		if projPath := srcPath.Child("clusterTrustBundle"); source.ClusterTrustBundle != nil {
 			numSources++
@@ -1282,6 +1312,11 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			if source.ClusterTrustBundle.Path == "" {
 				allErrs = append(allErrs, field.Required(projPath.Child("path"), ""))
 			}
+			if source.ClusterTrustBundle.User != nil {
+				for _, msg := range validation.IsValidUserID(*source.ClusterTrustBundle.User) {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("user"), *source.ClusterTrustBundle.User, msg))
+				}
+			}
 
 			allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ClusterTrustBundle.Path, projPath.Child("path"))...)
 
@@ -1300,6 +1335,11 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			if source.PodCertificate.UserAnnotations != nil {
 				userAnnotationsErrors := ValidateUserAnnotations(source.PodCertificate.UserAnnotations, projPath.Child("userAnnotations"))
 				allErrs = append(allErrs, userAnnotationsErrors...)
+			}
+			if source.PodCertificate.User != nil {
+				for _, msg := range validation.IsValidUserID(*source.PodCertificate.User) {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("user"), *source.PodCertificate.User, msg))
+				}
 			}
 
 			switch source.PodCertificate.KeyType {
@@ -1373,6 +1413,11 @@ func validateProjectedVolumeSource(projection *core.ProjectedVolumeSource, fldPa
 	projectionMode := projection.DefaultMode
 	if projectionMode != nil && (*projectionMode > 0777 || *projectionMode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, fileModeErrorMsg))
+	}
+	if projection.DefaultUser != nil {
+		for _, msg := range validation.IsValidUserID(*projection.DefaultUser) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultUser"), *projection.DefaultUser, msg))
+		}
 	}
 
 	allErrs = append(allErrs, validateProjectionSources(projection, projectionMode, fldPath, opts)...)

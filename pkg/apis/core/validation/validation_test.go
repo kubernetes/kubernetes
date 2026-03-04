@@ -4250,6 +4250,17 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		}, {
+			name: "valid Secret with defaultUser",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName:  "my-secret",
+						DefaultUser: ptr.To[int64](1001),
+					},
+				},
+			},
+		}, {
 			name: "valid Secret with projection and mode",
 			vol: core.Volume{
 				Name: "secret",
@@ -4260,6 +4271,21 @@ func TestValidateVolumes(t *testing.T) {
 							Key:  "key",
 							Path: "filename",
 							Mode: ptr.To[int32](0644),
+						}},
+					},
+				},
+			},
+		}, {
+			name: "valid Secret with projection and user",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: "my-secret",
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](1001),
 						}},
 					},
 				},
@@ -4353,6 +4379,74 @@ func TestValidateVolumes(t *testing.T) {
 				etype: field.ErrorTypeInvalid,
 				field: "secret.defaultMode",
 			}},
+		}, {
+			name: "secret with invalid positive defaultUser",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName:  "s",
+						DefaultUser: ptr.To[int64](2147483648),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.defaultUser",
+			}},
+		}, {
+			name: "secret with invalid negative defaultUser",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName:  "s",
+						DefaultUser: ptr.To[int64](-1),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.defaultUser",
+			}},
+		}, {
+			name: "secret with projection and invalid positive user",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: "my-secret",
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](2147483648),
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.items[0].user",
+			}},
+		}, {
+			name: "secret with projection and invalid negative user",
+			vol: core.Volume{
+				Name: "secret",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: "my-secret",
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](-1),
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.items[0].user",
+			}},
 		},
 		// ConfigMap
 		{
@@ -4381,6 +4475,19 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		}, {
+			name: "valid ConfigMap with defaultUser",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{
+							Name: "my-cfgmap",
+						},
+						DefaultUser: ptr.To[int64](1001),
+					},
+				},
+			},
+		}, {
 			name: "valid ConfigMap with projection and mode",
 			vol: core.Volume{
 				Name: "cfgmap",
@@ -4392,6 +4499,22 @@ func TestValidateVolumes(t *testing.T) {
 							Key:  "key",
 							Path: "filename",
 							Mode: ptr.To[int32](0644),
+						}},
+					},
+				},
+			},
+		}, {
+			name: "valid ConfigMap with projection and user",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{
+							Name: "my-cfgmap"},
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](1001),
 						}},
 					},
 				},
@@ -4485,6 +4608,76 @@ func TestValidateVolumes(t *testing.T) {
 			errs: []verr{{
 				etype: field.ErrorTypeInvalid,
 				field: "configMap.defaultMode",
+			}},
+		}, {
+			name: "configmap with invalid positive defaultUser",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{Name: "c"},
+						DefaultUser:          ptr.To[int64](2147483648),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.defaultUser",
+			}},
+		}, {
+			name: "configmap with invalid negative defaultUser",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{Name: "c"},
+						DefaultUser:          ptr.To[int64](-1),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.defaultUser",
+			}},
+		}, {
+			name: "configMap with projection and invalid positive user",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{
+							Name: "my-cfgmap"},
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](2147483648),
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.items[0].user",
+			}},
+		}, {
+			name: "configMap with projection and invalid negative user",
+			vol: core.Volume{
+				Name: "cfgmap",
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{
+							Name: "my-cfgmap"},
+						Items: []core.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+							User: ptr.To[int64](-1),
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.items[0].user",
 			}},
 		},
 		// Glusterfs
@@ -4884,6 +5077,75 @@ func TestValidateVolumes(t *testing.T) {
 				field: "downwardAPI.mode",
 			}},
 		}, {
+			name: "downapi valid defaultUser",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						DefaultUser: ptr.To[int64](1001),
+					},
+				},
+			},
+		}, {
+			name: "downapi valid item user",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							User: ptr.To[int64](1001),
+							Path: "path",
+							FieldRef: &core.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+		}, {
+			name: "downapi invalid positive item user",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							User: ptr.To[int64](2147483648),
+							Path: "path",
+							FieldRef: &core.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.user",
+			}},
+		}, {
+			name: "downapi invalid negative item user",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							User: ptr.To[int64](-1),
+							Path: "path",
+							FieldRef: &core.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.user",
+			}},
+		}, {
 			name: "downapi empty metatada path",
 			vol: core.Volume{
 				Name: "downapi",
@@ -5038,6 +5300,34 @@ func TestValidateVolumes(t *testing.T) {
 			errs: []verr{{
 				etype: field.ErrorTypeInvalid,
 				field: "downwardAPI.defaultMode",
+			}},
+		}, {
+			name: "downapi invalid positive defaultUser",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						DefaultUser: ptr.To[int64](2147483648),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.defaultUser",
+			}},
+		}, {
+			name: "downapi invalid negative defaultUser",
+			vol: core.Volume{
+				Name: "downapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						DefaultUser: ptr.To[int64](-1),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.defaultUser",
 			}},
 		},
 		// FC
@@ -5464,6 +5754,298 @@ func TestValidateVolumes(t *testing.T) {
 			}, {
 				etype: field.ErrorTypeForbidden,
 				field: "projected.sources[1]",
+			}},
+		}, {
+			name: "ProjectedVolumeSource valid defaultMode",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultMode: ptr.To[int32](0644),
+					},
+				},
+			},
+		}, {
+			name: "ProjectedVolumeSource invalid positive defaultMode",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultMode: ptr.To[int32](01000),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.defaultMode",
+			}},
+		}, {
+			name: "ProjectedVolumeSource invalid negative defaultMode",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultMode: ptr.To[int32](-1),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.defaultMode",
+			}},
+		}, {
+			name: "ProjectedVolumeSource valid defaultUser",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultUser: ptr.To[int64](1001),
+					},
+				},
+			},
+		}, {
+			name: "ProjectedVolumeSource invalid positive defaultUser",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultUser: ptr.To[int64](2147483648),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.defaultUser",
+			}},
+		}, {
+			name: "ProjectedVolumeSource invalid negative defaultUser",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "foo",
+								},
+							},
+						}},
+						DefaultUser: ptr.To[int64](-1),
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.defaultUser",
+			}},
+		}, {
+			name: "ProjectedVolumeSource ServiceAccountToken valid user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ServiceAccountToken: &core.ServiceAccountTokenProjection{
+								Audience:          "foo-audience",
+								ExpirationSeconds: 6000,
+								Path:              "foo-path",
+								User:              ptr.To[int64](1001),
+							},
+						}},
+					},
+				},
+			},
+		}, {
+			name: "ProjectedVolumeSource ServiceAccountToken invalid positive user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ServiceAccountToken: &core.ServiceAccountTokenProjection{
+								Audience:          "foo-audience",
+								ExpirationSeconds: 6000,
+								Path:              "foo-path",
+								User:              ptr.To[int64](2147483648),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].serviceAccountToken.user",
+			}},
+		}, {
+			name: "ProjectedVolumeSource ServiceAccountToken invalid negative user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ServiceAccountToken: &core.ServiceAccountTokenProjection{
+								Audience:          "foo-audience",
+								ExpirationSeconds: 6000,
+								Path:              "foo-path",
+								User:              ptr.To[int64](-1),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].serviceAccountToken.user",
+			}},
+		}, {
+			name: "ProjectedVolumeSource ClusterTrustBundle valid user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+								Path: "foo-path",
+								Name: ptr.To("foo"),
+								User: ptr.To[int64](1001),
+							},
+						}},
+					},
+				},
+			},
+		}, {
+			name: "ProjectedVolumeSource ClusterTrustBundle invalid positive user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+								Path: "foo-path",
+								Name: ptr.To("foo"),
+								User: ptr.To[int64](2147483648),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].clusterTrustBundle.user",
+			}},
+		}, {
+			name: "ProjectedVolumeSource ServiceAccountToken invalid negative user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+								Path: "foo-path",
+								Name: ptr.To("foo"),
+								User: ptr.To[int64](-1),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].clusterTrustBundle.user",
+			}},
+		}, {
+			name: "ProjectedVolumeSource PodCertificate valid user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							PodCertificate: &core.PodCertificateProjection{
+								SignerName:           "example.com/foo",
+								KeyType:              "ED25519",
+								CredentialBundlePath: "credbundle.pem",
+								User:                 ptr.To[int64](1001),
+							},
+						}},
+					},
+				},
+			},
+		}, {
+			name: "ProjectedVolumeSource PodCertificate invalid positive user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							PodCertificate: &core.PodCertificateProjection{
+								SignerName:           "example.com/foo",
+								KeyType:              "ED25519",
+								CredentialBundlePath: "credbundle.pem",
+								User:                 ptr.To[int64](2147483648),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].podCertificate.user",
+			}},
+		}, {
+			name: "ProjectedVolumeSource ServiceAccountToken invalid negative user",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							PodCertificate: &core.PodCertificateProjection{
+								SignerName:           "example.com/foo",
+								KeyType:              "ED25519",
+								CredentialBundlePath: "credbundle.pem",
+								User:                 ptr.To[int64](-1),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "projected.sources[0].podCertificate.user",
 			}},
 		},
 		// ImageVolumeSource
