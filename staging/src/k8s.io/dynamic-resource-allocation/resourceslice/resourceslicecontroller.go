@@ -134,6 +134,12 @@ type Controller struct {
 // DriverResources is a complete description of all resources synchronized by the controller.
 type DriverResources struct {
 	// Each driver may manage different resource pools.
+	//
+	// The key in the map is the pool name. Pools are
+	// sorted first so that pools with devices which
+	// have binding conditions are tried last, then by name.
+	// So the name can also be used to indicate preference
+	// when a driver publishes more than one pool.
 	Pools map[string]Pool
 }
 
@@ -163,6 +169,8 @@ type Pool struct {
 	//    Since the index is part of the name, the order in this
 	//    list determines the allocation priority. Driver authors
 	//    can influence priority by putting preferred slices first.
+	//    Likewise, within a slice the preferred devices should be
+	//    listed first.
 	// 2. Migration: When upgrading from a driver version that used
 	//    randomly generated names (via GenerateName), existing
 	//    ResourceSlices will be deleted and recreated with

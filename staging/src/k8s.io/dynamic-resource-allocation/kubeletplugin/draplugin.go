@@ -739,6 +739,10 @@ func (d *Helper) Stop() {
 // version using random names will cause existing slices to be recreated.
 // See [resourceslice.Pool.Slices] for more details.
 //
+// Pools are sorted first so that pools with devices which have binding
+// conditions are tried last, then by name. So the name can also be used to
+// indicate preference when a driver publishes more than one pool.
+//
 // PublishResources does not block, so it might still take a while
 // after it returns before all information is actually written
 // to the API server.
