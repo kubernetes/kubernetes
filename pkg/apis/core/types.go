@@ -771,10 +771,15 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	ModifyVolumeStatus *ModifyVolumeStatus
-	// UnusedSince is the timestamp that represents when the PVC last transitioned
-	// to not being in use. When the PVC is currently in use, this field is nil.
-	// It is updated when the last Pod referencing this PVC is deleted or reaches a
-	// terminal state, and cleared when a new Pod starts referencing the PVC.
+	// UnusedSince represents the timestamp since when a PVC has not been in-use, as known to the kube-controller-manager.
+	// When the PVC is currently in use, this field is nil. It is updated when the last Pod referencing this PVC is
+	// deleted or reaches a terminal state, and cleared when a new Pod starts referencing the PVC.
+	//
+	// The unused since time duration indicated by this field may be shorter than actual unused-since time because
+	// of processing delays or when this feature was enabled in the cluster.
+	//
+	// This is an alpha field, and requires enabling the PersistentVolumeClaimUnusedSinceTime feature gate.
+	//
 	// +featureGate=PersistentVolumeClaimUnusedSinceTime
 	// +optional
 	UnusedSince *metav1.Time
