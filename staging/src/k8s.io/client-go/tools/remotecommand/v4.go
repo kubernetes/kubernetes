@@ -86,6 +86,9 @@ func (p *streamProtocolV4) stream(logger klog.Logger, conn streamCreator, ready 
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
+	if len(message) == 0 {
+		return fmt.Errorf("error stream closed before receiving a status message: command execution may have been interrupted")
+	}
 	status := metav1.Status{}
 	err := json.Unmarshal(message, &status)
 	if err != nil {

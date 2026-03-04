@@ -201,5 +201,8 @@ func (p *streamProtocolV2) stream(logger klog.Logger, conn streamCreator, ready 
 type errorDecoderV2 struct{}
 
 func (d *errorDecoderV2) decode(message []byte) error {
+	if len(message) == 0 {
+		return nil
+	}
 	return fmt.Errorf("error executing remote command: %s", message)
 }
