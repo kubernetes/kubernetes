@@ -6666,11 +6666,21 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 	}
 
 	// Verify that describeNodeResource works correctly with pod-level resources
+	// Pod-level resources: requests cpu=2, memory=4Gi; limits cpu=4, memory=8Gi
+	// Node allocatable: cpu=4, memory=12Gi
+	// Expected: cpu requests 2 (50%), cpu limits 4 (100%), memory requests 4Gi (33%), memory limits 8Gi (66%)
 	expectedOut := []string{
 		"pod-with-pod-level-resources",
-		"Allocated resources:",
-		"cpu",
-		"memory",
+		// Verify per-pod row shows correct computed values for pod-level resources
+		"pod-with-pod-level-resources    2 (50%)       4 (100%)    4Gi (33%)        8Gi (66%)",
+		// Verify the allocated resources totals correctly account for pod-level resources
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests   Limits
+  --------           --------   ------
+  cpu                2 (50%)    4 (100%)
+  memory             4Gi (33%)  8Gi (66%)
+  ephemeral-storage  0 (0%)     0 (0%)`,
 	}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
