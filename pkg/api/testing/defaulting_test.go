@@ -244,7 +244,6 @@ func TestDefaulting(t *testing.T) {
 	sort.Sort(testTypes)
 
 	for _, gvk := range testTypes {
-		gvk := gvk
 		t.Run(gvk.String(), func(t *testing.T) {
 			// Each sub-tests gets its own fuzzer instance to make running it independent
 			// from what other tests ran before.

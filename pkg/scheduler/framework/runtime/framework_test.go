@@ -1094,7 +1094,6 @@ func TestRunPreScorePlugins(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1731,7 +1730,6 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1826,7 +1824,6 @@ func TestRunPreFilterExtensionRemovePod(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1914,7 +1911,6 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil

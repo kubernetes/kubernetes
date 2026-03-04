@@ -2899,7 +2899,6 @@ func (tc *testContext) listAll(tCtx ktesting.TContext) (objects []metav1.Object)
 	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	for _, claim := range claims.Items {
-		claim := claim
 		objects = append(objects, &claim)
 	}
 	sortObjects(objects)
