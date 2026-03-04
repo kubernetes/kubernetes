@@ -546,6 +546,8 @@ type CapacityRequestPolicyRange struct {
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
+// If DRAListTypeAttributes feature gate is enabled, the limit applies
+// to the sum of the number of entries in scalar attributes, capacity and items in list attributes.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
@@ -647,9 +649,6 @@ type DeviceAttributeListType struct {
 	// +oneOf=ValueType
 	VersionValue []string
 }
-
-// DeviceAttributeMaxListLength is the maximum number of entries in a list attribute value.
-const DeviceAttributeMaxListLength = 64
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64

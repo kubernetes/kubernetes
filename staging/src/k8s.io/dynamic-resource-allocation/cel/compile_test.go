@@ -31,6 +31,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+var maxElementsListTypeEnabled = uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice))
+
 var testcases = map[string]struct {
 	// environment.StoredExpressions is the default (= all CEL fields and features from the current version available).
 	// environment.NewExpressions can be used to enforce that only fields and features from the previous version are available.
@@ -238,7 +240,7 @@ var testcases = map[string]struct {
 		attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {ListValue: &resourceapi.DeviceAttributeListType{IntValue: []int64{1, 2}}}},
 		driver:                   "dra.example.com",
 		expectMatch:              true,
-		expectCost:               5 + ((3 + 3) * 64 /* (cost(loopCondition=="not_strictly_false(!accu)") + cost(loopStep=="accu && (x > 0)")) * max list length */),
+		expectCost:               5 + ((3 + 3) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(!accu)") + cost(loopStep=="accu && (x > 0)")) * maxElementsListTypeEnabled */),
 	},
 	"enabled-list-type-attributes--macro-on-list-of-string": {
 		enableListTypeAttributes: true,
@@ -247,7 +249,7 @@ var testcases = map[string]struct {
 		attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {ListValue: &resourceapi.DeviceAttributeListType{StringValue: []string{"fish", "bird"}}}},
 		driver:                   "dra.example.com",
 		expectMatch:              true,
-		expectCost:               5 + ((2 + 2) * 64 /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x != "")")) * max list length */),
+		expectCost:               5 + ((2 + 2) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x != "")")) * maxElementsListTypeEnabled */),
 	},
 	"enabled-list-type-attributes--macro-on-list-of-semver": {
 		enableListTypeAttributes: true,
@@ -256,7 +258,7 @@ var testcases = map[string]struct {
 		attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {ListValue: &resourceapi.DeviceAttributeListType{VersionValue: []string{"1.0.0", "2.0.0"}}}},
 		driver:                   "dra.example.com",
 		expectMatch:              true,
-		expectCost:               5 + ((2 + 4) * 64 /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x.isGreaterThan(semver("0.0.1"))")) * max list length */),
+		expectCost:               5 + ((2 + 4) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x.isGreaterThan(semver("0.0.1"))")) * maxElementsListTypeEnabled */),
 	},
 	"disabled-list-type-attributes--include-function": {
 		enableConsumableCapacity: false,

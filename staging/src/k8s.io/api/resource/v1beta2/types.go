@@ -573,6 +573,8 @@ type CapacityRequestPolicyRange struct {
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
+// If DRAListTypeAttributes feature gate is enabled, the limit applies
+// to the sum of the number of entries in scalar attributes, capacity and items in list attributes.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
@@ -662,7 +664,6 @@ type DeviceAttributeListType struct {
 	// +listType=atomic
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
-	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
 	IntValue []int64 `json:"ints,omitempty" protobuf:"varint,2,opt,name=ints"`
 
 	// BoolValue is a list of true/false values.
@@ -671,7 +672,6 @@ type DeviceAttributeListType struct {
 	// +listType=atomic
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
-	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
 	BoolValue []bool `json:"bools,omitempty" protobuf:"varint,3,opt,name=bools"`
 
 	// StringValue is a list of strings.
@@ -681,7 +681,6 @@ type DeviceAttributeListType struct {
 	// +listType=atomic
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
-	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
 	// +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
 	StringValue []string `json:"strings,omitempty" protobuf:"bytes,4,opt,name=strings"`
 
@@ -692,13 +691,9 @@ type DeviceAttributeListType struct {
 	// +listType=atomic
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
-	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
 	// +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
 	VersionValue []string `json:"versions,omitempty" protobuf:"bytes,5,opt,name=versions"`
 }
-
-// DeviceAttributeListMaxLength is the maximum number of entries in a list attribute value.
-const DeviceAttributeListMaxLength = 64
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64

@@ -18,7 +18,6 @@ package resourceslice
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"testing"
 
@@ -136,38 +135,38 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", "").WithOrigin("union").MarkAlpha(),
 					},
 				},
-				"invalid: device attribute list of ints with too many items": {
-					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_ints", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{IntValue: slices.Repeat([]int64{1}, resource.DeviceAttributeMaxListLength+1)}})),
-					expectedErrs: field.ErrorList{
-						field.TooMany(
-							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_ints").Child("list").Child("ints"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
-						).WithOrigin("maxItems").MarkAlpha(),
-					},
-				},
-				"invalid: device attribute list of bools with too many items": {
-					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_bools", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{BoolValue: slices.Repeat([]bool{true}, resource.DeviceAttributeMaxListLength+1)}})),
-					expectedErrs: field.ErrorList{
-						field.TooMany(
-							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_bools").Child("list").Child("bools"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
-						).WithOrigin("maxItems").MarkAlpha(),
-					},
-				},
-				"invalid: device attribute list of strings with too many items": {
-					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: slices.Repeat([]string{"a"}, resource.DeviceAttributeMaxListLength+1)}})),
-					expectedErrs: field.ErrorList{
-						field.TooMany(
-							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("list").Child("strings"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
-						).WithOrigin("maxItems").MarkAlpha(),
-					},
-				},
-				"invalid: device attribute list of versions with too many items": {
-					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{VersionValue: slices.Repeat([]string{"1.2.3"}, resource.DeviceAttributeMaxListLength+1)}})),
-					expectedErrs: field.ErrorList{
-						field.TooMany(
-							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_versions").Child("list").Child("versions"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
-						).WithOrigin("maxItems").MarkAlpha(),
-					},
-				},
+				// "invalid: device attribute list of ints with too many items": {
+				// 	input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_ints", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{IntValue: slices.Repeat([]int64{1}, resource.DeviceAttributeMaxListLength+1)}})),
+				// 	expectedErrs: field.ErrorList{
+				// 		field.TooMany(
+				// 			field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_ints").Child("list").Child("ints"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+				// 		).WithOrigin("maxItems").MarkAlpha(),
+				// 	},
+				// },
+				// "invalid: device attribute list of bools with too many items": {
+				// 	input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_bools", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{BoolValue: slices.Repeat([]bool{true}, resource.DeviceAttributeMaxListLength+1)}})),
+				// 	expectedErrs: field.ErrorList{
+				// 		field.TooMany(
+				// 			field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_bools").Child("list").Child("bools"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+				// 		).WithOrigin("maxItems").MarkAlpha(),
+				// 	},
+				// },
+				// "invalid: device attribute list of strings with too many items": {
+				// 	input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: slices.Repeat([]string{"a"}, resource.DeviceAttributeMaxListLength+1)}})),
+				// 	expectedErrs: field.ErrorList{
+				// 		field.TooMany(
+				// 			field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("list").Child("strings"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+				// 		).WithOrigin("maxItems").MarkAlpha(),
+				// 	},
+				// },
+				// "invalid: device attribute list of versions with too many items": {
+				// 	input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{VersionValue: slices.Repeat([]string{"1.2.3"}, resource.DeviceAttributeMaxListLength+1)}})),
+				// 	expectedErrs: field.ErrorList{
+				// 		field.TooMany(
+				// 			field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_versions").Child("list").Child("versions"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+				// 		).WithOrigin("maxItems").MarkAlpha(),
+				// 	},
+				// },
 				"invalid: device attribute list of too long strings": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: []string{strings.Repeat("a", resource.DeviceAttributeMaxValueLength+1)}}})),
 					expectedErrs: field.ErrorList{

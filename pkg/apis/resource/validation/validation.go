@@ -805,11 +805,22 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
+
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
-	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
-	if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
-		allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
+	// Please note that when the DRAListTypeAttributes feature gate is enabled,
+	// we count the total number of attribute entries (scalars and list items)
+	// instead of just the number of attributes, so we need a different check in that case.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes) {
+		attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
+		if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
+			allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
+		}
+	} else {
+		attributeEntriesAndCapacityLength := numEntriesDeviceAttribute(device) + len(device.Capacity)
+		if attributeEntriesAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
+			allErrs = append(allErrs, field.Invalid(fldPath, attributeEntriesAndCapacityLength, fmt.Sprintf("the total number of attribute entries(scalars and list items) and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
+		}
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
@@ -869,6 +880,24 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
 	return allErrs
+}
+
+// numEntriesDeviceAttribute counts the total number of entries in the device's attributes,
+// counting each item in list values separately.
+// This is used to enforce the maximum number of attributes and capacities
+// per device when the DRAListTypeAttributes feature gate is enabled.
+func numEntriesDeviceAttribute(device resource.Device) int {
+	numEntries := 0
+	for _, attr := range device.Attributes {
+		if attr.ListValue == nil {
+			numEntries++
+			continue
+		}
+		// These fields are actually mutually exclusive, but we count the total number of entries across all of them.
+		// If setting multiple fields in the list value, the validation will fail later and report that exactly one value must be specified.
+		numEntries += len(attr.ListValue.BoolValue) + len(attr.ListValue.IntValue) + len(attr.ListValue.StringValue) + len(attr.ListValue.VersionValue)
+	}
+	return numEntries
 }
 
 func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
@@ -986,35 +1015,21 @@ func validateDeviceAttributeVersionValueByDeclarative(value *string, fldPath *fi
 func validateDeviceAttributeListValue(deviceAttributeListType *resource.DeviceAttributeListType, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	numFields := 0
-	tooManyOnField := func(path *field.Path, actual int) *field.Error {
-		return field.TooMany(path, actual, resource.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative()
-	}
+
 	if deviceAttributeListType.BoolValue != nil {
 		numFields++
-		if len(deviceAttributeListType.BoolValue) > resource.DeviceAttributeMaxListLength {
-			allErrs = append(allErrs, tooManyOnField(fldPath.Child("bools"), len(deviceAttributeListType.BoolValue)))
-		}
 	}
 	if deviceAttributeListType.IntValue != nil {
 		numFields++
-		if len(deviceAttributeListType.IntValue) > resource.DeviceAttributeMaxListLength {
-			allErrs = append(allErrs, tooManyOnField(fldPath.Child("ints"), len(deviceAttributeListType.IntValue)))
-		}
 	}
 	if deviceAttributeListType.StringValue != nil {
 		numFields++
-		if len(deviceAttributeListType.StringValue) > resource.DeviceAttributeMaxListLength {
-			allErrs = append(allErrs, tooManyOnField(fldPath.Child("strings"), len(deviceAttributeListType.StringValue)))
-		}
 		for i, item := range deviceAttributeListType.StringValue {
 			allErrs = append(allErrs, validateDeviceAttributeStringValueByDeclarative(&item, fldPath.Child("strings").Index(i))...)
 		}
 	}
 	if deviceAttributeListType.VersionValue != nil {
 		numFields++
-		if len(deviceAttributeListType.VersionValue) > resource.DeviceAttributeMaxListLength {
-			allErrs = append(allErrs, tooManyOnField(fldPath.Child("versions"), len(deviceAttributeListType.VersionValue)))
-		}
 		for i, item := range deviceAttributeListType.VersionValue {
 			allErrs = append(allErrs, validateDeviceAttributeVersionValueByDeclarative(&item, fldPath.Child("versions").Index(i))...)
 		}

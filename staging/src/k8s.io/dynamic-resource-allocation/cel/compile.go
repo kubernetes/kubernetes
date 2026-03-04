@@ -355,7 +355,8 @@ func newCompiler(features Features) *compiler {
 			// use DynType instead of AnyType so that iterate functions can work(e.g., exists, all, etc.)
 			apiservercel.DynType,
 			// if list attributes are enabled, the maximum size of the attribute could be larger.
-			max(resourceapi.DeviceAttributeListMaxLength, resourceapi.DeviceAttributeMaxValueLength),
+			// We have to admit this value for maxElements because we can have no knowledge the attribute is scalar or list.
+			max(resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice, resourceapi.DeviceAttributeMaxValueLength),
 		)
 	}
 	// Each map is bound by the maximum number of different attributes.
@@ -449,12 +450,10 @@ func includeFunc(target, arg ref.Val) ref.Val {
 		return types.False
 	}
 
-	equal := target.Equal(arg)
-	if equal == types.True || equal == types.False {
-		return equal
+	if target.Equal(arg) == types.True {
+		return types.True
 	}
-
-	return types.ValOrErr(target, "no such overload for include")
+	return types.False
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {

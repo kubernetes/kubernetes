@@ -575,7 +575,6 @@ message DeviceAttributeListType {
   // +listType=atomic
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:unionMember
-  // +k8s:alpha(since: "1.36")=+k8s:maxItems=64
   repeated int64 ints = 2;
 
   // BoolValue is a list of true/false values.
@@ -584,7 +583,6 @@ message DeviceAttributeListType {
   // +listType=atomic
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:unionMember
-  // +k8s:alpha(since: "1.36")=+k8s:maxItems=64
   repeated bool bools = 3;
 
   // StringValue is a list of strings.
@@ -594,7 +592,6 @@ message DeviceAttributeListType {
   // +listType=atomic
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:unionMember
-  // +k8s:alpha(since: "1.36")=+k8s:maxItems=64
   // +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
   repeated string strings = 4;
 
@@ -605,7 +602,6 @@ message DeviceAttributeListType {
   // +listType=atomic
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:unionMember
-  // +k8s:alpha(since: "1.36")=+k8s:maxItems=64
   // +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
   repeated string versions = 5;
 }

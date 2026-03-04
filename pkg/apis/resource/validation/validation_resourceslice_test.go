@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"testing"
 
@@ -122,20 +121,8 @@ func TestValidateResourceSlice(t *testing.T) {
 	badMultipleListValue := &resourceapi.DeviceAttributeListType{
 		IntValue: []int64{1}, BoolValue: []bool{true},
 	}
-	badTooLongListBoolValue := &resourceapi.DeviceAttributeListType{
-		BoolValue: slices.Repeat([]bool{true}, resourceapi.DeviceAttributeMaxListLength+1),
-	}
-	badTooLongListIntValue := &resourceapi.DeviceAttributeListType{
-		IntValue: slices.Repeat([]int64{1}, resourceapi.DeviceAttributeMaxListLength+1),
-	}
-	badTooLongListStringValue := &resourceapi.DeviceAttributeListType{
-		StringValue: slices.Repeat([]string{"x"}, resourceapi.DeviceAttributeMaxListLength+1),
-	}
 	badListStringValueTooLong := &resourceapi.DeviceAttributeListType{
 		StringValue: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
-	}
-	badTooLongListVersionValue := &resourceapi.DeviceAttributeListType{
-		VersionValue: slices.Repeat([]string{"1.0.0"}, resourceapi.DeviceAttributeMaxListLength+1),
 	}
 	badListVersionValueTooLong := &resourceapi.DeviceAttributeListType{
 		VersionValue: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
@@ -145,6 +132,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		slice                         *resourceapi.ResourceSlice
 		wantFailures                  field.ErrorList
 		consumableCapacityFeatureGate bool
+		listTypeAttributesFeatureGate bool
 	}{
 		"good": {
 			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices),
@@ -468,13 +456,13 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(goodName).Child("list"), badEmptyListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName).Child("list"), badMultipleListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
-				field.TooMany(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("list", "bools"), len(badTooLongListBoolValue.BoolValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-				field.TooMany(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("list", "ints"), len(badTooLongListIntValue.IntValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-				field.TooMany(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("list", "strings"), len(badTooLongListStringValue.StringValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-				field.TooLong(field.NewPath("spec", "devices").Index(5).Child("attributes").Key(goodName).Child("list", "strings").Index(0), badListStringValueTooLong.StringValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
-				field.TooMany(field.NewPath("spec", "devices").Index(6).Child("attributes").Key(goodName).Child("list", "versions"), len(badTooLongListVersionValue.VersionValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices").Index(7).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], "must be a string compatible with semver.org spec 2.0.0"),
-				field.TooLong(field.NewPath("spec", "devices").Index(7).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+				// field.TooMany(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("list", "bools"), len(badTooLongListBoolValue.BoolValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				// field.TooMany(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("list", "ints"), len(badTooLongListIntValue.IntValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				// field.TooMany(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("list", "strings"), len(badTooLongListStringValue.StringValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.TooLong(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("list", "strings").Index(0), badListStringValueTooLong.StringValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+				// field.TooMany(field.NewPath("spec", "devices").Index(6).Child("attributes").Key(goodName).Child("list", "versions"), len(badTooLongListVersionValue.VersionValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], "must be a string compatible with semver.org spec 2.0.0"),
+				field.TooLong(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
 			},
 
 			slice: func() *resourceapi.ResourceSlice {
@@ -486,23 +474,10 @@ func TestValidateResourceSlice(t *testing.T) {
 					resourceapi.QualifiedName(goodName): {ListValue: badMultipleListValue},
 				}
 				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListBoolValue},
-				}
-				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListIntValue},
-				}
-				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListStringValue},
-				}
-				slice.Spec.Devices[5].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {ListValue: badListStringValueTooLong},
 				}
-				// List of VersionValue(max list length)
-				slice.Spec.Devices[6].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListVersionValue},
-				}
 				// List of VersionValue(max length and invalid)
-				slice.Spec.Devices[7].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {ListValue: badListVersionValueTooLong},
 				}
 				return slice
@@ -592,6 +567,77 @@ func TestValidateResourceSlice(t *testing.T) {
 				// Too large together by one.
 				slice.Spec.Devices[3].Attributes = slice.Spec.Devices[0].Attributes
 				slice.Spec.Devices[3].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+		},
+		"combined-attributes-capacity-length-with-list": {
+			listTypeAttributesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attribute entries(scalars and list items) and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(3), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attribute entries(scalars and list items) and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(5), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attribute entries(scalars and list items) and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(6), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attribute entries(scalars and list items) and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				maxScalarAttributes := func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+					attributes := map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+					for i := range resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
+						attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
+					}
+					return attributes
+				}
+				maxListAttributes := func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+					attributes := map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+					for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i += 2 {
+						attributes[resourceapi.QualifiedName(fmt.Sprintf("list_attr_%d", i))] = resourceapi.DeviceAttribute{
+							ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+								StringValue: []string{"x", "y"},
+							}),
+						}
+					}
+					return attributes
+				}
+
+				slice := testResourceSlice(goodName, goodName, goodName, 7)
+
+				// success: string attribute only
+				slice.Spec.Devices[0].Attributes = maxScalarAttributes()
+				slice.Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				// error: Too large together by one list attribute
+				slice.Spec.Devices[1].Attributes = maxScalarAttributes()
+				slice.Spec.Devices[1].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+					StringValue: []string{"x"},
+				})}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+
+				// success: capacity only
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+				slice.Spec.Devices[2].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				quantity := resource.MustParse("1Gi")
+				capacity := resourceapi.DeviceCapacity{Value: quantity}
+				for i := range resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
+					slice.Spec.Devices[2].Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
+				}
+				// error: Too large together by one list attribute
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("extra_attr"): {ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+						StringValue: []string{"x"},
+					})},
+				}
+				slice.Spec.Devices[3].Capacity = slice.Spec.Devices[2].Capacity
+
+				// success: list attribute only
+				slice.Spec.Devices[4].Attributes = maxListAttributes()
+				slice.Spec.Devices[4].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				// error: Too large together by one scalar attribute
+				slice.Spec.Devices[5].Attributes = maxListAttributes()
+				slice.Spec.Devices[5].Attributes["extra_attr"] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
+				slice.Spec.Devices[5].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				// error: Too large together by one capacity
+				slice.Spec.Devices[6].Attributes = maxListAttributes()
+				slice.Spec.Devices[6].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 					"cap": capacity,
 				}
 				return slice
@@ -1092,6 +1138,7 @@ func TestValidateResourceSlice(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAListTypeAttributes, scenario.listTypeAttributesFeatureGate)
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

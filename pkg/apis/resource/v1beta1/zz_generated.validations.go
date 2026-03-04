@@ -673,10 +673,6 @@ func Validate_DeviceAttributeListType(ctx context.Context, op operation.Operatio
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -695,10 +691,6 @@ func Validate_DeviceAttributeListType(ctx context.Context, op operation.Operatio
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -715,10 +707,6 @@ func Validate_DeviceAttributeListType(ctx context.Context, op operation.Operatio
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -740,10 +728,6 @@ func Validate_DeviceAttributeListType(ctx context.Context, op operation.Operatio
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
