@@ -139,7 +139,8 @@ func expectedRequestMetadata(reqName string, devs []Device) *v1alpha1.DeviceMeta
 }
 
 // expectedCDISpec returns the expected CDI spec for a single request.
-func expectedCDISpec(reqName, metadataHostPath string) cdiSpec {
+// containerPath is the full expected path inside the container.
+func expectedCDISpec(reqName, metadataHostPath, containerPath string) cdiSpec {
 	return cdiSpec{
 		Version: cdiVersionStr,
 		Kind:    testDriverName + "/metadata",
@@ -148,12 +149,20 @@ func expectedCDISpec(reqName, metadataHostPath string) cdiSpec {
 			ContainerEdits: cdiContainerEdits{
 				Mounts: []cdiMount{{
 					HostPath:      metadataHostPath,
-					ContainerPath: containerMetadataDir + "/" + testClaimName + "/" + reqName + "/" + testDriverName + "-metadata.json",
+					ContainerPath: containerPath,
 					Options:       []string{"ro", "bind"},
 				}},
 			},
 		}},
 	}
+}
+
+func directContainerPath(claimName, reqName string) string {
+	return containerMetadataDir + "/" + claimName + "/" + reqName + "/metadata.json"
+}
+
+func templateContainerPath(podClaimName, reqName string) string {
+	return containerMetadataDir + "/" + containerTemplatesSubDir + "/" + podClaimName + "/" + reqName + "/metadata.json"
 }
 
 func TestProcessPreparedClaim(t *testing.T) {
@@ -261,7 +270,12 @@ func TestProcessPreparedClaim(t *testing.T) {
 				if err := json.Unmarshal(cdiData, &gotCDISpec); err != nil {
 					t.Fatalf("unmarshal CDI spec: %v", err)
 				}
-				if diff := cmp.Diff(expectedCDISpec(baseReq, metadataPath), gotCDISpec); diff != "" {
+
+				wantContainerPath := directContainerPath(testClaimName, baseReq)
+				if tc.expectPodClaimName != nil {
+					wantContainerPath = templateContainerPath(*tc.expectPodClaimName, baseReq)
+				}
+				if diff := cmp.Diff(expectedCDISpec(baseReq, metadataPath, wantContainerPath), gotCDISpec); diff != "" {
 					t.Errorf("CDI spec for request %q (-want +got):\n%s", requestRef, diff)
 				}
 			}

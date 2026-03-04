@@ -101,6 +101,12 @@ const (
 	// where metadata files are mounted.
 	containerMetadataDir = "/var/run/dra-device-attributes"
 
+	// containerTemplatesSubDir is the subdirectory under containerMetadataDir
+	// where template-generated claims are mounted, keyed by podClaimName.
+	// Direct claims use {containerMetadataDir}/{claimName}/... while template
+	// claims use {containerMetadataDir}/{containerTemplatesSubDir}/{podClaimName}/...
+	containerTemplatesSubDir = "templates"
+
 	// DefaultCDIDir is the default directory for CDI spec files.
 	DefaultCDIDir = "/var/run/cdi"
 
@@ -186,7 +192,7 @@ func (w *metadataWriter) processPreparedClaim(
 			return nil, fmt.Errorf("write metadata for request %q: %w", requestRef, err)
 		}
 
-		cdiID, err := w.writeCDISpec(claim, baseReq)
+		cdiID, err := w.writeCDISpec(ref, claim, baseReq)
 		if err != nil {
 			return nil, fmt.Errorf("write CDI spec for request %q: %w", requestRef, err)
 		}
@@ -358,8 +364,12 @@ func (w *metadataWriter) encodeMetadataStream(dm *metadata.DeviceMetadata) ([]by
 }
 
 // writeCDISpec writes a CDI spec that bind-mounts the metadata file into the
-// container. Returns the CDI device ID.
+// container. Returns the CDI device ID. The container destination path depends
+// on whether the claim was created from a template (ref.podClaimName != nil):
+//   - Direct claims:   {containerMetadataDir}/{claimName}/{req}/metadata.json
+//   - Template claims: {containerMetadataDir}/templates/{podClaimName}/{req}/metadata.json
 func (w *metadataWriter) writeCDISpec(
+	ref claimRef,
 	claim *resourceapi.ResourceClaim,
 	requestName string,
 ) (string, error) {
@@ -375,7 +385,7 @@ func (w *metadataWriter) writeCDISpec(
 					Mounts: []cdiMount{
 						{
 							HostPath:      w.metadataFilePath(claim.Namespace, claim.Name, requestName),
-							ContainerPath: w.containerFilePath(claim.Name, requestName),
+							ContainerPath: w.containerFilePath(ref, requestName),
 							Options:       []string{"ro", "bind"},
 						},
 					},
@@ -421,10 +431,17 @@ func (w *metadataWriter) cdiSpecFilePath(claimUID types.UID, requestName string)
 }
 
 // containerFilePath returns the path where the metadata file appears inside
-// the container.
-// Format: /var/run/dra-device-attributes/{claimName}/{requestName}/{driverName}-metadata.json
-func (w *metadataWriter) containerFilePath(claimName, requestName string) string {
-	return filepath.Join(containerMetadataDir, claimName, requestName, w.driverName+"-metadata.json")
+// the container. For template-generated claims (podClaimName set), the path
+// is placed under a "templates/" subdirectory keyed by the pod-local claim
+// name, which is deterministic from the pod spec alone.
+//
+// Direct claims:   /var/run/dra-device-attributes/{claimName}/{requestName}/metadata.json
+// Template claims: /var/run/dra-device-attributes/templates/{podClaimName}/{requestName}/metadata.json
+func (w *metadataWriter) containerFilePath(ref claimRef, requestName string) string {
+	if ref.podClaimName != nil && *ref.podClaimName != "" {
+		return filepath.Join(containerMetadataDir, containerTemplatesSubDir, *ref.podClaimName, requestName, "metadata.json")
+	}
+	return filepath.Join(containerMetadataDir, ref.name, requestName, "metadata.json")
 }
 
 // UpdateRequestMetadata overwrites the metadata file for a specific

@@ -519,7 +519,7 @@ func DRAService(enabled bool) Option {
 // the framework writes a metadata file per request under the plugin data
 // directory and a CDI spec per request under the CDI directory (see
 // [CDIDirectory]) that bind-mounts the metadata file read-only into containers
-// at /var/run/dra-device-attributes/{claimName}/{requestName}/{driverName}-metadata.json.
+// at /var/run/dra-device-attributes/{claimName}/{requestName}/metadata.json.
 //
 // Each metadata file is a JSON stream: the same data encoded once per
 // configured API version (newest first). A consumer reads through the stream
