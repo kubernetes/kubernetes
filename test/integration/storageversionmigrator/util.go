@@ -1054,6 +1054,24 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	}
 }
 
+func (svm *svmTest) crdMigrated(t *testing.T, crdName string) bool {
+	t.Helper()
+
+	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get CRD: %v", err)
+	}
+
+	var storedVersion string
+	for _, version := range crd.Spec.Versions {
+		if version.Storage {
+			storedVersion = version.Name
+		}
+	}
+
+	return len(crd.Status.StoredVersions) == 1 && crd.Status.StoredVersions[0] == storedVersion
+}
+
 func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bool {
 	t.Helper()
 
@@ -1072,7 +1090,7 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 	return obj.GetAPIVersion() == fmt.Sprintf("%s/%s", crdGroup, version)
 }
 
-func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, triggerCRName string) bool {
+func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, crdName, triggerCRName string) bool {
 	t.Helper()
 
 	var triggerOnce sync.Once
@@ -1099,8 +1117,8 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
-				t.Logf("%q SVM has completed migration", crdSVMName)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
+				t.Logf("%q SVM has completed migration for crd %s", crdSVMName, crdName)
 				return true, nil
 			}
 
