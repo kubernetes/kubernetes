@@ -251,6 +251,11 @@ linters:
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
         path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
       
+      # PreferredMarkers - Existing stable/deprecated API fields that intentionally
+      # retain kubebuilder:validation:Required markers for backward compatibility.
+      - text: 'preferredmarkers: field (PortStatus|IngressPortStatus)\.Error uses marker "kubebuilder:validation:Required", should use preferred marker "required" instead'
+        path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+      
       # jsontags: 'Port' must be capitalized for backward compatibility
       - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
         path: "staging/src/k8s.io/api/core/v1/types.go"
