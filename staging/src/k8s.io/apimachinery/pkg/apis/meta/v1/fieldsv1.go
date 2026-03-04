@@ -27,6 +27,13 @@ func (FieldsV1) SwaggerDoc() map[string]string {
 	}
 }
 
+type FieldsV1Reader interface {
+	io.Reader
+	io.ReaderAt
+	// Size returns the original byte length of the underlying data. Size is the number of bytes available for reading via ReadAt.
+	Size() int64
+}
+
 func (f *FieldsV1) DeepCopy() *FieldsV1 {
 	if f == nil {
 		return nil

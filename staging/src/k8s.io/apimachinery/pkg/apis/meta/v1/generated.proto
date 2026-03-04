@@ -374,6 +374,8 @@ message FieldSelectorRequirement {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message FieldsV1 {
   // Raw is the underlying serialization of this object.
+  //
+  // Deprecated: Direct access to this field is deprecated. Use GetRawBytes, GetRawString, SetRawBytes, SetRawString, GetRawReader, NewFieldsV1 instead.
   optional bytes Raw = 1;
 }
 
