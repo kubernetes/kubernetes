@@ -425,14 +425,12 @@ func (r *Reflector) RunWithContext(ctx context.Context) {
 	logger.V(3).Info("Starting reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
 	// Until runs the loop immediately (immediate=true) and resets the backoff timer after each
 	// successful iteration (sliding=true). See backoff constants at top of file for generalized QPS targets (~0.22 QPS).
-	if err := r.delayHandler.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
+	_ = r.delayHandler.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
 		if err := r.ListAndWatchWithContext(ctx); err != nil {
 			r.watchErrorHandler(ctx, r, err)
 		}
 		return false, nil
-	}); err != nil {
-		logger.Error(err, "Reflector stopped with error", "type", r.typeDescription, "reflector", r.name)
-	}
+	})
 	logger.V(3).Info("Stopping reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
 }
 
