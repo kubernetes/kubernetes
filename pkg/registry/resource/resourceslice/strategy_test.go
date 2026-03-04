@@ -374,14 +374,9 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			}(),
 		},
 		"drop-fields-list-type-attributes": {
-			obj:                sliceWithListTypeAttributes,
-			listTypeAttributes: false,
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.Spec.Devices[0].Attributes = map[resource.QualifiedName]resource.DeviceAttribute{}
-				obj.Generation = 1
-				return obj
-			}(),
+			obj:                     sliceWithListTypeAttributes,
+			listTypeAttributes:      false,
+			expectedValidationError: true,
 		},
 	}
 
@@ -791,14 +786,8 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
-			listTypeAttributes: false,
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.Spec.Devices[0].Attributes = map[resource.QualifiedName]resource.DeviceAttribute{}
-				obj.ResourceVersion = "4"
-				obj.Generation = 1
-				return obj
-			}(),
+			listTypeAttributes:    false,
+			expectValidationError: true,
 		},
 		"keep-list-type-attributes": {
 			oldObj: sliceWithListTypeAttributes,
