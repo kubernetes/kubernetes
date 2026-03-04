@@ -191,6 +191,12 @@ const (
 	// Enables configuring custom stop signals for containers from container lifecycle
 	ContainerStopSignals featuregate.Feature = "ContainerStopSignals"
 
+	// owner: @HirazawaUi
+	// kep: https://kep.k8s.io/5758
+	//
+	// Enable support for configuring Ulimit for containers
+	ContainerUlimits featuregate.Feature = "ContainerUlimits"
+
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
 	//
@@ -1349,6 +1355,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ContainerUlimits: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CrossNamespaceVolumeDataSource: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2397,6 +2407,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ContainerRestartRules: {},
 
 	ContainerStopSignals: {},
+
+	ContainerUlimits: {NodeDeclaredFeatures},
 
 	CoordinatedLeaderElection: {},
 
