@@ -68,10 +68,11 @@ var (
 
 func NewCmdTop(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "top",
-		Short: i18n.T("Display resource (CPU/memory) usage"),
-		Long:  topLong,
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		Use:        "top",
+		Short:      i18n.T("Display resource (CPU/memory) usage"),
+		Long:       topLong,
+		Run:        cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		SuggestFor: []string{"stats"},
 	}
 
 	// create subcommands
