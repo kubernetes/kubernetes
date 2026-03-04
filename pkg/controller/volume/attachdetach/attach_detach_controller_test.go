@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -716,13 +717,7 @@ func verifyAttachDetachCalls(t *testing.T, testPlugin *controllervolumetesting.T
 						expectedNode, verify_op, tries)
 				}
 				for _, expectedVolume := range expectedVolumeList {
-					volFound = false
-					for _, volume := range volumeList {
-						if expectedVolume == volume {
-							volFound = true
-							break
-						}
-					}
+					volFound = slices.Contains(volumeList, expectedVolume)
 					if !volFound && tries == 10 {
 						t.Fatalf("Expected %v operation not found, node:%v, volume: %v, tries: %d",
 							verify_op, expectedNode, expectedVolume, tries)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -621,12 +622,7 @@ func hasOrphanFinalizer(accessor metav1.Object) bool {
 
 func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == matchingFinalizer {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(finalizers, matchingFinalizer)
 }
 
 // this function takes newAccessor directly because the caller already

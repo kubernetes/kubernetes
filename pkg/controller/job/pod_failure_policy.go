@@ -18,6 +18,7 @@ package job
 
 import (
 	"fmt"
+	"slices"
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -122,19 +123,9 @@ func getMatchingContainerFromList(containerStatuses []v1.ContainerStatus, requir
 func isOnExitCodesOperatorMatching(exitCode int32, requirement *batch.PodFailurePolicyOnExitCodesRequirement) bool {
 	switch requirement.Operator {
 	case batch.PodFailurePolicyOnExitCodesOpIn:
-		for _, value := range requirement.Values {
-			if value == exitCode {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(requirement.Values, exitCode)
 	case batch.PodFailurePolicyOnExitCodesOpNotIn:
-		for _, value := range requirement.Values {
-			if value == exitCode {
-				return false
-			}
-		}
-		return true
+		return !slices.Contains(requirement.Values, exitCode)
 	default:
 		return false
 	}
