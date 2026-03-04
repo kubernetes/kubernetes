@@ -667,6 +667,10 @@ func (pgi *PodGroupInfo) GetNamespace() string {
 	return pgi.Namespace
 }
 
+func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
+	return pgi.UnscheduledPods
+}
+
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).

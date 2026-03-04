@@ -207,6 +207,10 @@ type Framework interface {
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
+	// RunPlacementGeneratePlugins runs the set of configured PlacementGenerate plugins.
+	// It returns the combined list of generated Placements.
+	RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) ([]*fwk.Placement, *fwk.Status)
+
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is

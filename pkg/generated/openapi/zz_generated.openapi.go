@@ -68773,6 +68773,13 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
 						},
 					},
+					"placementGenerate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PlacementGenerate is a list of plugins that should be invoked during pod group scheduling cycle when determining placements for a pod group.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
