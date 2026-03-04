@@ -229,10 +229,6 @@ func Convert_v1_Device_To_v1beta1_Device(in *resourceapi.Device, out *resourcev1
 	return nil
 }
 
-func Convert_v1_DeviceAttribute_To_v1beta1_DeviceAttribute(in *resourceapi.DeviceAttribute, out *resourcev1beta1.DeviceAttribute, s conversion.Scope) error {
-	return autoConvert_v1_DeviceAttribute_To_v1beta1_DeviceAttribute(in, out, s)
-}
-
 func convert_v1_Attributes_To_v1beta1_Attributes(in map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, out map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute, s conversion.Scope) error {
 	for k, v := range in {
 		var a resourcev1beta1.DeviceAttribute
