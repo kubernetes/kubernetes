@@ -131,10 +131,10 @@
     version: "1.30"
 - name: AtomicWriteVolumeUserFields
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
-    version: "1.37"
+    preRelease: Beta
+    version: "1.36"
 - name: AuthorizeNodeWithSelectors
   versionedSpecs:
   - default: false
