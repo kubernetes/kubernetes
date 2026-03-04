@@ -4786,13 +4786,13 @@ func TestEvaluateNominatedNode(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			snapshot := internalcache.NewSnapshot(nil, tt.allNodes)
-			placement := &fwk.PlacementInfo{AncestorPlacements: []*fwk.Placement{{}}}
+			placement := &fwk.Placement{}
 			for _, nodeName := range tt.placementNodes {
 				node, err := snapshot.Get(nodeName)
 				if err != nil {
 					t.Fatalf("Error getting node %s: %v", nodeName, err)
 				}
-				placement.PlacementNodes = append(placement.PlacementNodes, node)
+				placement.Nodes = append(placement.Nodes, node)
 			}
 			err := snapshot.AssumePlacement(placement)
 			if err != nil {

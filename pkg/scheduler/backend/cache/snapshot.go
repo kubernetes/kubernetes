@@ -300,17 +300,17 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 // The placement should be unset with ForgetPlacement once it's no longer needed.
 // This function should only be used by the scheduler to limit the node candidates for scheduling.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
-func (s *Snapshot) AssumePlacement(placement *fwk.PlacementInfo) error {
-	if len(placement.AncestorPlacements) == 0 {
-		// no ancestors means it's the root placement which contains all nodes, thus there's not point in replacing the list of nodes.
+func (s *Snapshot) AssumePlacement(placement *fwk.Placement) error {
+	if len(placement.Nodes) == len(s.nodeInfoList) {
+		// All nodes in placement, meaning we can treat it the same as no placement and avoid copying the buffer.
 		s.ForgetPlacement()
 		return nil
 	}
 	s.placementNodes = &placementNodes{
-		nodeInfoList: placement.PlacementNodes,
+		nodeInfoList: placement.Nodes,
 		nodeInfoSet:  sets.New[string](),
 	}
-	for _, node := range placement.PlacementNodes {
+	for _, node := range placement.Nodes {
 		snapshotNode, ok := s.nodeInfoMap[node.Node().Name]
 		if !ok {
 			s.ForgetPlacement()

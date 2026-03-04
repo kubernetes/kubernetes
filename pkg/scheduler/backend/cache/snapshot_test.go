@@ -591,13 +591,13 @@ func TestSnapshot_Placement(t *testing.T) {
 		name           string
 		initialNodes   []string
 		placementNodes []string
-		testFn         func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo)
+		testFn         func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement)
 	}{
 		{
 			name:           "When placement is not set, nodes in placement are same as nodes in snapshot",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{}, // unused
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				// We intentionally don't use snapshot.AssumePlacement here
 				numNodes := snapshot.NumNodesInPlacement()
 				if numNodes != 3 {
@@ -620,7 +620,7 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement is set, nodes in placement are the nodes from the provided placement",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2", "n3"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				err := snapshot.AssumePlacement(placement)
 				if err != nil {
 					t.Fatalf("got unexpected error from AssumePlacement %v", err)
@@ -650,7 +650,7 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement is set, List and Get are not affected and still use snapshot nodes",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2", "n3"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				err := snapshot.AssumePlacement(placement)
 				if err != nil {
 					t.Fatalf("got unexpected error from AssumePlacement %v", err)
@@ -672,7 +672,7 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement is cleared through ForgetPlacement, nodes in placement are same as nodes in snapshot",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2", "n3"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				err := snapshot.AssumePlacement(placement)
 				if err != nil {
 					t.Fatalf("got unexpected error from AssumePlacement %v", err)
@@ -699,7 +699,7 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement contains nodes from outside the snapshot, AssumePlacement returns error and placement is not set",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2", "n3", "n4"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				err := snapshot.AssumePlacement(placement)
 				if err == nil {
 					t.Fatalf("expected AssumePlacement to return error due to placement using a node from outside the snapshot but got nil")
@@ -730,8 +730,8 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement uses nodes that point to a different instance than snapshot, AssumePlacement returns error and placement is not set",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
-				placement.PlacementNodes[0] = placement.PlacementNodes[0].Snapshot()
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				placement.Nodes[0] = placement.Nodes[0].Snapshot()
 				err := snapshot.AssumePlacement(placement)
 				if err == nil {
 					t.Fatalf("expected AssumePlacement to return error due to no match between placement and snapshot node instance but got nil")
@@ -758,7 +758,7 @@ func TestSnapshot_Placement(t *testing.T) {
 			name:           "When placement is set, the effect of AssumePod is visible in nodes in placement",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.PlacementInfo) {
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
 				err := snapshot.AssumePlacement(placement)
 				if err != nil {
 					t.Fatalf("unexpected error from AssumePlacement %v", err)
@@ -821,10 +821,8 @@ func TestSnapshot_Placement(t *testing.T) {
 				placementNodes = append(placementNodes, node)
 			}
 
-			tc.testFn(t, snapshot, &fwk.PlacementInfo{
-				AncestorPlacements: []*fwk.Placement{{}},
-				Placement:          fwk.Placement{},
-				PlacementNodes:     placementNodes,
+			tc.testFn(t, snapshot, &fwk.Placement{
+				Nodes: placementNodes,
 			})
 		})
 	}

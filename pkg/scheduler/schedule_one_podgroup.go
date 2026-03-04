@@ -474,7 +474,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 // The placement information can be used by the placement score plugins.
 type placementResult struct {
 	podGroupAlgorithmResult
-	placement *fwk.PlacementInfo
+	placement *fwk.Placement
 }
 
 // podGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the pod group and selects the best one.
@@ -490,12 +490,9 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 
 	// TODO: kubernetes/enhancements#5732 - run placement generator plugins to get the set of placements
-	placements := []*fwk.PlacementInfo{
+	placements := []*fwk.Placement{
 		{
-			Placement: fwk.Placement{
-				NodeSelector: nil,
-			},
-			PlacementNodes: allNodes,
+			Nodes: allNodes,
 		},
 	}
 
@@ -503,7 +500,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	successfulResults := make([]placementResult, 0, len(placements))
 
 	for i, placement := range placements {
-		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Placement, "ancestorPlacements", placement.AncestorPlacements)
+		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
 			return sched.podGroupAlgorithmFailure(ctx, podGroupInfo, fwk.AsStatus(err))
