@@ -21,10 +21,14 @@ import (
 	"testing"
 	"time"
 
+	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
+	// Speed up encryption config reload from the default 1 minute to 1 second.
+	// This variable is exported specifically for integration tests.
+	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 	framework.EtcdMain(m.Run)
 }
 

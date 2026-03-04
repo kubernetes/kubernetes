@@ -171,7 +171,9 @@ func TestBitFlipCorruptObjectDeletion(t *testing.T) {
 				t.Fatalf("unexpected error from AddEventHandler: %v", err)
 			}
 
-			factory.Start(test.Done())
+			informerCtx, informerCancel := context.WithCancel(test)
+			defer informerCancel()
+			factory.Start(informerCtx.Done())
 			waitForSyncCtx, waitForSyncCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 			defer waitForSyncCancel()
 			if !cache.WaitForCacheSync(waitForSyncCtx.Done(), secretInformer.Informer().HasSynced) {

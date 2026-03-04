@@ -97,7 +97,7 @@ resources:
 // 2. Secrets are decrypted on read
 // when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		transformerConfigContent string
 		transformerPrefix        string
 		unSealFunc               unSealSecret
@@ -267,7 +267,9 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			}
 
 			lister := informer.Lister()
-			factory.Start(test.Done())
+			informerCtx, informerCancel := context.WithCancel(test)
+			defer informerCancel()
+			factory.Start(informerCtx.Done())
 			waitForSyncCtx, waitForSyncCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 			defer waitForSyncCancel()
 			if !cache.WaitForCacheSync(waitForSyncCtx.Done(), informer.Informer().HasSynced) {
@@ -295,8 +297,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			// i) wait for the breaking changes to take effect
 			testCtx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			// TODO: dynamic encryption config reload takes about 1m, so can't use
-			// wait.ForeverTestTimeout just yet, investigate and reduce the reload time.
+			// dynamic encryption config reload takes about 1m, so can't use wait.ForeverTestTimeout
 			err = wait.PollUntilContextTimeout(testCtx, 1*time.Second, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 				_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(ctx, secretCorrupt, metav1.GetOptions{})
 				var got apierrors.APIStatus
@@ -665,8 +666,8 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
-
+	transformerConfig apiserverv1.ProviderConfiguration,
+) ([]byte, error) {
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
@@ -686,8 +687,8 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 }
 
 func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
-
+	transformerConfig apiserverv1.ProviderConfiguration,
+) ([]byte, error) {
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {
 		return nil, err
