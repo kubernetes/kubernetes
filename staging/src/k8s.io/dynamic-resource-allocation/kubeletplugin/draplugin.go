@@ -733,10 +733,11 @@ func (d *Helper) Stop() {
 // objects.
 //
 // Note that the order of slices in the provided resources
-// is significant: ResourceSlices are named deterministically based on
+// is significant: ResourceSlices start with a name prefix based on
 // their index, and the allocator uses this order to prioritize allocation
-// (first-fit). Also, upgrading to this deterministic naming from an older
-// version using random names will cause existing slices to be recreated.
+// (first-fit). Also, upgrading to this naming from an older
+// version using random names without the index at the beginning will
+// cause existing slices to be recreated.
 // See [resourceslice.Pool.Slices] for more details.
 //
 // Pools are sorted first so that pools with devices which have binding

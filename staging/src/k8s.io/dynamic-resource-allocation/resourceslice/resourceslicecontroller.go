@@ -18,8 +18,6 @@ package resourceslice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -69,18 +67,17 @@ const (
 	// doesn't get fixed while that human is waiting for it.
 	DefaultSyncDelay = 30 * time.Second
 
-	// poolHashLength is the number of characters from the pool name hash
-	// to include in the ResourceSlice name.
-	poolHashLength = 8
-
 	// alphanums is the set of available characters for ResourceSlice names.
 	// We omit vowels to reduce the chances of "bad words" being formed.
 	alphanums = "bcdfghjklmnpqrstvwxz2456789"
 
 	// resourceSliceIndexLength is the length of the encoded index in the
 	// ResourceSlice name. 14 characters is the minimum needed to represent
-	// the maximum int64 value in base27 safely.
+	// the maximum int value in base27 safely.
 	resourceSliceIndexLength = 14
+
+	// nameSeparator is used to separate parts of the ResourceSlice name.
+	nameSeparator = "-"
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -162,19 +159,20 @@ type Pool struct {
 	// definition for details, in particular the limit on
 	// the number of devices.
 	//
-	// ResourceSlices are named deterministically based on their
+	// ResourceSlices start with a name prefix based on their
 	// index in this list. This has two important consequences:
 	// 1. Priority: The allocator sorts ResourceSlices
 	//    lexicographically by name and uses a first-fit strategy.
-	//    Since the index is part of the name, the order in this
-	//    list determines the allocation priority. Driver authors
-	//    can influence priority by putting preferred slices first.
-	//    Likewise, within a slice the preferred devices should be
-	//    listed first.
+	//    Since the index is at the beginning of the name, the order
+	//    in this list determines the allocation priority. Driver
+	//    authors can influence priority by putting preferred slices
+	//    first. Likewise, within a slice the preferred devices should
+	//    be listed first.
 	// 2. Migration: When upgrading from a driver version that used
-	//    randomly generated names (via GenerateName), existing
-	//    ResourceSlices will be deleted and recreated with
-	//    deterministic names.
+	//    randomly generated names without index at the beginning,
+	//    existing ResourceSlices will be deleted and recreated with
+	//    names starting with the new prefix:
+	//    [encoded index]-[owner name (if not nil)]-[driver name]-
 	//
 	// If slices are not valid, then the controller will
 	// log errors produced by the apiserver.
@@ -682,22 +680,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Construct the deterministic name prefix for all slices in this pool.
-	// Use the pool name hash to ensure uniqueness across pools from the same driver
-	// while keeping the total name length manageable.
-	resourceSliceNamePrefix := c.driverName + "-" + getPoolHash(poolName) + "-"
-	if c.owner != nil {
-		resourceSliceNamePrefix = c.owner.Name + "-" + resourceSliceNamePrefix
-	}
-
-	// 1. Map the deterministic names of the desired slices to their indices.
-	desiredNameToIndex := make(map[string]int, len(pool.Slices))
-	for i := range pool.Slices {
-		desiredNameToIndex[getResourceSliceName(resourceSliceNamePrefix, int64(i))] = i
-	}
-
-	// 2. Classify existing slices. If an existing slice has wrong generation
-	// or doesn't match a desired name, it's obsolete.
+	// Classify existing slices. If an existing slice has wrong generation
+	// or doesn't match a desired index, it's obsolete.
 	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
 	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
 
@@ -708,15 +692,16 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			continue
 		}
 
-		// If the slice name matches a desired index, it's a match.
-		// Otherwise (random name or out of current index range), it's obsolete.
-		if index, ok := desiredNameToIndex[slice.Name]; ok {
-			currentSliceForDesiredSlice[index] = slice
-			logger.V(5).Info("Matched existing slice by name", "slice", klog.KObj(slice), "matchIndex", index)
-		} else {
-			obsoleteSlices = append(obsoleteSlices, slice)
-			logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
+		index := decodeIndex(slice.Name)
+		if index >= 0 && index < len(pool.Slices) {
+			if _, ok := currentSliceForDesiredSlice[index]; !ok {
+				currentSliceForDesiredSlice[index] = slice
+				logger.V(5).Info("Matched existing slice by index", "slice", klog.KObj(slice), "matchIndex", index)
+				continue
+			}
 		}
+		obsoleteSlices = append(obsoleteSlices, slice)
+		logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
 	}
 
 	// Desired metadata which must be set in each slice.
@@ -821,11 +806,19 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				},
 			)
 		}
-		name := getResourceSliceName(resourceSliceNamePrefix, int64(i))
+		// The GenerateName follows the scheme:
+		// [encoded index]-[owner name (if not nil)]-[driver name]-
+		// This ensures that the index is at the beginning of the name,
+		// and the API server handles uniqueness by appending a random suffix.
+		generateName := encodeIndex(i) + nameSeparator
+		if c.owner != nil {
+			generateName += c.owner.Name + nameSeparator
+		}
+		generateName += c.driverName + nameSeparator
 		slice := &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            name,
 				OwnerReferences: ownerReferences,
+				GenerateName:    generateName,
 			},
 			Spec: resourceapi.ResourceSliceSpec{
 				Driver:                 c.driverName,
@@ -1048,28 +1041,37 @@ func refIfNotZero[T comparable](t T) *T {
 	return &t
 }
 
-// getPoolHash returns a short, fixed-length hash of the pool name to be used in
-// deterministic ResourceSlice names.
-func getPoolHash(poolName string) string {
-	hash := sha256.Sum256([]byte(poolName))
-	return hex.EncodeToString(hash[:])[:poolHashLength]
+// decodeIndex decodes an integer from the start of a string.
+// It returns -1 if the string does not start with resourceSliceIndexLength
+// characters from alphanums.
+func decodeIndex(name string) int {
+	if len(name) < resourceSliceIndexLength {
+		return -1
+	}
+	const base = len(alphanums)
+	var res int
+	for i := range resourceSliceIndexLength {
+		char := name[i]
+		idx := strings.IndexByte(alphanums, char)
+		if idx == -1 {
+			return -1
+		}
+		res = res*base + idx
+	}
+	return res
 }
 
 // encodeIndex encodes an integer into a deterministic string, padded with
-// the first character of the alphabet to resourceSliceIndexLength characters.
+// the first character of alphanums to resourceSliceIndexLength characters.
 // resourceSliceIndexLength characters is the minimum needed to represent
-// the maximum int64 value in base27 safely.
-func encodeIndex(index int64) string {
+// the maximum int value in base27 safely.
+func encodeIndex(index int) string {
 	val := index
-	const base = int64(len(alphanums))
+	const base = len(alphanums)
 	res := make([]byte, resourceSliceIndexLength)
 	for i := resourceSliceIndexLength - 1; i >= 0; i-- {
 		res[i] = alphanums[val%base]
 		val /= base
 	}
 	return string(res)
-}
-
-func getResourceSliceName(prefix string, index int64) string {
-	return prefix + encodeIndex(index)
 }

@@ -60,6 +60,7 @@ func TestLexicographicalAllocator(t *testing.T,
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
+				// pools with binding conditions will be considered after pools without binding conditions.
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
 					device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
