@@ -138,6 +138,18 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ReadOnlyPort != 0 && utilvalidation.IsValidPortNum(int(kc.ReadOnlyPort)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: readOnlyPort (--read-only-port) %v must be between 0 and 65535, inclusive", kc.ReadOnlyPort))
 	}
+	if kc.SystemMemoryContentionThreshold <= 0 || kc.SystemMemoryContentionThreshold > 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemMemoryContentionThreshold %v must be greater than 0 and less than or equal to 1", kc.SystemMemoryContentionThreshold))
+	}
+	if kc.SystemDiskContentionThreshold <= 0 || kc.SystemDiskContentionThreshold > 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemDiskContentionThreshold %v must be greater than 0 and less than or equal to 1", kc.SystemDiskContentionThreshold))
+	}
+	if kc.KubepodsMemoryContentionThreshold <= 0 || kc.KubepodsMemoryContentionThreshold > 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubepodsMemoryContentionThreshold %v must be greater than 0 and less than or equal to 1", kc.KubepodsMemoryContentionThreshold))
+	}
+	if kc.KubepodsDiskContentionThreshold <= 0 || kc.KubepodsDiskContentionThreshold > 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubepodsDiskContentionThreshold %v must be greater than 0 and less than or equal to 1", kc.KubepodsDiskContentionThreshold))
+	}
 	if kc.RegistryBurst < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: registryBurst (--registry-burst) %v must not be a negative number", kc.RegistryBurst))
 	}
