@@ -164,7 +164,7 @@ linters:
       # optionalfields - Ignore optionalfields issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
-        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apidiscovery|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "optionalfields: field StorageVersionCondition.ObservedGeneration should be a pointer."
         path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
       - text: "optionalfields: field StorageVersion.Spec should be a pointer."
