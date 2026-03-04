@@ -229,6 +229,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
 type algorithmResult struct {
+	// pod is the pod the result applies to.
+	pod *v1.Pod
 	// scheduleResult is a scheduling algorithm result.
 	scheduleResult ScheduleResult
 	// podCtx is a specific pod scheduling context used for the scheduling algorithm.
@@ -242,6 +244,14 @@ type algorithmResult struct {
 	// permitStatus is a status of the permit check.
 	// This is only set when the `status` is success or the `requiresPreemption` is true.
 	permitStatus *fwk.Status
+}
+
+func (ar *algorithmResult) GetPod() *v1.Pod {
+	return ar.pod
+}
+
+func (ar *algorithmResult) GetNodeName() string {
+	return ar.scheduleResult.SuggestedHost
 }
 
 // podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
@@ -344,6 +354,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 		} else {
 			// In case of pod being just unschedulable or having an error, just return now.
 			return algorithmResult{
+				pod:                pod,
 				scheduleResult:     scheduleResult,
 				podCtx:             podCtx,
 				schedulingDuration: time.Since(start),
@@ -354,6 +365,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
 	if !assumeStatus.IsSuccess() {
 		return algorithmResult{
+			pod:                pod,
 			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
 			podCtx:             podCtx,
 			schedulingDuration: time.Since(start),
@@ -384,6 +396,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 			permitStatus = fwk.NewStatus(permitStatus.Code()).WithError(fitErr)
 		}
 		return algorithmResult{
+			pod:                pod,
 			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
 			podCtx:             podCtx,
 			schedulingDuration: time.Since(start),
@@ -392,6 +405,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	}
 
 	return algorithmResult{
+		pod:                pod,
 		scheduleResult:     scheduleResult,
 		podCtx:             podCtx,
 		schedulingDuration: time.Since(start),
@@ -505,13 +519,6 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 	}
 }
 
-// placementResult associates pod group algorithm result with the placement.
-// The placement information can be used by the placement score plugins.
-type placementResult struct {
-	podGroupAlgorithmResult
-	placement *fwk.Placement
-}
-
 // podGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the pod group and selects the best one.
 // First it runs placement generator plugins to create a list of placements.
 // Placement is a set of nodes that will be considered when scheduling a pod group.
@@ -526,17 +533,20 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		}
 	}
 
-	// TODO: kubernetes/enhancements#5732 - run placement generator plugins to get the set of placements
-	placements := []*fwk.Placement{
-		{
-			Nodes: allNodes,
-		},
+	podGroupCycleState := framework.NewCycleState()
+	// For now, always record plugin metrics until we understand its impact on performance.
+	podGroupCycleState.SetRecordPluginMetrics(true)
+	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, allNodes)
+	if !status.IsSuccess() {
+		return podGroupAlgorithmResult{
+			status: status,
+		}
 	}
 
-	results := make([]placementResult, len(placements))
-	successfulResults := make([]placementResult, 0, len(placements))
+	var anyResult *podGroupAlgorithmResult
+	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
-	for i, placement := range placements {
+	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
@@ -550,24 +560,86 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			return result
 		}
 
-		results[i] = placementResult{
-			podGroupAlgorithmResult: result,
-			placement:               placement,
+		if anyResult == nil {
+			anyResult = &result
 		}
 
 		if result.status.IsSuccess() || result.waitingOnPreemption {
-			successfulResults = append(successfulResults, results[i])
+			successfulResults[placement] = &result
 		}
 	}
 
 	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		return results[0].podGroupAlgorithmResult
+		return *anyResult
 	}
 
-	// TODO: kubernetes/enhancements#5732 - run placement scorer plugins to select the best placement
-	return successfulResults[0].podGroupAlgorithmResult
+	if len(successfulResults) == 1 {
+		for _, result := range successfulResults {
+			return *result
+		}
+	}
+
+	bestPlacement, status := sched.findBestPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
+	if !status.IsSuccess() {
+		return podGroupAlgorithmResult{
+			status: status,
+		}
+	}
+
+	return *successfulResults[bestPlacement]
+}
+
+// findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.
+func (sched *Scheduler) findBestPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.QueuedPodGroupInfo, successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) (*fwk.Placement, *fwk.Status) {
+	placementPodGroupAssignments := makePodGroupAssignments(successfulResults)
+
+	scores, status := schedFwk.RunPlacementScorePlugins(ctx, podGroupCycleState, podGroupInfo, placementPodGroupAssignments)
+	if !status.IsSuccess() {
+		return nil, status
+	}
+
+	for i := range scores {
+		scores[i].Randomizer = rand.Int()
+	}
+
+	loggerVTen := klog.FromContext(ctx).V(10)
+	if loggerVTen.Enabled() {
+		for _, score := range scores {
+			for _, pluginScore := range score.Scores {
+				loggerVTen.Info("Plugin scored placement for podGroup", "podGroup", klog.KRef(podGroupInfo.GetNamespace(), podGroupInfo.GetName()), "plugin", pluginScore.Name, "placement", score.Placement.Name, "score", pluginScore.Score)
+			}
+			loggerVTen.Info("Calculated placement's final score for podGroup", "podGroup", klog.KRef(podGroupInfo.GetNamespace(), podGroupInfo.GetName()), "placement", score.Placement.Name, "score", score.TotalScore)
+		}
+	}
+
+	bestScore := &scores[0]
+	for _, score := range scores[1:] {
+		if score.TotalScore > bestScore.TotalScore ||
+			score.TotalScore == bestScore.TotalScore &&
+				score.Randomizer > bestScore.Randomizer {
+			bestScore = &score
+		}
+	}
+	return bestScore.Placement, nil
+}
+
+func makePodGroupAssignments(successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) []*fwk.PodGroupAssignments {
+	placementPodGroupAssignments := make([]*fwk.PodGroupAssignments, 0, len(successfulResults))
+	for placement, result := range successfulResults {
+		proposedAssignments := make([]fwk.ProposedAssignment, 0)
+		for _, algorithmResult := range result.podResults {
+			if algorithmResult.GetNodeName() != "" {
+				proposedAssignments = append(proposedAssignments, &algorithmResult)
+			}
+		}
+		placementPodGroupAssignments = append(placementPodGroupAssignments, &fwk.PodGroupAssignments{
+			Placement:           placement,
+			ProposedAssignments: proposedAssignments,
+		})
+	}
+	return placementPodGroupAssignments
 }
 
 // podGroupSchedulingAlgorithm attempts to schedule pods in the pod group according to the policy and constraints and returns the scheduling result for each pod in the pod group.
