@@ -1157,6 +1157,11 @@ func (in TypedObjectReference) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in Ulimit) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.Ulimit"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Volume) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.Volume"
 }

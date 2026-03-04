@@ -95,6 +95,11 @@ type SecurityContextApplyConfiguration struct {
 	// overrides the pod's appArmorProfile.
 	// Note that this field cannot be set when spec.os.name is windows.
 	AppArmorProfile *AppArmorProfileApplyConfiguration `json:"appArmorProfile,omitempty"`
+	// The ulimits to be applied to the container.
+	// Each element in this list maps to a system ulimit setting.
+	// If unspecified, the container runtime default ulimits will be used.
+	// Note that this field cannot be set when spec.os.name is windows.
+	Ulimits []UlimitApplyConfiguration `json:"ulimits,omitempty"`
 }
 
 // SecurityContextApplyConfiguration constructs a declarative configuration of the SecurityContext type for use with
@@ -196,5 +201,18 @@ func (b *SecurityContextApplyConfiguration) WithSeccompProfile(value *SeccompPro
 // If called multiple times, the AppArmorProfile field is set to the value of the last call.
 func (b *SecurityContextApplyConfiguration) WithAppArmorProfile(value *AppArmorProfileApplyConfiguration) *SecurityContextApplyConfiguration {
 	b.AppArmorProfile = value
+	return b
+}
+
+// WithUlimits adds the given value to the Ulimits field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Ulimits field.
+func (b *SecurityContextApplyConfiguration) WithUlimits(values ...*UlimitApplyConfiguration) *SecurityContextApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithUlimits")
+		}
+		b.Ulimits = append(b.Ulimits, *values[i])
+	}
 	return b
 }
