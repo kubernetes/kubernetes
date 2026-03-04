@@ -309,7 +309,7 @@ func TestStatusz(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "apiserver",
 		},
-		Paths: []string{"/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
+		Paths: []string{"/flagz", "/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
 	}
 	wantBodyBeta := &statuszv1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
@@ -319,7 +319,7 @@ func TestStatusz(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "apiserver",
 		},
-		Paths: []string{"/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
+		Paths: []string{"/flagz", "/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
 	}
 
 	for _, tc := range []struct {
