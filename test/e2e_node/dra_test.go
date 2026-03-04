@@ -1796,7 +1796,7 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 		},
 	}
 
-	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create ResourceClaim "+claimName)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claimName, metav1.DeleteOptions{})
@@ -1804,7 +1804,30 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 			framework.Failf("Failed to delete ResourceClaim %s: %v", claimName, err)
 		}
 	})
-	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q (without claim allocation yet)", podName))
+
+	ginkgo.By(fmt.Sprintf("Pre-allocating claim %q before pod creation", claimName))
+	// Set the Allocation on the claim before creating the pod to avoid a race
+	// condition where the kubelet sees the pod spec change (claim allocation
+	// arriving after container start) and kills the container during PLEG re-sync.
+	// ReservedFor is set after pod creation since it requires the real pod UID.
+	createdClaim.Status = resourceapi.ResourceClaimStatus{
+		Allocation: &resourceapi.AllocationResult{
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: []resourceapi.DeviceRequestAllocationResult{
+					{
+						Driver:  driverName,
+						Pool:    poolName,
+						Device:  deviceName,
+						Request: "my-request",
+					},
+				},
+			},
+		},
+	}
+	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "failed to pre-allocate ResourceClaim "+claimName)
+
+	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q", podName))
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -1828,7 +1851,6 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 			},
 		},
 	}
-	// Create the pod on the API server to assign the real UID.
 	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create Pod "+podName)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -1847,31 +1869,16 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, createdPod.Name, apitypes.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
 	framework.ExpectNoError(err, "failed to patch Pod status with ResourceClaimStatuses")
 
-	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
-	// Get the created claim to ensure the latest version before updating.
+	ginkgo.By(fmt.Sprintf("Reserving claim %q for pod %q with its real UID", claimName, podName))
+	// Get the latest version of the claim and set ReservedFor with the real pod UID.
 	claimToUpdate, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claimName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "failed to get latest version of ResourceClaim "+claimName)
 
-	// Update the claims status to reserve it for the *real* pod UID.
-	claimToUpdate.Status = resourceapi.ResourceClaimStatus{
-		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
-			{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
-		},
-		Allocation: &resourceapi.AllocationResult{
-			Devices: resourceapi.DeviceAllocationResult{
-				Results: []resourceapi.DeviceRequestAllocationResult{
-					{
-						Driver:  driverName,
-						Pool:    poolName,
-						Device:  deviceName,
-						Request: "my-request",
-					},
-				},
-			},
-		},
+	claimToUpdate.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
 	}
 	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claimToUpdate, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "failed to update ResourceClaim status for test")
+	framework.ExpectNoError(err, "failed to reserve ResourceClaim for pod")
 
 	return createdPod
 }
@@ -1948,7 +1955,7 @@ func createTestObjectsWithShareID(ctx context.Context, f *framework.Framework, d
 		},
 	}
 
-	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create ResourceClaim "+claimName)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claimName, metav1.DeleteOptions{})
@@ -1956,6 +1963,29 @@ func createTestObjectsWithShareID(ctx context.Context, f *framework.Framework, d
 			framework.Failf("Failed to delete ResourceClaim %s: %v", claimName, err)
 		}
 	})
+
+	ginkgo.By(fmt.Sprintf("Pre-allocating claim %q with ShareID before pod creation", claimName))
+	// Set the Allocation on the claim before creating the pod to avoid a race
+	// condition where the kubelet sees the pod spec change (claim allocation
+	// arriving after container start) and kills the container during PLEG re-sync.
+	// ReservedFor is set after pod creation since it requires the real pod UID.
+	createdClaim.Status = resourceapi.ResourceClaimStatus{
+		Allocation: &resourceapi.AllocationResult{
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: []resourceapi.DeviceRequestAllocationResult{
+					{
+						Driver:  driverName,
+						Pool:    poolName,
+						Device:  deviceName,
+						Request: "my-request",
+						ShareID: shareID, // Include ShareID in allocation
+					},
+				},
+			},
+		},
+	}
+	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "failed to pre-allocate ResourceClaim with ShareID")
 
 	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q", podName))
 	pod := &v1.Pod{
@@ -2000,31 +2030,15 @@ func createTestObjectsWithShareID(ctx context.Context, f *framework.Framework, d
 	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, createdPod.Name, apitypes.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
 	framework.ExpectNoError(err, "failed to patch Pod status with ResourceClaimStatuses")
 
-	ginkgo.By(fmt.Sprintf("Allocating claim %q with ShareID", claimName))
+	ginkgo.By(fmt.Sprintf("Reserving claim %q for pod %q with its real UID", claimName, podName))
 	claimToUpdate, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claimName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "failed to get latest version of ResourceClaim "+claimName)
 
-	// Update the claims status with ShareID in the allocation result
-	claimToUpdate.Status = resourceapi.ResourceClaimStatus{
-		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
-			{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
-		},
-		Allocation: &resourceapi.AllocationResult{
-			Devices: resourceapi.DeviceAllocationResult{
-				Results: []resourceapi.DeviceRequestAllocationResult{
-					{
-						Driver:  driverName,
-						Pool:    poolName,
-						Device:  deviceName,
-						Request: "my-request",
-						ShareID: shareID, // Include ShareID in allocation
-					},
-				},
-			},
-		},
+	claimToUpdate.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
 	}
 	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claimToUpdate, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "failed to update ResourceClaim status with ShareID")
+	framework.ExpectNoError(err, "failed to reserve ResourceClaim for pod")
 
 	return createdPod
 }
