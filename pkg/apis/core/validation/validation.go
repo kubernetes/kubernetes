@@ -129,6 +129,28 @@ var validOS = sets.New(core.Linux, core.Windows)
 // additional responders.
 const MaxPodEvictionResponders = 10
 
+const (
+	ulimitUnlimitedValue int64 = -1
+
+	minNofileUlimitValue int64 = 256
+	maxNofileUlimitValue int64 = 65536
+
+	minNiceUlimitValue int64 = 0
+	maxNiceUlimitValue int64 = 40
+
+	minRtprioUlimitValue int64 = 0
+	maxRtprioUlimitValue int64 = 99
+
+	minStackUlimitValue int64 = 262144
+	maxStackUlimitValue int64 = 17179869184
+
+	minMemlockUlimitValue int64 = 8192
+	maxMemlockUlimitValue int64 = 17179869184
+
+	minCoreUlimitValue int64 = 0
+	maxCoreUlimitValue int64 = 17179869184
+)
+
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4043,7 +4065,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
-	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse)...)
+	allErrs = append(allErrs, validateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts)...)
 	return allErrs
 }
 
@@ -5119,6 +5141,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 			}
 			if sc.RunAsGroup != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsGroup"), "cannot be set for a windows pod"))
+			}
+			if sc.Ulimits != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("ulimits"), "cannot be set for a windows pod"))
 			}
 		}
 		return true
@@ -8840,6 +8865,10 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 
 // ValidateSecurityContext ensures the security context contains valid settings
 func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers, allowSysAdminWhenPrivilegeEscalationFalse bool) field.ErrorList {
+	return validateSecurityContext(sc, fldPath, hostUsers, PodValidationOptions{AllowSysAdminWhenPrivilegeEscalationFalse: allowSysAdminWhenPrivilegeEscalationFalse})
+}
+
+func validateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers bool, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// this should only be true for testing since SecurityContext is defaulted by the core
 	if sc == nil {
@@ -8879,7 +8908,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 			allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))
 		}
 
-		if !allowSysAdminWhenPrivilegeEscalationFalse && sc.Capabilities != nil {
+		if !opts.AllowSysAdminWhenPrivilegeEscalationFalse && sc.Capabilities != nil {
 			for _, cap := range sc.Capabilities.Add {
 				if string(cap) == "CAP_SYS_ADMIN" {
 					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
@@ -8890,8 +8919,79 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	if sc.Ulimits != nil {
+		allErrs = append(allErrs, validateUlimits(sc.Ulimits, fldPath.Child("ulimits"))...)
+	}
 
 	return allErrs
+}
+
+func validateUlimits(ulimits *core.Ulimits, fldPath *field.Path) field.ErrorList {
+	if ulimits == nil {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+
+	validateNamedUlimit := func(name string, ulimit *core.Ulimit, ulimitPath *field.Path) {
+		if ulimit == nil {
+			return
+		}
+		allErrs = append(allErrs, validateUlimitValue(name, ulimit.Hard, ulimitPath.Child("hard"))...)
+		allErrs = append(allErrs, validateUlimitValue(name, ulimit.Soft, ulimitPath.Child("soft"))...)
+		if ulimit.Hard != nil && ulimit.Soft != nil && *ulimit.Hard != ulimitUnlimitedValue {
+			if *ulimit.Soft == ulimitUnlimitedValue {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), *ulimit.Soft, "must not be -1 when `hard` is finite"))
+			} else if *ulimit.Soft > *ulimit.Hard {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), *ulimit.Soft, "must be less than or equal to `hard`"))
+			}
+		}
+	}
+
+	validateNamedUlimit("nofile", ulimits.Nofile, fldPath.Child("nofile"))
+	validateNamedUlimit("memlock", ulimits.Memlock, fldPath.Child("memlock"))
+	validateNamedUlimit("core", ulimits.Core, fldPath.Child("core"))
+	validateNamedUlimit("nice", ulimits.Nice, fldPath.Child("nice"))
+	validateNamedUlimit("rtprio", ulimits.Rtprio, fldPath.Child("rtprio"))
+	validateNamedUlimit("stack", ulimits.Stack, fldPath.Child("stack"))
+
+	return allErrs
+}
+
+func validateUlimitValue(name string, value *int64, fldPath *field.Path) field.ErrorList {
+	if value == nil {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+	if *value == ulimitUnlimitedValue {
+		return nil
+	}
+
+	var minValue int64
+	var maxValue int64
+	switch name {
+	case "nofile":
+		minValue, maxValue = minNofileUlimitValue, maxNofileUlimitValue
+	case "nice":
+		minValue, maxValue = minNiceUlimitValue, maxNiceUlimitValue
+	case "rtprio":
+		minValue, maxValue = minRtprioUlimitValue, maxRtprioUlimitValue
+	case "stack":
+		minValue, maxValue = minStackUlimitValue, maxStackUlimitValue
+	case "memlock":
+		minValue, maxValue = minMemlockUlimitValue, maxMemlockUlimitValue
+	case "core":
+		minValue, maxValue = minCoreUlimitValue, maxCoreUlimitValue
+	default:
+		return nil
+	}
+
+	if *value < minValue || *value > maxValue {
+		return field.ErrorList{
+			field.Invalid(fldPath, *value, fmt.Sprintf("must be -1 or between %d and %d for `%s`", minValue, maxValue, name)),
+		}
+	}
+
+	return nil
 }
 
 // maxGMSACredentialSpecLength is the max length, in bytes, for the actual contents
