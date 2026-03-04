@@ -1421,8 +1421,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 		klog.V(4).InfoS("Trying to apply Policies for service", "serviceInfo", svcInfo)
 		var hnsLoadBalancer *loadBalancerInfo
-		var sourceVip = proxier.sourceVip
-		if containsPublicIP || containsNodeIP {
+		sourceVip := proxier.sourceVip
+		if containsPublicIP || containsNodeIP || len(sourceVip) == 0 {
 			sourceVip = proxier.nodeIP.String()
 		}
 
