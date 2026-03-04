@@ -21,6 +21,7 @@ package app
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -261,7 +262,7 @@ func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 }
 
 func newRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	caProvider, caRun, err := getKubeAPIServerCAContentProvider(controllerContext)
 	if err != nil {
 		return nil, err
 	}
@@ -275,15 +276,17 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,
-		rootCA,
+		caProvider,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating root CA certificate publisher: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
-		sac.Run(ctx, 1)
-	}, controllerName), nil
+	runners := []runFunc{func(ctx context.Context) { sac.Run(ctx, 1) }}
+	if caRun != nil {
+		runners = append(runners, caRun)
+	}
+	return newControllerLoop(concurrentRun(runners...), controllerName), nil
 }
 
 func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
@@ -299,17 +302,12 @@ type controllerConstructor func(string, dynamiccertificates.CAContentProvider, k
 func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	ctx context.Context, controllerContext ControllerContext, controllerName string,
 ) (Controller, error) {
-	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	servingSigners, caRun, err := getKubeAPIServerCAContentProvider(controllerContext)
 	if err != nil {
 		return nil, err
 	}
-	if len(rootCA) == 0 {
+	if len(servingSigners.CurrentCABundleContent()) == 0 {
 		return nil, nil
-	}
-
-	servingSigners, err := dynamiccertificates.NewStaticCAContent("kube-apiserver-serving", rootCA)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
 	}
 
 	schemaControllerMapping := map[schema.GroupVersion]controllerConstructor{
@@ -349,7 +347,11 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		return nil, nil
 	}
 
-	return newControllerLoop(runner.Run, controllerName), nil
+	runners := []runFunc{runner.Run}
+	if caRun != nil {
+		runners = append(runners, caRun)
+	}
+	return newControllerLoop(concurrentRun(runners...), controllerName), nil
 }
 
 func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
@@ -370,19 +372,42 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 	return false, err
 }
 
-func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
-	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
+// clientConfigCAContent is a static, non-validating CAContentProvider holding
+// the CA bundle from kube-controller-manager's own client config. Used when
+// --root-ca-file is not set. Unlike dynamiccertificates.NewStaticCAContent it
+// does not require the bytes to be parseable PEM, so an empty or malformed
+// bundle is passed through as-is.
+type clientConfigCAContent struct {
+	caBundle []byte
+}
+
+func (c clientConfigCAContent) Name() string                   { return "client-config" }
+func (c clientConfigCAContent) CurrentCABundleContent() []byte { return c.caBundle }
+func (c clientConfigCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
+	return x509.VerifyOptions{}, false
+}
+func (c clientConfigCAContent) AddListener(dynamiccertificates.Listener) {}
+
+// getKubeAPIServerCAContentProvider returns a CA content provider for the
+// kube-apiserver serving CA, and a runFunc that drives the file watcher
+// (nil if there is nothing to watch).
+//
+// If --root-ca-file is set, the provider watches the file for changes.
+// Otherwise the CA bundle from kube-controller-manager's own client config is
+// used and never changes.
+func getKubeAPIServerCAContentProvider(controllerContext ControllerContext) (dynamiccertificates.CAContentProvider, runFunc, error) {
+	caFile := controllerContext.ComponentConfig.SAController.RootCAFile
+	if caFile == "" {
 		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return config.CAData, nil
+		return clientConfigCAContent{caBundle: config.CAData}, nil, nil
 	}
 
-	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)
+	dyn, err := dynamiccertificates.NewDynamicCAContentFromFile("kube-apiserver-serving", caFile)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
+		return nil, nil, fmt.Errorf("error parsing root-ca-file at %s: %w", caFile, err)
 	}
-	return rootCA, nil
-
+	return dyn, func(ctx context.Context) { dyn.Run(ctx, 1) }, nil
 }
