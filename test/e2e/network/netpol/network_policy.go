@@ -32,8 +32,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1294,6 +1297,210 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
+		// This test verifies that NetworkPolicy blocks traffic arriving via NodePort from
+		// in-cluster clients. With externalTrafficPolicy=Local, we test against both:
+		// 1. The node where the pod runs (to confirm NetworkPolicy blocks, not externalTrafficPolicy)
+		// 2. A different node (to confirm externalTrafficPolicy drops traffic with no local endpoints)
+		f.It("should block ingress traffic via NodePort from in-cluster clients to isolated pods", feature.NetworkPolicy, func(ctx context.Context) {
+			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{80}
+			k8s = initializeResources(ctx, f, protocols, ports, "x/a", "y/a")
+			nsX, _, _ := getK8sNamespaces(k8s)
+
+			ginkgo.By("Creating a deny-all-ingress NetworkPolicy for pod x/a")
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("deny-all-ingress-to-a", map[string]string{"pod": "a"}, SetSpecIngressRules())
+			CreatePolicy(ctx, k8s, policy, nsX)
+
+			ginkgo.By("Creating a NodePort service with externalTrafficPolicy=Local for pod x/a")
+			nodePortSvc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "nodeport-isolated-pod",
+					Namespace: nsX,
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
+					Selector:              map[string]string{"pod": "a"},
+					Ports: []v1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: v1.ProtocolTCP,
+						},
+					},
+				},
+			}
+			createdSvc, err := k8s.clientSet.CoreV1().Services(nsX).Create(ctx, nodePortSvc, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "creating NodePort service")
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := k8s.clientSet.CoreV1().Services(nsX).Delete(ctx, createdSvc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "deleting NodePort service")
+			})
+			nodePort := createdSvc.Spec.Ports[0].NodePort
+
+			ginkgo.By("Waiting for service endpoints to be ready")
+			err = e2eendpointslice.WaitForEndpointCount(ctx, k8s.clientSet, nsX, createdSvc.Name, 1)
+			framework.ExpectNoError(err, "waiting for service endpoints")
+
+			ginkgo.By("Getting node IPs for testing")
+			podList, err := k8s.clientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=a"})
+			framework.ExpectNoError(err, "listing pods")
+			if len(podList.Items) == 0 {
+				framework.Failf("Failing: unable to find pods with label pod=a in namespace %s", nsX)
+			}
+			targetPod := podList.Items[0]
+			localNodeIP := targetPod.Status.HostIP
+			if localNodeIP == "" {
+				framework.Failf("Failing: unable to find HostIP for pod %s/%s", nsX, targetPod.Name)
+			}
+
+			// Get a different node's IP to test externalTrafficPolicy=Local behavior
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, k8s.clientSet, 2)
+			framework.ExpectNoError(err, "getting schedulable nodes")
+			var remoteNodeIP string
+			for _, node := range nodes.Items {
+				nodeIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
+				if len(nodeIPs) > 0 && nodeIPs[0] != localNodeIP {
+					remoteNodeIP = nodeIPs[0]
+					break
+				}
+			}
+
+			ginkgo.By("Verifying that pod-to-pod traffic is blocked by the NetworkPolicy")
+			reachability := NewReachability(k8s.AllPodStrings(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+			// Test NodePort on the local node (where the pod runs)
+			// This should be blocked by NetworkPolicy, not by externalTrafficPolicy
+			ginkgo.By(fmt.Sprintf("Verifying that NodePort traffic to local node %s:%d is blocked by NetworkPolicy", localNodeIP, nodePort))
+			localNodePortAddr := net.JoinHostPort(localNodeIP, fmt.Sprintf("%d", nodePort))
+
+			for _, testPod := range k8s.AllPods() {
+				if testPod.Namespace == nsX && testPod.Name == "a" {
+					continue
+				}
+				cmd := []string{"/agnhost", "connect", localNodePortAddr, "--timeout=3s", "--protocol=tcp"}
+				_, _, err := k8s.executeRemoteCommand(testPod.Namespace, testPod.Name, cmd)
+				if err == nil {
+					framework.Failf("Failing: expected connection from %s/%s to local NodePort %s to be blocked by NetworkPolicy, but it succeeded", testPod.Namespace, testPod.Name, localNodePortAddr)
+				}
+				framework.Logf("Connection from %s/%s to local NodePort %s was correctly blocked", testPod.Namespace, testPod.Name, localNodePortAddr)
+			}
+
+			// Test NodePort on a different node (no local endpoint)
+			// This should be dropped by externalTrafficPolicy=Local (no local endpoints)
+			if remoteNodeIP != "" {
+				ginkgo.By(fmt.Sprintf("Verifying that NodePort traffic to remote node %s:%d is dropped (no local endpoints)", remoteNodeIP, nodePort))
+				remoteNodePortAddr := net.JoinHostPort(remoteNodeIP, fmt.Sprintf("%d", nodePort))
+
+				for _, testPod := range k8s.AllPods() {
+					if testPod.Namespace == nsX && testPod.Name == "a" {
+						continue
+					}
+					cmd := []string{"/agnhost", "connect", remoteNodePortAddr, "--timeout=3s", "--protocol=tcp"}
+					_, _, err := k8s.executeRemoteCommand(testPod.Namespace, testPod.Name, cmd)
+					if err == nil {
+						framework.Failf("Failing: expected connection from %s/%s to remote NodePort %s to fail (no local endpoints), but it succeeded", testPod.Namespace, testPod.Name, remoteNodePortAddr)
+					}
+					framework.Logf("Connection from %s/%s to remote NodePort %s correctly failed (no local endpoints)", testPod.Namespace, testPod.Name, remoteNodePortAddr)
+				}
+			} else {
+				framework.Logf("Skipping remote node test - could not find a different node IP")
+			}
+		})
+
+		// This test verifies that NetworkPolicy blocks traffic arriving via LoadBalancer from
+		// in-cluster clients. With externalTrafficPolicy=Local, traffic to the LoadBalancer IP
+		// should be blocked by NetworkPolicy when the pod is fully isolated for ingress.
+		f.It("should block ingress traffic via LoadBalancer from in-cluster clients to isolated pods", feature.NetworkPolicy, func(ctx context.Context) {
+			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{80}
+			k8s = initializeResources(ctx, f, protocols, ports, "x/a", "y/a")
+			nsX, _, _ := getK8sNamespaces(k8s)
+
+			ginkgo.By("Creating a deny-all-ingress NetworkPolicy for pod x/a")
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("deny-all-ingress-to-a", map[string]string{"pod": "a"}, SetSpecIngressRules())
+			CreatePolicy(ctx, k8s, policy, nsX)
+
+			ginkgo.By("Creating a LoadBalancer service with externalTrafficPolicy=Local for pod x/a")
+			lbSvc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "lb-isolated-pod",
+					Namespace: nsX,
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
+					Selector:              map[string]string{"pod": "a"},
+					Ports: []v1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: v1.ProtocolTCP,
+						},
+					},
+				},
+			}
+			createdSvc, err := k8s.clientSet.CoreV1().Services(nsX).Create(ctx, lbSvc, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "unable to create LoadBalancer service")
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := k8s.clientSet.CoreV1().Services(nsX).Delete(ctx, createdSvc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "unable to delete LoadBalancer service")
+			})
+
+			ginkgo.By("Waiting for service endpoints to be ready")
+			err = e2eendpointslice.WaitForEndpointCount(ctx, k8s.clientSet, nsX, createdSvc.Name, 1)
+			framework.ExpectNoError(err, "unable to wait for service endpoints")
+
+			ginkgo.By("Waiting for LoadBalancer IP to be assigned")
+			var lbIP string
+			err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+				svc, err := k8s.clientSet.CoreV1().Services(nsX).Get(ctx, createdSvc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if len(svc.Status.LoadBalancer.Ingress) > 0 {
+					if svc.Status.LoadBalancer.Ingress[0].IP != "" {
+						lbIP = svc.Status.LoadBalancer.Ingress[0].IP
+						return true, nil
+					}
+					if svc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+						lbIP = svc.Status.LoadBalancer.Ingress[0].Hostname
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			if err != nil {
+				e2eskipper.Skipf("Unable to get LoadBalancer IP (cloud provider may not support LoadBalancer): %v", err)
+			}
+
+			ginkgo.By("Verifying that pod-to-pod traffic is blocked by the NetworkPolicy")
+			reachability := NewReachability(k8s.AllPodStrings(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+			ginkgo.By(fmt.Sprintf("Verifying that LoadBalancer traffic to %s:80 is blocked by NetworkPolicy", lbIP))
+			lbAddr := net.JoinHostPort(lbIP, "80")
+
+			for _, testPod := range k8s.AllPods() {
+				if testPod.Namespace == nsX && testPod.Name == "a" {
+					continue
+				}
+				cmd := []string{"/agnhost", "connect", lbAddr, "--timeout=3s", "--protocol=tcp"}
+				_, _, err := k8s.executeRemoteCommand(testPod.Namespace, testPod.Name, cmd)
+				if err == nil {
+					framework.Failf("Failing: expected connection from %s/%s to LoadBalancer %s to be blocked by NetworkPolicy, but it succeeded", testPod.Namespace, testPod.Name, lbAddr)
+				}
+				framework.Logf("Connection from %s/%s to LoadBalancer %s was correctly blocked", testPod.Namespace, testPod.Name, lbAddr)
+			}
 		})
 	})
 })
