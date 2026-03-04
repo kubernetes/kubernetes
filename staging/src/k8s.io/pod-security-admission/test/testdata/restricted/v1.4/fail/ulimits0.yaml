@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ulimits0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      ulimits:
+      - hard: 2048
+        name: nofile
+        soft: 1024
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext: {}
+  securityContext:
+    runAsNonRoot: true

@@ -55,6 +55,8 @@ func TestPodSecurity(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ProcMountType:         true,
 		features.UserNamespacesSupport: true,
+		features.NodeDeclaredFeatures:  true,
+		features.ContainerUlimits:      true,
 	})
 	// Start server
 	server := startPodSecurityServer(t)
@@ -103,6 +105,8 @@ func TestPodSecurityWebhook(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ProcMountType:         true,
 		features.UserNamespacesSupport: true,
+		features.NodeDeclaredFeatures:  true,
+		features.ContainerUlimits:      true,
 	})
 
 	// Start test API server.
