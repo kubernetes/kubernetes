@@ -31,10 +31,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/ptr"
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -45,6 +41,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/dynamic-resource-allocation/internal/workqueue"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
