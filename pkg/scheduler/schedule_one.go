@@ -1113,8 +1113,11 @@ func (sched *Scheduler) assume(logger klog.Logger, state fwk.CycleState, assumed
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
 		// If DRANativeResources is enabled, copy the calculated native resource claim status
 		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
-		// cached version of the pod reflects the native resources allocated by the DRA plugin,
-		// making this information available for NodeInfo cache update.
+		// cached version of the pod reflects the native resources allocated by the DRA plugin
+		// for this scheduling cycle, making this information available for NodeInfo cache update.
+		// Any potential NativeResourceClaimStatus from a previously failed scheduling attempt is overwritten.
+		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
+		// before re-queueing.
 		assumedPodInfo.Pod.Status.NativeResourceClaimStatus = dynamicresources.ExtractPodNativeResourceClaimStatus(logger, state, host)
 	}
 
