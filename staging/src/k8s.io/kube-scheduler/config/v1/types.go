@@ -232,6 +232,9 @@ type Plugins struct {
 	// including `multiPoint.Disabled = '*'` and `multiPoint.Enabled = pluginA` will still register that specific
 	// plugin through MultiPoint. This follows the same behavior as all other extension point configurations.
 	MultiPoint PluginSet `json:"multiPoint,omitempty"`
+
+	// PlacementGenerate is a list of plugins that should be invoked during pod group scheduling cycle when determining placements for a pod group.
+	PlacementGenerate PluginSet `json:"placementGenerate,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
