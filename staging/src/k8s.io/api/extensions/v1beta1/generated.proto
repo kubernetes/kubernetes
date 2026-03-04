@@ -41,7 +41,7 @@ message DaemonSet {
 
   // The desired behavior of this daemon set.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional DaemonSetSpec spec = 2;
 
   // The current status of this daemon set. This data may be
@@ -49,13 +49,14 @@ message DaemonSet {
   // Populated by the system.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional DaemonSetStatus status = 3;
 }
 
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
   // Type of DaemonSet condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
@@ -214,11 +215,11 @@ message Deployment {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
-  // +optional
+  // +required
   optional DeploymentSpec spec = 2;
 
   // Most recently observed status of the Deployment.
-  // +optional
+  // +required
   optional DeploymentStatus status = 3;
 }
 
@@ -272,7 +273,7 @@ message DeploymentRollback {
   map<string, string> updatedAnnotations = 2;
 
   // The config of this deployment rollback.
-  // +required
+  // +optional
   optional RollbackConfig rollbackTo = 3;
 }
 
@@ -420,11 +421,12 @@ message HTTPIngressPath {
   //   or treat it identically to Prefix or Exact path types.
   // Implementations are required to support all path types.
   // Defaults to ImplementationSpecific.
+  // +optional
   optional string pathType = 3;
 
   // Backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
-  // +required
+  // +optional
   optional IngressBackend backend = 2;
 }
 
@@ -472,7 +474,7 @@ message Ingress {
 
   // Spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional IngressSpec spec = 2;
 
   // Status is the current state of the Ingress.
@@ -805,6 +807,7 @@ message NetworkPolicySpec {
   // same set of pods.  In this case, the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // List of ingress rules to be applied to the selected pods.
@@ -866,13 +869,14 @@ message ReplicaSet {
   // Populated by the system.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional ReplicaSetStatus status = 3;
 }
 
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
@@ -1062,7 +1066,7 @@ message Scale {
   optional ScaleSpec spec = 2;
 
   // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
-  // +optional
+  // +required
   optional ScaleStatus status = 3;
 }
 
