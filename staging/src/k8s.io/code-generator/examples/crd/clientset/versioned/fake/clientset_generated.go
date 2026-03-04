@@ -41,10 +41,6 @@ import (
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-//
-// Deprecated: NewClientset replaces this with support for field management, which significantly improves
-// server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
-// via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -105,6 +101,10 @@ func (c *Clientset) IsWatchListSemanticsUnSupported() bool {
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
+//
+// Compared to NewSimpleClientset, the Clientset returned here supports field tracking and thus
+// server-side apply. Beware though that support in that for CRDs is missing
+// (https://github.com/kubernetes/kubernetes/issues/126850).
 func NewClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewFieldManagedObjectTracker(
 		scheme,
