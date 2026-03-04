@@ -1010,6 +1010,10 @@ items:
     - nodes/metrics
     verbs:
     - get
+  - nonResourceURLs:
+    - /statusz
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
