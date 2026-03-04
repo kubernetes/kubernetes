@@ -35,6 +35,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -49,11 +50,10 @@ type Interface interface {
 	// PodEligibleToPreemptOthers returns one bool and one string. The bool indicates whether this pod should be considered for
 	// preempting other pods or not. The string includes the reason if this pod isn't eligible.
 	PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string)
-	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
-	// for "pod" to be scheduled.
-	// Note that both `state` and `nodeInfo` are deep copied.
-	SelectVictimsOnNode(ctx context.Context, state fwk.CycleState,
-		pod *v1.Pod, nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
+	// SelectVictimsOnDomain finds minimum set of pods on the given domain that should be preempted in order to make enough room
+	// for "pods" from preemptor to be scheduled.
+	// Note that both `preemptor` (with its state) and `nodeInfo` are deep copied.
+	SelectVictimsOnDomain(ctx context.Context, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 	// The ordered score functions will be processed one by one iff we find more than one node with the highest score.
 	// Default score functions will be processed if nil returned here for backwards-compatibility.
@@ -72,13 +72,13 @@ type Evaluator struct {
 	Interface
 }
 
-func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Features) *Evaluator {
 	return &Evaluator{
 		PluginName:            pluginName,
 		Handler:               fh,
 		PodLister:             fh.SharedInformerFactory().Core().V1().Pods().Lister(),
 		PdbLister:             fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		enableAsyncPreemption: enableAsyncPreemption,
+		enableAsyncPreemption: fts.EnableAsyncPreemption,
 		Executor:              newExecutor(fh),
 		Interface:             i,
 	}
@@ -126,6 +126,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
+
 	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, pod, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, fwk.AsStatus(err)
@@ -240,7 +241,6 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 				return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
 			}
 		}
-
 		// Replace victimsMap with new result after preemption. So the
 		// rest of extenders can continue use it as parameter.
 		victimsMap = nodeNameToVictims
@@ -414,6 +414,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	nodeStatuses := framework.NewDefaultNodeToStatus()
+	preemptor := NewPodPreemptor(pod, state)
 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Dry run the preemption", "potentialNodesNumber", len(potentialNodes), "pdbsNumber", len(pdbs), "offset", offset, "candidatesNumber", candidatesNum)
@@ -424,8 +425,9 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
 		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
 
-		stateCopy := state.Clone()
-		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
+		domain := NewDomainForPodByPodPreemption(nodeInfoCopy, nodeInfoCopy.Node().Name)
+		pods, numPDBViolations, status := ev.SelectVictimsOnDomain(ctx, preemptor.Snapshot(), domain, pdbs)
+
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
 				Pods:             pods,
