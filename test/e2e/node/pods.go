@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -612,81 +611,6 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			framework.ExpectNoError(err, "failed to query for pod")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
 		})
-
-		// This is the same test as https://github.com/kubernetes/kubernetes/blob/aa08c90fca8d30038d3f05c0e8f127b540b40289/test/e2e/node/pod_admission.go#L35,
-		// except that this verifies the pod generation and observedGeneration, which is
-		// currently behind a feature gate. When we GA observedGeneration functionality,
-		// we can fold these tests together into one.
-		ginkgo.It("pod rejected by kubelet should have updated generation and observedGeneration", func(ctx context.Context) {
-			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
-
-			// Create a pod that requests more CPU than the node has.
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-out-of-cpu",
-					Namespace: f.Namespace.Name,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "pod-out-of-cpu",
-							Image: imageutils.GetPauseImageName(),
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU: resource.MustParse("1000000000000"), // requests more CPU than any node has
-								},
-							},
-						},
-					},
-				},
-			}
-
-			ginkgo.By("submitting the pod to kubernetes")
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(func(ctx context.Context) error {
-				ginkgo.By("deleting the pod")
-				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
-			})
-
-			// Wait for the scheduler to update the pod status
-			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
-			framework.ExpectNoError(err)
-
-			// Fetch the pod to verify that the scheduler has set the PodScheduled condition
-			// with observedGeneration.
-			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(len(pod.Status.Conditions)).To(gomega.BeEquivalentTo(1))
-			gomega.Expect(pod.Status.Conditions[0].Type).To(gomega.BeEquivalentTo(v1.PodScheduled))
-			gomega.Expect(pod.Status.Conditions[0].ObservedGeneration).To(gomega.BeEquivalentTo(1))
-
-			// Force assign the Pod to a node in order to get rejection status.
-			binding := &v1.Binding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-					UID:       pod.UID,
-				},
-				Target: v1.ObjectReference{
-					Kind: "Node",
-					Name: node.Name,
-				},
-			}
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}))
-
-			// Kubelet has rejected the pod.
-			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "OutOfcpu", f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
-
-			// Fetch the rejected Pod and verify the generation and observedGeneration.
-			gotPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
-			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))
-		})
-
 		ginkgo.It("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
@@ -706,7 +630,8 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			})
 
 			expectedPodConditions := []v1.PodConditionType{
-				v1.PodReadyToStartContainers,
+				// add back once PodReadyToStartContainers feature GAs
+				// v1.PodReadyToStartContainers
 				v1.PodInitialized,
 				v1.PodReady,
 				v1.ContainersReady,
