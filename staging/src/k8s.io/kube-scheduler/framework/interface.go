@@ -293,6 +293,9 @@ type PlacementPluginScores struct {
 	Scores []PluginScore
 	// TotalScore is the total score in Scores.
 	TotalScore int64
+	// Randomizer is used to provide randomness
+	// when randomizing placements within a common score.
+	Randomizer int
 }
 
 const (
