@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -1269,7 +1271,19 @@ func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1
 // verifyResizeExceedsAvailable validates that the resize request exceeds available node resources.
 // This helps catch test setup issues early rather than waiting for timeout.
 func verifyResizeExceedsAvailable(ctx context.Context, f *framework.Framework, node *v1.Node, resizeRequestMilliCPU int64) {
-	_, currentAvailable, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceCPU)
+	var currentAvailable resource.Quantity
+	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, available, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, node, v1.ResourceCPU)
+		if err != nil {
+			if strings.Contains(err.Error(), "unexpected negative value of nodeAvailable") {
+				framework.Logf("Retrying resize precondition check due to transient node available CPU error: %v", err)
+				return false, nil
+			}
+			return false, err
+		}
+		currentAvailable = available
+		return true, nil
+	})
 	framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
 	framework.Logf("Verifying resize request (%dm) exceeds current available resources (%dm)",
 		resizeRequestMilliCPU, currentAvailable.MilliValue())
