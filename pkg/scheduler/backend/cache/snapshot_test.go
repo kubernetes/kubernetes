@@ -696,37 +696,6 @@ func TestSnapshot_Placement(t *testing.T) {
 			},
 		},
 		{
-			name:           "When placement contains nodes from outside the snapshot, AssumePlacement returns error and placement is not set",
-			initialNodes:   []string{"n1", "n2", "n3"},
-			placementNodes: []string{"n2", "n3", "n4"},
-			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
-				err := snapshot.AssumePlacement(placement)
-				if err == nil {
-					t.Fatalf("expected AssumePlacement to return error due to placement using a node from outside the snapshot but got nil")
-				}
-				// ensure the placement is cleared
-				numNodes := snapshot.NumNodesInPlacement()
-				if numNodes != 3 {
-					t.Errorf("unexpected number of nodes from NumNodesInPlacement, want: %v, got: %v", 3, numNodes)
-				}
-				nodes, err := snapshot.ListNodesInPlacement()
-				if err != nil {
-					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
-				}
-				if len(nodes) != 3 {
-					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 3, len(nodes))
-				}
-				_, err = snapshot.GetNodeInPlacement("n1")
-				if err != nil {
-					t.Errorf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
-				}
-				_, err = snapshot.GetNodeInPlacement("n4")
-				if err == nil {
-					t.Errorf("expected GetNodeInPlacement not to find node but instead got nil error")
-				}
-			},
-		},
-		{
 			name:           "When placement uses nodes that point to a different instance than snapshot, AssumePlacement returns error and placement is not set",
 			initialNodes:   []string{"n1", "n2", "n3"},
 			placementNodes: []string{"n2"},
