@@ -489,11 +489,10 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		return sched.podGroupAlgorithmFailure(ctx, podGroupInfo, fwk.AsStatus(err))
 	}
 
-	// TODO: kubernetes/enhancements#5732 - run placement generator plugins to get the set of placements
-	placements := []*fwk.Placement{
-		{
-			Nodes: allNodes,
-		},
+	podGroupCycleState := framework.NewCycleState()
+	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, allNodes)
+	if !status.IsSuccess() {
+		return sched.podGroupAlgorithmFailure(ctx, podGroupInfo, status)
 	}
 
 	results := make([]placementResult, len(placements))
