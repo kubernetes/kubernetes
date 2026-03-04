@@ -27,6 +27,24 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
+# This file is intended for out-of-tree projects running code generators.
+# In that context, all in-tree Kubernetes types (e.g. metav1.TypeMeta,
+# resource.Quantity) live in the read-only Go module cache, so generators
+# must not attempt to write output files for them. These packages are passed
+# as --readonly-pkg to generators that support it (validation-gen, openapi-gen).
+# NOTE: These must be passed as separate arguments using an array loop, not
+# via "$(printf ...)". Double-quoting a printf command substitution collapses
+# the output into a single argument, which silently breaks flag parsing.
+KUBE_CODEGEN_READONLY_PKGS=(
+    k8s.io/apimachinery/pkg/apis/meta/v1
+    k8s.io/apimachinery/pkg/api/resource
+    k8s.io/apimachinery/pkg/runtime
+    k8s.io/apimachinery/pkg/types
+    k8s.io/apimachinery/pkg/util/intstr
+    k8s.io/apimachinery/pkg/version
+    time
+)
+
 # Callers which want a specific tag of the k8s.io/code-generator repo should
 # set the KUBE_CODEGEN_TAG to the tag name, e.g. KUBE_CODEGEN_TAG="release-1.32"
 # before sourcing this file.
@@ -180,21 +198,6 @@ function kube::codegen::gen_helpers() {
     )
 
 
-    # This list needs to cover all of the types used transitively from the
-    # main API types. Validations defined on types in these packages will be
-    # used, but not regenerated, unless they are also listed as a "regular"
-    # input on the command-line.
-    #
-    # This list is the same as in kubernetes/kubernetes hack/update-codegen.sh
-    local validation_readonly_pkgs=(
-        k8s.io/apimachinery/pkg/apis/meta/v1
-        k8s.io/apimachinery/pkg/api/resource
-        k8s.io/apimachinery/pkg/runtime
-        k8s.io/apimachinery/pkg/types
-        k8s.io/apimachinery/pkg/util/intstr
-        time
-    )
-
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating validation code for ${#input_pkgs[@]} targets"
 
@@ -204,10 +207,14 @@ function kube::codegen::gen_helpers() {
             -name zz_generated.validations.go \
             | xargs -0 rm -f
 
+        local readonly_args=()
+        for pkg in "${KUBE_CODEGEN_READONLY_PKGS[@]}"; do
+            readonly_args+=("--readonly-pkg" "${pkg}")
+        done
         "${GOBIN}/validation-gen" \
             -v "${v}" \
             --output-file zz_generated.validations.go \
-            "$(printf -- " --readonly-pkg %s" "${validation_readonly_pkgs[@]}")" \
+            "${readonly_args[@]}" \
             --go-header-file "${boilerplate}" \
             "${input_pkgs[@]}"
     fi
@@ -425,6 +432,15 @@ function kube::codegen::gen_openapi() {
             -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
+        local readonly_args=()
+        for pkg in "${KUBE_CODEGEN_READONLY_PKGS[@]}"; do
+            readonly_args+=("--readonly-pkg" "${pkg}")
+        done
+        # These apimachinery packages are passed as explicit inputs
+        # because they contain types referenced by most API types
+        # (e.g. ObjectMeta, Quantity). openapi-gen needs them for
+        # type resolution even though they are not in the caller's
+        # input directory.
         "${GOBIN}/openapi-gen" \
             -v "${v}" \
             --output-file zz_generated.openapi.go \
@@ -433,6 +449,7 @@ function kube::codegen::gen_openapi() {
             --output-pkg "${out_pkg}" \
             --report-filename "${new_report}" \
             --output-model-name-file="${output_model_name_file}" \
+            "${readonly_args[@]}" \
             "k8s.io/apimachinery/pkg/apis/meta/v1" \
             "k8s.io/apimachinery/pkg/runtime" \
             "k8s.io/apimachinery/pkg/version" \
