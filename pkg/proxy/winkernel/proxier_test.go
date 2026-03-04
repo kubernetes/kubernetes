@@ -110,15 +110,19 @@ func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType st
 		sourceVip = "192::1:2"
 	}
 
-	// enable `WinDSR` feature gate
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
-
 	config := config.KubeProxyWinkernelConfiguration{
 		SourceVip:             sourceVip,
 		EnableDSR:             enableDSR,
 		NetworkName:           testNetwork,
 		ForwardHealthCheckVip: true,
 	}
+
+	return NewFakeProxierWithConfig(t, nodeName, nodeIP, networkType, config, family)
+}
+
+func NewFakeProxierWithConfig(t *testing.T, nodeName string, nodeIP net.IP, networkType string, config config.KubeProxyWinkernelConfiguration, family v1.IPFamily) *Proxier {
+	// enable `WinDSR` feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
 
 	hcnMock := getHcnMock(networkType)
 
@@ -1925,6 +1929,69 @@ func TestETPClusterIngressIPServiceWithPreferDualStack(t *testing.T) {
 
 func TestETPClusterIngressIPServiceWithRequireDualStack(t *testing.T) {
 	testDualStackService(t, false, v1.IPFamilyPolicyRequireDualStack, v1.ServiceExternalTrafficPolicyCluster)
+}
+
+func TestSnatSourceVipFallback(t *testing.T) {
+	nodeIP := "10.0.0.1"
+	proxier := NewFakeProxierWithConfig(t, testNodeName, netutils.ParseIPSloppy(nodeIP), NETWORK_TYPE_OVERLAY, config.KubeProxyWinkernelConfiguration{
+		SourceVip:             "", // Empty SourceVip to trigger fallback
+		EnableDSR:             true,
+		NetworkName:           testNetwork,
+		ForwardHealthCheckVip: true,
+	}, v1.IPv4Protocol)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "snat-fallback"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	// Add an endpoint to ensure we have a load balancer created
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"192.168.1.10"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.NotEmpty(t, svcInfo.hnsID, "Expected HNS ID to be set for service %q", svcPortName.String())
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	assert.NoError(t, err)
+	assert.NotNil(t, lb)
+
+	// Verify that SourceVIP is the Node IP because config.SourceVip was empty
+	assert.Equal(t, nodeIP, lb.SourceVIP, "SourceVIP should fallback to nodeIP when config.SourceVip is empty")
 }
 
 func makeNSN(namespace, name string) types.NamespacedName {
