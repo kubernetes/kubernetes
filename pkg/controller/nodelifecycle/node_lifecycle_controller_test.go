@@ -3156,6 +3156,22 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		Key:    v1.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
+	systemMemoryContentionTaint := &v1.Taint{
+		Key:    v1.TaintNodeSystemMemoryContentionPressure,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	systemDiskContentionTaint := &v1.Taint{
+		Key:    v1.TaintNodeSystemDiskContentionPressure,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	kubepodsMemoryContentionTaint := &v1.Taint{
+		Key:    v1.TaintNodeKubepodsMemoryContentionPressure,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	kubepodsDiskContentionTaint := &v1.Taint{
+		Key:    v1.TaintNodeKubepodsDiskContentionPressure,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 
 	tests := []struct {
 		Name           string
@@ -3277,6 +3293,134 @@ func TestTaintsNodeByCondition(t *testing.T) {
 				},
 			},
 			ExpectedTaints: []*v1.Taint{unreachableTaint},
+		},
+		{
+			Name: "SystemMemoryContention is true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeSystemMemoryContentionPressure,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{systemMemoryContentionTaint},
+		},
+		{
+			Name: "SystemDiskContention is true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeSystemDiskContentionPressure,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{systemDiskContentionTaint},
+		},
+		{
+			Name: "KubepodsMemoryContention is true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeKubepodsMemoryContentionPressure,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{kubepodsMemoryContentionTaint},
+		},
+		{
+			Name: "KubepodsDiskContention is true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeKubepodsDiskContentionPressure,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{kubepodsDiskContentionTaint},
 		},
 	}
 
