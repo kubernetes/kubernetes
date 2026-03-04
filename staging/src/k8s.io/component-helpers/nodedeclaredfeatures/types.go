@@ -29,4 +29,3 @@ type RuntimeFeatures = types.RuntimeFeatures
 type FeatureGate = types.FeatureGate
 type StaticConfiguration = types.StaticConfiguration
 type NodeConfiguration = types.NodeConfiguration
-type RuntimeFeatures = types.RuntimeFeatures
