@@ -17,13 +17,28 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
+
+type ctxCapturingRuntime struct {
+	*containertest.FakeRuntime
+	deleteCtxCh chan context.Context
+}
+
+func (r *ctxCapturingRuntime) DeleteContainer(ctx context.Context, _ kubecontainer.ContainerID) error {
+	select {
+	case r.deleteCtxCh <- ctx:
+	default:
+	}
+	return nil
+}
 
 func TestGetContainersToDeleteInPodWithFilter(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
@@ -203,5 +218,44 @@ func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
 		if !reflect.DeepEqual(candidates, test.expectedContainersToDelete) {
 			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
 		}
+	}
+}
+
+func TestNewPodContainerDeletorUsesCallerContext(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	runtime := &ctxCapturingRuntime{
+		FakeRuntime: &containertest.FakeRuntime{},
+		deleteCtxCh: make(chan context.Context, 1),
+	}
+
+	deletor := newPodContainerDeletor(ctx, runtime, 0)
+	podStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:        kubecontainer.ContainerID{Type: "test", ID: "1"},
+				Name:      "foo",
+				CreatedAt: time.Now(),
+				State:     kubecontainer.ContainerStateExited,
+			},
+		},
+	}
+
+	deletor.deleteContainersInPod(logger, "", podStatus, false)
+
+	var deleteCtx context.Context
+	select {
+	case deleteCtx = <-runtime.deleteCtxCh:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for DeleteContainer call")
+	}
+
+	cancel()
+	select {
+	case <-deleteCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("DeleteContainer did not receive cancellable caller context")
 	}
 }
