@@ -63,10 +63,11 @@ func (f *FieldsV1) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if f.Raw != nil {
-		i -= len(f.Raw)
-		copy(dAtA[i:], f.Raw)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(f.Raw)))
+	rawBytes := f.GetRawBytes()
+	if len(rawBytes) > 0 {
+		i -= len(rawBytes)
+		copy(dAtA[i:], rawBytes)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(rawBytes)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -79,8 +80,7 @@ func (f *FieldsV1) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if f.Raw != nil {
-		l = len(f.Raw)
+	if l := int(f.GetRawReader().Size()); l > 0 {
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -144,10 +144,8 @@ func (f *FieldsV1) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			f.Raw = append(f.Raw[:0], dAtA[iNdEx:postIndex]...)
-			if f.Raw == nil {
-				f.Raw = []byte{}
-			}
+
+			f.SetRawBytes(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
