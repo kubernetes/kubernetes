@@ -60,7 +60,6 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
-	startScheduler(tCtx)
 
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -117,6 +116,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	_, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create slice without binding conditions")
 
+	startScheduler(tCtx)
 	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
 	start := time.Now()
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
