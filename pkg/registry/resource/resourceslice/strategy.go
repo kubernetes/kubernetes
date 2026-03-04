@@ -333,11 +333,9 @@ func dropDisableDRAListTypeAttributesFields(newSlice, oldSlice *resource.Resourc
 	}
 
 	for i := range newSlice.Spec.Devices {
-		if newSlice.Spec.Devices[i].Attributes != nil {
-			for k, deviceAttribute := range newSlice.Spec.Devices[i].Attributes {
-				if deviceAttribute.ListValue != nil {
-					delete(newSlice.Spec.Devices[i].Attributes, k)
-				}
+		for k, deviceAttribute := range newSlice.Spec.Devices[i].Attributes {
+			if deviceAttribute.ListValue != nil {
+				delete(newSlice.Spec.Devices[i].Attributes, k)
 			}
 		}
 	}
@@ -349,11 +347,9 @@ func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
 	}
 
 	for _, device := range slice.Spec.Devices {
-		if device.Attributes != nil {
-			for _, deviceAttribute := range device.Attributes {
-				if deviceAttribute.ListValue != nil {
-					return true
-				}
+		for _, deviceAttribute := range device.Attributes {
+			if deviceAttribute.ListValue != nil {
+				return true
 			}
 		}
 	}
