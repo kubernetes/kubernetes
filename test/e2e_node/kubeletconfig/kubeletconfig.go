@@ -42,7 +42,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func getKubeletConfigFilePath() (string, error) {
+func GetKubeletConfigFilePath() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
@@ -56,7 +56,7 @@ func getKubeletConfigFilePath() (string, error) {
 // This method should only run together with e2e node tests, meaning the test executor and the cluster nodes is the
 // same machine
 func GetCurrentKubeletConfigFromFile() (*kubeletconfig.KubeletConfiguration, error) {
-	kubeletConfigFilePath, err := getKubeletConfigFilePath()
+	kubeletConfigFilePath, err := GetKubeletConfigFilePath()
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func WriteKubeletConfigFile(kubeletConfig *kubeletconfig.KubeletConfiguration) e
 		return err
 	}
 
-	kubeletConfigFilePath, err := getKubeletConfigFilePath()
+	kubeletConfigFilePath, err := GetKubeletConfigFilePath()
 	if err != nil {
 		return err
 	}
