@@ -553,6 +553,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "imperative-eviction-interceptor-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(coordinationGroup).Resources("evictionrequests").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(coordinationGroup).Resources("evictionrequests/status").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	return controllerRoles, controllerRoleBindings
 }
 

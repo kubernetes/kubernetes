@@ -30,6 +30,7 @@ import (
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	imperativeevictioninterceptor "k8s.io/kubernetes/pkg/controller/imperativeevictioninterceptor/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
@@ -98,6 +99,9 @@ type KubeControllerManagerConfiguration struct {
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration
 	// HPAControllerConfiguration holds configuration for HPAController related features.
 	HPAController poautosclerconfig.HPAControllerConfiguration
+	// ImperativeEvictionInterceptorControllerConfiguration contains elements configuring
+	// the imperative eviction interceptor controller.
+	ImperativeEvictionInterceptorController imperativeevictioninterceptor.ImperativeEvictionInterceptorControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController jobconfig.JobControllerConfiguration
 	// LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.

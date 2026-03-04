@@ -60,6 +60,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.EphemeralVolumeController = in.EphemeralVolumeController
 	in.GarbageCollectorController.DeepCopyInto(&out.GarbageCollectorController)
 	out.HPAController = in.HPAController
+	out.ImperativeEvictionInterceptorController = in.ImperativeEvictionInterceptorController
 	out.JobController = in.JobController
 	out.LegacySATokenCleaner = in.LegacySATokenCleaner
 	out.NamespaceController = in.NamespaceController
