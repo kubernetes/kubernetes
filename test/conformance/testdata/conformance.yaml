@@ -2573,6 +2573,12 @@
     and status.observedGeneration are updated as expected.
   release: v1.35
   file: test/e2e/node/pods.go
+- testname: Pods Generation set in pod conditions
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod observedGeneration
+    field set in pod conditions [Conformance]'
+  description: Verify pod generation is set with pod conditions
+  release: v1.36
+  file: test/e2e/node/pods.go
 - testname: Pods, QOS
   codename: '[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with
     matching resource requests and limits for memory and cpu [Conformance]'
