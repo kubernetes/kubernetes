@@ -64,13 +64,7 @@ func TestSchedulerPerf(t *testing.T) {
 			if allocatorName == "stable" {
 				options = append(options, perf.WithPreRunFn(func(tCtx ktesting.TContext) error {
 					gate := utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate)
-					// DRAAdminAccess is locked to its default at 1.36.
-					// If the emulation version is >= 1.36, lower it to 1.35 to allow disabling them.
-					if gate.EmulationVersion().AtLeast(version.MustParse("1.36")) {
-						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
-					}
 					overrides := featuregatetesting.FeatureOverrides{
-						features.DRAAdminAccess:     false,
 						features.DRAPrioritizedList: false,
 					}
 					// If version emulation already caused features to be off,
