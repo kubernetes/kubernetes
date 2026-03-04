@@ -313,6 +313,10 @@ var (
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
+	// Owner: sig-node
+	// Testing kubelet PSI node condition for feature control.
+	PSINodeCondition = framework.WithFeature(framework.ValidFeatures.Add("PSINodeCondition"))
+
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
