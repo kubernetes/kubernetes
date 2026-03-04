@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -117,8 +119,27 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 	if securityContext.ReadOnlyRootFilesystem != nil {
 		sc.ReadonlyRootfs = *securityContext.ReadOnlyRootFilesystem
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) && securityContext.Ulimits != nil {
+		sc.Ulimits = convertToRuntimeUlimits(securityContext.Ulimits)
+	}
 
 	return sc
+}
+
+// convertToRuntimeUlimits converts v1.Ulimit to runtimeapi.Ulimit.
+func convertToRuntimeUlimits(ulimits []v1.Ulimit) []*runtimeapi.Ulimit {
+	if len(ulimits) == 0 {
+		return nil
+	}
+	runtimeUlimits := make([]*runtimeapi.Ulimit, len(ulimits))
+	for i, u := range ulimits {
+		runtimeUlimits[i] = &runtimeapi.Ulimit{
+			Name: u.Name,
+			Hard: u.Hard,
+			Soft: u.Soft,
+		}
+	}
+	return runtimeUlimits
 }
 
 // convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.

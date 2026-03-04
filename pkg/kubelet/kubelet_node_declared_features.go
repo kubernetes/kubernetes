@@ -20,6 +20,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate" // Import for the type conversion
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // FeatureGateAdapter adapts a component-base FeatureGate to the nodedeclaredfeatures FeatureGate interface.
@@ -39,12 +40,19 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	staticConfig := nodedeclaredfeatures.StaticConfiguration{
 		CPUManagerPolicy: kl.containerManager.GetNodeConfig().CPUManagerPolicy,
 	}
+	runtimeFeatures := nodedeclaredfeatures.RuntimeFeatures{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) {
+		if features := kl.runtimeState.runtimeFeatures(); features != nil {
+			runtimeFeatures.ContainerUlimits = features.ContainerUlimits
+		}
+	}
 
 	adaptedFG := FeatureGateAdapter{FeatureGate: utilfeature.DefaultFeatureGate}
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
-		FeatureGates: adaptedFG,
-		StaticConfig: staticConfig,
-		Version:      kl.version,
+		FeatureGates:    adaptedFG,
+		StaticConfig:    staticConfig,
+		Version:         kl.version,
+		RuntimeFeatures: runtimeFeatures,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
 }

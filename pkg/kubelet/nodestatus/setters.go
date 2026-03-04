@@ -430,16 +430,23 @@ func GoRuntime() Setter {
 // NodeFeatures returns a Setter that sets NodeFeatures on the node.
 func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+		runtimeFeatures := featuresGetter()
+		if runtimeFeatures == nil {
 			return nil
 		}
-		features := featuresGetter()
-		if features == nil {
+		supplementalGroupsPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy)
+		containerUlimitsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits)
+		if !supplementalGroupsPolicyEnabled && !containerUlimitsEnabled {
 			return nil
 		}
-		node.Status.Features = &v1.NodeFeatures{
-			SupplementalGroupsPolicy: &features.SupplementalGroupsPolicy,
+		nodeFeatures := &v1.NodeFeatures{}
+		if containerUlimitsEnabled {
+			nodeFeatures.ContainerUlimits = &runtimeFeatures.ContainerUlimits
 		}
+		if supplementalGroupsPolicyEnabled {
+			nodeFeatures.SupplementalGroupsPolicy = &runtimeFeatures.SupplementalGroupsPolicy
+		}
+		node.Status.Features = nodeFeatures
 		return nil
 	}
 }
