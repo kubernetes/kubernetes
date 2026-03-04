@@ -101,15 +101,31 @@ var (
 		v1.NodePIDPressure: {
 			v1.ConditionTrue: v1.TaintNodePIDPressure,
 		},
+		v1.NodeSystemMemoryContentionPressure: {
+			v1.ConditionTrue: v1.TaintNodeSystemMemoryContentionPressure,
+		},
+		v1.NodeSystemDiskContentionPressure: {
+			v1.ConditionTrue: v1.TaintNodeSystemDiskContentionPressure,
+		},
+		v1.NodeKubepodsMemoryContentionPressure: {
+			v1.ConditionTrue: v1.TaintNodeKubepodsMemoryContentionPressure,
+		},
+		v1.NodeKubepodsDiskContentionPressure: {
+			v1.ConditionTrue: v1.TaintNodeKubepodsDiskContentionPressure,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
-		v1.TaintNodeNotReady:           v1.NodeReady,
-		v1.TaintNodeUnreachable:        v1.NodeReady,
-		v1.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
-		v1.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
-		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
+		v1.TaintNodeNotReady:                         v1.NodeReady,
+		v1.TaintNodeUnreachable:                      v1.NodeReady,
+		v1.TaintNodeNetworkUnavailable:               v1.NodeNetworkUnavailable,
+		v1.TaintNodeMemoryPressure:                   v1.NodeMemoryPressure,
+		v1.TaintNodeDiskPressure:                     v1.NodeDiskPressure,
+		v1.TaintNodePIDPressure:                      v1.NodePIDPressure,
+		v1.TaintNodeSystemMemoryContentionPressure:   v1.NodeSystemMemoryContentionPressure,
+		v1.TaintNodeSystemDiskContentionPressure:     v1.NodeSystemDiskContentionPressure,
+		v1.TaintNodeKubepodsMemoryContentionPressure: v1.NodeKubepodsMemoryContentionPressure,
+		v1.TaintNodeKubepodsDiskContentionPressure:   v1.NodeKubepodsDiskContentionPressure,
 	}
 )
 

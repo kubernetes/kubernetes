@@ -34,6 +34,18 @@ const (
 	// and removed when node has enough memory.
 	TaintNodeMemoryPressure = "node.kubernetes.io/memory-pressure"
 
+	// TaintNodeSystemMemoryContentionPressure will be added when node has system memory contention pressure
+	TaintNodeSystemMemoryContentionPressure = "node.kubernetes.io/memory-contention-pressure"
+
+	// TaintNodeSystemDiskContentionPressure will be added when node has system disk contention pressure
+	TaintNodeSystemDiskContentionPressure = "node.kubernetes.io/disk-contention-pressure"
+
+	// TaintNodeKubepodsMemoryContentionPressure will be added when node has kubepods memory contention pressure
+	TaintNodeKubepodsMemoryContentionPressure = "node.kubernetes.io/kubepods-memory-contention-pressure"
+
+	// TaintNodeKubepodsDiskContentionPressure will be added when node has kubepods disk contention pressure
+	TaintNodeKubepodsDiskContentionPressure = "node.kubernetes.io/kubepods-disk-contention-pressure"
+
 	// TaintNodeDiskPressure will be added when node has disk pressure
 	// and removed when node has enough disk.
 	TaintNodeDiskPressure = "node.kubernetes.io/disk-pressure"
