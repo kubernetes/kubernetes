@@ -171,7 +171,7 @@ func (tk *TestKubelet) Cleanup() {
 			// Wait for the plugin manager to fully stop before removing rootDirectory,
 			// so its goroutines no longer access the filesystem. Done() returns
 			// immediately if Run() was never started.
-			<-tk.kubelet.pluginManager.Done()
+			<-tk.kubelet.pluginManager.Stopped()
 		}
 		os.RemoveAll(tk.kubelet.rootDirectory)
 		tk.kubelet = nil

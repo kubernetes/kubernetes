@@ -18,7 +18,6 @@ package pluginmanager
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -44,9 +43,8 @@ type PluginManager interface {
 	// registration/deregistration
 	AddHandler(pluginType string, pluginHandler cache.PluginHandler)
 
-	// Done returns a channel that is closed once Run() has fully exited.
-	// If Run() was never called, the returned channel is already closed.
-	Done() <-chan struct{}
+	// Stopped returns a closed channel once Run() has fully exited.
+	Stopped() <-chan struct{}
 }
 
 const (
@@ -81,6 +79,7 @@ func NewPluginManager(
 		reconciler:          reconciler,
 		desiredStateOfWorld: dsw,
 		actualStateOfWorld:  asw,
+		stopped:             make(chan struct{}),
 	}
 	return pm
 }
@@ -108,15 +107,14 @@ type pluginManager struct {
 	// populator (plugin watcher).
 	desiredStateOfWorld cache.DesiredStateOfWorld
 
-	// wg tracks whether Run() is currently executing
-	wg sync.WaitGroup
+	// stopped is closed when Run() has fully exited
+	stopped chan struct{}
 }
 
 var _ PluginManager = &pluginManager{}
 
 func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
-	pm.wg.Add(1)
-	defer pm.wg.Done()
+	defer close(pm.stopped)
 	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
@@ -145,12 +143,6 @@ func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandl
 }
 
 // Done returns a channel that is closed once Run() has fully exited.
-// If Run() was never called, the returned channel is already closed.
-func (pm *pluginManager) Done() <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		pm.wg.Wait()
-		close(ch)
-	}()
-	return ch
+func (pm *pluginManager) Stopped() <-chan struct{} {
+	return pm.stopped
 }
