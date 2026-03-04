@@ -454,7 +454,7 @@ type InformerOptions struct {
 
 	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
-	FIFOMetricsProvider FIFOMetricsProvider
+	FIFOMetricsProvider InformerMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -464,9 +464,9 @@ type InformerOptions struct {
 func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	var clientState Store
 	if options.Indexers == nil {
-		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		clientState = NewStoreWithMetric(DeletionHandlingMetaNamespaceKeyFunc, options.Identifier, options.FIFOMetricsProvider)
 	} else {
-		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
+		clientState = NewIndexerWithMetric(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, options.Identifier, options.FIFOMetricsProvider)
 	}
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
@@ -844,7 +844,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 // It returns the FIFO and the logger used by the FIFO.
 // That logger includes the name used for the FIFO,
 // in contrast to the logger which was passed in.
-func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider FIFOMetricsProvider) (klog.Logger, Queue) {
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider InformerMetricsProvider) (klog.Logger, Queue) {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
 			Logger:          &logger,

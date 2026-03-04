@@ -407,10 +407,30 @@ func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
 	return c
 }
 
+func NewStoreWithMetric(keyFunc KeyFunc, identifier InformerNameAndResource, metrics InformerMetricsProvider, opts ...StoreOption) Store {
+	storeMetrics := newStoreMetrics(identifier, metrics)
+	c := &cache{
+		cacheStorage: NewThreadSafeStoreWithMetric(Indexers{}, Indices{}, storeMetrics),
+		keyFunc:      keyFunc,
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
 // NewIndexer returns an Indexer implemented simply with a map and a lock.
 func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 	return &cache{
 		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
+		keyFunc:      keyFunc,
+	}
+}
+
+func NewIndexerWithMetric(keyFunc KeyFunc, indexers Indexers, identifier InformerNameAndResource, metrics InformerMetricsProvider) Indexer {
+	storeMetrics := newStoreMetrics(identifier, metrics)
+	return &cache{
+		cacheStorage: NewThreadSafeStoreWithMetric(indexers, Indices{}, storeMetrics),
 		keyFunc:      keyFunc,
 	}
 }
