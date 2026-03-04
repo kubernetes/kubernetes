@@ -5557,6 +5557,37 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
+		"list-attributes-match-constaint-list-of-string-values-with-partially-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {ListValue: &resourceapi.DeviceAttributeListType{
+						StringValue: []string{"value1", "value2"},
+					}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {ListValue: &resourceapi.DeviceAttributeListType{
+						StringValue: []string{"value2", "value3"},
+					}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {ListValue: &resourceapi.DeviceAttributeListType{
+						StringValue: []string{"value3", "value1"},
+					}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
 		"list-attributes-match-constaint-list-of-string-values-without-common-elements": {
 			features: Features{
 				ListTypeAttributes: true,
@@ -5611,6 +5642,35 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
+		},
+		"list-attributes-match-constaint-mixed-scalar-and-list-of-string-values-with-partially-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: ptr.To("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {ListValue: &resourceapi.DeviceAttributeListType{
+						StringValue: []string{"value1", "value2"},
+					}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {ListValue: &resourceapi.DeviceAttributeListType{
+						StringValue: []string{"value2", "value3"},
+					}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
 		},
 		"list-attributes-match-constaint-mixed-scalar-and-list-of-string-values-without-common-elements": {
 			features: Features{
