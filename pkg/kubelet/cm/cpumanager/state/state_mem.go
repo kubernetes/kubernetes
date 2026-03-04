@@ -117,7 +117,7 @@ func (s *stateMemory) ClearState() {
 	s.Lock()
 	defer s.Unlock()
 
-	s.defaultCPUSet = cpuset.CPUSet{}
+	s.defaultCPUSet = cpuset.New()
 	s.assignments = make(ContainerCPUAssignments)
 	s.logger.V(2).Info("Cleared state")
 }

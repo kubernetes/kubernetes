@@ -87,7 +87,7 @@ func (s *mockState) Delete(podUID string, containerName string) {
 }
 
 func (s *mockState) ClearState() {
-	s.defaultCPUSet = cpuset.CPUSet{}
+	s.defaultCPUSet = cpuset.New()
 	s.assignments = make(state.ContainerCPUAssignments)
 }
 
