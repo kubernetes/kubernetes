@@ -39,6 +39,7 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -693,11 +694,22 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
 		nodestatus.NodeFeatures(kl.runtimeState.runtimeFeatures),
 	)
-
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
+	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) {
+		setters = append(setters,
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemMemoryContentionPressure, kl.getSystemMemoryPSI, kl.kubeletConfiguration.SystemMemoryContentionThreshold, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemDiskContentionPressure, kl.getSystemDiskPSI, kl.kubeletConfiguration.SystemDiskContentionThreshold, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsMemoryContentionPressure, kl.getKubepodsMemoryPSI, kl.kubeletConfiguration.KubepodsMemoryContentionThreshold, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsDiskContentionPressure, kl.getKubepodsDiskPSI, kl.kubeletConfiguration.KubepodsDiskContentionThreshold, kl.recordNodeStatusEvent),
+		)
+	}
+
+	setters = append(setters,
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors,
 			kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
@@ -708,6 +720,70 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		kl.recordNodeSchedulableEvent,
 	)
 	return setters
+}
+
+// getSystemMemoryPSI returns the system memory PSI stats.
+func (kl *Kubelet) getSystemMemoryPSI(ctx context.Context) (*statsapi.PSIData, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.SystemMemoryContentionThreshold == 0.0 {
+		return nil, nil
+	}
+	summary, err := kl.resourceAnalyzer.Get(ctx, false)
+	if err != nil || summary.Node.Memory == nil || summary.Node.Memory.PSI == nil {
+		return nil, err
+	}
+	return &summary.Node.Memory.PSI.Full, nil
+}
+
+// getSystemDiskPSI returns the system disk PSI stats.
+func (kl *Kubelet) getSystemDiskPSI(ctx context.Context) (*statsapi.PSIData, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.SystemDiskContentionThreshold == 0.0 {
+		return nil, nil
+	}
+	summary, err := kl.resourceAnalyzer.Get(ctx, false)
+	if err != nil || summary.Node.IO == nil || summary.Node.IO.PSI == nil {
+		return nil, err
+	}
+	return &summary.Node.IO.PSI.Full, nil
+}
+
+// getKubepodsMemoryPSI returns the kubepods memory PSI stats.
+func (kl *Kubelet) getKubepodsMemoryPSI(ctx context.Context) (*statsapi.PSIData, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.KubepodsMemoryContentionThreshold == 0.0 {
+		return nil, nil
+	}
+	summary, err := kl.resourceAnalyzer.Get(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, container := range summary.Node.SystemContainers {
+		if container.Name == statsapi.SystemContainerPods {
+			if container.Memory != nil && container.Memory.PSI != nil {
+				return &container.Memory.PSI.Full, nil
+			}
+			break
+		}
+	}
+	return nil, nil
+}
+
+// getKubepodsDiskPSI returns the kubepods disk PSI stats.
+func (kl *Kubelet) getKubepodsDiskPSI(ctx context.Context) (*statsapi.PSIData, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.KubepodsDiskContentionThreshold == 0.0 {
+		return nil, nil
+	}
+	summary, err := kl.resourceAnalyzer.Get(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, container := range summary.Node.SystemContainers {
+		if container.Name == statsapi.SystemContainerPods {
+			if container.IO != nil && container.IO.PSI != nil {
+				return &container.IO.PSI.Full, nil
+			}
+			break
+		}
+	}
+	return nil, nil
 }
 
 // Validate given node IP belongs to the current host
