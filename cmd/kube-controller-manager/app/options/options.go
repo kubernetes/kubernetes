@@ -84,6 +84,7 @@ type KubeControllerManagerOptions struct {
 	EphemeralVolumeController                 *EphemeralVolumeControllerOptions
 	GarbageCollectorController                *GarbageCollectorControllerOptions
 	HPAController                             *HPAControllerOptions
+	ImperativeEvictionResponderController     *ImperativeEvictionResponderControllerOptions
 	JobController                             *JobControllerOptions
 	CronJobController                         *CronJobControllerOptions
 	LegacySATokenCleaner                      *LegacySATokenCleanerOptions
@@ -179,6 +180,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		HPAController: &HPAControllerOptions{
 			&componentConfig.HPAController,
+		},
+		ImperativeEvictionResponderController: &ImperativeEvictionResponderControllerOptions{
+			&componentConfig.ImperativeEvictionResponderController,
 		},
 		JobController: &JobControllerOptions{
 			&componentConfig.JobController,
@@ -287,6 +291,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.EphemeralVolumeController.AddFlags(fss.FlagSet(names.EphemeralVolumeController))
 	s.GarbageCollectorController.AddFlags(fss.FlagSet(names.GarbageCollectorController))
 	s.HPAController.AddFlags(fss.FlagSet(names.HorizontalPodAutoscalerController))
+	s.ImperativeEvictionResponderController.AddFlags(fss.FlagSet(names.ImperativeEvictionResponderController))
 	s.JobController.AddFlags(fss.FlagSet(names.JobController))
 	s.CronJobController.AddFlags(fss.FlagSet(names.CronJobController))
 	s.LegacySATokenCleaner.AddFlags(fss.FlagSet(names.LegacyServiceAccountTokenCleanerController))
@@ -373,6 +378,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.HPAController.ApplyTo(&c.ComponentConfig.HPAController); err != nil {
 		return err
 	}
+	if err := s.ImperativeEvictionResponderController.ApplyTo(&c.ComponentConfig.ImperativeEvictionResponderController); err != nil {
+		return err
+	}
 	if err := s.JobController.ApplyTo(&c.ComponentConfig.JobController); err != nil {
 		return err
 	}
@@ -456,6 +464,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.EphemeralVolumeController.Validate()...)
 	errs = append(errs, s.GarbageCollectorController.Validate()...)
 	errs = append(errs, s.HPAController.Validate()...)
+	errs = append(errs, s.ImperativeEvictionResponderController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
 	errs = append(errs, s.CronJobController.Validate()...)
 	errs = append(errs, s.LegacySATokenCleaner.Validate()...)
