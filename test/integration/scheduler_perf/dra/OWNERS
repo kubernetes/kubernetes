@@ -1,0 +1,8 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - bart0sh
+  - klueska
+  - pohly
+labels:
+  - wg/device-management

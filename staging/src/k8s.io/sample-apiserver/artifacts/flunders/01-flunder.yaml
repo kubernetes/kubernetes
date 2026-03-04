@@ -1,0 +1,6 @@
+apiVersion: wardle.example.com/v1alpha1
+kind: Flunder
+metadata:
+  name: my-first-flunder
+  labels:
+    sample-label: "true"

@@ -1,0 +1,12 @@
+kind: Foo
+apiVersion: company.com/v1
+metadata:
+  name: second-instance
+  namespace: default
+  labels:
+    pruneGroup: "true"
+someField: field1
+otherField: field2
+nestedField:
+  someSubfield: subfield1
+  otherSubfield: subfield2

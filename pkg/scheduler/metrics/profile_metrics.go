@@ -1,0 +1,72 @@
+/*
+Copyright 2020 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package metrics
+
+// This file contains helpers for metrics that are associated to a profile.
+
+var (
+	ScheduledResult           = "scheduled"
+	UnschedulableResult       = "unschedulable"
+	WaitingOnPreemptionResult = "waiting_on_preemption"
+	ErrorResult               = "error"
+)
+
+// PodScheduled can records a successful scheduling attempt and the duration
+// since `start`.
+func PodScheduled(profile string, duration float64) {
+	observeScheduleAttemptAndLatency(ScheduledResult, profile, duration)
+}
+
+// PodUnschedulable can records a scheduling attempt for an unschedulable pod
+// and the duration since `start`.
+func PodUnschedulable(profile string, duration float64) {
+	observeScheduleAttemptAndLatency(UnschedulableResult, profile, duration)
+}
+
+// PodScheduleError can records a scheduling attempt that had an error and the
+// duration since `start`.
+func PodScheduleError(profile string, duration float64) {
+	observeScheduleAttemptAndLatency(ErrorResult, profile, duration)
+}
+
+func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
+	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	scheduleAttempts.WithLabelValues(result, profile).Inc()
+}
+
+// PodGroupScheduled can records a successful pod group scheduling attempt and the duration
+// since `start`.
+func PodGroupScheduled(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(ScheduledResult, profile, duration)
+}
+
+// PodGroupUnschedulable can records a pod group scheduling attempt for an unschedulable pod group
+// and the duration since `start`.
+func PodGroupUnschedulable(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(UnschedulableResult, profile, duration)
+}
+
+// PodGroupWaitingOnPreemption can records a pod group scheduling attempt for an unschedulable pod group
+// waiting on preemption, and the duration since `start`.
+func PodGroupWaitingOnPreemption(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(WaitingOnPreemptionResult, profile, duration)
+}
+
+func observePodGroupScheduleAttemptAndLatency(result, profile string, duration float64) {
+	podGroupSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()
+}

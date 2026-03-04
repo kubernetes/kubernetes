@@ -1,0 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Changing feature lifecycle requires feature-approvers approval
+options:
+  no_parent_owners: true
+approvers:
+  - feature-approvers
+labels:
+  - area/feature-gates

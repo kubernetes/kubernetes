@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-with-taint
+spec:
+  taints:
+    - key: toleration
+      effect: NoSchedule
+status:
+  capacity:
+    pods: "90000"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

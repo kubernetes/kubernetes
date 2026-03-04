@@ -1,0 +1,21 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: calico-node-vertical-autoscaler
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+data:
+  node-autoscaler: |-
+    {
+      "calico-node": {
+        "requests": {
+          "cpu": {
+            "base": "80m",
+            "step": "20m",
+            "nodesPerStep": 10,
+            "max": "500m"
+          }
+        }
+      }
+    }

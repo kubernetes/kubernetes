@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged1
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext: {}
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      privileged: true
+  securityContext: {}

@@ -1,0 +1,30 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - aojea
+  - caesarxuchao
+  - deads2k
+  - liggitt
+  - smarterclayton
+  - sttts
+  - yliaog
+  - jpbetz
+  - enj
+reviewers:
+  - aojea
+  - apelisse
+  - caesarxuchao
+  - deads2k
+  - jpbetz
+  - liggitt
+  - skitt
+  - soltysh
+  - sttts
+  - yliaog
+  - jpbetz
+  - jefftree
+  - enj
+labels:
+  - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])  # Apache 2.0
+
+go_library(
+    name = "expr",
+    srcs = [
+        "checked.pb.go",
+        "eval.pb.go",
+        "explain.pb.go",
+        "syntax.pb.go",
+        "value.pb.go",
+    ],
+    importpath = "cel.dev/expr",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_genproto_googleapis_rpc//status:go_default_library",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+        "@org_golang_google_protobuf//runtime/protoimpl",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/durationpb",
+        "@org_golang_google_protobuf//types/known/emptypb",
+        "@org_golang_google_protobuf//types/known/structpb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":expr",
+    visibility = ["//visibility:public"],
+)

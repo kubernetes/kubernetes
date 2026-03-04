@@ -1,0 +1,40 @@
+{
+   "kind":"ReplicationController",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"agnhost-primary",
+      "labels":{
+         "app":"agnhost",
+         "role":"primary"
+      }
+   },
+   "spec":{
+      "replicas":1,
+      "selector":{
+         "app":"agnhost",
+         "role":"primary"
+      },
+      "template":{
+         "metadata":{
+            "labels":{
+               "app":"agnhost",
+               "role":"primary"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"agnhost-primary",
+                  "image": "{{.AgnhostImage}}",
+                  "ports":[
+                     {
+                        "name":"agnhost-server",
+                        "containerPort":6379
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
+}

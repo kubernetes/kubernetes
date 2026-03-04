@@ -1,0 +1,270 @@
+# This is the system spec that must be satisfied by the images running on GKE.
+
+os: Linux
+
+kernelSpec:
+  versions:
+  # GKE requires kernel version 4.4+.
+  - '4\.[4-9].*'
+  - '4\.[1-9][0-9].*'
+  - '[5-9].*'
+
+  # Required kernel configurations -- the configuration must be set to "y" or
+  # "m".
+  required:
+  # The configurations required by virtual machine or cloud provider.
+
+  - name: BOOTPARAM_HARDLOCKUP_PANIC
+    description: 'Enable the kernel to panic on "hard lockups".'
+  - name: BOOTPARAM_SOFTLOCKUP_PANIC
+    description: 'Enable the kernel to panic on "soft lockups".'
+  - name: PANIC_ON_OOPS
+    description: 'Enable the kernel to panic when it oops.'
+  - name: PVPANIC
+    description: 'Enable the VM (guest) to communicate panic events with the
+      host.'
+  - name: DMIID
+    description: 'Make sure /sys/class/dmi is exported - cAdvisor currently
+      uses this to determine which the cloud provider it is: aws, azure, or
+      gce, etc'
+  - name: ACPI_BUTTON
+    description: 'Enable the software-controlled power management, and required
+      by reset or stop button of GCE console.'
+
+  # The configurations required by network.
+
+  - name: INET
+    description: 'Enable TCP/IP networking.'
+  - name: VXLAN
+    description: 'Required by the overlay networking in Kubernetes.'
+  - name: IP_SET
+    description: 'Required by Kubernetes network policy.'
+  - name: IP_SET_HASH_IP
+    description: 'This introduces hash:ip set type support, which is required
+      by Kubernetes Calico networking.'
+  - name: IPVLAN
+    description: 'Required by IPVLAN feature.'
+  - name: IPV6
+    description: 'Required by IPVLAN feature.'
+  - name: IP6_NF_IPTABLES
+    description: 'Required by kube-proxy.'
+  - name: IP_NF_TARGET_REDIRECT
+    aliases:
+    - NETFILTER_XT_TARGET_REDIRECT
+    description: 'Enabled REDIRECT: all incoming connections are mapped onto
+      the incoming interface''s address, causing the packets to come to the
+      local machine instead of passing through. This is required by
+      kube-proxy.'
+  - name: NETFILTER_XT_MATCH_COMMENT
+    description: 'This option adds a "comment" dummy-match, which allows you to
+      put comments in your iptables ruleset. Today''s kube-proxy implementation
+      depends on this feature.'
+  # This is not critical, but debian-based container-vm kernel module study
+  # shows that many customers' nodes have loaded those kernel modules. We
+  # suspect sysdig module depends on these set of kernel modules for
+  # monitoring.
+  - name: PACKET_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+  - name: UNIX_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+  - name: INET_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+  - name: INET_TCP_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+  - name: INET_UDP_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+  - name: NETLINK_DIAG
+    description: 'Required by ss (similar to netstat) tools to display Linux
+      TCP / UDP network and socket information.'
+
+  # The configurations are required by filesystem.
+
+  - name: EXT4_FS
+  - name: DEBUG_FS
+  - name: PROC_FS
+  - name: XFS_FS
+  - name: SCSI_PROC_FS
+  # Currently Kubelet supports three docker graph drivers: overlay, aufs, and
+  # devicemapper due to the legacy reason. But for GKE, we plan to only support
+  # overlayfs.
+  - name: OVERLAY_FS
+    description: 'Enable OverlayFS, which will be the only docker graph driver
+      supported on GKE.'
+  - name: NFS_FS
+    description: 'Required by NFS support.'
+  - name: AUTOFS4_FS
+    description: 'Required by NFS support.'
+  - name: NFS_FSCACHE
+    description: 'Required by NFS support.'
+  - name: FSCACHE
+    description: 'Required by NFS support.'
+  - name: CACHEFILES
+    description: 'Required by NFS support.'
+  - name: FUSE_FS
+    description: 'Required by GlusterFS support.'
+  - name: BCACHE
+    # TODO(yguo0905): Add a description for BCACHE.
+
+  # The configuration required by the resource isolation, accounting, and
+  # management.
+
+  - name: NAMESPACES
+    description: 'Required by kubelet and docker. Enabling it allows the
+      processes within a pod or a container to have their own view of the
+      system.'
+  - name: IPC_NS
+    description: 'Required by kubelet and docker. Enabling it allows the
+      processes within a pod or a container to have their own view of the
+      system.'
+  - name: NET_NS
+    description: 'Required by kubelet and docker. Enabling it allows the
+      processes within a pod or a container to have their own view of the
+      system.'
+  - name: PID_NS
+    description: 'Required by kubelet and docker. Enabling it allows the
+      processes within a pod or a container to have their own view of the
+      system.'
+  - name: UTS_NS
+    description: 'Required by kubelet and docker. Enabling it allows the
+      processes within a pod or a container to have their own view of the
+      system.'
+  - name: CGROUPS
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: CGROUP_CPUACCT
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: CGROUP_DEVICE
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: CGROUP_SCHED
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: CPUSETS
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: MEMCG
+    description: 'Required by kubelet and docker. The resource usage of the
+      processes within a pod or a container can be monitored, accounted, and
+      controlled.'
+  - name: QUOTA
+    description: 'Required by kubelet to have an accurate and efficient disk
+      space and inode accounting, and eventually to limit the usage.'
+
+  # The security-related configurations
+
+  - name: SECCOMP
+    description: 'Enabled the SECCOMP application API.'
+  - name: SECURITY_APPARMOR
+    description: 'Enable for AppArmor support.'
+  - name: CC_STACKPROTECTOR_STRONG # Linux kernel <= 4.17
+    aliases:
+    - CC_STACKPROTECTOR_REGULAR # Linux kernel <= 4.17
+    - CC_STACKPROTECTOR_ALL # Linux kernel <= 4.17
+    - STACKPROTECTOR_STRONG # Linux kernel >= 4.18
+    description: 'Add the stack buffer overflow protections.'
+  - name: STRICT_DEVMEM
+    description: 'Required for blocking the direct physical memory access.'
+  - name: IMA
+    description: 'Required for security-related logging and auditing.'
+  - name: AUDIT
+    description: 'Required for security-related logging and auditing.'
+  - name: AUDITSYSCALL
+    description: 'Required for security-related logging and auditing.'
+
+  # Misc. configurations
+
+  - name: MODULES
+    description: 'Required for loadable module support.'
+  - name: PRINTK
+    description: 'Required for kernel logging message.'
+  - name: MMU
+    description: 'Required for memory management hardware and mmap() system
+      call.'
+
+packageSpecs:
+- name: apparmor
+  versionRange: '>=2.10.1'
+- name: apparmor-profiles
+  versionRange: '>=2.10.1'
+- name: audit
+  versionRange: '>=2.5.0'
+- name: autofs
+  versionRange: '>=5.0.7'
+- name: bash
+  versionRange: '>=4.3'
+- name: bridge-utils
+  versionRange: '>=1.5'
+- name: cloud-init
+  versionRange: '>=0.7.6'
+- name: coreutils
+  versionRange: '>=8.24'
+- name: dbus
+  versionRange: '>=1.6.8'
+- name: e2fsprogs
+  versionRange: '>=1.4.3'
+- name: ebtables
+  versionRange: '>=2.0.10'
+- name: ethtool
+  versionRange: '>=3.18'
+- name: iproute2
+  versionRange: '>=4.2.0'
+- name: less
+  versionRange: '>=481'
+- name: netcat-openbsd
+  versionRange: '>=1.10'
+- name: python
+  versionRange: '>=2.7.10'
+- name: pv
+  versionRange: '>=1.3.4'
+- name: sudo
+  versionRange: '>=1.8.12'
+- name: systemd
+  versionRange: '>=225'
+- name: tar
+  versionRange: '>=1.28'
+- name: util-linux
+  versionRange: '>=2.27.1'
+- name: wget
+  versionRange: '>=1.18'
+- name: gce-compute-image-packages
+  versionRange: '>=20170227'
+# TODO(yguo0905): Figure out whether watchdog is required.
+
+# packageSpecOverrides contains the OS distro specific package requirements.
+packageSpecOverrides:
+# The following overrides apply to all Ubuntu images.
+- osDistro: ubuntu
+  subtractions:
+  - name: apparmor-profiles
+    description: 'On Ubuntu the apparmor profiles are shipped with individual
+      application package, so the "apparmor-profiles" package is not required.'
+  - name: audit
+    description: 'On Ubuntu the equivalent package is called "auditd", so the
+      "audit" package is not required and "auditd" exists in the additions.'
+  - name: wget
+    description: 'The Ubuntu 1604-xenial image includes wget 1.17.1, which does
+      not satisfy the spec (>=1.18), but meets the functionality requirements.
+      Therefore, it is removed from the base spec. See wget in the additions.'
+  additions:
+  - name: auditd
+    versionRange: '>=2.4.5'
+    description: 'auditd 2.4.5 currently satisfies the requirements because the
+      GKE features that require auditd 2.5 are not yet available.'
+  - name: grub-common
+    versionRange: '>=2.2'
+    description: 'grub is the bootloader on Ubuntu.'
+  - name: wget
+    versionRange: '>=1.17.1'
+    description: 'wget 1.17.1 satisfies the functionality requirements but does
+      not meet the spec, which is fine'

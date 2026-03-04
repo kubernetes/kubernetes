@@ -1,0 +1,40 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-countersets-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 2
+  driver: test-driver.cdi.k8s.io
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-with-dra
+        operator: In
+        values:
+        - "true"
+  sharedCounters:
+  - name: counter-set-for-cpu
+    counters:
+      cpu1:
+        value: "1"
+      cpu2:
+        value: "1"
+      cpu3:
+        value: "1"
+      cpu4:
+        value: "1"
+      cpu5:
+        value: "1"
+      cpu6:
+        value: "1"
+      cpu7:
+        value: "1"
+      cpu8:
+        value: "1"
+  - name: counter-set-for-mem
+    counters:
+      mem:
+        value: "70Gi"

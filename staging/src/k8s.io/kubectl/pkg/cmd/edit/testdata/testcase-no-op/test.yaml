@@ -1,0 +1,18 @@
+description: no-op edit
+mode: edit
+args:
+- configmap/mymap
+namespace: "default"
+expectedStderr:
+- Edit cancelled, no changes made.
+expectedExitCode: 0
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/default/configmaps/mymap
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response
+- type: edit
+  expectedInput: 1.original
+  resultingOutput: 1.edited

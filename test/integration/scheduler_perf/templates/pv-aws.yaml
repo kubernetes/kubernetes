@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: PersistentVolume
+spec:
+  accessModes:
+  - ReadOnlyMany
+  awsElasticBlockStore:
+    volumeID: <volume-id>
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Retain

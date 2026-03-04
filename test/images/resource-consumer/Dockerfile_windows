@@ -1,0 +1,33 @@
+# Copyright 2021 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASEIMAGE
+
+# We're using a Linux image to unpack the archives, then we're copying them over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+ADD https://download.sysinternals.com/files/Testlimit.zip /Testlimit.zip
+RUN unzip /Testlimit.zip -d /
+
+FROM $BASEIMAGE
+
+COPY --from=prep /Testlimit64.exe /bin/testlimit.exe
+COPY --from=prep /Eula.txt /bin/
+
+ADD consumer /consumer.exe
+ADD consume-cpu/consume-cpu /consume-cpu/consume-cpu.exe
+
+ENV PATH="C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
+EXPOSE 8080
+ENTRYPOINT ["/consumer.exe"]

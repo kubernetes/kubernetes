@@ -1,0 +1,11 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "only-allow-name-matching-node-configmaps"
+spec:
+  policyName: "only-allow-name-matching-node-configmaps"
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: "e2e-ns"

@@ -1,0 +1,10 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: portless-backend
+spec:
+  parentRefs:
+  - name: prod-web
+  rules:
+  - backendRefs:
+    - name: foo

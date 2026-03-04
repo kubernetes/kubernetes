@@ -1,0 +1,160 @@
+{
+  "components": {
+    "schemas": {
+      "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
+        "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "name is the name of the group.",
+            "type": "string"
+          },
+          "preferredVersion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"
+              }
+            ],
+            "default": {},
+            "description": "preferredVersion is the version preferred by the API server, which probably is the storage version."
+          },
+          "serverAddressByClientCIDRs": {
+            "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "versions": {
+            "description": "versions are the versions supported in this group.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "name",
+          "versions"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "APIGroup",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery": {
+        "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
+        "properties": {
+          "groupVersion": {
+            "default": "",
+            "description": "groupVersion specifies the API group and version in the form \"group/version\"",
+            "type": "string"
+          },
+          "version": {
+            "default": "",
+            "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "groupVersion",
+          "version"
+        ],
+        "type": "object"
+      },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR": {
+        "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+        "properties": {
+          "clientCIDR": {
+            "default": "",
+            "description": "The CIDR with which clients can match their IP to figure out the server address that they should use.",
+            "type": "string"
+          },
+          "serverAddress": {
+            "default": "",
+            "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientCIDR",
+          "serverAddress"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/apis/discovery.k8s.io/": {
+      "get": {
+        "description": "get information of a group",
+        "operationId": "getDiscoveryAPIGroup",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "discovery"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+      - secrets
+    providers:
+      - kms:
+          apiVersion: v2
+          name: foo
+          endpoint: unix:///tmp/testprovider.sock
+          timeout:   15s
+      - kms:
+          apiVersion: v2
+          name: bar
+          endpoint: unix:///tmp/testprovider.sock
+          timeout:   15s

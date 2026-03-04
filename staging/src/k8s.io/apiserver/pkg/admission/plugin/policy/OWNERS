@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - jpbetz
+  - cici37
+  - alexzielenski
+reviewers:
+  - jpbetz
+  - cici37
+  - alexzielenski

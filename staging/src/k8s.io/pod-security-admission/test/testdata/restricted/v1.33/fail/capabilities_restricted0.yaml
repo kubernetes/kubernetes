@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: capabilities_restricted0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities: {}
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

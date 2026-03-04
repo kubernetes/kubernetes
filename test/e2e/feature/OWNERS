@@ -1,0 +1,6 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Features in test/e2e/feature/ are not directly mapped to the kubelet feature gates,
+# but is a good approximation to allow adding alpha features by SIG approvers.
+approvers:
+  - feature-approvers

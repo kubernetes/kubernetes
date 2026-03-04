@@ -1,0 +1,16 @@
+# A headless service to create DNS records
+apiVersion: v1
+kind: Service
+metadata:
+  name: galera
+  labels:
+    app: mysql
+spec:
+  ports:
+  - port: 3306
+    name: mysql
+  # *.galear.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: mysql
+  publishNotReadyAddresses: true

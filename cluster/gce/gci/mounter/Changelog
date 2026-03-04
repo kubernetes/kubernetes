@@ -1,0 +1,7 @@
+## v1 (Thu Oct 20 2016 Vishnu Kannan <vishh@google.com>)
+  - Creating a container with mount tools pre-installed
+  - Digest: sha256:9b3c1f04ad6b8947af4eb98f1eff2dc54c5664e3469b4cdf722ec5dd2a1dc064
+
+## v2 (Fri Oct 28 2016 Vishnu Kannan <vishh@google.com>)
+  - Adding netbase package.
+  - Digest: sha256:c7dfe059fbbf976fc4284a87eb18adf0f8e0c4cf30a30f5a852842c772a64c2d

@@ -1,0 +1,45 @@
+---
+apiVersion: kubectl.config.k8s.io/v1unknown1
+kind: Preference
+overrides:
+  - command: v1unknown1-apply
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1unknown1-delete
+    flags:
+      - name: interactive
+        default: "true"
+---
+apiVersion: kubectl.config.k8s.io/v1alpha1
+kind: Preference
+overrides:
+  - command: v1alpha1-apply-first
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1alpha1-delete-first
+    flags:
+      - name: interactive
+        default: "true"
+---
+apiVersion: kubectl.config.k8s.io/v1alpha1
+kind: Preference
+overrides:
+  - command: v1alpha1-apply-second
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1alpha1-delete-second
+    flags:
+      - name: interactive
+        default: "true"
+---
+apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: v1beta1-apply-first
+    options:
+      - name: server-side
+        default: "true"
+  - command: v1beta1-delete-first

@@ -1,0 +1,60 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v2;
+option go_package = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2";
+
+// EncryptedObject is the representation of data stored in etcd after envelope encryption.
+message EncryptedObject {
+  // EncryptedData is the encrypted data.
+  bytes encryptedData = 1;
+
+  // KeyID is the KMS key ID used for encryption operations.
+  // keyID must satisfy the following constraints:
+  // 1. The keyID is not empty.
+  // 2. The size of keyID is less than 1 kB.
+  string keyID = 2;
+
+  // EncryptedDEKSource is the ciphertext of the source of the DEK used to encrypt the data stored in encryptedData.
+  // encryptedDEKSourceType defines the process of using the plaintext of this field to determine the aforementioned DEK.
+  // encryptedDEKSource must satisfy the following constraints:
+  // 1. The encrypted DEK source is not empty.
+  // 2. The size of encrypted DEK source is less than 1 kB.
+  bytes encryptedDEKSource = 3;
+
+  // Annotations is additional metadata that was provided by the KMS plugin.
+  // Annotations must satisfy the following constraints:
+  //  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+  //  2. The size of annotations keys + values is less than 32 kB.
+  map<string, bytes> annotations = 4;
+
+  // encryptedDEKSourceType defines the process of using the plaintext of encryptedDEKSource to determine the DEK.
+  EncryptedDEKSourceType encryptedDEKSourceType = 5;
+}
+
+enum EncryptedDEKSourceType {
+  // AES_GCM_KEY means that the plaintext of encryptedDEKSource is the DEK itself, with AES-GCM as the encryption algorithm.
+  AES_GCM_KEY = 0;
+
+  // HKDF_SHA256_XNONCE_AES_GCM_SEED means that the plaintext of encryptedDEKSource is the pseudo random key
+  // (referred to as the seed throughout the code) that is fed into HKDF expand.  SHA256 is the hash algorithm
+  // and first 32 bytes of encryptedData are the info param.  The first 32 bytes from the HKDF stream are used
+  // as the DEK with AES-GCM as the encryption algorithm.
+  HKDF_SHA256_XNONCE_AES_GCM_SEED = 1;
+}

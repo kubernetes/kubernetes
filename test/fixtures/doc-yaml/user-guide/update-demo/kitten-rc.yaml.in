@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: update-demo-kitten
+spec:
+  selector:
+    name: update-demo
+    version: kitten
+  template:
+    metadata:
+      labels:
+        name: update-demo
+        version: kitten
+    spec:
+      containers:
+      - image: {{.KittenImage}}
+        name: update-demo
+        ports:
+        - containerPort: 80
+          protocol: TCP

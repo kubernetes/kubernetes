@@ -1,0 +1,11 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: missing-ns
+spec:
+  to:
+  - group: ""
+    kind: "Service"
+  from:
+  - group: "gateway.networking.k8s.io"
+    kind: "HTTPRoute"

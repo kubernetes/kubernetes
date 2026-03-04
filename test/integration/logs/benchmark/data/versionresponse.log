@@ -1,0 +1,1 @@
+{"ts":1678174403964.6985,"caller":"remote/remote_runtime.go:147","msg":"[RemoteRuntimeService] Version Response","v":10,"apiVersion":{"version":"0.1.0","runtime_name":"containerd","runtime_version":"v1.6.18","runtime_api_version":"v1"}}

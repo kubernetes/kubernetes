@@ -1,0 +1,43 @@
+{
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/.well-known/openid-configuration/": {
+      "get": {
+        "description": "get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'",
+        "operationId": "getServiceAccountIssuerOpenIDConfiguration",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "WellKnown"
+        ]
+      }
+    }
+  }
+}
