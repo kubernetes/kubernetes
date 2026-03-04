@@ -45,6 +45,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 const (
@@ -745,6 +746,80 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 		// Make sure to only update node status after reconciler starts syncing up states
 		if syncedFunc() {
 			node.Status.VolumesInUse = volumesInUseFunc()
+		}
+		return nil
+	}
+}
+
+// PSICondition returns a Setter that updates a PSI-based condition on the node.
+func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
+	conditionType v1.NodeConditionType,
+	getPSIFunc func(context.Context) (*statsapi.PSIData, error),
+	threshold float64,
+	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
+		currentTime := metav1.NewTime(nowFunc())
+		var condition *v1.NodeCondition
+
+		// Check if condition already exists and if it does, just pick it up for update.
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == conditionType {
+				condition = &node.Status.Conditions[i]
+			}
+		}
+
+		newCondition := false
+		// If the condition doesn't exist, create one
+		if condition == nil {
+			condition = &v1.NodeCondition{
+				Type:   conditionType,
+				Status: v1.ConditionUnknown,
+			}
+			newCondition = true
+		}
+
+		// Update the heartbeat time
+		condition.LastHeartbeatTime = currentTime
+
+		psi, err := getPSIFunc(ctx)
+		if err != nil || psi == nil {
+			// If we fail to get PSI stats, preserve the existing condition and do nothing.
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, *condition)
+			}
+			return nil
+		}
+
+		thresholdPercentage := threshold * 100
+
+		if psi.Avg60 >= thresholdPercentage {
+			if psi.Avg10 >= thresholdPercentage {
+				// Record an event indicating high resource pressure (ongoing or new)
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
+
+				// trending higher or consistently high, set condition for high resource contention pressure
+				if condition.Status != v1.ConditionTrue {
+					condition.Status = v1.ConditionTrue
+					condition.Reason = fmt.Sprintf("KubeletHas%s", conditionType)
+					condition.Message = fmt.Sprintf("kubelet has %s", conditionType)
+					condition.LastTransitionTime = currentTime
+				}
+			} else if condition.Status == v1.ConditionTrue {
+				// trending lower, record an event mentioning the resource contention pressure is trending lower
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%sTrendingLower", conditionType))
+			}
+		} else if condition.Status != v1.ConditionFalse {
+			condition.Status = v1.ConditionFalse
+			condition.Reason = fmt.Sprintf("KubeletHasNo%s", conditionType)
+			condition.Message = fmt.Sprintf("kubelet has no %s", conditionType)
+			condition.LastTransitionTime = currentTime
+			recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
+		}
+
+		if newCondition {
+			node.Status.Conditions = append(node.Status.Conditions, *condition)
 		}
 		return nil
 	}
