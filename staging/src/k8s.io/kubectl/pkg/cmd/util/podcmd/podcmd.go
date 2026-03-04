@@ -54,41 +54,40 @@ func FindContainerByName(pod *v1.Pod, name string) (*v1.Container, string) {
 // exists, or returns an error. It will print a message to the user indicating a default was
 // selected if there was more than one container.
 func FindOrDefaultContainerByName(pod *v1.Pod, name string, quiet bool, warn io.Writer) (*v1.Container, error) {
-	var container *v1.Container
-
-	if len(name) > 0 {
-		container, _ = FindContainerByName(pod, name)
-		if container == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", name, pod.Name)
-		}
-		return container, nil
-	}
-
 	// this should never happen, but just in case
 	if len(pod.Spec.Containers) == 0 {
 		return nil, fmt.Errorf("pod %s/%s does not have any containers", pod.Namespace, pod.Name)
 	}
 
-	// read the default container the annotation as per
+	// if no container name was specified read the default container from the annotation as per
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/2227-kubectl-default-container
-	if name := pod.Annotations[DefaultContainerAnnotationName]; len(name) > 0 {
-		if container, _ = FindContainerByName(pod, name); container != nil {
-			klog.V(4).Infof("Defaulting container name from annotation %s", container.Name)
-			return container, nil
+	if len(name) == 0 {
+		name = pod.Annotations[DefaultContainerAnnotationName]
+		if len(name) > 0 {
+			klog.V(4).Infof("Attempting default container name from annotation %s", name)
 		}
-		klog.V(4).Infof("Default container name from annotation %s was not found in the pod", name)
 	}
 
-	// pick the first container as per existing behavior
-	container = &pod.Spec.Containers[0]
-	if !quiet && (len(pod.Spec.Containers) > 1 || len(pod.Spec.InitContainers) > 0 || len(pod.Spec.EphemeralContainers) > 0) {
-		fmt.Fprintf(warn, "Defaulted container %q out of: %s\n", container.Name, AllContainerNames(pod))
+	if len(name) > 0 {
+		container, _ := FindContainerByName(pod, name)
+		if container == nil {
+			return nil, fmt.Errorf("container %s is not valid for pod %s out of: %s", name, pod.Name, AllContainerNames(pod))
+		}
+		return container, nil
 	}
 
-	klog.V(4).Infof("Defaulting container name to %s", container.Name)
-	return &pod.Spec.Containers[0], nil
+	// fallback to pick the first container to maintain existing behavior
+	container := &pod.Spec.Containers[0]
+	if !quiet {
+		fmt.Fprintf(warn, "Defaulted container %q out of: %s\n", container.Name, AllContainerNames(pod)) // nolint:errcheck
+	}
+	klog.V(4).Infof("Using the first container in a pod: %s", container.Name)
+	return container, nil
 }
 
+// AllContainerNames returns a comma-separated list of all container names in the pod,
+// including regular containers, ephemeral containers (marked with "ephem"), and init
+// containers (marked with "init") in that order.
 func AllContainerNames(pod *v1.Pod) string {
 	var containers []string
 	for _, container := range pod.Spec.Containers {
