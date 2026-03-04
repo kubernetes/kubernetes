@@ -660,6 +660,12 @@ const (
 	// Enables ordered namespace deletion.
 	OrderedNamespaceDeletion featuregate.Feature = "OrderedNamespaceDeletion"
 
+	// owner: @ArvindParekh
+	// kep: https://kep.k8s.io/5541
+	//
+	// Adds a new `UnusedSince` status field to `PersistentVolumeClaim` that indicates the time since the PVC was last used by a pod.
+	PersistentVolumeClaimUnusedSinceTime featuregate.Feature = "PersistentVolumeClaimUnusedSinceTime"
+
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
 	//
@@ -746,12 +752,6 @@ const (
 	//
 	// Enables PreferSameZone and PreferSameNode values for trafficDistribution
 	PreferSameTrafficDistribution featuregate.Feature = "PreferSameTrafficDistribution"
-
-	// owner: @ArvindParekh
-	// kep: https://kep.k8s.io/5541
-	//
-	// Adds a new `UnusedSince` status field to `PersistentVolumeClaim` that indicates the time since the PVC was last used by a pod.
-	PersistentVolumeClaimUnusedSinceTime featuregate.Feature = "PersistentVolumeClaimUnusedSinceTime"
 
 	// owner: @sreeram-venkitesh
 	//
@@ -1593,6 +1593,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
+	PersistentVolumeClaimUnusedSinceTime: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodAndContainerStatsFromCRI: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1659,10 +1663,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	PersistentVolumeClaimUnusedSinceTime: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PreventStaticPodAPIReferences: {
@@ -2362,6 +2362,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	OrderedNamespaceDeletion: {},
 
+	PersistentVolumeClaimUnusedSinceTime: {},
+
 	PodAndContainerStatsFromCRI: {},
 
 	PodCertificateRequest: {AuthorizeNodeWithSelectors},
@@ -2387,8 +2389,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PortForwardWebsockets: {},
 
 	PreferSameTrafficDistribution: {},
-
-	PersistentVolumeClaimUnusedSinceTime: {},
 
 	PreventStaticPodAPIReferences: {},
 
