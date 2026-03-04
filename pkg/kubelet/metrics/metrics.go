@@ -1197,6 +1197,60 @@ var (
 
 var registerMetrics sync.Once
 
+// initializeRuntimeOperationsErrorMetrics initializes the kubelet_runtime_operations_errors_total
+// counter to 0 for all runtime operation types. This ensures the metric is present in the /metrics
+// endpoint even when no errors have occurred, preventing false positive alerts in monitoring systems.
+func initializeRuntimeOperationsErrorMetrics() {
+	// All runtime operation types from pkg/kubelet/kuberuntime/instrumented_services.go
+	operationTypes := []string{
+		// Container operations
+		"version",
+		"status",
+		"create_container",
+		"start_container",
+		"stop_container",
+		"remove_container",
+		"list_containers",
+		"container_status",
+		"update_container",
+		"reopen_container_log",
+		"exec_sync",
+		"exec",
+		"attach",
+		"checkpoint_container",
+		"get_container_events",
+		"container_stats",
+		"list_container_stats",
+		// Pod sandbox operations
+		"run_podsandbox",
+		"stop_podsandbox",
+		"remove_podsandbox",
+		"podsandbox_status",
+		"list_podsandbox",
+		"podsandbox_stats",
+		"list_podsandbox_stats",
+		"update_podsandbox_resources",
+		"list_podsandbox_metrics",
+		// Image operations
+		"list_images",
+		"image_status",
+		"pull_image",
+		"remove_image",
+		"image_fs_info",
+		// Runtime configuration operations
+		"update_runtime_config",
+		"runtime_config",
+		"list_metric_descriptors",
+		// Cleanup operations
+		"close",
+	}
+
+	// Initialize each operation type counter to 0
+	for _, opType := range operationTypes {
+		RuntimeOperationsErrors.WithLabelValues(opType).Add(0)
+	}
+}
+
 // Register registers all metrics.
 func Register() {
 	// Register the metrics.
@@ -1228,6 +1282,9 @@ func Register() {
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
+		// Initialize runtime operations error counters to 0 for all operation types
+		// This ensures the metric is present even when no errors have occurred
+		initializeRuntimeOperationsErrorMetrics()
 		legacyregistry.MustRegister(Evictions)
 		legacyregistry.MustRegister(EvictionStatsAge)
 		legacyregistry.MustRegister(Preemptions)
