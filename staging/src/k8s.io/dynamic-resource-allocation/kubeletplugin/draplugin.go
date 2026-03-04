@@ -732,6 +732,13 @@ func (d *Helper) Stop() {
 // called, then the kubelet plugin does not manage any ResourceSlice
 // objects.
 //
+// Note that the order of slices in the provided resources
+// is significant: ResourceSlices are named deterministically based on
+// their index, and the allocator uses this order to prioritize allocation
+// (first-fit). Also, upgrading to this deterministic naming from an older
+// version using random names will cause existing slices to be recreated.
+// See [resourceslice.Pool.Slices] for more details.
+//
 // PublishResources does not block, so it might still take a while
 // after it returns before all information is actually written
 // to the API server.

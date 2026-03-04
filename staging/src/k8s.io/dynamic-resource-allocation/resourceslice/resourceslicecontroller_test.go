@@ -1688,16 +1688,18 @@ func newDevice(name string, fields ...any) resourceapi.Device {
 
 func TestEncodeIndex(t *testing.T) {
 	testCases := []struct {
-		index    int
+		index    int64
 		expected string
 	}{
-		{0, "0000000000000"},
-		{1, "0000000000001"},
-		{9, "0000000000009"},
-		{10, "000000000000a"},
-		{35, "000000000000z"},
-		{36, "0000000000010"},
-		{100000, "000000000255s"},
+		{0, "bbbbbbbbbbbbbb"},
+		{1, "bbbbbbbbbbbbbc"},
+		{9, "bbbbbbbbbbbbbm"},
+		{10, "bbbbbbbbbbbbbn"},
+		{26, "bbbbbbbbbbbbb9"},
+		{27, "bbbbbbbbbbbbcb"},
+		{35, "bbbbbbbbbbbbcl"},
+		{36, "bbbbbbbbbbbbcm"},
+		{100000, "bbbbbbbbbbhdgz"},
 	}
 
 	for _, tc := range testCases {

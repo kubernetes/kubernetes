@@ -54,21 +54,24 @@ func TestLexicographicalAllocator(t *testing.T,
 			)},
 		},
 		"lexicographical-sorting-pools-with-binding-conditions": {
+			features: Features{
+				DeviceBindingAndStatus: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
+					device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
-				sliceWithDevices(slice2, node1, resourcePool(pool3, 1), driverA, device(device2, nil, nil)),
-				sliceWithDevices(slice3, node1, resourcePool(pool2, 1), driverA, device(device3, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool3, 1), driverA, device(device3, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool2, 1), driverA, device(device2, nil, nil)),
 			),
 			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool2, device3, false),
-				deviceAllocationResult(req0, driverA, pool3, device2, false),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
+				deviceAllocationResult(req0, driverA, pool3, device3, false),
 			)},
 		},
 		"lexicographical-sorting-slices": {
@@ -89,22 +92,31 @@ func TestLexicographicalAllocator(t *testing.T,
 			)},
 		},
 		"lexicographical-sorting-slices-with-binding-conditions": {
+			features: Features{
+				DeviceBindingAndStatus: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
-					device(device1, nil, nil).withBindingConditions([]string{"Ready"}, nil),
+					device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
 				sliceWithDevices(slice3, node1, resourcePool(pool1, 3), driverA, device(device3, nil, nil)),
 				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2, false),
-				deviceAllocationResult(req0, driverA, pool1, device3, false),
-			)},
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
+							deviceAllocationResult(req0, driverA, pool1, device2, false),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
 		},
 	}
 

@@ -106,10 +106,6 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 		}
 	}
 
-	// Sort slices by name to ensure a deterministic allocation order.
-	// Because the allocator uses a first-fit search, this allows driver authors
-	// to influence prioritization through their naming conventions.
-	sortSlicesByName(relevantSlices)
 	for _, s := range relevantSlices {
 		if err := addSlice(pools, s); err != nil {
 			return nil, fmt.Errorf("failed to add node slice %s: %w", s.Name, err)
@@ -124,6 +120,7 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 	// if they are not relevant for the node, so we have to be
 	// careful with the "is incomplete" check.
 	result := make([]*Pool, 0, len(pools))
+	var resultWithBindingConditions []*Pool
 	for poolID, slicesForPool := range pools {
 		// If we have all slices, we are done.
 		isComplete := int64(len(slicesForPool)) == slicesForPool[0].Spec.Pool.ResourceSliceCount
@@ -131,6 +128,10 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 			pool, err := buildPool(poolID, slicesForPool, features, nil)
 			if err != nil {
 				return nil, err
+			}
+			if poolHasBindingConditions(*pool) {
+				resultWithBindingConditions = append(resultWithBindingConditions, pool)
+				continue
 			}
 			result = append(result, pool)
 			continue
@@ -169,6 +170,11 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 		if err != nil {
 			return nil, err
 		}
+		// if pool has binding conditions, add the pool to the end of the result
+		if poolHasBindingConditions(*pool) {
+			resultWithBindingConditions = append(resultWithBindingConditions, pool)
+			continue
+		}
 		result = append(result, pool)
 	}
 
@@ -176,19 +182,27 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 	// Because the allocator uses a first-fit search, this allows driver authors
 	// to influence prioritization through their naming conventions.
 	sortPoolsByID(result)
+	sortPoolsByID(resultWithBindingConditions)
+
+	if len(resultWithBindingConditions) != 0 {
+		result = append(result, resultWithBindingConditions...)
+	}
 
 	return result, nil
 }
 
-func sortSlicesByName(slicesToSort []*resourceapi.ResourceSlice) {
-	slices.SortFunc(slicesToSort, func(a, b *resourceapi.ResourceSlice) int {
+func sortSlicesByName(slicesToSort []*draapi.ResourceSlice) {
+	slices.SortFunc(slicesToSort, func(a, b *draapi.ResourceSlice) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 }
 
 func sortPoolsByID(pools []*Pool) {
 	slices.SortFunc(pools, func(a, b *Pool) int {
-		return cmp.Compare(a.PoolID.String(), b.PoolID.String())
+		if cmp := cmp.Compare(a.PoolID.Driver.String(), b.PoolID.Driver.String()); cmp != 0 {
+			return cmp
+		}
+		return cmp.Compare(a.PoolID.Pool.String(), b.PoolID.Pool.String())
 	})
 }
 
@@ -224,6 +238,11 @@ func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceS
 }
 
 func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, allSlicesForPool []*resourceapi.ResourceSlice) (*Pool, error) {
+	// Sort slices by name to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
+	sortSlicesByName(slices)
+
 	var deviceSlices []*draapi.ResourceSlice
 	var counterSetSlices []*draapi.ResourceSlice
 	if features.PartitionableDevices {
@@ -369,6 +388,17 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 		}
 	}
 	return nil
+}
+
+func poolHasBindingConditions(pool Pool) bool {
+	for _, slice := range pool.DeviceSlicesTargetingNode {
+		for _, device := range slice.Spec.Devices {
+			if device.BindingConditions != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // checkSlicesInPool is an expensive check of all slices in the pool.
