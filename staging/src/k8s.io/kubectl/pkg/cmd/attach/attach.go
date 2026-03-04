@@ -66,6 +66,8 @@ var (
 const (
 	defaultPodAttachTimeout = 60 * time.Second
 	defaultPodLogsTimeout   = 20 * time.Second
+
+	defaultDetachSequence = "ctrl-p,ctrl-q"
 )
 
 // AttachOptions declare the arguments accepted by the Attach command
@@ -74,6 +76,8 @@ type AttachOptions struct {
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
+
+	DetachKeys string
 
 	CommandName string
 
@@ -122,6 +126,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
+	cmd.Flags().StringVar(&o.DetachKeys, "detach-keys", defaultDetachSequence, "Override the key sequence for detaching a container")
 	return cmd
 }
 
@@ -149,8 +154,17 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
 		}, scheme.ParameterCodec)
-
-		return o.Attach.Attach(req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
+		stdin := o.In
+		if o.Stdin && raw {
+			if o.DetachKeys == "" {
+				o.DetachKeys = defaultDetachSequence
+			}
+			stdin, err = term.NewDetachableReader(stdin, o.DetachKeys)
+			if err != nil {
+				return fmt.Errorf("could not bind detach keys: %w", err)
+			}
+		}
+		return o.Attach.Attach(req.URL(), o.Config, stdin, o.Out, o.ErrOut, raw, sizeQueue)
 	}
 }
 
@@ -352,13 +366,13 @@ func (o *AttachOptions) GetContainerName(pod *corev1.Pod) (string, error) {
 // reattachMessage returns a message to print after attach has completed, or
 // the empty string if no message should be printed.
 func (o *AttachOptions) reattachMessage(containerName string, rawTTY bool) string {
-	if o.Quiet || !o.Stdin || !rawTTY || o.Pod.Spec.RestartPolicy != corev1.RestartPolicyAlways {
+	if o.Quiet || !o.Stdin || !rawTTY {
 		return ""
 	}
 	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
 		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -n %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
 	}
-	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -n %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
+	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -n %s -i -t' command", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
 }
 
 type terminalSizeQueueAdapter struct {
