@@ -261,6 +261,11 @@ type Options struct {
 	// This enables node-owned slices that remain cluster-visible via
 	// NodeSelector or AllNodes.
 	//
+	// Beware that this has a performance impact on the cluster
+	// because all nodes have to receive all ResourceSlices of
+	// the driver. Without this option, each node only receives
+	// its own ResourceSlices.
+	//
 	// Empty means the default behavior.
 	ReconcileOnlyPoolName string
 }
