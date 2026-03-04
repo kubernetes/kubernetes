@@ -1378,42 +1378,63 @@ func TestControllerSyncPool(t *testing.T) {
 // invalid pool sets when ReconcileOnlyPoolName is set
 func TestControllerUpdateReconcileOnlyPoolNameValidation(t *testing.T) {
 	const poolName = "pool"
-	singlePoolResources := &DriverResources{
-		Pools: map[string]Pool{
-			poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+
+	testcases := map[string]struct {
+		resources      *DriverResources
+		expectedErrors []string
+	}{
+		"multiple pools returns error": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedErrors: []string{"found 2 pools; expected exactly one pool with this name"},
+		},
+
+		"wrong pool only returns error": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedErrors: []string{"found 1 pools; expected exactly one pool with this name"},
+		},
+
+		"empty pools succeeds": {
+			resources: &DriverResources{Pools: map[string]Pool{}},
+		},
+
+		"single matching pool succeeds": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
 		},
 	}
-	multiplePoolsResources := &DriverResources{
-		Pools: map[string]Pool{
-			poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-			"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-		},
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			ctrl := &Controller{
+				reconcileOnlyPoolName: poolName,
+				queue:                 ptr.To(workqueue.Mock[string]{}),
+				errorHandler: func(_ context.Context, err error, _ string) {
+					if len(tc.expectedErrors) > 0 {
+						require.Error(t, err)
+						for _, expectedError := range tc.expectedErrors {
+							assert.Contains(t, err.Error(), expectedError)
+						}
+						return
+					}
+
+					require.NoError(t, err)
+				},
+			}
+			ctrl.Update(tc.resources)
+		})
 	}
-	wrongPoolOnlyResources := &DriverResources{
-		Pools: map[string]Pool{
-			"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
-		},
-	}
-	emptyPoolsResources := &DriverResources{Pools: map[string]Pool{}}
-
-	var queue workqueue.Mock[string]
-	ctrl := &Controller{
-		reconcileOnlyPoolName: poolName,
-		queue:                 &queue,
-	}
-
-	err := ctrl.Update(multiplePoolsResources)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "other pools found")
-	assert.Contains(t, err.Error(), "2 total")
-
-	err = ctrl.Update(wrongPoolOnlyResources)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "other pools found")
-	assert.Contains(t, err.Error(), "1 total")
-
-	require.NoError(t, ctrl.Update(emptyPoolsResources))
-	require.NoError(t, ctrl.Update(singlePoolResources))
 }
 
 func joinErrors(errors []string) string {

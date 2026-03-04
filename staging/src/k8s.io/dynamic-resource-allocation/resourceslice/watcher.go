@@ -31,6 +31,7 @@ func newWrapWatcher(ctx context.Context, w watch.Interface, match func(event wat
 		ctx:     ctx,
 		cancel:  cancel,
 		result:  make(chan watch.Event),
+		done:    make(chan struct{}),
 	}
 	go watcher.receive(ctx)
 
@@ -44,10 +45,12 @@ type wrapWatcher struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	result chan watch.Event
+	done   chan struct{}
 }
 
 func (w *wrapWatcher) receive(ctx context.Context) {
 	defer close(w.result)
+	defer close(w.done)
 	resultChan := w.watcher.ResultChan()
 	for {
 		select {
@@ -75,4 +78,5 @@ func (w *wrapWatcher) Stop() {
 		w.watcher.Stop()
 		w.cancel()
 	}
+	<-w.done
 }

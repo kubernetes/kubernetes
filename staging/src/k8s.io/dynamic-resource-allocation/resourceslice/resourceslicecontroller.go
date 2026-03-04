@@ -26,9 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -47,6 +44,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -351,7 +350,7 @@ func (c *Controller) Stop() {
 // The controller is doing a deep copy, so the caller may update
 // the instance once Update returns. Nil is valid and the same
 // as an empty resources struct.
-func (c *Controller) Update(resources *DriverResources) error {
+func (c *Controller) Update(resources *DriverResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -368,8 +367,10 @@ func (c *Controller) Update(resources *DriverResources) error {
 		if c.reconcileOnlyPoolName != "" {
 			_, ok := resources.Pools[c.reconcileOnlyPoolName]
 			if (ok && len(resources.Pools) > 1) || !ok && len(resources.Pools) > 0 {
-				return fmt.Errorf("reconcileOnlyPoolName is set to %q, but other pools found (%d total)",
-					c.reconcileOnlyPoolName, len(resources.Pools))
+				c.errorHandler(context.Background(),
+					fmt.Errorf("ReconcileOnlyPoolName=%q, but found %d pools; expected exactly one pool with this name", c.reconcileOnlyPoolName, len(resources.Pools)),
+					"processing update DriverResources")
+				return
 			}
 		}
 
@@ -381,8 +382,6 @@ func (c *Controller) Update(resources *DriverResources) error {
 	for poolName := range c.resources.Pools {
 		c.queue.Add(poolName)
 	}
-
-	return nil
 }
 
 // roundTaintTimeAdded rounds all timestamps to seconds because that is all
@@ -460,9 +459,7 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 		return nil, err
 	}
 
-	if err := c.Update(options.Resources); err != nil {
-		return nil, fmt.Errorf("failed to update resources: %w", err)
-	}
+	c.Update(options.Resources)
 
 	return c, nil
 }
@@ -476,6 +473,9 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		resourceapi.ResourceSliceSelectorDriver:   c.driverName,
 		resourceapi.ResourceSliceSelectorNodeName: "",
 	}
+	// TODO: We can list/watch ResourceSlices with field selectors for NodeName or Driver.
+	// There is no field selector for PoolName, so we apply additional client-side filtering in list/watch. Issue for adding a PoolName field selector:                                                     │
+	// https://github.com/kubernetes/kubernetes/issues/137413
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcileOnlyPoolName == "" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
@@ -766,9 +766,10 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		Generation:         generation, // May get updated later.
 		ResourceSliceCount: int64(resourceSliceCount),
 	}
-	desiredAllNodes := func(perDeviceNodeSelection *bool) bool {
-		// allNodes is true if the pool has no nodeSelector, nodeName or perDeviceNodeSelection.
-		return pool.NodeSelector == nil && nodeName == "" && !ptr.Deref(perDeviceNodeSelection, false)
+
+	// desiredAllNodes returns true if the pool has no nodeSelector, nodeName or perDeviceNodeSelection.
+	desiredAllNodes := func(slice *Slice) bool {
+		return pool.NodeSelector == nil && nodeName == "" && !ptr.Deref(slice.PerDeviceNodeSelection, false)
 	}
 
 	// Now for each desired slice, figure out which of them are changed.
@@ -778,7 +779,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// entries are the same.
 		if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
-			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection) ||
+			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes(&pool.Slices[i]) ||
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
@@ -828,7 +829,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		//
 		// When adding new fields here, then also extend sliceStored.
 		slice.Spec.NodeSelector = pool.NodeSelector
-		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection))
+		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes(&pool.Slices[i]))
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
@@ -876,7 +877,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				Pool:                   desiredPool,
 				NodeName:               refIfNotZero(nodeName),
 				NodeSelector:           pool.NodeSelector,
-				AllNodes:               refIfNotZero(desiredAllNodes(pool.Slices[i].PerDeviceNodeSelection)),
+				AllNodes:               refIfNotZero(desiredAllNodes(&pool.Slices[i])),
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
