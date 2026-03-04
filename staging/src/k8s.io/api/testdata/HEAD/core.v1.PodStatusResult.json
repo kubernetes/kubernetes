@@ -163,8 +163,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }
@@ -262,8 +261,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }
@@ -362,8 +360,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }

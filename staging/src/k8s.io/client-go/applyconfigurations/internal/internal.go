@@ -7519,9 +7519,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: health
       type:
         scalar: string
-    - name: message
-      type:
-        scalar: string
     - name: resourceID
       type:
         scalar: string
