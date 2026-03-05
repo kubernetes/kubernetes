@@ -144,8 +144,16 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
 
 	var numaNodes []int
-	for _, node := range topology {
-		numaNodes = append(numaNodes, node.Id)
+	if topologyAffinityStore != nil {
+		topologyManagerNUMANodes := topologyAffinityStore.GetNUMANodeIDs()
+		if topologyManagerNUMANodes != nil {
+			numaNodes = append([]int{}, topologyManagerNUMANodes...)
+		}
+	}
+	if numaNodes == nil {
+		for _, node := range topology {
+			numaNodes = append(numaNodes, node.Id)
+		}
 	}
 
 	manager := &ManagerImpl{

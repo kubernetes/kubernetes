@@ -96,6 +96,10 @@ func (s *scope) GetPolicy() Policy {
 	return s.policy
 }
 
+func (s *scope) GetNUMANodeIDs() []int {
+	return nil
+}
+
 func (s *scope) AddHintProvider(h HintProvider) {
 	s.hintProviders = append(s.hintProviders, h)
 }

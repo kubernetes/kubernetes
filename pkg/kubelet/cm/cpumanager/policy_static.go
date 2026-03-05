@@ -676,12 +676,14 @@ func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, po
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
 func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+	numaNodes := p.getNUMANodesForTopologyHints()
+
 	// Initialize minAffinitySize to include all NUMA Nodes.
-	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
+	minAffinitySize := len(numaNodes)
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
@@ -736,6 +738,31 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) getNUMANodesForTopologyHints() []int {
+	topologyNUMANodes := p.topology.CPUDetails.NUMANodes().List()
+	if p.affinity == nil {
+		return topologyNUMANodes
+	}
+
+	hintNUMANodes := p.affinity.GetNUMANodeIDs()
+	if hintNUMANodes == nil {
+		return topologyNUMANodes
+	}
+
+	hintNodeSet := map[int]struct{}{}
+	for _, nodeID := range hintNUMANodes {
+		hintNodeSet[nodeID] = struct{}{}
+	}
+
+	var filteredNUMANodes []int
+	for _, nodeID := range topologyNUMANodes {
+		if _, ok := hintNodeSet[nodeID]; ok {
+			filteredNUMANodes = append(filteredNUMANodes, nodeID)
+		}
+	}
+	return filteredNUMANodes
 }
 
 // isHintSocketAligned function return true if numa nodes in hint are socket aligned.

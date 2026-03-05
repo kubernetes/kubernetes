@@ -27,6 +27,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -322,6 +323,66 @@ func TestValidateReservedMemory(t *testing.T) {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedError, err.Error())
 			}
+		})
+	}
+}
+
+func TestGetReservedMemoryNUMANodes(t *testing.T) {
+	machineInfo := returnMachineInfo()
+
+	testCases := []struct {
+		description                string
+		nodeAllocatableReservation v1.ResourceList
+		reservedMemory             []kubeletconfig.MemoryReservation
+		expectedReservedNodes      []int
+		expectedError              string
+	}{
+		{
+			description: "single NUMA node fully reserved",
+			nodeAllocatableReservation: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+			},
+			reservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+					},
+				},
+			},
+			expectedReservedNodes: []int{0},
+		},
+		{
+			description: "NUMA node partially reserved",
+			nodeAllocatableReservation: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(2*gb, resource.BinarySI),
+			},
+			reservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(2*gb, resource.BinarySI),
+					},
+				},
+			},
+			expectedReservedNodes: []int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			reservedNodes, err := GetReservedMemoryNUMANodes(&machineInfo, tc.nodeAllocatableReservation, tc.reservedMemory)
+			if tc.expectedError != "" {
+				assert.EqualError(t, err, tc.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.expectedReservedNodes, reservedNodes)
 		})
 	}
 }
