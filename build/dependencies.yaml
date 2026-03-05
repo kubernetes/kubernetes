@@ -129,16 +129,7 @@ dependencies:
     #- path: cluster/gce/windows/k8s-node-setup.psm1
     #  match: DEFAULT_NPD_VERSION
 
-  # Golang
-  # TODO: this should really be eliminated and controlled by .go-version
-  - name: "golang: upstream version"
-    version: 1.26.0
-    refPaths:
-    - path: .go-version
-    - path: staging/publishing/rules.yaml
-      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-
-  # This should ideally be updated to match the golang version
+  # This should ideally be updated to match the golang version in .go-version
   # but we can dynamically fetch go if the base image is out of date.
   # This allows us to ship go updates more quickly.
   #
