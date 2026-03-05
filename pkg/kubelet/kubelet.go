@@ -3392,6 +3392,10 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 	}
 }
 
-func (kl *Kubelet) SetPodWatchCondition(podUID types.UID, conditionKey string, condition pleg.WatchCondition) {
-	kl.pleg.SetPodWatchCondition(podUID, conditionKey, condition)
+func (kl *Kubelet) RequestPodReSync(podUID types.UID) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() {
+		kl.eventedPleg.RequestPodReSync(podUID)
+		return
+	}
+	kl.pleg.RequestPodReSync(podUID)
 }
