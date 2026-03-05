@@ -299,12 +299,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		allocationResult.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, len(internalResult.devices))
 		for i, internal := range internalResult.devices {
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:     internal.requestName(),
-				Driver:      internal.id.Driver.String(),
-				Pool:        internal.id.Pool.String(),
-				Device:      internal.id.Device.String(),
-				AdminAccess: internal.adminAccess,
-				Tolerations: internal.lookupRequest(claim).tolerations(),
+				Request:                 internal.requestName(),
+				Driver:                  internal.id.Driver.String(),
+				Pool:                    internal.id.Pool.String(),
+				Device:                  internal.id.Device.String(),
+				AdminAccess:             internal.adminAccess,
+				Tolerations:             internal.lookupRequest(claim).tolerations(),
+				RequiresNodePreparation: internal.requiresNodePreparation,
 			}
 		}
 
@@ -588,11 +589,12 @@ type internalAllocationResult struct {
 
 type internalDeviceResult struct {
 	*draapi.Device
-	request       string // name of the request (if no subrequests) or the subrequest
-	parentRequest string // name of the request which contains the subrequest, empty otherwise
-	id            DeviceID
-	slice         *draapi.ResourceSlice
-	adminAccess   *bool
+	request                 string // name of the request (if no subrequests) or the subrequest
+	parentRequest           string // name of the request which contains the subrequest, empty otherwise
+	id                      DeviceID
+	slice                   *draapi.ResourceSlice
+	adminAccess             *bool
+	requiresNodePreparation *bool
 }
 
 func (idr internalDeviceResult) requestName() string {
@@ -1186,6 +1188,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		id:            device.id,
 		Device:        device.Device,
 		slice:         device.slice,
+	}
+	if requestData.class != nil {
+		result.requiresNodePreparation = requestData.class.Spec.RequiresNodePreparation
 	}
 	if request.adminAccess() {
 		result.adminAccess = ptr.To(request.adminAccess())
