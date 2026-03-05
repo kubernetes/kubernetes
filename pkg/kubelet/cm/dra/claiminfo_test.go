@@ -29,6 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	features "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
@@ -67,6 +70,7 @@ var (
 )
 
 func TestNewClaimInfoFromClaim(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodePreparation, true)
 	for _, test := range []struct {
 		description    string
 		claim          *resourceapi.ResourceClaim
@@ -140,6 +144,53 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 					Namespace:   namespace,
 					PodUIDs:     sets.New[string](),
 					DriverState: map[string]state.DriverState{},
+				},
+				prepared: false,
+			},
+		},
+		{
+			description: "skip drivers with requiresNodePreparation false",
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       claimUID,
+					Name:      claimName,
+					Namespace: namespace,
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: requestName,
+									Pool:    poolName,
+									Device:  deviceName,
+									Driver:  "driver-that-is-skipped",
+									RequiresNodePreparation: func() *bool {
+										b := false
+										return &b
+									}(),
+								},
+								{
+									Request: requestName2,
+									Pool:    poolName,
+									Device:  deviceName,
+									Driver:  "driver-that-stays",
+								},
+							},
+						},
+					},
+				},
+				Spec: resourceapi.ResourceClaimSpec{},
+			},
+			expectedResult: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimUID:  claimUID,
+					ClaimName: claimName,
+					Namespace: namespace,
+					PodUIDs:   sets.New[string](),
+					DriverState: map[string]state.DriverState{
+						"driver-that-stays": {},
+					},
 				},
 				prepared: false,
 			},

@@ -303,10 +303,10 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
 
-		// At this point we assume that we have to prepare the claim and thus need
-		// the driver. If the driver is currently unavailable, it is better to fail
-		// even if the claim is already prepared because something is wrong with
-		// the node.
+		// At this point we determine whether node-local preparation is needed.
+		// If it is needed and the driver is currently unavailable, it is better
+		// to fail even if the claim is already prepared because something is wrong
+		// with the node.
 		infos[i].resourceClaim = resourceClaim
 		claimInfo, err := newClaimInfoFromClaim(resourceClaim)
 		if err != nil {
