@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -98,6 +99,8 @@ type Manager interface {
 type manager struct {
 	//Topology Manager Scope
 	scope Scope
+	// NUMA nodes available to topology-aware hint providers.
+	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -128,6 +131,8 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
 	Name() string
+	// GetNUMANodeIDs returns NUMA nodes available for topology-aware placement.
+	GetNUMANodeIDs() []int
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
@@ -170,7 +175,10 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
 		logger.Info("Creating topology manager with none policy")
-		return &manager{scope: NewNoneScope()}, nil
+		return &manager{
+			scope:     NewNoneScope(),
+			numaNodes: extractNUMANodes(topology),
+		}, nil
 	}
 
 	opts, err := NewPolicyOptions(logger, topologyPolicyOptions)
@@ -219,12 +227,22 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	}
 
 	manager := &manager{
-		scope: scope,
+		scope:     scope,
+		numaNodes: extractNUMANodes(topology),
 	}
 
 	manager.initializeMetrics()
 
 	return manager, nil
+}
+
+func extractNUMANodes(topology []cadvisorapi.Node) []int {
+	numaNodes := make([]int, 0, len(topology))
+	for _, node := range topology {
+		numaNodes = append(numaNodes, node.Id)
+	}
+	sort.Ints(numaNodes)
+	return numaNodes
 }
 
 func (m *manager) initializeMetrics() {
@@ -245,6 +263,10 @@ func (m *manager) GetPolicy() Policy {
 
 func (m *manager) Name() string {
 	return m.scope.Name()
+}
+
+func (m *manager) GetNUMANodeIDs() []int {
+	return append([]int{}, m.numaNodes...)
 }
 
 func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {

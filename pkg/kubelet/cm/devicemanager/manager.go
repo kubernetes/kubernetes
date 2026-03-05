@@ -143,9 +143,28 @@ func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologym
 func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
 
-	var numaNodes []int
+	topologyNUMANodes := make([]int, 0, len(topology))
 	for _, node := range topology {
-		numaNodes = append(numaNodes, node.Id)
+		topologyNUMANodes = append(topologyNUMANodes, node.Id)
+	}
+	sort.Ints(topologyNUMANodes)
+
+	// Derive the set of NUMA nodes used for topology hint iteration.
+	// The topology manager store carries the active NUMA set after reserved-memory
+	// filtering, while the local topology slice is the set this device manager
+	// can reason about. When both are available, only use their intersection.
+	numaNodes := append([]int{}, topologyNUMANodes...)
+	if topologyAffinityStore != nil {
+		topologyManagerNUMANodes := topologyAffinityStore.GetNUMANodeIDs()
+		if len(topologyManagerNUMANodes) > 0 {
+			hintNodeSet := sets.New[int](topologyManagerNUMANodes...)
+			numaNodes = numaNodes[:0]
+			for _, nodeID := range topologyNUMANodes {
+				if hintNodeSet.Has(nodeID) {
+					numaNodes = append(numaNodes, nodeID)
+				}
+			}
+		}
 	}
 
 	manager := &ManagerImpl{

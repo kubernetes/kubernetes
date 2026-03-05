@@ -139,10 +139,25 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cm.topologyManager = topologymanager.NewFakeManager()
 	cm.cpuManager = cpumanager.NewFakeManager(logger)
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
+	topology := machineInfo.Topology
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		if len(nodeConfig.MemoryManagerReservedMemory) > 0 {
+			reservedNUMANodes, err := memorymanager.GetReservedMemoryNUMANodes(machineInfo, cm.GetNodeAllocatableReservation(), nodeConfig.MemoryManagerReservedMemory)
+			if err != nil {
+				return nil, err
+			}
+			if len(reservedNUMANodes) > 0 {
+				logger.Info("Excluding fully reserved NUMA nodes from topology hints", "numaNodes", reservedNUMANodes)
+				topology = filterNUMATopology(topology, reservedNUMANodes)
+				if len(topology) == 0 {
+					return nil, fmt.Errorf("all NUMA nodes excluded by --reserved-memory; at least one NUMA node must remain active")
+				}
+			}
+		}
+
 		logger.Info("Creating topology manager")
-		cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
+		cm.topologyManager, err = topologymanager.NewManager(topology,
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)

@@ -88,6 +88,10 @@ func (m *fakeManager) Name() string {
 	return m.scope
 }
 
+func (m *fakeManager) GetNUMANodeIDs() []int {
+	return nil
+}
+
 func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }

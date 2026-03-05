@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
-const policyTypeNone policyType = "None"
+// PolicyTypeNone is the name of the "None" memory manager policy.
+const PolicyTypeNone policyType = "None"
 
 // none is implementation of the policy interface for the none policy, using none
 // policy is the same as disable memory management
@@ -37,7 +38,7 @@ func NewPolicyNone(logger klog.Logger) Policy {
 }
 
 func (p *none) Name() string {
-	return string(policyTypeNone)
+	return string(PolicyTypeNone)
 }
 
 func (p *none) Start(logger klog.Logger, s state.State) error {

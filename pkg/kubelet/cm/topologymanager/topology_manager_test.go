@@ -588,3 +588,55 @@ func TestAdmit(t *testing.T) {
 		}
 	}
 }
+
+func TestManagerGetNUMANodeIDsReturnsFilteredSet(t *testing.T) {
+	topology := []cadvisorapi.Node{
+		{Id: 0}, {Id: 2}, {Id: 5},
+	}
+
+	mgr, err := NewManager(topology, PolicyBestEffort, ContainerTopologyScope, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := mgr.GetNUMANodeIDs()
+	expected := []int{0, 2, 5}
+	if len(got) != len(expected) {
+		t.Fatalf("expected %v, got %v", expected, got)
+	}
+	for i := range expected {
+		if got[i] != expected[i] {
+			t.Fatalf("expected %v, got %v", expected, got)
+		}
+	}
+
+	// Mutating the returned slice must not affect the manager's internal state.
+	got[0] = 99
+	second := mgr.GetNUMANodeIDs()
+	if second[0] != 0 {
+		t.Fatalf("GetNUMANodeIDs returned a reference to internal state; expected defensive copy")
+	}
+}
+
+func TestScopeGetNUMANodeIDsReturnsNil(t *testing.T) {
+	for _, scopeName := range []string{ContainerTopologyScope, PodTopologyScope} {
+		t.Run(scopeName, func(t *testing.T) {
+			topology := []cadvisorapi.Node{{Id: 0}, {Id: 1}}
+			mgr, err := NewManager(topology, PolicyBestEffort, scopeName, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			m := mgr.(*manager)
+			scopeResult := m.scope.GetNUMANodeIDs()
+			if scopeResult != nil {
+				t.Errorf("scope.GetNUMANodeIDs() should return nil, got %v", scopeResult)
+			}
+
+			managerResult := mgr.GetNUMANodeIDs()
+			if len(managerResult) == 0 {
+				t.Errorf("manager.GetNUMANodeIDs() should return the filtered set, got %v", managerResult)
+			}
+		})
+	}
+}

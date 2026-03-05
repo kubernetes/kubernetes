@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -140,7 +141,7 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 
 	switch policyType(policyName) {
 
-	case policyTypeNone:
+	case PolicyTypeNone:
 		policy = NewPolicyNone(logger)
 
 	case PolicyTypeStatic:
@@ -483,6 +484,65 @@ func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatab
 	}
 
 	return reservedMemoryConverted, nil
+}
+
+// GetReservedMemoryNUMANodes returns NUMA nodes whose memory resources are fully reserved.
+//
+// A NUMA node is considered fully reserved if all allocatable memory resources
+// on that node (regular memory and hugepages) are reserved through
+// --reserved-memory and therefore not available for workloads.
+func GetReservedMemoryNUMANodes(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation) ([]int, error) {
+	systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
+	if err != nil {
+		return nil, err
+	}
+
+	var reservedNUMANodes []int
+	for _, node := range machineInfo.Topology {
+		if isNodeMemoryFullyReserved(node, systemReserved) {
+			reservedNUMANodes = append(reservedNUMANodes, node.Id)
+		}
+	}
+	sort.Ints(reservedNUMANodes)
+
+	return reservedNUMANodes, nil
+}
+
+// isNodeMemoryFullyReserved reports whether all allocatable memory on a NUMA
+// node is covered by --reserved-memory. A node with zero memory and no
+// hugepages (e.g. CPU-less GPU-memory NUMA nodes on NVIDIA GB200) is
+// considered fully reserved because there is nothing left for workloads.
+func isNodeMemoryFullyReserved(node cadvisorapi.Node, systemReserved systemReservedMemory) bool {
+	var hugepagesCapacity uint64
+	for _, hugepage := range node.HugePages {
+		hugepageSize := hugepage.NumPages * hugepage.PageSize * 1024
+		hugepagesCapacity += hugepageSize
+
+		hugepageQuantity := resource.NewQuantity(int64(hugepage.PageSize)*1024, resource.BinarySI)
+		resourceName := corev1helper.HugePageResourceName(*hugepageQuantity)
+		if getResourceSystemReserved(systemReserved, node.Id, resourceName) < hugepageSize {
+			return false
+		}
+	}
+
+	// node.Memory is cadvisor's MemTotal which includes memory backing
+	// hugepages. Subtract hugepagesCapacity to get the regular (non-
+	// hugepage) allocatable memory for this NUMA node.
+	allocatableMemory := node.Memory
+	if allocatableMemory > hugepagesCapacity {
+		allocatableMemory -= hugepagesCapacity
+	} else {
+		allocatableMemory = 0
+	}
+
+	return getResourceSystemReserved(systemReserved, node.Id, v1.ResourceMemory) >= allocatableMemory
+}
+
+func getResourceSystemReserved(systemReserved systemReservedMemory, nodeID int, resourceName v1.ResourceName) uint64 {
+	if nodeSystemReserved, ok := systemReserved[nodeID]; ok {
+		return nodeSystemReserved[resourceName]
+	}
+	return 0
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node

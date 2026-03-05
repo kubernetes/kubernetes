@@ -27,6 +27,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -81,7 +82,7 @@ func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 	case PolicyTypeStatic:
 		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
 		return policy
-	case policyTypeNone:
+	case PolicyTypeNone:
 		return NewPolicyNone(logger)
 	}
 	return nil
@@ -328,6 +329,203 @@ func TestValidateReservedMemory(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetReservedMemoryNUMANodes(t *testing.T) {
+	machineInfo := returnMachineInfo()
+
+	testCases := []struct {
+		description                string
+		nodeAllocatableReservation v1.ResourceList
+		reservedMemory             []kubeletconfig.MemoryReservation
+		expectedReservedNodes      []int
+		expectedError              string
+	}{
+		{
+			description: "single NUMA node fully reserved",
+			nodeAllocatableReservation: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+			},
+			reservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+					},
+				},
+			},
+			expectedReservedNodes: []int{0},
+		},
+		{
+			description: "NUMA node partially reserved",
+			nodeAllocatableReservation: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(2*gb, resource.BinarySI),
+			},
+			reservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(2*gb, resource.BinarySI),
+					},
+				},
+			},
+			expectedReservedNodes: []int{},
+		},
+		{
+			description: "all NUMA nodes fully reserved",
+			nodeAllocatableReservation: v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(10*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(10*gb, resource.BinarySI),
+			},
+			reservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+					},
+				},
+				{
+					NumaNode: 1,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+					},
+				},
+			},
+			expectedReservedNodes: []int{0, 1},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			reservedNodes, err := GetReservedMemoryNUMANodes(&machineInfo, tc.nodeAllocatableReservation, tc.reservedMemory)
+			if tc.expectedError != "" {
+				assert.EqualError(t, err, tc.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.expectedReservedNodes, reservedNodes)
+		})
+	}
+}
+
+func TestGetReservedMemoryNUMANodesZeroMemory(t *testing.T) {
+	machineInfo := cadvisorapi.MachineInfo{
+		Topology: []cadvisorapi.Node{
+			{
+				Id:     0,
+				Memory: 10 * gb,
+				HugePages: []cadvisorapi.HugePagesInfo{
+					{PageSize: pageSize1Gb, NumPages: 5},
+				},
+			},
+			{
+				Id:     1,
+				Memory: 10 * gb,
+				HugePages: []cadvisorapi.HugePagesInfo{
+					{PageSize: pageSize1Gb, NumPages: 5},
+				},
+			},
+			{Id: 2, Memory: 0},
+			{Id: 3, Memory: 0},
+		},
+	}
+
+	reservedNodes, err := GetReservedMemoryNUMANodes(
+		&machineInfo,
+		v1.ResourceList{
+			v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+			hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+		},
+		[]kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 0,
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+					hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []int{0, 2, 3}, reservedNodes,
+		"nodes with zero memory should be treated as fully reserved without explicit --reserved-memory entries")
+}
+
+func TestGetReservedMemoryNUMANodesMultipleHugepageSizes(t *testing.T) {
+	const pageSize2Mb = 2048 // 2Mi in KB
+
+	machineInfo := cadvisorapi.MachineInfo{
+		Topology: []cadvisorapi.Node{
+			{
+				Id:     0,
+				Memory: 10 * gb,
+				HugePages: []cadvisorapi.HugePagesInfo{
+					{PageSize: pageSize1Gb, NumPages: 5},
+					{PageSize: pageSize2Mb, NumPages: 512},
+				},
+			},
+			{
+				Id:     1,
+				Memory: 10 * gb,
+				HugePages: []cadvisorapi.HugePagesInfo{
+					{PageSize: pageSize1Gb, NumPages: 5},
+				},
+			},
+		},
+	}
+
+	t.Run("1G hugepages fully reserved but 2M hugepages not reserved", func(t *testing.T) {
+		reservedNodes, err := GetReservedMemoryNUMANodes(
+			&machineInfo,
+			v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+			},
+			[]kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+					},
+				},
+			},
+		)
+		require.NoError(t, err)
+		assert.Empty(t, reservedNodes,
+			"node 0 should not be fully reserved because 2M hugepages are not reserved")
+	})
+
+	t.Run("all hugepage sizes fully reserved", func(t *testing.T) {
+		reservedNodes, err := GetReservedMemoryNUMANodes(
+			&machineInfo,
+			v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+				hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+				hugepages2M:       *resource.NewQuantity(int64(512*2*mb), resource.BinarySI),
+			},
+			[]kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages1G:       *resource.NewQuantity(5*gb, resource.BinarySI),
+						hugepages2M:       *resource.NewQuantity(int64(512*2*mb), resource.BinarySI),
+					},
+				},
+			},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, []int{0}, reservedNodes,
+			"node 0 should be fully reserved when all hugepage sizes are reserved")
+	})
 }
 
 func TestConvertPreReserved(t *testing.T) {
@@ -1047,7 +1245,7 @@ func TestAddContainer(t *testing.T) {
 		{
 			description:               "Shouldn't return any error when policy is set as None",
 			updateError:               nil,
-			policyName:                policyTypeNone,
+			policyName:                PolicyTypeNone,
 			machineInfo:               machineInfo,
 			reserved:                  reserved,
 			machineState:              state.NUMANodeMap{},
@@ -1994,7 +2192,7 @@ func TestNewManager(t *testing.T) {
 		},
 		{
 			description:                "Should create manager with \"none\" policy",
-			policyName:                 policyTypeNone,
+			policyName:                 PolicyTypeNone,
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},

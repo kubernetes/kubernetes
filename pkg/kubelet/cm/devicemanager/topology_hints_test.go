@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,8 @@ import (
 )
 
 type mockAffinityStore struct {
-	hint topologymanager.TopologyHint
+	hint      topologymanager.TopologyHint
+	numaNodes []int
 }
 
 func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
@@ -46,6 +48,10 @@ func (m *mockAffinityStore) GetPolicy() topologymanager.Policy {
 
 func (m *mockAffinityStore) Name() string {
 	return "container"
+}
+
+func (m *mockAffinityStore) GetNUMANodeIDs() []int {
+	return m.numaNodes
 }
 
 func makeNUMADevice(id string, numa int) *pluginapi.Device {
@@ -426,7 +432,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
-			topologyAffinityStore: &mockAffinityStore{tc.hint},
+			topologyAffinityStore: &mockAffinityStore{hint: tc.hint},
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
@@ -616,7 +622,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
-			topologyAffinityStore: &mockAffinityStore{tc.hint},
+			topologyAffinityStore: &mockAffinityStore{hint: tc.hint},
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
@@ -2040,5 +2046,188 @@ func getPodScopeTestCases() []topologyHintTestCase {
 				},
 			},
 		},
+	}
+}
+
+func TestNewManagerImplUsesTopologyManagerNUMANodes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	fullTopology := []cadvisorapi.Node{
+		{Id: 0}, {Id: 1}, {Id: 2}, {Id: 3},
+	}
+
+	tests := []struct {
+		name          string
+		store         topologymanager.Store
+		expectedNUMAs []int
+	}{
+		{
+			name:          "uses GetNUMANodeIDs when store provides filtered nodes",
+			store:         &mockAffinityStore{numaNodes: []int{0, 1}},
+			expectedNUMAs: []int{0, 1},
+		},
+		{
+			name:          "intersects GetNUMANodeIDs with local topology",
+			store:         &mockAffinityStore{numaNodes: []int{0, 4, 5}},
+			expectedNUMAs: []int{0},
+		},
+		{
+			name:          "falls back to topology when GetNUMANodeIDs returns nil",
+			store:         &mockAffinityStore{numaNodes: nil},
+			expectedNUMAs: []int{0, 1, 2, 3},
+		},
+		{
+			name:          "falls back to topology when store is nil",
+			store:         nil,
+			expectedNUMAs: []int{0, 1, 2, 3},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mgr, err := newManagerImpl(logger, t.TempDir(), fullTopology, tc.store)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(mgr.numaNodes, tc.expectedNUMAs) {
+				t.Errorf("expected numaNodes %v, got %v", tc.expectedNUMAs, mgr.numaNodes)
+			}
+		})
+	}
+}
+
+func TestDevicesOnExcludedNUMANodesNotInHints(t *testing.T) {
+	resourceName := "testdevice"
+
+	tcases := []struct {
+		description   string
+		numaNodes     []int
+		devices       []*pluginapi.Device
+		request       int
+		expectedHints []topologymanager.TopologyHint
+	}{
+		{
+			description: "devices only on active NUMA nodes produce normal hints",
+			numaNodes:   []int{0, 1},
+			devices: []*pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+			},
+			request: 1,
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(1), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			},
+		},
+		{
+			description: "devices on excluded NUMA nodes are invisible to hints",
+			numaNodes:   []int{0, 1},
+			devices: []*pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 2),
+				makeNUMADevice("Dev4", 3),
+			},
+			request: 1,
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(1), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			},
+		},
+		{
+			description: "all devices on excluded NUMA nodes yields empty hints",
+			numaNodes:   []int{0, 1},
+			devices: []*pluginapi.Device{
+				makeNUMADevice("Dev1", 2),
+				makeNUMADevice("Dev2", 3),
+			},
+			request:       1,
+			expectedHints: []topologymanager.TopologyHint{},
+		},
+		{
+			description: "request unsatisfiable from active NUMA nodes alone yields empty hints",
+			numaNodes:   []int{0},
+			devices: []*pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+			},
+			request:       2,
+			expectedHints: []topologymanager.TopologyHint{},
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "fakePod"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "fakeContainer",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceName(resourceName)] =
+				resource.MustParse(fmt.Sprintf("%d", tc.request))
+
+			m := ManagerImpl{
+				allDevices:       NewResourceDeviceInstances(),
+				healthyDevices:   make(map[string]sets.Set[string]),
+				allocatedDevices: make(map[string]sets.Set[string]),
+				podDevices:       newPodDevices(),
+				sourcesReady:     &sourcesReadyStub{},
+				activePods:       func() []*v1.Pod { return []*v1.Pod{pod} },
+				numaNodes:        tc.numaNodes,
+			}
+
+			m.allDevices[resourceName] = make(DeviceInstances)
+			m.healthyDevices[resourceName] = sets.New[string]()
+			for _, d := range tc.devices {
+				m.allDevices[resourceName][d.ID] = d
+				m.healthyDevices[resourceName].Insert(d.ID)
+			}
+
+			// Verify GetTopologyHints
+			containerHints := m.GetTopologyHints(pod, &pod.Spec.Containers[0])
+			gotHints := containerHints[resourceName]
+			sort.SliceStable(gotHints, func(i, j int) bool {
+				return gotHints[i].LessThan(gotHints[j])
+			})
+			sort.SliceStable(tc.expectedHints, func(i, j int) bool {
+				return tc.expectedHints[i].LessThan(tc.expectedHints[j])
+			})
+			if !reflect.DeepEqual(gotHints, tc.expectedHints) {
+				t.Errorf("GetTopologyHints: expected %v, got %v", tc.expectedHints, gotHints)
+			}
+
+			// Verify no hint references an excluded NUMA node
+			activeSet := sets.New(tc.numaNodes...)
+			for _, h := range gotHints {
+				for _, bit := range h.NUMANodeAffinity.GetBits() {
+					if !activeSet.Has(bit) {
+						t.Errorf("hint %v references excluded NUMA node %d", h, bit)
+					}
+				}
+			}
+
+			// Verify GetPodTopologyHints matches
+			podHints := m.GetPodTopologyHints(pod)
+			gotPodHints := podHints[resourceName]
+			sort.SliceStable(gotPodHints, func(i, j int) bool {
+				return gotPodHints[i].LessThan(gotPodHints[j])
+			})
+			if !reflect.DeepEqual(gotPodHints, tc.expectedHints) {
+				t.Errorf("GetPodTopologyHints: expected %v, got %v", tc.expectedHints, gotPodHints)
+			}
+		})
 	}
 }
