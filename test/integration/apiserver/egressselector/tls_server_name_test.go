@@ -17,7 +17,6 @@ limitations under the License.
 package egressselector
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -26,13 +25,9 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -95,7 +90,7 @@ func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, se
 }
 
 // runTLSEgressProxy runs an HTTP CONNECT proxy with TLS.
-func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath string, called *atomic.Bool, ready chan<- struct{}) (string, error) {
+func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath string, called *atomic.Bool, observedSNI *atomic.Value) (string, error) {
 	t.Helper()
 
 	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
@@ -112,6 +107,10 @@ func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath s
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    clientCAs,
+		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			observedSNI.Store(hello.ServerName)
+			return nil, nil
+		},
 	}
 
 	listener, err := tls.Listen("tcp", "127.0.0.1:0", tlsConfig)
@@ -135,8 +134,6 @@ func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath s
 		}
 	})
 
-	close(ready)
-
 	return proxyAddr, nil
 }
 
@@ -153,24 +150,28 @@ func TestTLSServerName(t *testing.T) {
 		name              string
 		tlsServerName     string
 		expectProxyCalled bool
+		expectedSNI       string
 		description       string
 	}{
 		{
 			name:              "matching tlsServerName succeeds TLS handshake",
 			tlsServerName:     proxyHostname,
 			expectProxyCalled: true,
+			expectedSNI:       proxyHostname,
 			description:       "SNI override matches cert SANs, connection succeeds",
 		},
 		{
 			name:              "mismatched tlsServerName fails TLS handshake",
 			tlsServerName:     "wrong-hostname.example.com",
 			expectProxyCalled: false,
+			expectedSNI:       "wrong-hostname.example.com",
 			description:       "SNI override doesn't match cert SANs, connection fails",
 		},
 		{
 			name:              "empty tlsServerName uses dial address and fails",
 			tlsServerName:     "",
 			expectProxyCalled: false,
+			expectedSNI:       "",
 			description:       "Without tlsServerName, uses dial address 127.0.0.1 which fails cert validation",
 		},
 	}
@@ -178,20 +179,14 @@ func TestTLSServerName(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var proxyCalled atomic.Bool
+			var observedSNI atomic.Value
 
-			ready := make(chan struct{})
-			proxyAddr, err := runTLSEgressProxy(t, serverCertPath, serverKeyPath, caCertPath, &proxyCalled, ready)
+			proxyAddr, err := runTLSEgressProxy(t, serverCertPath, serverKeyPath, caCertPath, &proxyCalled, &observedSNI)
 			require.NoError(t, err, "Failed to start TLS egress proxy")
-
-			select {
-			case <-ready:
-				t.Logf("TLS egress proxy ready at %s (cert issued for: %s)", proxyAddr, proxyHostname)
-			case <-time.After(10 * time.Second):
-				t.Fatal("timeout waiting for TLS egress proxy to start")
-			}
+			t.Logf("TLS egress proxy ready at %s (cert issued for: %s)", proxyAddr, proxyHostname)
 
 			caCertContent, _, caFilePath, caKeyFilePath := oidctest.GenerateCert(t)
-			signingPrivateKey, publicKey := oidctest.RSAGenerateKey(t)
+			_, publicKey := oidctest.RSAGenerateKey(t)
 			oidcServer := utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
 			egressConfig := fmt.Sprintf(`
@@ -243,30 +238,9 @@ jwt:
 
 			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
-			idTokenLifetime := time.Second * 1200
-			oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
-				t,
-				signingPrivateKey,
-				map[string]interface{}{
-					"iss": oidcServer.URL(),
-					"sub": "test-user",
-					"aud": "foo",
-					"exp": time.Now().Add(idTokenLifetime).Unix(),
-				},
-				"access-token",
-				"refresh-token",
-			)).Maybe()
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			client := kubernetes.NewForConfigOrDie(rest.CopyConfig(server.ClientConfig))
-
-			// Attempt to list namespaces to trigger egress proxy usage
-			// The error is expected in some test cases (e.g., when TLS handshake fails)
-			_, _ = client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-
-			time.Sleep(100 * time.Millisecond)
+			if sni, _ := observedSNI.Load().(string); sni != tc.expectedSNI {
+				t.Errorf("expected SNI=%q, got=%q", tc.expectedSNI, sni)
+			}
 
 			if tc.expectProxyCalled != proxyCalled.Load() {
 				t.Errorf("expected proxy called=%v, got=%v", tc.expectProxyCalled, proxyCalled.Load())
