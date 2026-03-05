@@ -203,7 +203,8 @@ func (jm *Controller) discoverPodGroupForWorkload(ctx context.Context, job *batc
 	var matched []*schedulingv1alpha2.PodGroup
 	for _, pg := range allPodGroups {
 		if pg.Spec.PodGroupTemplateRef != nil &&
-			pg.Spec.PodGroupTemplateRef.WorkloadName == workload.Name {
+			pg.Spec.PodGroupTemplateRef.Workload != nil &&
+			pg.Spec.PodGroupTemplateRef.Workload.WorkloadName == workload.Name {
 			matched = append(matched, pg)
 		}
 	}
@@ -298,8 +299,10 @@ func (jm *Controller) createPodGroupForWorkload(ctx context.Context, job *batch.
 		},
 		Spec: schedulingv1alpha2.PodGroupSpec{
 			PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-				WorkloadName:         workload.Name,
-				PodGroupTemplateName: template.Name,
+				Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+					WorkloadName:         workload.Name,
+					PodGroupTemplateName: template.Name,
+				},
 			},
 			SchedulingPolicy: *template.SchedulingPolicy.DeepCopy(),
 		},

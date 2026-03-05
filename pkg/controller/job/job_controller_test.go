@@ -8086,8 +8086,10 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			},
 			Spec: schedulingv1alpha2.PodGroupSpec{
 				PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-					WorkloadName:         wlName,
-					PodGroupTemplateName: templateName,
+					Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+						WorkloadName:         wlName,
+						PodGroupTemplateName: templateName,
+					},
 				},
 			},
 		}

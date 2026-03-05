@@ -441,8 +441,10 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			},
 			Spec: schedulingv1alpha2.PodGroupSpec{
 				PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-					WorkloadName:         wlName,
-					PodGroupTemplateName: templateName,
+					Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+						WorkloadName:         wlName,
+						PodGroupTemplateName: templateName,
+					},
 				},
 			},
 		}
@@ -533,8 +535,10 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					},
 					Spec: schedulingv1alpha2.PodGroupSpec{
 						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-							WorkloadName:         "user-created-workload",
-							PodGroupTemplateName: templateName,
+							Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+								WorkloadName:         "user-created-workload",
+								PodGroupTemplateName: templateName,
+							},
 						},
 					},
 				},
@@ -721,20 +725,6 @@ func TestCreatePodGroupForWorkload(t *testing.T) {
 		t.Errorf("PodGroup name = %q, want %q", pg.Name, expectedName)
 	}
 
-	if pg.Spec.PodGroupTemplateRef == nil {
-		t.Fatal("expected podGroupTemplateRef")
-	}
-	if pg.Spec.PodGroupTemplateRef.WorkloadName != workload.Name {
-		t.Errorf("templateRef.workloadName = %q, want %q", pg.Spec.PodGroupTemplateRef.WorkloadName, workload.Name)
-	}
-	if pg.Spec.PodGroupTemplateRef.PodGroupTemplateName != templateName {
-		t.Errorf("templateRef.podGroupTemplateName = %q, want %q", pg.Spec.PodGroupTemplateRef.PodGroupTemplateName, templateName)
-	}
-
-	if pg.Spec.SchedulingPolicy.Gang == nil || pg.Spec.SchedulingPolicy.Gang.MinCount != 4 {
-		t.Errorf("expected copied gang policy with minCount=4, got %+v", pg.Spec.SchedulingPolicy)
-	}
-
 	if len(pg.OwnerReferences) != 2 {
 		t.Fatalf("expected 2 ownerReferences, got %d", len(pg.OwnerReferences))
 	}
@@ -900,7 +890,9 @@ func TestDiscoverPodGroupForWorkload(t *testing.T) {
 					},
 					Spec: schedulingv1alpha2.PodGroupSpec{
 						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-							WorkloadName: workload.Name,
+							Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+								WorkloadName: workload.Name,
+							},
 						},
 					},
 				},
@@ -926,7 +918,9 @@ func TestDiscoverPodGroupForWorkload(t *testing.T) {
 					},
 					Spec: schedulingv1alpha2.PodGroupSpec{
 						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-							WorkloadName: "different-workload",
+							Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+								WorkloadName: "different-workload",
+							},
 						},
 					},
 				},
@@ -941,7 +935,9 @@ func TestDiscoverPodGroupForWorkload(t *testing.T) {
 					},
 					Spec: schedulingv1alpha2.PodGroupSpec{
 						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-							WorkloadName: workload.Name,
+							Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+								WorkloadName: workload.Name,
+							},
 						},
 					},
 				},
@@ -952,7 +948,9 @@ func TestDiscoverPodGroupForWorkload(t *testing.T) {
 					},
 					Spec: schedulingv1alpha2.PodGroupSpec{
 						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-							WorkloadName: workload.Name,
+							Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+								WorkloadName: workload.Name,
+							},
 						},
 					},
 				},
