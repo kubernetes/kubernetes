@@ -363,18 +363,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					framework.ExpectNoError(err)
 				})
 
-				ginkgo.By("Waiting for the restarted regular container to be running", func() {
-					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "restarted regular container to be running",
-						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.ContainerStatuses) == 0 {
-								return false, nil
-							}
-							containerStatus := pod.Status.ContainerStatuses[0]
-							return containerStatus.RestartCount >= 1 && containerStatus.State.Running != nil, nil
-						})
-					framework.ExpectNoError(err)
-				})
-
 				ginkgo.By("Changing the image of the failed regular container", func() {
 					client.Update(ctx, pod.Name, func(pod *v1.Pod) {
 						pod.Spec.Containers[0].Image = updatedImage
@@ -384,9 +372,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("verifying that the image changed", func() {
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "container attempted to run with updated image",
 						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.ContainerStatuses) == 0 {
-								return false, nil
-							}
 							containerStatus := pod.Status.ContainerStatuses[0]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
@@ -461,18 +446,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					framework.ExpectNoError(err)
 				})
 
-				ginkgo.By("Waiting for the restarted regular container to be running", func() {
-					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "restarted regular container to be running",
-						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.ContainerStatuses) == 0 {
-								return false, nil
-							}
-							containerStatus := pod.Status.ContainerStatuses[0]
-							return containerStatus.RestartCount >= 1 && containerStatus.State.Running != nil, nil
-						})
-					framework.ExpectNoError(err)
-				})
-
 				ginkgo.By("Changing the image of the failed regular container", func() {
 					client.Update(ctx, pod.Name, func(pod *v1.Pod) {
 						pod.Spec.Containers[0].Image = updatedImage
@@ -482,9 +455,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("verifying that the image changed", func() {
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "container attempted to run with updated image",
 						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.ContainerStatuses) == 0 {
-								return false, nil
-							}
 							containerStatus := pod.Status.ContainerStatuses[0]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
@@ -4201,18 +4171,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					framework.ExpectNoError(err)
 				})
 
-				ginkgo.By("Waiting for the restarted init container to be running", func() {
-					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "restarted init container to be running",
-						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.InitContainerStatuses) <= 1 {
-								return false, nil
-							}
-							containerStatus := pod.Status.InitContainerStatuses[1]
-							return containerStatus.RestartCount >= 1 && containerStatus.State.Running != nil, nil
-						})
-					framework.ExpectNoError(err)
-				})
-
 				ginkgo.By("Changing the image of the initializing restartable init container", func() {
 					client.Update(ctx, pod.Name, func(pod *v1.Pod) {
 						pod.Spec.InitContainers[1].Image = updatedImage
@@ -4231,9 +4189,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "init container attempted to run with updated image",
 						time.Duration(30)*time.Second, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.InitContainerStatuses) <= 1 {
-								return false, nil
-							}
 							containerStatus := pod.Status.InitContainerStatuses[1]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
@@ -4515,18 +4470,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					framework.ExpectNoError(err)
 				})
 
-				ginkgo.By("Waiting for the restarted init container to be running", func() {
-					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "restarted init container to be running",
-						time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.InitContainerStatuses) <= 1 {
-								return false, nil
-							}
-							containerStatus := pod.Status.InitContainerStatuses[1]
-							return containerStatus.RestartCount >= 1 && containerStatus.State.Running != nil, nil
-						})
-					framework.ExpectNoError(err)
-				})
-
 				ginkgo.By("Changing the image of the initializing restartable init container", func() {
 					client.Update(ctx, pod.Name, func(pod *v1.Pod) {
 						pod.Spec.InitContainers[1].Image = updatedImage
@@ -4539,9 +4482,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "init container attempted to run with updated image",
 						time.Duration(30)*time.Second, func(pod *v1.Pod) (bool, error) {
-							if len(pod.Status.InitContainerStatuses) <= 1 {
-								return false, nil
-							}
 							containerStatus := pod.Status.InitContainerStatuses[1]
 							return containerStatus.Image == updatedImage, nil
 						})
