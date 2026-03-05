@@ -30,6 +30,10 @@ type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
 	Cgroups         map[types.UID]CgroupName
+	// ExistsReturn controls what Exists() returns. When nil, defaults to true.
+	// Set to a false pointer to simulate pcm.Exists() returning false after
+	// EnsureExists() (e.g., cgroup v2/systemd race condition).
+	ExistsReturn *bool
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
@@ -50,6 +54,9 @@ func (m *FakePodContainerManager) Exists(_ *v1.Pod) bool {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "Exists")
+	if m.ExistsReturn != nil {
+		return *m.ExistsReturn
+	}
 	return true
 }
 

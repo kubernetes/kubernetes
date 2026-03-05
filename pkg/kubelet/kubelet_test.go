@@ -5111,6 +5111,69 @@ func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alterna
 	return caCertBytes, leafCertBytes, key, err
 }
 
+// TestSyncPodCgroupKillRaceWithInitializedPod reproduces the race condition
+// where pcm.Exists() returns false after EnsureExists() was already called
+// (e.g., on cgroup v2 with systemd cgroup driver, where systemd may delete
+// cgroup subsystems that libcontainer created). Without the fix, SyncPod
+// would kill pods in this scenario. With the fix, pods that have already
+// had EnsureExists called are not killed.
+func TestSyncPodCgroupKillRaceWithInitializedPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeContainerManager := testKubelet.fakeContainerManager
+
+	// Enable cgroups-per-qos so the cgroup kill path is active
+	kl.cgroupsPerQOS = true
+
+	// Simulate pcm.Exists() returning false (the race condition)
+	existsReturn := false
+	fakeContainerManager.PodContainerManager.ExistsReturn = &existsReturn
+
+	pod := podWithUIDNameNsSpec("race-test-uid", "race-test-pod", "default", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "test-container", Image: "busybox"},
+		},
+	})
+
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	// Provide a kubecontainer.PodStatus with a running container so that
+	// generateAPIPodStatus produces ContainerStatuses with State.Running,
+	// which makes firstSync=false in SyncPod's cgroup kill path.
+	podStatus := &kubecontainer.PodStatus{
+		ID: pod.UID,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "test-container",
+				State: kubecontainer.ContainerStateRunning,
+				ID:    kubecontainer.ContainerID{Type: "test", ID: "fake-container-id"},
+			},
+		},
+	}
+
+	// Case 1: Without markPodCgroupInitialized — pod SHOULD be killed
+	// (pcm.Exists=false, firstSync=false, not initialized)
+	fakeRuntime.KilledPods = nil
+	_, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	// We expect either success or an error, but killPod should have been called
+	_ = err
+	if len(fakeRuntime.KilledPods) == 0 {
+		t.Error("Case 1: Expected pod to be killed when pcm.Exists()=false, firstSync=false, and pod cgroup NOT initialized")
+	}
+
+	// Case 2: WITH markPodCgroupInitialized — pod should NOT be killed
+	kl.markPodCgroupInitialized(pod.UID)
+	fakeRuntime.KilledPods = nil
+	_, err = kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	_ = err
+	if len(fakeRuntime.KilledPods) > 0 {
+		t.Error("Case 2: Pod should NOT be killed when pcm.Exists()=false but pod cgroup IS initialized (fix prevents unnecessary kill)")
+	}
+}
+
 func TestPodCgroupInitializedTracking(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
