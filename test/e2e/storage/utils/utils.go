@@ -734,6 +734,20 @@ func WaitForOwnedResourcesDeleted(ctx context.Context,
 	return fmt.Errorf("some %s %s owned by %s were not deleted within %v", gvr.Resource, scope, ownerUID, timeout)
 }
 
+// FilterResourcesByOwner filters unstructured resources to only those owned by the specified owner kind and UID
+func FilterResourcesByOwner(resources []unstructured.Unstructured, ownerKind string, ownerUID types.UID) []unstructured.Unstructured {
+	var filtered []unstructured.Unstructured
+	for _, resource := range resources {
+		for _, owner := range resource.GetOwnerReferences() {
+			if owner.Kind == ownerKind && owner.UID == ownerUID {
+				filtered = append(filtered, resource)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 // WaitUntil runs checkDone until a timeout is reached
 func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 	// TODO (pohly): replace with gomega.Eventually

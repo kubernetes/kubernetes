@@ -361,38 +361,50 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				} else {
 					// For pre-provisioned snapshots, query VolumeSnapshots owned by the VGS
 					dc := f.DynamicClient
-					vgsList, err := dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-					framework.ExpectNoError(err, "failed to list VolumeGroupSnapshots")
-
-					var vgsUID string
-					for _, vgs := range vgsList.Items {
-						if vgs.GetName() == snapshot.VGS.GetName() {
-							vgsUID = string(vgs.GetUID())
-							break
-						}
-					}
-					gomega.Expect(vgsUID).NotTo(gomega.BeEmpty(), "failed to get VGS UID")
+					vgsUID := snapshot.VGS.GetUID()
 
 					// List VolumeSnapshots owned by this VGS
 					vss, err := dc.Resource(utils.SnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list VolumeSnapshots")
 
-					var preProvisionedSnapshots []string
-					for _, vs := range vss.Items {
-						for _, owner := range vs.GetOwnerReferences() {
-							if owner.Kind == "VolumeGroupSnapshot" && string(owner.UID) == vgsUID {
-								preProvisionedSnapshots = append(preProvisionedSnapshots, vs.GetName())
-								break
-							}
-						}
+					// Map VolumeSnapshot name to its source PVC name
+					type snapshotInfo struct {
+						vsName    string
+						sourcePVC string
+					}
+
+					// Filter to only VolumeSnapshots owned by our VGS
+					ownedSnapshots := utils.FilterResourcesByOwner(vss.Items, "VolumeGroupSnapshot", vgsUID)
+					gomega.Expect(ownedSnapshots).Should(gomega.HaveLen(groupTest.numReplicas), "expected %d VolumeSnapshots owned by VGS, got %d", groupTest.numReplicas, len(ownedSnapshots))
+
+					// Process each owned snapshot to get source PVC mapping
+					var preProvisionedSnapshots []snapshotInfo
+					for _, vs := range ownedSnapshots {
+						// Pre-provisioned snapshot - get snapshot handle from VSC, then look up PVC name
+						spec := vs.Object["spec"].(map[string]interface{})
+						source := spec["source"].(map[string]interface{})
+						vscName := source["volumeSnapshotContentName"].(string)
+
+						vsc, err := dc.Resource(utils.SnapshotContentGVR).Get(ctx, vscName, metav1.GetOptions{})
+						framework.ExpectNoError(err, "failed to get VolumeSnapshotContent %s for pre-provisioned VolumeSnapshot %s", vscName, vs.GetName())
+
+						vscStatus := vsc.Object["status"].(map[string]interface{})
+						snapshotHandle := vscStatus["snapshotHandle"].(string)
+
+						// Look up the source PVC name from the mapping in the snapshot resource
+						sourcePVCName := snapshot.SnapshotHandleToPVCName[snapshotHandle]
+						gomega.Expect(sourcePVCName).NotTo(gomega.BeEmpty(), "no PVC name mapping found for snapshot handle %s", snapshotHandle)
+
+						preProvisionedSnapshots = append(preProvisionedSnapshots, snapshotInfo{
+							vsName:    vs.GetName(),
+							sourcePVC: sourcePVCName,
+						})
 					}
 					gomega.Expect(preProvisionedSnapshots).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify pre-provisioned snapshot count")
 
-					// Map snapshot index to original PVC name (snapshots are created in the same order as PVCs)
-					for i, vsName := range preProvisionedSnapshots {
-						// Original PVC name for StatefulSet
-						originalPVCName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
-						restoredPVCName := fmt.Sprintf("restored-%s", originalPVCName)
+					// Create restored PVCs from snapshots, using the actual source PVC name
+					for _, snapInfo := range preProvisionedSnapshots {
+						restoredPVCName := fmt.Sprintf("restored-%s", snapInfo.sourcePVC)
 
 						pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 							StorageClassName: &groupTest.volumeResources[0].Sc.Name,
@@ -405,7 +417,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
 							APIGroup: &group,
 							Kind:     "VolumeSnapshot",
-							Name:     vsName,
+							Name:     snapInfo.vsName,
 						}
 
 						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
