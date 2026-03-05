@@ -2668,6 +2668,10 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 		affectedNodes sets.Set[string]
 	}
 
+	orderingByName := func(vi1, vi2 preemption.PreemptionUnit) bool {
+		return vi1.Pods()[0].GetPod().Name < vi2.Pods()[0].GetPod().Name
+	}
+
 	tests := []struct {
 		name                          string
 		nodeNames                     []string
@@ -2680,6 +2684,7 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 		expectedNumViolatingVictim    []int
 		expectedStatus                []*fwk.Status
 		preemptionUnitTemplates       []preemptionUnitTemplate
+		customOrdering                MoreImportantVictimFunc
 	}{
 		{
 			name:      "Basic: Preempt single lower priority pod",
@@ -2867,6 +2872,55 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			expectedNumViolatingVictim: []int{0},
 			expectedStatus:             []*fwk.Status{fwk.NewStatus(fwk.UnschedulableAndUnresolvable)},
 		},
+		{
+			name:      "Workload aware: all victims have the same priority",
+			nodeNames: []string{"node1"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).Obj(),
+			},
+			preemptionUnitTemplates: []preemptionUnitTemplate{
+				{pods: sets.New("p1"), priority: lowPriority, affectedNodes: sets.New("node1")},
+				{pods: sets.New("p2"), priority: lowPriority, affectedNodes: sets.New("node1")},
+				{pods: sets.New("p3"), priority: lowPriority, affectedNodes: sets.New("node1")},
+			},
+			preemptor: preemption.NewPodPreemptor(st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(), framework.NewCycleState()),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", blockingVictims: []string{"p1"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p2"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p3"}, capacity: 1},
+			},
+			expectedPods:                  [][]string{{"p1"}},
+			expectedNumViolatingVictim:    []int{0},
+			expectedStatus:                []*fwk.Status{fwk.NewStatus(fwk.Success)},
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:      "Workload aware: default priority ordering will be applied",
+			nodeNames: []string{"node1"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node1").Priority(midPriority).Obj(),
+				st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).Obj(),
+			},
+			preemptionUnitTemplates: []preemptionUnitTemplate{
+				{pods: sets.New("p1"), priority: highPriority, affectedNodes: sets.New("node1")},
+				{pods: sets.New("p2"), priority: midPriority, affectedNodes: sets.New("node1")},
+				{pods: sets.New("p3"), priority: lowPriority, affectedNodes: sets.New("node1")},
+			},
+			preemptor: preemption.NewPodPreemptor(st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(), framework.NewCycleState()),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", blockingVictims: []string{"p1"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p2"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p3"}, capacity: 1},
+			},
+			expectedPods:                  [][]string{{"p3"}},
+			expectedNumViolatingVictim:    []int{0},
+			expectedStatus:                []*fwk.Status{fwk.NewStatus(fwk.Success)},
+			customOrdering:                orderingByName,
+			enableWorkloadAwarePreemption: true,
+		},
 	}
 
 	labelKeys := []string{"hostname", "zone", "region"}
@@ -2944,6 +2998,9 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 				t.Fatal(err)
 			}
 			pl.SimulatePodScheduling = getMockCanPlacePodsFunc(tt.blockingRules)
+			if tt.customOrdering != nil {
+				pl.MoreImportantVictim = tt.customOrdering
+			}
 
 			var domains []preemption.Domain
 			if tt.enableWorkloadAwarePreemption {

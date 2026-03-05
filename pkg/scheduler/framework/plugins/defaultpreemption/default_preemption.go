@@ -248,8 +248,17 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	preemptor preemption.Preemptor,
 	domain preemption.Domain,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
+	var priorityFunc MoreImportantVictimFunc
+	// Use default priority function if workload aware preemption is enabled.
+	if pl.fts.EnableWorkloadAwarePreemption {
+		priorityFunc = pl.moreImportantVictim
+	} else {
+		priorityFunc = pl.MoreImportantVictim
+	}
+
 	logger := klog.FromContext(ctx)
 	nameToNode := make(map[string]fwk.NodeInfo)
+
 	for _, nodeInfo := range domain.Nodes() {
 		nameToNode[nodeInfo.Node().Name] = nodeInfo
 	}
@@ -313,15 +322,15 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	if status := pl.SimulatePodScheduling(ctx, preemptor, domain); !status.IsSuccess() {
 		return nil, 0, status
 	}
-
+	// Sort potentialVictims by descending importance, which ensures reprieve of
+	// higher priority victims first.
 	sort.Slice(potentialVictims, func(i, j int) bool {
-		return pl.MoreImportantVictim(potentialVictims[i], potentialVictims[j])
+		return priorityFunc(potentialVictims[i], potentialVictims[j])
 	})
 
 	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
 	numViolatingVictim := 0
-	// Sort potentialVictims by descending importance, which ensures reprieve of
-	// higher priority victims first.
+
 	reprieveVictim := func(v preemption.PreemptionUnit) (bool, error) {
 		if err := addPods(v); err != nil {
 			return false, err
@@ -354,9 +363,22 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 		}
 	}
 
-	victimsToPreempt = append(victimsToPreempt, nonViolatingVictims...)
+	if len(nonViolatingVictims) > 0 && pl.fts.EnableWorkloadAwarePreemption {
+		var err error
+		victims, err := pl.selectVictimsByBinarySearch(ctx, preemptor, domain, nonViolatingVictims, addPods, removePods)
+		if err != nil {
+			return nil, 0, fwk.AsStatus(err)
+		}
+		victimsToPreempt = append(victimsToPreempt, victims...)
+	} else {
+		victimsToPreempt = append(victimsToPreempt, nonViolatingVictims...)
+		sort.Slice(victimsToPreempt, func(i, j int) bool {
+			return priorityFunc(victimsToPreempt[i], victimsToPreempt[j])
+		})
+	}
+
 	sort.Slice(victimsToPreempt, func(i, j int) bool {
-		return pl.MoreImportantVictim(victimsToPreempt[i], victimsToPreempt[j])
+		return priorityFunc(victimsToPreempt[i], victimsToPreempt[j])
 	})
 	var podsToPreempt []*v1.Pod
 	for _, v := range victimsToPreempt {
@@ -493,7 +515,7 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 	return false
 }
 
-// MoreImportantVictim decides which of two preemption units is considered more critical.
+// moreImportantVictim decides which of two preemption units is considered more critical.
 //
 // The comparison logic follows this strict hierarchy:
 //
@@ -546,4 +568,134 @@ func getEarliestPodStartTime(pInfos []fwk.PodInfo) *metav1.Time {
 		}
 	}
 	return earliest
+}
+
+// This algorithm efficiently identifies the minimal set of victims to preempt to make room for a new workload.
+// It reduces computational cost by searching across "priority tiers" rather than individual pods.
+//
+//  1. SORTING (The "Safety" Hierarchy):
+//     Victims are sorted from Highest Priority to Lowest Priority [1].
+//     - The beginning of the list (Index 0) represents victims we most want to SAVE.
+//     - The end of the list represents victims we are most willing to SACRIFICE.
+//
+//  2. BREAKPOINTS (Priority Tiers):
+//     We identify indices where the priority changes [2]. These "breakpoints" define valid "Cutoff Points".
+//     A Cutoff at index K means: "Keep victims 0 to K (High Prio), Preempt K to End (Low Prio)".
+//
+//  3. BINARY SEARCH (Finding the Limit):
+//     We search the breakpoints to find the "tipping point" [3].
+//     - The search predicate returns TRUE if the placement FAILS.
+//     - Therefore, sort.Search finds the *first* cutoff where we kept too many victims and the new pod no longer fits.
+//
+//  4. STATE MANAGEMENT (Delta Updates):
+//     To keep the search O(log N) effectively, we don't rebuild the state every iteration.
+//     We only "Add" or "Remove" the pods in the range between the old and new cutoff indices [4].
+//
+//  5. RESOLUTION:
+//     The search gives us the first failure point. We revert to the breakpoint immediately preceding it
+//     (idx - 1), which is the state where we maximized saved victims while still fitting the new pod [5].
+//     Finally, we perform a linear pass on the remaining victims to add it to the potentialVictims list for the FINAL BEST-EFFORT REPRIEVE [6].
+func (pl *DefaultPreemption) selectVictimsByBinarySearch(
+	ctx context.Context,
+	preemptor preemption.Preemptor,
+	domain preemption.Domain,
+	nonViolatingVictims []preemption.PreemptionUnit,
+	addPods func(preemption.PreemptionUnit) error,
+	removePods func(preemption.PreemptionUnit) error,
+) ([]preemption.PreemptionUnit, error) {
+	// Sorts victims High -> Low.
+	// This organizes the list so that [0...i] are the most important pods to keep.
+	// Allows O(1) lookups for victims to preempt by unique priority [1].
+	sort.Slice(nonViolatingVictims, func(i, j int) bool {
+		return pl.moreImportantVictim(nonViolatingVictims[i], nonViolatingVictims[j])
+	})
+
+	// Identify indices where priority changes.
+	// We will binary search over these indices rather than every single pod to save time [2].
+	var breakpoints []int
+	currentPrio := nonViolatingVictims[0].Priority()
+
+	for i, v := range nonViolatingVictims {
+		p := v.Priority()
+		if p != currentPrio {
+			breakpoints = append(breakpoints, i) // Record the start of the NEW priority tier [2]
+			currentPrio = p
+		}
+	}
+	breakpoints = append(breakpoints, len(nonViolatingVictims)) // Final breakpoint is the end of list [2]
+
+	currentCutoffIndex := 0
+	var searchErr error
+
+	// [STEP 3] BINARY SEARCH EXECUTION
+	// Search for the boundary between Success and Failure.[3]
+	idx := sort.Search(len(breakpoints), func(i int) bool {
+		targetCutoffIndex := breakpoints[i]
+
+		// Only modify the cluster state for the "delta"
+		// between the previous check and the current check.
+		if targetCutoffIndex > currentCutoffIndex {
+			// Moving Right: We are expanding the "Safe Zone".
+			// We are adding High Priority victims BACK into the cluster state to see if they fit.
+			// Range: [currentCutoffIndex, targetCutoffIndex) [4]
+			for k := currentCutoffIndex; k < targetCutoffIndex; k++ {
+				if err := addPods(nonViolatingVictims[k]); err != nil {
+					searchErr = err
+					return true
+				}
+			}
+		} else if targetCutoffIndex < currentCutoffIndex {
+			// Moving Left: We are shrinking the "Safe Zone".
+			// We are sacrificing (Removing) High Priority victims to make more room.
+			// Range: [targetCutoffIndex, currentCutoffIndex) [4]
+			for k := targetCutoffIndex; k < currentCutoffIndex; k++ {
+				if err := removePods(nonViolatingVictims[k]); err != nil {
+					searchErr = err
+					return true
+				}
+			}
+		}
+
+		currentCutoffIndex = targetCutoffIndex
+
+		// CHECK: Does the new workload fail to fit in this state?
+		// Returns TRUE if Failure (which stops the binary search at this index).
+		return !pl.SimulatePodScheduling(ctx, preemptor, domain).IsSuccess()
+	})
+
+	if searchErr != nil {
+		return nil, searchErr
+	}
+
+	// The search returned the first FAILURE point (`idx`).
+	// The last SUCCESS point is `idx - 1`. We rollback the state to that safe breakpoint. [5]
+	safeBreakpointIndex := 0
+	if idx > 0 {
+		safeBreakpointIndex = breakpoints[idx-1]
+	}
+
+	// Re-align state to the safe breakpoint:
+	// Everything < safeBreakpointIndex should be added.
+	// Everything >= safeBreakpointIndex should be removed. [5]
+	if currentCutoffIndex > safeBreakpointIndex {
+		for k := safeBreakpointIndex; k < currentCutoffIndex; k++ {
+			if err := removePods(nonViolatingVictims[k]); err != nil {
+				return nil, err
+			}
+		}
+	} else if currentCutoffIndex < safeBreakpointIndex {
+		for k := currentCutoffIndex; k < safeBreakpointIndex; k++ {
+			if err := addPods(nonViolatingVictims[k]); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// We iterate through the "Sacrificed" tail (Low Priority) one last time [6].
+	var victimsToPreempt []preemption.PreemptionUnit
+	for i := safeBreakpointIndex; i < len(nonViolatingVictims); i++ {
+		victimsToPreempt = append(victimsToPreempt, nonViolatingVictims[i])
+	}
+
+	return victimsToPreempt, nil
 }

@@ -171,6 +171,8 @@ type PreemptionUnit interface {
 	// Evicting this unit implies evicting all Pods in this list.
 	Pods() []fwk.PodInfo
 
+	// IsPodGroup returns true if the preemption unit represents a PodGroup
+	// that must be scheduled atomically, or false if it represents a single Pod.
 	IsPodGroup() bool
 }
 
