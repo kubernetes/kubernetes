@@ -47,8 +47,6 @@ const (
 	PodSync PodLifeCycleEventType = "PodSync"
 	// ContainerChanged - event type when the new state of container is unknown.
 	ContainerChanged PodLifeCycleEventType = "ContainerChanged"
-	// ConditionMet - event type triggered when any number of watch conditions are met.
-	ConditionMet PodLifeCycleEventType = "ConditionMet"
 )
 
 // PodLifecycleEvent is an event that reflects the change of the pod state.
@@ -68,10 +66,8 @@ type PodLifecycleEventGenerator interface {
 	Start()
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
-	// SetPodWatchCondition flags the pod for reinspection on every Relist iteration until the watch
-	// condition is met. The condition is keyed so it can be updated before the condition
-	// is met.
-	SetPodWatchCondition(podUID types.UID, conditionKey string, condition WatchCondition)
+	// RequestReinspect flags the pod for reinspection on the next Relist iteration.
+	RequestReinspect(podUID types.UID)
 }
 
 // podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs

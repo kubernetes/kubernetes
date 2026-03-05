@@ -3441,6 +3441,6 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 	}
 }
 
-func (kl *Kubelet) SetPodWatchCondition(podUID types.UID, conditionKey string, condition pleg.WatchCondition) {
-	kl.pleg.SetPodWatchCondition(podUID, conditionKey, condition)
+func (kl *Kubelet) RequestPodReinspect(podUID types.UID) {
+	kl.pleg.RequestReinspect(podUID)
 }
