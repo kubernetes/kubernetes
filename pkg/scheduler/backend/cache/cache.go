@@ -361,6 +361,17 @@ func (cache *cacheImpl) PodCount() (int, error) {
 	return count, nil
 }
 
+// GetNodeGeneration returns the current generation of the node in the cache.
+func (cache *cacheImpl) GetNodeGeneration(nodeName string) (int64, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	ni, ok := cache.nodes[nodeName]
+	if !ok {
+		return 0, fmt.Errorf("node %q not found in cache", nodeName)
+	}
+	return ni.info.Generation, nil
+}
+
 func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {

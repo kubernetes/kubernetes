@@ -322,7 +322,7 @@ func (sched *Scheduler) assumeAndReserve(
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err := sched.assume(logger, assumedPodInfo, scheduleResult.SuggestedHost)
+	err := sched.assume(logger, assumedPodInfo, scheduleResult.SuggestedHost, scheduleResult.SuggestedNodeGeneration)
 	if err != nil {
 		// This is most probably result of a BUG in retrying logic.
 		// We report an error here so that pod scheduling can be retried.
@@ -590,14 +590,16 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
-		node := feasibleNodes[0].Node().Name
+		selectedNode := feasibleNodes[0]
+		node := selectedNode.Node().Name
 		if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 			fwk.StoreScheduleResults(ctx, signature, nodeHint, node, nil, sched.CurrentCycle())
 		}
 		return ScheduleResult{
-			SuggestedHost:  node,
-			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
-			FeasibleNodes:  1,
+			SuggestedHost:           node,
+			SuggestedNodeGeneration: selectedNode.GetGeneration(),
+			EvaluatedNodes:          1 + diagnosis.NodeToStatus.Len(),
+			FeasibleNodes:           1,
 		}, nil
 	}
 
@@ -610,14 +612,24 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	node := sortedPrioritizedNodes.Pop()
 	trace.Step("Prioritizing done")
 
+	// Capture generation of the selected node from snapshot (for optimistic locking in assume()).
+	var selectedNodeGeneration int64
+	for _, ni := range feasibleNodes {
+		if ni.Node().Name == node {
+			selectedNodeGeneration = ni.GetGeneration()
+			break
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 		fwk.StoreScheduleResults(ctx, signature, nodeHint, node, sortedPrioritizedNodes, sched.CurrentCycle())
 	}
 
 	return ScheduleResult{
-		SuggestedHost:  node,
-		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
-		FeasibleNodes:  len(feasibleNodes),
+		SuggestedHost:           node,
+		SuggestedNodeGeneration: selectedNodeGeneration,
+		EvaluatedNodes:          len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
+		FeasibleNodes:           len(feasibleNodes),
 	}, err
 }
 
@@ -1096,7 +1108,16 @@ func (h *nodeScoreHeap) Pop() interface{} {
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // When called during pod group scheduling cycle, pod is assumed in the snapshot instead.
-func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.QueuedPodInfo, host string) error {
+// expectedNodeGeneration is the generation of the node when we selected it (from snapshot); used for optimistic locking.
+func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.QueuedPodInfo, host string, expectedNodeGeneration int64) error {
+	// Optimistic locking: verify node generation hasn't changed (e.g. another scheduler replica assumed a pod).
+	currentGen, err := sched.Cache.GetNodeGeneration(host)
+	if err != nil {
+		return fmt.Errorf("node %s get generation: %w", host, err)
+	}
+	if currentGen != expectedNodeGeneration {
+		return fmt.Errorf("node %s generation mismatch: expected %d, got %d (retry needed)", host, expectedNodeGeneration, currentGen)
+	}
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
