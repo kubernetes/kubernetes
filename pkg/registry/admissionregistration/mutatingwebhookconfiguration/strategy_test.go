@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingwebhookconfiguration
+package mutatingwebhookconfiguration
 
 import (
 	"testing"
@@ -27,41 +27,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
-func TestValidatingWebhookConfigurationStrategy(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	if Strategy.NamespaceScoped() {
-		t.Error("ValidatingWebhookConfiguration strategy must be cluster scoped")
-	}
-	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("ValidatingWebhookConfiguration should not allow create on update")
-	}
-
-	configuration := validValidatingWebhookConfiguration()
-	Strategy.PrepareForCreate(ctx, configuration)
-	errs := Strategy.Validate(ctx, configuration)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error validating %v", errs)
-	}
-	invalidConfiguration := &admissionregistration.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: ""},
-	}
-	Strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
-	errs = Strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
-	if len(errs) == 0 {
-		t.Errorf("Expected a validation error")
-	}
-}
-func validValidatingWebhookConfiguration() *admissionregistration.ValidatingWebhookConfiguration {
+func validMutatingWebhookConfiguration() *admissionregistration.MutatingWebhookConfiguration {
 	ignore := admissionregistration.Ignore
 	exact := admissionregistration.Exact
 	thirty := int32(30)
 	none := admissionregistration.SideEffectClassNone
 	servicePath := "/"
-	return &admissionregistration.ValidatingWebhookConfiguration{
+	return &admissionregistration.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
-		Webhooks: []admissionregistration.ValidatingWebhook{{
+		Webhooks: []admissionregistration.MutatingWebhook{{
 			Name: "foo.example.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
 				Service: &admissionregistration.ServiceReference{
@@ -86,8 +62,8 @@ func TestStaticSuffixWarningsAndValidation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	staticName := "my-webhook.static.k8s.io"
 
-	makeConfig := func(name string) *admissionregistration.ValidatingWebhookConfiguration {
-		cfg := validValidatingWebhookConfiguration()
+	makeConfig := func(name string) *admissionregistration.MutatingWebhookConfiguration {
+		cfg := validMutatingWebhookConfiguration()
 		cfg.Name = name
 		return cfg
 	}
