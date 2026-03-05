@@ -578,10 +578,10 @@ func getValidScoreWeights(f *frameworkImpl, pluginType reflect.Type, plugins []c
 		}
 
 		// Checks totalPriority against MaxTotalScore to avoid overflow
-		if int64(weights[e.Name])*fwk.MaxNodeScore > fwk.MaxTotalScore-totalPriority {
+		if int64(weights[e.Name])*fwk.MaxScore > fwk.MaxTotalScore-totalPriority {
 			return nil, fmt.Errorf("total score of Score plugins could overflow")
 		}
-		totalPriority += int64(weights[e.Name]) * fwk.MaxNodeScore
+		totalPriority += int64(weights[e.Name]) * fwk.MaxScore
 	}
 	return weights, nil
 }
@@ -1536,8 +1536,8 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 			placementScoreList := pluginToPlacementScores[pl.Name()]
 			score := placementScoreList[index].Score
 
-			if score > fwk.MaxNodeScore || score < fwk.MinNodeScore {
-				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, fwk.MinNodeScore, fwk.MaxNodeScore)
+			if score > fwk.MaxScore || score < fwk.MinScore {
+				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, fwk.MinScore, fwk.MaxScore)
 				errCh.SendWithCancel(err, cancel)
 				return
 			}
