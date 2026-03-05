@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)", func() {
@@ -163,7 +164,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics f
 		metricInFallback := false
 		for _, metricStatus := range currentHPA.Status.CurrentMetrics {
 			if metricStatus.Type == v2.ExternalMetricSourceType && metricStatus.External != nil {
-				if metricStatus.External.MetricFetchStatus == v2.MetricFetchFallback {
+				if metricStatus.External.MetricFetchStatus == ptr.To(v2.MetricFetchFallback) {
 					framework.Logf("External metric %s is in fallback state", metricStatus.External.Metric.Name)
 					metricInFallback = true
 				}

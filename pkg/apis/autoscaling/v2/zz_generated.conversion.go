@@ -435,7 +435,7 @@ func autoConvert_v2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in 
 	if err := Convert_v2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
 	}
-	out.MetricFetchStatus = autoscaling.MetricFetchStatusType(in.MetricFetchStatus)
+	out.MetricFetchStatus = (*autoscaling.MetricFetchStatusType)(unsafe.Pointer(in.MetricFetchStatus))
 	out.FirstFailureTime = (*metav1.Time)(unsafe.Pointer(in.FirstFailureTime))
 	return nil
 }
@@ -452,7 +452,7 @@ func autoConvert_autoscaling_ExternalMetricStatus_To_v2_ExternalMetricStatus(in 
 	if err := Convert_autoscaling_MetricValueStatus_To_v2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
 	}
-	out.MetricFetchStatus = autoscalingv2.MetricFetchStatusType(in.MetricFetchStatus)
+	out.MetricFetchStatus = (*autoscalingv2.MetricFetchStatusType)(unsafe.Pointer(in.MetricFetchStatus))
 	out.FirstFailureTime = (*metav1.Time)(unsafe.Pointer(in.FirstFailureTime))
 	return nil
 }

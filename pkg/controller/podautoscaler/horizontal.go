@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -771,7 +772,7 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 				Current: autoscalingv2.MetricValueStatus{
 					AverageValue: resource.NewMilliQuantity(usageProposal, resource.DecimalSI),
 				},
-				MetricFetchStatus: autoscalingv2.MetricFetchHealthy,
+				MetricFetchStatus: ptr.To(autoscalingv2.MetricFetchHealthy),
 				FirstFailureTime:  nil,
 			},
 		}
@@ -825,7 +826,7 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 				Current: autoscalingv2.MetricValueStatus{
 					Value: resource.NewMilliQuantity(usageProposal, resource.DecimalSI),
 				},
-				MetricFetchStatus: autoscalingv2.MetricFetchHealthy,
+				MetricFetchStatus: ptr.To(autoscalingv2.MetricFetchHealthy),
 				FirstFailureTime:  nil,
 			},
 		}
@@ -1621,7 +1622,7 @@ func hasFallbackFailureThresholdElapsed(metricSpec autoscalingv2.MetricSpec, sta
 					Name:     metricSpec.External.Metric.Name,
 					Selector: metricSpec.External.Metric.Selector,
 				},
-				MetricFetchStatus: autoscalingv2.MetricFetchFailing,
+				MetricFetchStatus: ptr.To(autoscalingv2.MetricFetchFailing),
 				FirstFailureTime:  &metav1.Time{Time: time.Now()},
 			},
 		}
@@ -1643,7 +1644,7 @@ func hasFallbackFailureThresholdElapsed(metricSpec autoscalingv2.MetricSpec, sta
 					Name:     metricSpec.External.Metric.Name,
 					Selector: metricSpec.External.Metric.Selector,
 				},
-				MetricFetchStatus: autoscalingv2.MetricFetchFailing,
+				MetricFetchStatus: ptr.To(autoscalingv2.MetricFetchFailing),
 				FirstFailureTime:  fallbackExistingFirstFailureTime,
 			},
 		}
@@ -1658,7 +1659,7 @@ func hasFallbackFailureThresholdElapsed(metricSpec autoscalingv2.MetricSpec, sta
 				Name:     metricSpec.External.Metric.Name,
 				Selector: metricSpec.External.Metric.Selector,
 			},
-			MetricFetchStatus: autoscalingv2.MetricFetchFallback,
+			MetricFetchStatus: ptr.To(autoscalingv2.MetricFetchFallback),
 			FirstFailureTime:  fallbackExistingFirstFailureTime,
 		},
 	}

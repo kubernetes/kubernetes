@@ -325,11 +325,13 @@ func (m *ExternalMetricStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x22
 	}
-	i -= len(m.MetricFetchStatus)
-	copy(dAtA[i:], m.MetricFetchStatus)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricFetchStatus)))
-	i--
-	dAtA[i] = 0x1a
+	if m.MetricFetchStatus != nil {
+		i -= len(*m.MetricFetchStatus)
+		copy(dAtA[i:], *m.MetricFetchStatus)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.MetricFetchStatus)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	{
 		size, err := m.Current.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -1478,8 +1480,10 @@ func (m *ExternalMetricStatus) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Current.Size()
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.MetricFetchStatus)
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.MetricFetchStatus != nil {
+		l = len(*m.MetricFetchStatus)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	if m.FirstFailureTime != nil {
 		l = m.FirstFailureTime.Size()
 		n += 1 + l + sovGenerated(uint64(l))
@@ -1922,7 +1926,7 @@ func (this *ExternalMetricStatus) String() string {
 	s := strings.Join([]string{`&ExternalMetricStatus{`,
 		`Metric:` + strings.Replace(strings.Replace(this.Metric.String(), "MetricIdentifier", "MetricIdentifier", 1), `&`, ``, 1) + `,`,
 		`Current:` + strings.Replace(strings.Replace(this.Current.String(), "MetricValueStatus", "MetricValueStatus", 1), `&`, ``, 1) + `,`,
-		`MetricFetchStatus:` + fmt.Sprintf("%v", this.MetricFetchStatus) + `,`,
+		`MetricFetchStatus:` + valueToStringGenerated(this.MetricFetchStatus) + `,`,
 		`FirstFailureTime:` + strings.Replace(fmt.Sprintf("%v", this.FirstFailureTime), "Time", "v1.Time", 1) + `,`,
 		`}`,
 	}, "")
@@ -3003,7 +3007,8 @@ func (m *ExternalMetricStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.MetricFetchStatus = MetricFetchStatusType(dAtA[iNdEx:postIndex])
+			s := MetricFetchStatusType(dAtA[iNdEx:postIndex])
+			m.MetricFetchStatus = &s
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {

@@ -427,7 +427,7 @@ const (
 	AverageValueMetricType MetricTargetType = "AverageValue"
 )
 
-// MetricFetchStatus indicates whether an external metric is operating normally, failing to be fetched or using a fallback value.
+// MetricFetchStatusType indicates whether an external metric is operating normally, failing to be fetched or using a fallback value.
 type MetricFetchStatusType string
 
 const (
@@ -626,11 +626,13 @@ type ExternalMetricStatus struct {
 
 	// metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
 	// +optional
-	MetricFetchStatus MetricFetchStatusType `json:"metricFetchStatus,omitempty" protobuf:"bytes,3,opt,name=metricFetchStatus,casttype=MetricFetchStatus"`
+	// +featureGate=HPAExternalMetricFallback
+	MetricFetchStatus *MetricFetchStatusType `json:"metricFetchStatus,omitempty" protobuf:"bytes,3,opt,name=metricFetchStatus,casttype=MetricFetchStatus"`
 
 	// firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
 	// Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
 	// +optional
+	// +featureGate=HPAExternalMetricFallback
 	FirstFailureTime *metav1.Time `json:"firstFailureTime,omitempty" protobuf:"bytes,4,opt,name=firstFailureTime"`
 }
 
