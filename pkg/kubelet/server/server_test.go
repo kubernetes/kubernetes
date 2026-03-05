@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +59,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	// Do some initialization to decode the query parameters correctly.
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -304,9 +306,12 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 }
 
 type fakeAuth struct {
-	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
-	attributesFunc   func(user.Info, *http.Request) []authorizer.Attributes
-	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	authenticateFunc       func(*http.Request) (*authenticator.Response, bool, error)
+	attributesFunc         func(user.Info, *http.Request) []authorizer.Attributes
+	authorizeFunc          func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	currentCABundleContent func() []byte
+	name                   string
+	verifyOptions          func() (x509.VerifyOptions, bool)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -317,6 +322,16 @@ func (f *fakeAuth) GetRequestAttributes(ctx context.Context, u user.Info, req *h
 }
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
+}
+func (f *fakeAuth) AddListener(listener dynamiccertificates.Listener) {}
+func (f *fakeAuth) CurrentCABundleContent() []byte {
+	return f.currentCABundleContent()
+}
+func (f *fakeAuth) Name() string {
+	return f.name
+}
+func (f *fakeAuth) VerifyOptions() (x509.VerifyOptions, bool) {
+	return f.verifyOptions()
 }
 
 type serverTestFramework struct {

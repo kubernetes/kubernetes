@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	"context"
-	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
@@ -58,6 +58,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -3283,8 +3284,32 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tempDir, err := os.MkdirTemp("", "logs")
 	ContainerLogsDir = tempDir
-	assert.NoError(t, err)
-	defer os.RemoveAll(ContainerLogsDir)
+	require.NoError(t, err)
+	defer func() {
+		err := os.RemoveAll(ContainerLogsDir)
+		require.NoError(t, err)
+	}()
+
+	ca, cert, key, err := generateCAAndCertKeyWithOptions(
+		"localhost",
+		[]net.IP{{127, 0, 0, 1}},
+		[]string{"localhost"},
+	)
+	require.NoError(t, err)
+
+	caPath := filepath.Join(tempDir, "kubelet-client-ca.cert")
+	certPath := filepath.Join(tempDir, "kubelet.cert")
+	keyPath := filepath.Join(tempDir, "kubelet.key")
+
+	err = os.WriteFile(caPath, ca, os.FileMode(0644))
+	require.NoError(t, err)
+
+	err = os.WriteFile(certPath, cert, os.FileMode(0644))
+	require.NoError(t, err)
+
+	err = os.WriteFile(keyPath, key, os.FileMode(0600))
+	require.NoError(t, err)
+
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
 		SyncFrequency: metav1.Duration{Duration: time.Minute},
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
@@ -3306,9 +3331,10 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		Available: 600,
 	}, nil).Maybe()
 	tlsOptions := &server.TLSOptions{
-		Config: &tls.Config{
-			MinVersion: 0,
-		},
+		MinVersion:   0,
+		CertFile:     certPath,
+		KeyFile:      keyPath,
+		ClientCAFile: caPath,
 	}
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
@@ -3336,6 +3362,10 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		TLSOptions:           tlsOptions,
 	}
 	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletServerCertificateFile, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletClientCAFile, false)
 
 	testMainKubelet, err := NewMainKubelet(
 		tCtx,
@@ -3365,8 +3395,8 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		1024,
 		false,
 	)
-	assert.NoError(t, err, "NewMainKubelet should succeed")
-	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
+	require.NoError(t, err, "NewMainKubelet should succeed")
+	require.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
 
 	testMainKubelet.BirthCry()
 	tCtx = ktesting.Init(t)
@@ -3394,8 +3424,141 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// }
 	// testMainKubelet.configMapManager.RegisterPod(pod)
 	// testMainKubelet.secretManager.RegisterPod(pod)
-	assert.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
-	assert.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+	require.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
+	require.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+	require.Nil(t, testMainKubelet.serverCertificateManager, "serverCertificateManager should be nil")
+	require.NotNil(t, kubeDep.TLSConfig.GetCertificate, "GetCertificate should not be nil")
+	require.Nil(t, kubeDep.TLSConfig.GetConfigForClient, "GetConfigForClient should be nil")
+	require.NotNil(t, kubeDep.TLSConfig.ClientCAs, "ClientCAs should not be nil")
+}
+
+func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tempDir, err := os.MkdirTemp("", "logs")
+	ContainerLogsDir = tempDir
+	require.NoError(t, err)
+	defer func() {
+		err := os.RemoveAll(ContainerLogsDir)
+		require.NoError(t, err)
+	}()
+
+	ca, cert, key, err := generateCAAndCertKeyWithOptions(
+		"localhost",
+		[]net.IP{{127, 0, 0, 1}},
+		[]string{"localhost"},
+	)
+	require.NoError(t, err)
+
+	caPath := filepath.Join(tempDir, "kubelet-client-ca.cert")
+	certPath := filepath.Join(tempDir, "kubelet.cert")
+	keyPath := filepath.Join(tempDir, "kubelet.key")
+
+	err = os.WriteFile(caPath, ca, os.FileMode(0644))
+	require.NoError(t, err)
+
+	err = os.WriteFile(certPath, cert, os.FileMode(0644))
+	require.NoError(t, err)
+
+	err = os.WriteFile(keyPath, key, os.FileMode(0600))
+	require.NoError(t, err)
+
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		SyncFrequency: metav1.Duration{Duration: time.Minute},
+		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
+		ContainerLogMaxSize:                       "10Mi",
+		ContainerLogMaxFiles:                      5,
+		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
+		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
+			MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
+		},
+	}
+	var prober volume.DynamicPluginProber
+	tp := noopoteltrace.NewTracerProvider()
+	cadvisor := cadvisortest.NewMockInterface(t)
+	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
+	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  1000,
+		Available: 600,
+	}, nil).Maybe()
+	tlsOptions := &server.TLSOptions{
+		MinVersion:   0,
+		CertFile:     certPath,
+		KeyFile:      keyPath,
+		ClientCAFile: caPath,
+	}
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+	}()
+	fakeRecorder := &record.FakeRecorder{}
+	rtSvc := createRemoteRuntimeService(endpoint, t, noopoteltrace.NewTracerProvider())
+	kubeDep := &Dependencies{
+		Auth:                 nil,
+		CAdvisorInterface:    cadvisor,
+		ContainerManager:     cm.NewStubContainerManager(),
+		KubeClient:           nil, // standalone mode
+		HeartbeatClient:      nil,
+		EventClient:          nil,
+		TracerProvider:       tp,
+		HostUtil:             hostutil.NewFakeHostUtil(nil),
+		Mounter:              mount.NewFakeMounter(nil),
+		Recorder:             fakeRecorder,
+		RemoteRuntimeService: rtSvc,
+		RemoteImageService:   fakeRuntime.ImageService,
+		Subpather:            &subpath.FakeSubpath{},
+		OOMAdjuster:          oom.NewOOMAdjuster(),
+		OSInterface:          kubecontainer.RealOS{},
+		DynamicPluginProber:  prober,
+		TLSOptions:           tlsOptions,
+	}
+	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletServerCertificateFile, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletClientCAFile, true)
+
+	testMainKubelet, err := NewMainKubelet(
+		tCtx,
+		kubeCfg,
+		kubeDep,
+		crOptions,
+		"hostname",
+		"hostname",
+		[]net.IP{},
+		"",
+		"external",
+		"/tmp/cert",
+		"/tmp/rootdir",
+		tempDir,
+		"",
+		"",
+		false,
+		[]v1.Taint{},
+		[]string{},
+		"",
+		false,
+		false,
+		metav1.Duration{Duration: time.Minute},
+		1024,
+		110,
+		map[string]string{},
+		1024,
+		false,
+	)
+	require.NoError(t, err, "NewMainKubelet should succeed")
+	require.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
+
+	testMainKubelet.BirthCry()
+	ctx := ktesting.Init(t)
+	testMainKubelet.StartGarbageCollection(ctx)
+	require.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
+	require.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+	require.NotNil(t, testMainKubelet.serverCertificateManager, "serverCertificateManager should not be nil")
+	require.NotNil(t, kubeDep.TLSConfig.GetCertificate, "GetCertificate should not be nil")
+	require.NotNil(t, kubeDep.TLSConfig.GetConfigForClient, "GetConfigForClient should be nil")
+	require.Nil(t, kubeDep.TLSConfig.ClientCAs, "ClientCAs should be nil")
 }
 
 func TestSyncPodSpans(t *testing.T) {
@@ -4906,4 +5069,43 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alternateDNS []string) (ca, certificate, certKey []byte, err error) {
+	certs, key, err := cert.GenerateSelfSignedCertKeyWithOptions(cert.SelfSignedCertKeyOptions{
+		Host:         host,
+		AlternateIPs: alternateIPs,
+		AlternateDNS: alternateDNS,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	parsedCerts, err := cert.ParseCertsPEM(certs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var leafCert *x509.Certificate
+	var caCert *x509.Certificate
+
+	for _, parsedCert := range parsedCerts {
+		if parsedCert.IsCA {
+			caCert = parsedCert
+		} else {
+			leafCert = parsedCert
+		}
+	}
+
+	caCertBytes, err := cert.EncodeCertificates(caCert)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	leafCertBytes, err := cert.EncodeCertificates(leafCert)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return caCertBytes, leafCertBytes, key, err
 }
