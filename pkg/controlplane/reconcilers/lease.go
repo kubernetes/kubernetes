@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -81,10 +82,35 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 	}
 
 	ipList := make([]string, 0, len(ipInfoList.Items))
-	for _, ip := range ipInfoList.Items {
-		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
-			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+	for _, ipInfo := range ipInfoList.Items {
+		if len(ipInfo.Subsets) > 0 && len(ipInfo.Subsets[0].Addresses) > 0 && len(ipInfo.Subsets[0].Addresses[0].IP) > 0 {
+			ip := ipInfo.Subsets[0].Addresses[0].IP
+			if isValidEndpointIP(ip) {
+				ipList = append(ipList, ip)
+			} else {
+				klog.Warningf("Discarding invalid master IP %q from storage", ip)
+			}
 		}
+	}
+
+	// If we have both loopback and global unicast IPs, discard loopback IPs
+	// to prevent a misconfigured apiserver from "poisoning" the list in a multi-node cluster.
+	// We still allow loopback IPs if they are the only ones present (e.g. in integration tests).
+	hasGlobal := false
+	for _, ipStr := range ipList {
+		if ip := netutils.ParseIPSloppy(ipStr); ip != nil && !ip.IsLoopback() {
+			hasGlobal = true
+			break
+		}
+	}
+	if hasGlobal {
+		filtered := make([]string, 0, len(ipList))
+		for _, ipStr := range ipList {
+			if ip := netutils.ParseIPSloppy(ipStr); ip != nil && !ip.IsLoopback() {
+				filtered = append(filtered, ipStr)
+			}
+		}
+		ipList = filtered
 	}
 
 	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
@@ -95,6 +121,9 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 // UpdateLease resets the TTL on a master IP in storage
 // UpdateLease will create a new key if it doesn't exist.
 func (s *storageLeases) UpdateLease(ip string) error {
+	if !isValidEndpointIP(ip) {
+		return fmt.Errorf("cannot update lease for invalid master IP %q", ip)
+	}
 	key := path.Join(s.baseKey, ip)
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
@@ -344,4 +373,17 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 
 func (r *leaseEndpointReconciler) Destroy() {
 	r.masterLeases.Destroy()
+}
+
+func isValidEndpointIP(ipAddress string) bool {
+	ip := netutils.ParseIPSloppy(ipAddress)
+	if ip == nil {
+		return false
+	}
+	// We allow loopback IPs for integration tests and single-node local-up-cluster.
+	// However, we still reject unspecified, link-local unicast, and link-local multicast.
+	if ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return false
+	}
+	return true
 }

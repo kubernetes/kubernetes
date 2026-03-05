@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -76,6 +77,23 @@ func newFakeLeases(t *testing.T, baseKey string, s storage.Interface) *fakeLease
 func (f *fakeLeases) SetKeys(keys []string) error {
 	for _, ip := range keys {
 		if err := f.UpdateLease(ip); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *fakeLeases) SetKeysWithoutValidation(keys []string) error {
+	for _, ipStr := range keys {
+		// key := path.Join(f.baseKey, ipStr) // path is not imported, using simple concat for tests or import it
+		key := f.baseKey + ipStr
+		err := f.storage.Create(apirequest.NewDefaultContext(), key, &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{Name: ipStr},
+			Subsets: []corev1.EndpointSubset{{
+				Addresses: []corev1.EndpointAddress{{IP: ipStr}},
+			}},
+		}, nil, 0)
+		if err != nil {
 			return err
 		}
 	}
@@ -724,5 +742,107 @@ func TestApiserverShutdown(t *testing.T) {
 				t.Errorf("expected %v got: %v", test.expectLeases, leases)
 			}
 		})
+	}
+}
+
+func TestLeaseStorageFiltered(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	t.Cleanup(func() { server.Terminate(t) })
+
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+
+	baseKey := "/" + uuid.New().String() + "/masterleases/"
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	t.Cleanup(dFunc)
+	fakeLeases := newFakeLeases(t, baseKey, s)
+
+	// Set keys without validation, including invalid IPs and loopback
+	ips := []string{"127.0.0.1", "0.0.0.0", "1.2.3.4", "10.0.0.1"}
+	err = fakeLeases.SetKeysWithoutValidation(ips)
+	if err != nil {
+		t.Fatalf("unexpected error creating keys: %v", err)
+	}
+
+	leases, err := fakeLeases.ListLeases()
+	if err != nil {
+		t.Fatalf("unexpected error listing leases: %v", err)
+	}
+
+	// 0.0.0.0 is invalid.
+	// 1.2.3.4 and 10.0.0.1 are valid global unicast.
+	// 127.0.0.1 is loopback, and since there are global unicast ones, it should be filtered.
+	expectedLeases := []string{"1.2.3.4", "10.0.0.1"}
+	sort.Strings(leases)
+	sort.Strings(expectedLeases)
+	if !reflect.DeepEqual(leases, expectedLeases) {
+		t.Errorf("expected %v got: %v", expectedLeases, leases)
+	}
+}
+
+func TestLeaseStorageLoopback(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	t.Cleanup(func() { server.Terminate(t) })
+
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+
+	baseKey := "/" + uuid.New().String() + "/masterleases/"
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	t.Cleanup(dFunc)
+	fakeLeases := newFakeLeases(t, baseKey, s)
+
+	// Set ONLY loopback IP
+	err = fakeLeases.SetKeysWithoutValidation([]string{"127.0.0.1"})
+	if err != nil {
+		t.Fatalf("unexpected error creating keys: %v", err)
+	}
+
+	leases, err := fakeLeases.ListLeases()
+	if err != nil {
+		t.Fatalf("unexpected error listing leases: %v", err)
+	}
+
+	// 127.0.0.1 should be allowed if it is the only one (for integration tests)
+	expectedLeases := []string{"127.0.0.1"}
+	if !reflect.DeepEqual(leases, expectedLeases) {
+		t.Errorf("expected %v got: %v", expectedLeases, leases)
+	}
+}
+
+func TestLeaseUpdateInvalid(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	t.Cleanup(func() { server.Terminate(t) })
+
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+
+	baseKey := "/" + uuid.New().String() + "/masterleases/"
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	t.Cleanup(dFunc)
+	fakeLeases := newFakeLeases(t, baseKey, s)
+
+	// Try to update with invalid IP
+	err = fakeLeases.UpdateLease("0.0.0.0")
+	if err == nil {
+		t.Errorf("expected error updating invalid lease, got nil")
+	}
+
+	// Try to update with loopback IP (should be allowed now)
+	err = fakeLeases.UpdateLease("127.0.0.1")
+	if err != nil {
+		t.Errorf("unexpected error updating loopback lease: %v", err)
 	}
 }
