@@ -60,7 +60,7 @@ func BenchmarkListener(b *testing.B) {
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
-	}, 0, 0, time.Now(), 1024*1024, newMockSynced(b, true))
+	}, 0, 0, time.Now(), 1024*1024, newMockSynced(b, true), InformerNameAndResource{}, "benchmark")
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop
