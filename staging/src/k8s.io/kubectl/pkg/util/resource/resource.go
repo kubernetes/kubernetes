@@ -32,6 +32,10 @@ import (
 // containers of the pod. If pod overhead is non-nil, the pod overhead is added to the
 // total container resource requests and to the total container limits which have a
 // non-zero quantity.
+//
+// Deprecated: Use k8s.io/component-helpers/resource.PodRequests and
+// k8s.io/component-helpers/resource.PodLimits instead, which also support
+// pod-level resources.
 func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 	return podRequests(pod), podLimits(pod)
 }
