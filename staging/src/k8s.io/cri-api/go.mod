@@ -9,12 +9,11 @@ godebug default=go1.25
 require (
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.72.2
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
