@@ -361,11 +361,10 @@ func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string
 
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
-	// Wait for resize to complete.
-
+	// Wait for resize to complete with a timeout of 30 seconds.
 	framework.ExpectNoError(framework.Gomega().
 		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
-		WithTimeout(f.Timeouts.PodStart).
+		WithTimeout(30*time.Second).
 		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
 			if helpers.IsPodResizeInfeasible(pod) {
 				// This is a terminal resize state
@@ -394,6 +393,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			}
 			return nil, nil
 		})),
+		"Pod resize did not complete within 30 seconds",
 	)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
