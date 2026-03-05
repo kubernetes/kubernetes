@@ -33,6 +33,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,6 +140,8 @@ type ProxyCA struct {
 	ProxySigningCert *x509.Certificate
 	ProxySigningKey  *rsa.PrivateKey
 }
+
+var setupDialerStopCh sync.Once
 
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
@@ -395,12 +398,16 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	if instanceOptions.EnableCertAuth {
 		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
+			// Certificate files automatically trigger background rotation loops in the global client-go
+			// transport cache. We use sync.Once to safely set the global DialerStopCh test-suite-wide
+			// to avoid data races. The first test's `t.Cleanup` acts as a global kill switch to prevent
+			// goroutine leaks. This doesn't fail other tests because the client falls back to
+			// synchronous cert loading, and our test certs are valid for 10,000 hours.
+			setupDialerStopCh.Do(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 				t.Cleanup(cancel)
 				clientgotransport.DialerStopCh = ctx.Done()
-			}
+			})
 			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 		}
 	}
