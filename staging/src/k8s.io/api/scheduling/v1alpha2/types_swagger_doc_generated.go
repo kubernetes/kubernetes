@@ -66,7 +66,7 @@ func (PodGroupList) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupSchedulingConstraints = map[string]string{
-	"":                    "PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.",
+	"":                    "PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.",
 	"topologyConstraints": "TopologyConstraints defines the topology constraints for the pod group. This field is required but we might loosen this assumption in the future if more types of constraints are added.",
 }
 

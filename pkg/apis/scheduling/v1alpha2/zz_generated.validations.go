@@ -106,9 +106,18 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
+var unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupSchedulingConstraints_ = validate.NewUnionMembership(validate.NewUnionMember("topologyConstraints"))
+
 // Validate_PodGroupSchedulingConstraints validates an instance of PodGroupSchedulingConstraints according
 // to declarative validation rules in the API schema.
 func Validate_PodGroupSchedulingConstraints(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupSchedulingConstraints) (errs field.ErrorList) {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupSchedulingConstraints_, func(obj *schedulingv1alpha2.PodGroupSchedulingConstraints) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.TopologyConstraints != nil
+	})...)
+
 	// field schedulingv1alpha2.PodGroupSchedulingConstraints.TopologyConstraints
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha2.TopologyConstraint, oldValueCorrelated bool) (errs field.ErrorList) {
@@ -118,12 +127,11 @@ func Validate_PodGroupSchedulingConstraints(ctx context.Context, op operation.Op
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -262,7 +270,7 @@ func Validate_PodGroupSpec(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
@@ -328,7 +336,7 @@ func Validate_PodGroupTemplate(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -393,14 +401,14 @@ func Validate_TopologyConstraint(ctx context.Context, op operation.Operation, fl
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("topologyKey"), &obj.TopologyKey, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.TopologyConstraint) *string { return &oldObj.TopologyKey }), oldObj != nil)...)
 

@@ -53845,7 +53845,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingConstraints(ref comm
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.",
+				Description: "PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"topologyConstraints": {

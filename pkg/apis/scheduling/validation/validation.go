@@ -136,27 +136,11 @@ func validatePodGroupSchedulingConstraints(constraints *scheduling.PodGroupSched
 
 func validatePodGroupTopologyConstraints(constraints []scheduling.TopologyConstraint, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if len(constraints) > 1 {
-		allErrs = append(allErrs, field.TooMany(fldPath, len(constraints), 1).WithOrigin("maxItems").MarkCoveredByDeclarative())
-	}
-	if len(constraints) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
-	}
-	for i, constraint := range constraints {
-		allErrs = append(allErrs, validatePodGroupTopologyConstraint(&constraint, fldPath.Index(i))...)
+	if constraints != nil && len(constraints) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "must not be empty"))
 	}
 	return allErrs
 
-}
-
-func validatePodGroupTopologyConstraint(constraint *scheduling.TopologyConstraint, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if constraint.TopologyKey == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "").MarkCoveredByDeclarative())
-	} else {
-		allErrs = append(allErrs, metav1validation.ValidateLabelName(constraint.TopologyKey, fldPath.Child("topologyKey")).WithOrigin("format=k8s-label-key").MarkCoveredByDeclarative()...)
-	}
-	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

@@ -115,12 +115,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"scheduling constraints with multiple topology constraints": {
 			input:        mkValidPodGroup(addTopologyConstraint()),
-			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems")},
+			tasEnabled:   true,
+		},
+		"empty scheduling constraints": {
+			input:        mkValidPodGroup(setSchedulingConstraints()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "must specify one of: `topologyConstraints`").WithOrigin("union")},
 			tasEnabled:   true,
 		},
 		"topology constraint with empty topology key": {
 			input:        mkValidPodGroup(setTopologyKey(0, "")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "")},
 			tasEnabled:   true,
 		},
 	}

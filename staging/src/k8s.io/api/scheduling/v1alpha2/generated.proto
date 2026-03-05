@@ -78,15 +78,16 @@ message PodGroupList {
   repeated PodGroup items = 2;
 }
 
-// PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.
+// PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 message PodGroupSchedulingConstraints {
   // TopologyConstraints defines the topology constraints for the pod group.
   // This field is required but we might loosen this assumption in the future
   // if more types of constraints are added.
   //
   // +optional
-  // +k8s:alpha(since:"1.36")=+k8s:required
-  // +k8s:alpha(since:"1.36")=+k8s:maxItems=1
+  // +k8s:optional
+  // +k8s:unionMember
+  // +k8s:maxItems=1
   // +listType=atomic
   repeated TopologyConstraint topologyConstraints = 1;
 }
@@ -136,7 +137,7 @@ message PodGroupSpec {
   //
   // +featureGate=TopologyAwareWorkloadScheduling
   // +optional
-  // +k8s:alpha(since:"1.36")=+k8s:optional
+  // +k8s:optional
   // +k8s:alpha(since:"1.36")=+k8s:immutable
   optional PodGroupSchedulingConstraints schedulingConstraints = 3;
 }
@@ -184,7 +185,7 @@ message PodGroupTemplate {
   //
   // +featureGate=TopologyAwareWorkloadScheduling
   // +optional
-  // +k8s:alpha(since:"1.36")=+k8s:optional
+  // +k8s:optional
   optional PodGroupSchedulingConstraints schedulingConstraints = 3;
 }
 
@@ -209,8 +210,8 @@ message TopologyConstraint {
   // Examples: "topology.kubernetes.io/rack"
   //
   // +required
-  // +k8s:alpha(since:"1.36")=+k8s:required
-  // +k8s:alpha(since:"1.36")=+k8s:format=k8s-label-key
+  // +k8s:required
+  // +k8s:format=k8s-label-key
   optional string topologyKey = 1;
 }
 

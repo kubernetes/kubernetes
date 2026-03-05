@@ -125,7 +125,7 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 
 // getTopologyKey returns the topology key for the pod group if there's any specified.
 func (pl *TopologyPlacement) getTopologyKey(podGroupResource *schedulingapi.PodGroup) (string, bool) {
-	if schedulingConstraints := podGroupResource.Spec.SchedulingConstraints; schedulingConstraints != nil {
+	if schedulingConstraints := podGroupResource.Spec.SchedulingConstraints; schedulingConstraints != nil && len(schedulingConstraints.TopologyConstraints) > 0 {
 		// Right now, we only support a single topology constraint on the API level.
 		return schedulingConstraints.TopologyConstraints[0].TopologyKey, true
 	}

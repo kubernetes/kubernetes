@@ -251,40 +251,6 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
-		"multiple topology constraints": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints = append(w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints, scheduling.TopologyConstraint{
-					TopologyKey: "bar",
-				})
-			}),
-			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-			},
-		},
-		"empty topology key": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints[0].TopologyKey = ""
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "").MarkCoveredByDeclarative(),
-			},
-		},
-		"no topology constraints": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints = nil
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints"), "").MarkCoveredByDeclarative(),
-			},
-		},
-		"invalid topology key": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foo-"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "foo-", "").MarkCoveredByDeclarative(),
-			},
-		},
 	}
 
 	for name, tc := range failureCases {
@@ -510,38 +476,12 @@ func TestValidatePodGroup(t *testing.T) {
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
-		"multiple topology constraints": {
+		"empty topology constraints": {
 			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingConstraints.TopologyConstraints = append(pg.Spec.SchedulingConstraints.TopologyConstraints, scheduling.TopologyConstraint{
-					TopologyKey: "bar",
-				})
+				pg.Spec.SchedulingConstraints.TopologyConstraints = []scheduling.TopologyConstraint{}
 			}),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-			},
-		},
-		"empty topology key": {
-			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = ""
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "").MarkCoveredByDeclarative(),
-			},
-		},
-		"no topology constraints": {
-			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingConstraints.TopologyConstraints = nil
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), "").MarkCoveredByDeclarative(),
-			},
-		},
-		"invalid topology key": {
-			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foo-"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "foo-", "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), ""),
 			},
 		},
 	}

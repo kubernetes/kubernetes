@@ -21,7 +21,7 @@ package v1alpha2
 // PodGroupSchedulingConstraintsApplyConfiguration represents a declarative configuration of the PodGroupSchedulingConstraints type for use
 // with apply.
 //
-// PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.
+// PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 type PodGroupSchedulingConstraintsApplyConfiguration struct {
 	// TopologyConstraints defines the topology constraints for the pod group.
 	// This field is required but we might loosen this assumption in the future
