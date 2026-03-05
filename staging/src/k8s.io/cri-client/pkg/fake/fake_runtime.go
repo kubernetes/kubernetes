@@ -375,6 +375,6 @@ func (f *RemoteRuntime) UpdatePodSandboxResources(ctx context.Context, req *kube
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (f *RemoteRuntime) Close() error {
-	return f.RuntimeService.Close()
+func (f *RemoteRuntime) Close(ctx context.Context) error {
+	return f.RuntimeService.Close(ctx)
 }

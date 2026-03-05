@@ -45,7 +45,7 @@ var defaultKnownCRISockets = []string{
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	Connect() error
-	Close()
+	Close(ctx context.Context)
 	SetImpl(Impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
@@ -99,14 +99,14 @@ func (runtime *CRIRuntime) Connect() error {
 }
 
 // Close closes the connections to the runtime and image services.
-func (runtime *CRIRuntime) Close() {
+func (runtime *CRIRuntime) Close(ctx context.Context) {
 	if runtime.runtimeService != nil {
-		if err := runtime.runtimeService.Close(); err != nil {
+		if err := runtime.runtimeService.Close(ctx); err != nil {
 			klog.Warningf("failed to close runtime service: %v", err)
 		}
 	}
 	if runtime.imageService != nil {
-		if err := runtime.imageService.Close(); err != nil {
+		if err := runtime.imageService.Close(ctx); err != nil {
 			klog.Warningf("failed to close image service: %v", err)
 		}
 	}

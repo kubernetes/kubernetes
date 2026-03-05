@@ -104,7 +104,9 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (r *remoteImageService) Close() error {
+func (r *remoteImageService) Close(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Closing image service connection")
 	return r.conn.Close()
 }
 

@@ -137,7 +137,9 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (r *remoteRuntimeService) Close() error {
+func (r *remoteRuntimeService) Close(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Closing runtime service connection")
 	return r.conn.Close()
 }
 
