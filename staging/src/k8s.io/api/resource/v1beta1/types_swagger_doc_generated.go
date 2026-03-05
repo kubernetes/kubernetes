@@ -232,10 +232,11 @@ func (DeviceClassList) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceClassSpec = map[string]string{
-	"":                     "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
-	"selectors":            "Each selector must be satisfied by a device which is claimed via this class.",
-	"config":               "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
-	"extendedResourceName": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
+	"":                        "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
+	"selectors":               "Each selector must be satisfied by a device which is claimed via this class.",
+	"config":                  "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
+	"extendedResourceName":    "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
+	"requiresNodePreparation": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
 }
 
 func (DeviceClassSpec) SwaggerDoc() map[string]string {
@@ -301,6 +302,7 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"bindingFailureConditions": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"shareID":                  "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
 	"consumedCapacity":         "ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+	"requiresNodePreparation":  "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {

@@ -95,6 +95,11 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
 	ConsumedCapacity map[resourcev1beta1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for this allocated device.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	RequiresNodePreparation *bool `json:"requiresNodePreparation,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -195,5 +200,13 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 	for k, v := range entries {
 		b.ConsumedCapacity[k] = v
 	}
+	return b
+}
+
+// WithRequiresNodePreparation sets the RequiresNodePreparation field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequiresNodePreparation field is set to the value of the last call.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithRequiresNodePreparation(value bool) *DeviceRequestAllocationResultApplyConfiguration {
+	b.RequiresNodePreparation = &value
 	return b
 }

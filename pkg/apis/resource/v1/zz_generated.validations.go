@@ -830,6 +830,7 @@ func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPa
 			return
 		}(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, safe.Field(oldObj, func(oldObj *resourcev1.DeviceClassSpec) *string { return oldObj.ExtendedResourceName }), oldObj != nil)...)
 
+	// field resourcev1.DeviceClassSpec.RequiresNodePreparation has no validation
 	return errs
 }
 
@@ -1150,6 +1151,7 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1.DeviceRequestAllocationResult) *types.UID { return oldObj.ShareID }), oldObj != nil)...)
 
 	// field resourcev1.DeviceRequestAllocationResult.ConsumedCapacity has no validation
+	// field resourcev1.DeviceRequestAllocationResult.RequiresNodePreparation has no validation
 	return errs
 }
 

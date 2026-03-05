@@ -725,6 +725,19 @@ message DeviceClassSpec {
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
+
+  // RequiresNodePreparation indicates whether kubelet must invoke
+  // NodePrepareResources and NodeUnprepareResources for allocations using this
+  // class.
+  //
+  // If unset, kubelet treats this as true for backward compatibility.
+  //
+  // This field is copied into each DeviceRequestAllocationResult by the
+  // built-in structured allocator.
+  //
+  // +optional
+  // +featureGate=DRANodePreparation
+  optional bool requiresNodePreparation = 5;
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -1106,6 +1119,15 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAConsumableCapacity
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
+
+  // RequiresNodePreparation indicates whether kubelet must invoke
+  // NodePrepareResources and NodeUnprepareResources for this allocated device.
+  //
+  // If unset, kubelet treats this as true for backward compatibility.
+  //
+  // +optional
+  // +featureGate=DRANodePreparation
+  optional bool requiresNodePreparation = 11;
 }
 
 // DeviceSelector must have exactly one field set.
