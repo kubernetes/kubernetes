@@ -31,6 +31,19 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+type podAssignment struct {
+	pod      *v1.Pod
+	nodeName string
+}
+
+func (pa *podAssignment) GetPod() *v1.Pod {
+	return pa.pod
+}
+
+func (pa *podAssignment) GetNodeName() string {
+	return pa.nodeName
+}
+
 func TestPlacementBinPackingArgsValidation(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -331,10 +344,13 @@ func TestPlacementBinPackingScore(t *testing.T) {
 				}
 				placementNodes = append(placementNodes, nodeInfo)
 			}
-			proposedAssignments := make(map[*v1.Pod]string)
+			proposedAssignments := make([]fwk.ProposedAssignment, 0, len(tc.podGroup))
 			for _, pod := range tc.podGroup {
 				if nodeName, ok := tc.podGroupAssignments[pod.UID]; ok {
-					proposedAssignments[pod] = nodeName
+					proposedAssignments = append(proposedAssignments, &podAssignment{
+						pod:      pod,
+						nodeName: nodeName,
+					})
 				}
 			}
 			podGroupInfo := &framework.PodGroupInfo{
@@ -369,9 +385,15 @@ func TestPlacementBinPackingScore_Strategies(t *testing.T) {
 		st.MakePod().UID("foo").Req(cpuAndMemory("100m", "0")).Obj(),
 		st.MakePod().UID("bar").Req(cpuAndMemory("200m", "60")).Obj(),
 	}
-	podGroupAssignments := map[*v1.Pod]string{
-		podGroup[0]: "node1",
-		podGroup[1]: "node2",
+	podGroupAssignments := []fwk.ProposedAssignment{
+		&podAssignment{
+			pod:      podGroup[0],
+			nodeName: "node1",
+		},
+		&podAssignment{
+			pod:      podGroup[1],
+			nodeName: "node2",
+		},
 	}
 
 	// Allocations:

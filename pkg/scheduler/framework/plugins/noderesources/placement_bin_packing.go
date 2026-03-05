@@ -66,7 +66,9 @@ func (pl *PlacementBinPacking) ScorePlacement(ctx context.Context, state fwk.Pod
 	logger := klog.FromContext(ctx)
 	requested := make([]int64, len(pl.resources))
 	// Calculate requests for the pod group pods scheduled for this placement
-	for pod, nodeName := range podGroupAssignments.ProposedAssignments {
+	for _, assignment := range podGroupAssignments.ProposedAssignments {
+		nodeName := assignment.GetNodeName()
+		pod := assignment.GetPod()
 		if _, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName); err != nil {
 			logger.Error(err, "pod assignment node not found in the snapshot", "pod", klog.KObj(pod), "node", nodeName)
 			continue
