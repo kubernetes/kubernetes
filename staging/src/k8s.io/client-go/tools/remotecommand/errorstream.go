@@ -44,6 +44,8 @@ func watchErrorStream(logger klog.Logger, errorStream io.Reader, d errorStreamDe
 		case err != nil && err != io.EOF:
 			errorChan <- fmt.Errorf("error reading from error stream: %w", err)
 		default:
+			// Delegate to the protocol-specific decoder, including for empty messages.
+			// v2/v3 treat empty as success; v4/v5 treat empty as an interrupted connection.
 			errorChan <- d.decode(message)
 		}
 		close(errorChan)

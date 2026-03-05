@@ -87,6 +87,11 @@ type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
 	if len(message) == 0 {
+		// In v4/v5, the kubelet always writes a JSON-marshaled metav1.Status to the error stream
+		// when the command completes (see v4WriteStatusFunc in
+		// https://github.com/kubernetes/kubernetes/blob/c38abeb4ffeab8d736376f7a9d0fe5f8c5b0af10/staging/src/k8s.io/kubelet/pkg/cri/streaming/remotecommand/httpstream.go#L444-L453).
+		// An empty error stream therefore means the connection was interrupted before the
+		// command finished (e.g., kubelet restart or network drop).
 		return fmt.Errorf("error stream closed before receiving a status message: command execution may have been interrupted")
 	}
 	status := metav1.Status{}

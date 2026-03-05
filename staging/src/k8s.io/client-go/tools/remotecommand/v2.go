@@ -202,6 +202,11 @@ type errorDecoderV2 struct{}
 
 func (d *errorDecoderV2) decode(message []byte) error {
 	if len(message) == 0 {
+		// In v2/v3, the error stream carries plain-text error messages and an empty
+		// stream indicates success (the command completed without error; see v1WriteStatusFunc in
+		// https://github.com/kubernetes/kubernetes/blob/c38abeb4ffeab8d736376f7a9d0fe5f8c5b0af10/staging/src/k8s.io/kubelet/pkg/cri/streaming/remotecommand/httpstream.go#L432-L440).
+		// This differs from v4/v5, where the kubelet always writes a JSON-marshaled metav1.Status
+		// and an empty stream signals an interrupted connection.
 		return nil
 	}
 	return fmt.Errorf("error executing remote command: %s", message)
