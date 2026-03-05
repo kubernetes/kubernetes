@@ -282,7 +282,7 @@ func isSpecialClaimName(name string) bool {
 }
 
 // deleteClaim deletes the claim after removing the finalizer from the claim, if there is any.
-func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.ResourceClaim, logger klog.Logger) error {
+func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.ResourceClaim) error {
 	refreshClaim := false
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
@@ -310,7 +310,7 @@ func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.
 		return retryErr
 	}
 
-	logger.V(5).Info("Delete", "resourceclaim", klog.KObj(claim))
+	klog.FromContext(ctx).V(5).Info("Delete", "resourceclaim", klog.KObj(claim))
 	err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
@@ -497,9 +497,9 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 // so we poll with a timeout.
 func (pl *DynamicResources) waitForExtendedClaimInAssumeCache(
 	ctx context.Context,
-	logger klog.Logger,
 	claim *resourceapi.ResourceClaim,
 ) {
+	logger := klog.FromContext(ctx)
 	pollErr := wait.PollUntilContextTimeout(
 		ctx,
 		1*time.Second,
@@ -526,11 +526,11 @@ func (pl *DynamicResources) waitForExtendedClaimInAssumeCache(
 // createExtendedResourceClaimInAPI creates an extended resource claim in the API server.
 func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 	ctx context.Context,
-	logger klog.Logger,
 	pod *v1.Pod,
 	nodeName string,
 	state *stateData,
 ) (*resourceapi.ResourceClaim, error) {
+	logger := klog.FromContext(ctx)
 	logger.V(5).Info("preparing to create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName)
 	// Get the node-specific claim that was prepared during Filter phase
 	nodeAllocation, ok := state.nodeAllocations[nodeName]
@@ -588,7 +588,7 @@ func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 // unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim
 // when scheduling fails. It reverts the assume cache, and deletes the claim from the API
 // server if it was already created.
-func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, logger klog.Logger, pod *v1.Pod, state *stateData) {
+func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, pod *v1.Pod, state *stateData) {
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 	if extendedResourceClaim == nil {
 		// there is no extended resource claim
@@ -605,9 +605,10 @@ func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, 
 		return
 	}
 	// Claim was written to API server, need to delete it to prevent orphaned resources.
+	logger := klog.FromContext(ctx)
 	logger.V(5).Info("delete extended resource backed by DRA", "resourceclaim", klog.KObj(extendedResourceClaim), "pod", klog.KObj(pod), "claim.UID", extendedResourceClaim.UID)
 	extendedResourceClaim = extendedResourceClaim.DeepCopy()
-	if err := pl.deleteClaim(ctx, extendedResourceClaim, logger); err != nil {
+	if err := pl.deleteClaim(ctx, extendedResourceClaim); err != nil {
 		logger.Error(err, "delete", "resourceclaim", klog.KObj(extendedResourceClaim))
 	}
 }
