@@ -529,14 +529,6 @@ type containerToKillInfo struct {
 	reason containerKillReason
 }
 
-// containerResources holds the set of resources applicable to the running container
-type containerResources struct {
-	memoryLimit   int64
-	memoryRequest int64
-	cpuLimit      int64
-	cpuRequest    int64
-}
-
 // containerToUpdateInfo contains necessary information to update a container's resources.
 type containerToUpdateInfo struct {
 	// The spec of the container.
@@ -544,9 +536,9 @@ type containerToUpdateInfo struct {
 	// ID of the runtime container that needs resource update
 	kubeContainerID kubecontainer.ContainerID
 	// Desired resources for the running container
-	desiredContainerResources containerResources
+	desiredContainerResources resourceRequirements
 	// Most recently configured resources on the running container
-	currentContainerResources *containerResources
+	currentContainerResources *resourceRequirements
 }
 
 // containerToRemoveInfo contains necessary information to update a container's resources.
@@ -599,8 +591,9 @@ type podActions struct {
 	UpdatePodLevelResources bool
 }
 
-// podLevelResources holds the set of resources applicable to the running pod
-type podLevelResources struct {
+// resourceRequirements summarizes the set of resources applicable to the
+// running pod or container in kuberuntime context.
+type resourceRequirements struct {
 	memoryLimit   int64
 	memoryRequest int64
 	cpuLimit      int64
@@ -634,8 +627,8 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0
 }
 
-func containerResourcesFromRequirements(podRequirements, containerRequirements *v1.ResourceRequirements) containerResources {
-	resources := containerResources{
+func containerResourcesFromRequirements(podRequirements, containerRequirements *v1.ResourceRequirements) resourceRequirements {
+	resources := resourceRequirements{
 		memoryLimit:   containerRequirements.Limits.Memory().Value(),
 		memoryRequest: containerRequirements.Requests.Memory().Value(),
 		cpuLimit:      containerRequirements.Limits.Cpu().MilliValue(),
@@ -652,12 +645,12 @@ func containerResourcesFromRequirements(podRequirements, containerRequirements *
 	return resources
 }
 
-func podResourcesFromRequirements(requirements *v1.ResourceRequirements) podLevelResources {
+func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourceRequirements {
 	if requirements == nil {
-		return podLevelResources{}
+		return resourceRequirements{}
 	}
 
-	return podLevelResources{
+	return resourceRequirements{
 		memoryLimit:   requirements.Limits.Memory().Value(),
 		memoryRequest: requirements.Requests.Memory().Value(),
 		cpuLimit:      requirements.Limits.Cpu().MilliValue(),

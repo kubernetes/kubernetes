@@ -17,8 +17,7 @@ limitations under the License.
 package inplacepodresize
 
 import (
-	"reflect"
-
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 )
@@ -51,7 +50,7 @@ func (f *podLevelResourcesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *
 	if oldPodInfo.Spec.Resources == nil && newPodInfo.Spec.Resources == nil {
 		return false
 	}
-	return !reflect.DeepEqual(oldPodInfo.Spec.Resources, newPodInfo.Spec.Resources)
+	return !apiequality.Semantic.DeepEqual(oldPodInfo.Spec.Resources, newPodInfo.Spec.Resources)
 }
 
 func (f *podLevelResourcesResizeFeature) MaxVersion() *version.Version {
