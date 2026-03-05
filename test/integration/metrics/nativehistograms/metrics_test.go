@@ -18,8 +18,13 @@ package nativehistograms
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
+	"os"
+	"path"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +35,9 @@ import (
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
@@ -41,7 +48,7 @@ func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error)
 
 	body, err := client.RESTClient().Get().AbsPath("metrics").DoRaw(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	metrics := testutil.NewMetrics()
 	err = testutil.ParseMetrics(string(body), &metrics)
@@ -100,4 +107,89 @@ func TestAPIServerNativeHistogramMetrics(t *testing.T) {
 		"apiserver_request_duration_seconds_sum",
 		"apiserver_request_duration_seconds_count",
 	})
+}
+
+// TestSchedulerNativeHistogramMetrics verifies that native histogram metrics are properly
+// exposed in scheduler when the NativeHistograms feature gate is enabled.
+func TestSchedulerNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+	defer func() {
+		if err := os.Remove(apiserverConfig.Name()); err != nil {
+			t.Errorf("Failed to remove config file: %v", err)
+		}
+	}()
+
+	configStr := fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: kube-scheduler
+  name: default-context
+current-context: default-context
+users:
+- name: kube-scheduler
+  user:
+    token: fake-token
+`, s.ClientConfig.Host, s.ServerOpts.SecureServing.ServerCert.CertKey.CertFile)
+
+	if _, err = apiserverConfig.WriteString(configStr); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	schedulerServer, err := kubeschedulertesting.StartTestServer(
+		t, ctx,
+		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authentication-skip-lookup=true", "--authorization-always-allow-paths=/metrics"},
+	)
+	if err != nil {
+		t.Fatalf("Failed to start kube-scheduler server: %v", err)
+	}
+	if schedulerServer.TearDownFn != nil {
+		defer schedulerServer.TearDownFn()
+	}
+
+	secureInfo := schedulerServer.Config.SecureServing
+	secureOptions := schedulerServer.Options.SecureServing
+	url := fmt.Sprintf("https://%s", secureInfo.Listener.Addr().String())
+	url = strings.ReplaceAll(url, "[::]", "127.0.0.1")
+
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert: %v", err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: pool},
+		},
+	}
+
+	histogramMetric := "scheduler_scheduling_algorithm_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(url+"/metrics", httpClient)
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found", histogramMetric)
+	}
+
+	testutil.AssertHasNativeHistogram(t, mf, nil)
 }
