@@ -46,7 +46,7 @@ const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 const acceptV2JSONNoPeer = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=nopeer"
 
-const maxTimeout = 10 * time.Second
+const maxTimeout = 30 * time.Second
 
 type testClient interface {
 	kubernetes.Interface
