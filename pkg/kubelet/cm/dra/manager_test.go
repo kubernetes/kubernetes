@@ -801,6 +801,31 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 `,
 		},
 		{
+			description: "skip node preparation when disabled by allocation result",
+			pod: func() *v1.Pod {
+				return genTestPod()
+			}(),
+			claim: func() *resourceapi.ResourceClaim {
+				claim := genTestClaim(claimName, "driver-without-plugin", deviceName, podUID)
+				claim.Status.Allocation.Devices.Results[0].RequiresNodePreparation = ptr.To(false)
+				return claim
+			}(),
+			expectedClaimInfoState: state.ClaimInfoState{
+				ClaimUID:    claimUID,
+				ClaimName:   claimName,
+				Namespace:   namespace,
+				PodUIDs:     sets.New[string](podUID),
+				DriverState: map[string]state.DriverState{},
+			},
+			expectedPrepareCalls: 0,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description:            "should prepare resources, driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -1066,14 +1091,17 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer draServerInfo.teardownFn()
-			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
-				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+			var draServerInfo fakeDRAServerInfo
+			if test.driverName != "" {
+				draServerInfo, err = setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer draServerInfo.teardownFn()
+				plg := manager.GetWatcherHandler()
+				if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+					t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+				}
 			}
 
 			if test.claimInfo != nil {
@@ -1082,9 +1110,14 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodePreparation, true)
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
-			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
+			var prepareCalls uint32
+			if draServerInfo.server != nil {
+				prepareCalls = draServerInfo.server.prepareResourceCalls.Load()
+			}
+			assert.Equal(t, test.expectedPrepareCalls, prepareCalls)
 
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
@@ -1251,6 +1284,27 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 `,
 		},
 		{
+			description: "skip node unprepare when no driver state exists",
+			pod:         genTestPod(),
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimUID:    claimUID,
+					ClaimName:   claimName,
+					Namespace:   namespace,
+					PodUIDs:     sets.New[string](string(podUID)),
+					DriverState: map[string]state.DriverState{},
+				},
+				prepared: true,
+			},
+			expectedUnprepareCalls: 0,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
 			description:            "should timeout",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -1370,19 +1424,21 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer draServerInfo.teardownFn()
-
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			var draServerInfo fakeDRAServerInfo
+			if test.driverName != "" {
+				draServerInfo, err = setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer draServerInfo.teardownFn()
 
-			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
-				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+				plg := manager.GetWatcherHandler()
+				if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+					t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+				}
 			}
 
 			if test.claimInfo != nil {
@@ -1390,9 +1446,14 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			}
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodePreparation, true)
 			err = manager.UnprepareResources(tCtx, test.pod)
 
-			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
+			var unprepareCalls uint32
+			if draServerInfo.server != nil {
+				unprepareCalls = draServerInfo.server.unprepareResourceCalls.Load()
+			}
+			assert.Equal(t, test.expectedUnprepareCalls, unprepareCalls)
 
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
