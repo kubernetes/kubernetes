@@ -21,8 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -33,7 +31,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
@@ -124,81 +121,7 @@ func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath s
 
 	proxyAddr := listener.Addr().String()
 
-	httpConnectProxy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/ready" {
-			t.Log("TLS egress proxy ready")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		called.Store(true)
-		t.Logf("TLS egress proxy received connection: %s %s", r.Method, r.Host)
-
-		if r.Method != http.MethodConnect {
-			http.Error(w, "this proxy only supports CONNECT passthrough", http.StatusMethodNotAllowed)
-			return
-		}
-
-		backendConn, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer func() {
-			if err := backendConn.Close(); err != nil {
-				t.Logf("Failed to close backend connection: %v", err)
-			}
-		}()
-
-		hijacker, ok := w.(http.Hijacker)
-		if !ok {
-			http.Error(w, "hijacking not supported", http.StatusInternalServerError)
-			return
-		}
-
-		clientConn, _, err := hijacker.Hijack()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer func() {
-			if err := clientConn.Close(); err != nil {
-				t.Logf("Failed to close client connection: %v", err)
-			}
-		}()
-
-		_, err = clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		if err != nil {
-			t.Errorf("unexpected established error: %v", err)
-			return
-		}
-
-		writerComplete := make(chan struct{})
-		readerComplete := make(chan struct{})
-
-		go func() {
-			_, err := io.Copy(backendConn, clientConn)
-			if err != nil && !utilnet.IsProbableEOF(err) {
-				t.Logf("writer error: %v", err)
-			}
-			close(writerComplete)
-		}()
-
-		go func() {
-			_, err := io.Copy(clientConn, backendConn)
-			if err != nil && !utilnet.IsProbableEOF(err) {
-				t.Logf("reader error: %v", err)
-			}
-			close(readerComplete)
-		}()
-
-		select {
-		case <-writerComplete:
-		case <-readerComplete:
-		}
-	})
-
-	server := &http.Server{Handler: httpConnectProxy}
+	server := &http.Server{Handler: oidctest.NewHTTPConnectProxyHandler(t, called)}
 
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
