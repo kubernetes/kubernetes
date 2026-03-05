@@ -631,6 +631,11 @@ func (in *DeviceClassSpec) DeepCopyInto(out *DeviceClassSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.RequiresNodePreparation != nil {
+		in, out := &in.RequiresNodePreparation, &out.RequiresNodePreparation
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -802,6 +807,11 @@ func (in *DeviceRequestAllocationResult) DeepCopyInto(out *DeviceRequestAllocati
 		for key, val := range *in {
 			(*out)[key] = val.DeepCopy()
 		}
+	}
+	if in.RequiresNodePreparation != nil {
+		in, out := &in.RequiresNodePreparation, &out.RequiresNodePreparation
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }

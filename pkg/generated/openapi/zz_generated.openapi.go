@@ -47827,6 +47827,13 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -48115,6 +48122,13 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 									},
 								},
 							},
+						},
+					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
@@ -50747,6 +50761,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -51103,6 +51124,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 									},
 								},
 							},
+						},
+					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
@@ -53042,6 +53070,13 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -53330,6 +53365,13 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 									},
 								},
 							},
+						},
+					},
+					"requiresNodePreparation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},

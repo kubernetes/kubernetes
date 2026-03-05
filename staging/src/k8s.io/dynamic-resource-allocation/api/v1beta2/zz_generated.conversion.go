@@ -950,6 +950,7 @@ func autoConvert_v1_DeviceClassSpec_To_v1beta2_DeviceClassSpec(in *v1.DeviceClas
 	out.Selectors = *(*[]resourcev1beta2.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.Config = *(*[]resourcev1beta2.DeviceClassConfiguration)(unsafe.Pointer(&in.Config))
 	out.ExtendedResourceName = (*string)(unsafe.Pointer(in.ExtendedResourceName))
+	out.RequiresNodePreparation = (*bool)(unsafe.Pointer(in.RequiresNodePreparation))
 	return nil
 }
 
@@ -962,6 +963,7 @@ func autoConvert_v1beta2_DeviceClassSpec_To_v1_DeviceClassSpec(in *resourcev1bet
 	out.Selectors = *(*[]v1.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.Config = *(*[]v1.DeviceClassConfiguration)(unsafe.Pointer(&in.Config))
 	out.ExtendedResourceName = (*string)(unsafe.Pointer(in.ExtendedResourceName))
+	out.RequiresNodePreparation = (*bool)(unsafe.Pointer(in.RequiresNodePreparation))
 	return nil
 }
 
@@ -1071,6 +1073,7 @@ func autoConvert_v1_DeviceRequestAllocationResult_To_v1beta2_DeviceRequestAlloca
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.ShareID = (*types.UID)(unsafe.Pointer(in.ShareID))
 	out.ConsumedCapacity = *(*map[resourcev1beta2.QualifiedName]resource.Quantity)(unsafe.Pointer(&in.ConsumedCapacity))
+	out.RequiresNodePreparation = (*bool)(unsafe.Pointer(in.RequiresNodePreparation))
 	return nil
 }
 
@@ -1090,6 +1093,7 @@ func autoConvert_v1beta2_DeviceRequestAllocationResult_To_v1_DeviceRequestAlloca
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.ShareID = (*types.UID)(unsafe.Pointer(in.ShareID))
 	out.ConsumedCapacity = *(*map[v1.QualifiedName]resource.Quantity)(unsafe.Pointer(&in.ConsumedCapacity))
+	out.RequiresNodePreparation = (*bool)(unsafe.Pointer(in.RequiresNodePreparation))
 	return nil
 }
 

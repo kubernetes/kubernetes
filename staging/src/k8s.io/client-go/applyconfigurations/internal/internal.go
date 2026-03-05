@@ -12640,6 +12640,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -12728,6 +12731,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: shareID
       type:
         scalar: string
@@ -13520,6 +13526,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -13633,6 +13642,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: shareID
       type:
         scalar: string
@@ -14229,6 +14241,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -14317,6 +14332,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: requiresNodePreparation
+      type:
+        scalar: boolean
     - name: shareID
       type:
         scalar: string

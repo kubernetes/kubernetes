@@ -1283,6 +1283,16 @@ func (m *DeviceClassSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.RequiresNodePreparation != nil {
+		i--
+		if *m.RequiresNodePreparation {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.ExtendedResourceName != nil {
 		i -= len(*m.ExtendedResourceName)
 		copy(dAtA[i:], *m.ExtendedResourceName)
@@ -1584,6 +1594,16 @@ func (m *DeviceRequestAllocationResult) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if m.RequiresNodePreparation != nil {
+		i--
+		if *m.RequiresNodePreparation {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x58
+	}
 	if len(m.ConsumedCapacity) > 0 {
 		keysForConsumedCapacity := make([]string, 0, len(m.ConsumedCapacity))
 		for k := range m.ConsumedCapacity {
@@ -3082,6 +3102,9 @@ func (m *DeviceClassSpec) Size() (n int) {
 		l = len(*m.ExtendedResourceName)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.RequiresNodePreparation != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -3229,6 +3252,9 @@ func (m *DeviceRequestAllocationResult) Size() (n int) {
 			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
+	}
+	if m.RequiresNodePreparation != nil {
+		n += 2
 	}
 	return n
 }
@@ -3927,6 +3953,7 @@ func (this *DeviceClassSpec) String() string {
 		`Selectors:` + repeatedStringForSelectors + `,`,
 		`Config:` + repeatedStringForConfig + `,`,
 		`ExtendedResourceName:` + valueToStringGenerated(this.ExtendedResourceName) + `,`,
+		`RequiresNodePreparation:` + valueToStringGenerated(this.RequiresNodePreparation) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4037,6 +4064,7 @@ func (this *DeviceRequestAllocationResult) String() string {
 		`BindingFailureConditions:` + fmt.Sprintf("%v", this.BindingFailureConditions) + `,`,
 		`ShareID:` + valueToStringGenerated(this.ShareID) + `,`,
 		`ConsumedCapacity:` + mapStringForConsumedCapacity + `,`,
+		`RequiresNodePreparation:` + valueToStringGenerated(this.RequiresNodePreparation) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -7902,6 +7930,27 @@ func (m *DeviceClassSpec) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.ExtendedResourceName = &s
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequiresNodePreparation", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.RequiresNodePreparation = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -9130,6 +9179,27 @@ func (m *DeviceRequestAllocationResult) Unmarshal(dAtA []byte) error {
 			}
 			m.ConsumedCapacity[QualifiedName(mapkey)] = *mapvalue
 			iNdEx = postIndex
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequiresNodePreparation", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.RequiresNodePreparation = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

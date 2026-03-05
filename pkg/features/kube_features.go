@@ -247,6 +247,12 @@ const (
 	// Enables support for node allocatable resources backed by DRA.
 	DRANodeAllocatableResources featuregate.Feature = "DRANodeAllocatableResources"
 
+	// owner: @lauralorenz
+	//
+	// Enables opting out of kubelet NodePrepareResources/NodeUnprepareResources
+	// calls for DRA allocations where node-local preparation is not needed.
+	DRANodePreparation featuregate.Feature = "DRANodePreparation"
+
 	// owner: @mortent, @cici37
 	// kep: http://kep.k8s.io/4815
 	//
@@ -1368,6 +1374,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRANodePreparation: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAPartitionableDevices: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2420,6 +2430,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAListTypeAttributes: {DynamicResourceAllocation},
 
 	DRANodeAllocatableResources: {DynamicResourceAllocation},
+
+	DRANodePreparation: {DynamicResourceAllocation},
 
 	DRAPartitionableDevices: {DynamicResourceAllocation},
 
