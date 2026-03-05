@@ -46,54 +46,119 @@ type constrainedImpersonationTest struct {
 	t *testing.T
 
 	constrainedImpersonationHandler *constrainedImpersonationHandler
-	checkedAttrs                    []authorizer.Attributes
+	authzChecks                     []authzCheck
 	echoCalled                      bool
 }
 
-func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	c.checkedAttrs = append(c.checkedAttrs, a)
+type authzCheck struct {
+	attributes authorizer.Attributes
+	decision   authorizer.Decision
+	reason     string
+	err        error
+}
 
+func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	u := a.GetUser()
 
+	var decision authorizer.Decision
+	var reason string
+	var err error
+
+	defer func() {
+		c.authzChecks = append(c.authzChecks, authzCheck{
+			attributes: a,
+			decision:   decision,
+			reason:     reason,
+			err:        err,
+		})
+	}()
+
 	if u.GetName() == "sa-impersonater" && a.GetVerb() == "impersonate:serviceaccount" && a.GetResource() == "serviceaccounts" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if u.GetName() == "system:serviceaccount:default:node" && a.GetVerb() == "impersonate:arbitrary-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if u.GetName() == "node-impersonater" && a.GetVerb() == "impersonate:arbitrary-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "associate-node-impersonater" && a.GetVerb() == "impersonate:associated-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if u.GetName() == "user-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "group-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "groups" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "extra-setter-scopes" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "userextras" && a.GetSubresource() == "pandas.io/scopes" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if u.GetName() == "legacy-impersonater" && a.GetVerb() == "impersonate" {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
 	if u.GetName() != "legacy-impersonator" &&
 		strings.HasPrefix(a.GetVerb(), "impersonate-on:") &&
 		(strings.HasSuffix(a.GetVerb(), "list") || strings.HasSuffix(a.GetVerb(), "get")) {
-		return authorizer.DecisionAllow, "", nil
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
 	}
 
-	return authorizer.DecisionNoOpinion, "deny by default", nil
+	// many-groups-impersonater: can impersonate users and any groups via wildcard
+	if u.GetName() == "many-groups-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+	if u.GetName() == "many-groups-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "groups" && a.GetName() == "*" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+
+	// many-extras-impersonater: can impersonate users and any extras via wildcard
+	if u.GetName() == "many-extras-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+	if u.GetName() == "many-extras-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "userextras" && a.GetSubresource() == "*" && a.GetName() == "*" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+
+	// mixed-impersonater: can impersonate users, specific groups, and specific extras (but NOT via wildcards)
+	if u.GetName() == "mixed-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+	// Allow specific group names, but NOT wildcard
+	if u.GetName() == "mixed-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "groups" && a.GetName() != "*" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+	// Allow specific extras for tags.io/env, but NOT wildcard
+	if u.GetName() == "mixed-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "userextras" &&
+		a.GetSubresource() == "tags.io/env" && a.GetName() != "*" {
+		decision, reason, err = authorizer.DecisionAllow, "", nil
+		return decision, reason, err
+	}
+
+	decision, reason, err = authorizer.DecisionNoOpinion, "deny by default", nil
+	return decision, reason, err
 }
 
 func (c *constrainedImpersonationTest) echoUserInfoHandler() http.HandlerFunc {
@@ -195,10 +260,10 @@ func (t *testRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func (c *constrainedImpersonationTest) assertAttributes(r testRequest) {
-	checkedAttrs := c.checkedAttrs
-	c.checkedAttrs = nil
+	authzChecks := c.authzChecks
+	c.authzChecks = nil
 
-	require.Equal(c.t, len(r.expectedAttributes), len(checkedAttrs))
+	require.Len(c.t, authzChecks, len(r.expectedAuthzChecks))
 
 	// normally all authorization checks are done against the requestor
 	// but in some cases such as associated-node, we check against a slightly different user
@@ -207,9 +272,10 @@ func (c *constrainedImpersonationTest) assertAttributes(r testRequest) {
 		expectedAttributesUser = r.requestor
 	}
 
-	for i := range len(r.expectedAttributes) {
-		expectedAttributes := withUser(r.expectedAttributes[i], expectedAttributesUser)
-		require.Equal(c.t, expectedAttributes, comparableAttributes(checkedAttrs[i]))
+	for i := range len(r.expectedAuthzChecks) {
+		expectedAttributes := withUser(r.expectedAuthzChecks[i].attributes, expectedAttributesUser)
+		require.Equal(c.t, expectedAttributes, comparableAttributes(authzChecks[i].attributes), "authz check %d: attributes mismatch", i)
+		require.Equal(c.t, r.expectedAuthzChecks[i].decision, authzChecks[i].decision, "authz check %d: decision mismatch", i)
 	}
 }
 
@@ -346,6 +412,21 @@ func withUser(a authorizer.AttributesRecord, u *user.DefaultInfo) authorizer.Att
 	return a
 }
 
+func expectAuthzCheck(attributes authorizer.AttributesRecord, decision authorizer.Decision) expectedAuthzCheck {
+	return expectedAuthzCheck{
+		attributes: attributes,
+		decision:   decision,
+	}
+}
+
+func expectAllow(attributes authorizer.AttributesRecord) expectedAuthzCheck {
+	return expectAuthzCheck(attributes, authorizer.DecisionAllow)
+}
+
+func expectDeny(attributes authorizer.AttributesRecord) expectedAuthzCheck {
+	return expectAuthzCheck(attributes, authorizer.DecisionNoOpinion)
+}
+
 func outerCacheKey(wantedUser, requestor *user.DefaultInfo, req *request.RequestInfo) impersonationCacheKey {
 	attributes := withUser(requestInfoToAttributes(req), requestor)
 	return impersonationCacheKey{
@@ -368,6 +449,11 @@ type innerKey struct {
 	wantedUser, requestor *user.DefaultInfo
 }
 
+type expectedAuthzCheck struct {
+	attributes authorizer.AttributesRecord
+	decision   authorizer.Decision
+}
+
 type testRequest struct {
 	request          *request.RequestInfo
 	requestor        *user.DefaultInfo
@@ -377,7 +463,7 @@ type testRequest struct {
 	expectedMessage          string
 
 	expectedAttributesUser *user.DefaultInfo // nil means use requestor
-	expectedAttributes     []authorizer.AttributesRecord
+	expectedAuthzChecks    []expectedAuthzCheck
 	expectedCache          *expectedCache
 	expectedCode           int
 }
@@ -466,9 +552,9 @@ func associatedNodeTestCase() []testRequest {
 			impersonatedUser:         &user.DefaultInfo{Name: "system:node:node1"}, // node matches
 			expectedImpersonatedUser: node1FullUserInfo,
 			expectedAttributesUser:   saDefaultOnAnyNode,
-			expectedAttributes: []authorizer.AttributesRecord{
-				withImpersonateOnAttributes(getSecretRequest, "associated-node"),
-				withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "*"}, "associated-node"),
+			expectedAuthzChecks: []expectedAuthzCheck{
+				expectAllow(withImpersonateOnAttributes(getSecretRequest, "associated-node")),
+				expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "*"}, "associated-node")),
 			},
 			expectedCache: cacheWithOnlyNode1Data,
 			expectedCode:  http.StatusOK,
@@ -479,7 +565,7 @@ func associatedNodeTestCase() []testRequest {
 			impersonatedUser:         &user.DefaultInfo{Name: "system:node:node2"}, // node matches
 			expectedImpersonatedUser: node2FullUserInfo,
 			expectedAttributesUser:   saDefaultOnAnyNode,
-			expectedAttributes:       nil, // no authz checks for the second request
+			expectedAuthzChecks:      nil, // no authz checks for the second request
 			expectedCache:            cacheWithOnlyNode1Data,
 			expectedCode:             http.StatusOK,
 		},
@@ -489,10 +575,10 @@ func associatedNodeTestCase() []testRequest {
 			impersonatedUser:       &user.DefaultInfo{Name: "system:node:node1"}, // node does not match
 			expectedMessage:        `nodes.authentication.k8s.io "node1" is forbidden: User "system:serviceaccount:default:default" cannot impersonate:arbitrary-node resource "nodes" in API group "authentication.k8s.io" at the cluster scope: deny by default`,
 			expectedAttributesUser: nil,
-			expectedAttributes: []authorizer.AttributesRecord{
-				withImpersonateOnAttributes(getSecretRequest, "arbitrary-node"),
-				withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node"),
-				withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"}),
+			expectedAuthzChecks: []expectedAuthzCheck{
+				expectAllow(withImpersonateOnAttributes(getSecretRequest, "arbitrary-node")),
+				expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node")),
+				expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"})),
 			},
 			expectedCache: cacheWithOnlyNode1Data,
 			expectedCode:  http.StatusForbidden,
@@ -503,8 +589,8 @@ func associatedNodeTestCase() []testRequest {
 			impersonatedUser:         &user.DefaultInfo{Name: "system:node:node2"}, // node matches
 			expectedImpersonatedUser: node2FullUserInfo,
 			expectedAttributesUser:   saDefaultOnAnyNode,
-			expectedAttributes: []authorizer.AttributesRecord{
-				withImpersonateOnAttributes(getPodRequest, "associated-node"), // one authz check because different request info
+			expectedAuthzChecks: []expectedAuthzCheck{
+				expectAllow(withImpersonateOnAttributes(getPodRequest, "associated-node")), // one authz check because different request info
 			},
 			expectedCache: cacheWithMultipleRequests,
 			expectedCode:  http.StatusOK,
@@ -515,7 +601,7 @@ func associatedNodeTestCase() []testRequest {
 			impersonatedUser:         &user.DefaultInfo{Name: "system:node:node1"}, // node matches
 			expectedImpersonatedUser: node1FullUserInfo,
 			expectedAttributesUser:   nil,
-			expectedAttributes:       nil, // no authz checks for pod request via node1
+			expectedAuthzChecks:      nil, // no authz checks for pod request via node1
 			expectedCache:            cacheWithMultipleRequests,
 			expectedCode:             http.StatusOK,
 		},
@@ -587,10 +673,10 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					request:          getPodRequest,
 					requestor:        &user.DefaultInfo{Name: "tester"},
 					impersonatedUser: anyone,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}, "user-info"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}, "user-info")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"})),
 					},
 					expectedCache:   nil,
 					expectedCode:    http.StatusForbidden,
@@ -606,9 +692,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					requestor:                userImpersonator,
 					impersonatedUser:         anyone,
 					expectedImpersonatedUser: anyoneAuthenticated,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}, "user-info"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}, "user-info")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -632,8 +718,8 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					requestor:                userImpersonator,
 					impersonatedUser:         anyone,
 					expectedImpersonatedUser: anyoneAuthenticated,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getAnotherPodRequest, "user-info"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getAnotherPodRequest, "user-info")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -657,9 +743,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					request:          createPodRequest,
 					requestor:        userImpersonator,
 					impersonatedUser: anyone,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(createPodRequest, "user-info"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectDeny(withImpersonateOnAttributes(createPodRequest, "user-info")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "anyone"})),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -690,9 +776,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					requestor:                saImpersonator,
 					impersonatedUser:         saUser,
 					expectedImpersonatedUser: saUserAuthenticated,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "serviceaccount"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "serviceaccounts", Namespace: "default", Name: "default"}, "serviceaccount"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "serviceaccount")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "serviceaccounts", Namespace: "default", Name: "default"}, "serviceaccount")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -723,10 +809,10 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					request:          getPodRequest,
 					requestor:        saImpersonator,
 					impersonatedUser: nodeUser,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "arbitrary-node"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "arbitrary-node")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"})),
 					},
 					expectedCache:   nil,
 					expectedCode:    http.StatusForbidden,
@@ -741,9 +827,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					request:          createPodRequest,
 					requestor:        nodeImpersonator,
 					impersonatedUser: nodeUser,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(createPodRequest, "arbitrary-node"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectDeny(withImpersonateOnAttributes(createPodRequest, "arbitrary-node")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"})),
 					},
 					expectedCache:   nil,
 					expectedCode:    http.StatusForbidden,
@@ -759,9 +845,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					requestor:                nodeImpersonator,
 					impersonatedUser:         nodeUser,
 					expectedImpersonatedUser: nodeUserAuthenticated,
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "arbitrary-node"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "arbitrary-node")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -796,12 +882,12 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						Groups: []string{"extra-setter-scopes"},
 						Extra:  map[string][]string{"pandas.io/scopes": {"scope-a", "scope-b"}},
 					},
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "extra-setter-scopes"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-a"}, "user-info"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "extra-setter-scopes"}, "user-info")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-a"}, "user-info")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"})),
 					},
 					expectedCache:   nil,
 					expectedCode:    http.StatusForbidden,
@@ -827,17 +913,17 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						Groups: []string{"system:authenticated"},
 						Extra:  map[string][]string{"pandas.io/scopes": {"scope-a", "scope-b", "5", "4", "3", "2", "1"}},
 					},
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "*", Name: "*"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-a"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-b"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "5"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "4"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "3"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "2"}, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "1"}, "user-info"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "*", Name: "*"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-a"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "scope-b"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "5"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "4"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "3"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "2"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "pandas.io/scopes", Name: "1"}, "user-info")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -901,10 +987,10 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						},
 					},
 					impersonatedUser: &user.DefaultInfo{Name: "system:node:node1"},
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "arbitrary-node"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "arbitrary-node")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "nodes", Name: "node1"}, "arbitrary-node")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:node:node1"})),
 					},
 					expectedCache:   nil,
 					expectedCode:    http.StatusForbidden,
@@ -923,16 +1009,265 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						Name:   "system:admin",
 						Groups: []string{"system:authenticated"},
 					},
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getPodRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info"),
-						withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"}, "user-info")),
+						expectAllow(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "system:admin"})),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
 							"legacy-impersonater": "impersonate",
 						},
 						modes: nil, // legacy impersonation does not cache
+					},
+					expectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			name: "system:masters-group-not-allowed",
+			requests: []testRequest{
+				{
+					request:   getPodRequest,
+					requestor: userImpersonator,
+					impersonatedUser: &user.DefaultInfo{
+						Name:   "admin-user",
+						Groups: []string{user.SystemPrivilegedGroup},
+					},
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "admin-user"}, "user-info")),
+						expectDeny(withLegacyImpersonateAttributes(authorizer.AttributesRecord{Resource: "users", Name: "admin-user"})),
+					},
+					expectedCache:   nil,
+					expectedCode:    http.StatusForbidden,
+					expectedMessage: `groups.authentication.k8s.io "system:masters" is forbidden: User "user-impersonater" cannot impersonate:user-info resource "groups" in API group "authentication.k8s.io" at the cluster scope: impersonating the system:masters group is not allowed`,
+				},
+			},
+		},
+		{
+			name: "many-groups-wildcard-allowed",
+			requests: []testRequest{
+				{
+					request: getPodRequest,
+					requestor: &user.DefaultInfo{
+						Name: "many-groups-impersonater",
+					},
+					impersonatedUser: &user.DefaultInfo{
+						Name:   "bob",
+						Groups: []string{"group1", "group2", "group3", "group4"},
+					},
+					expectedImpersonatedUser: &user.DefaultInfo{
+						Name:   "bob",
+						Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+					},
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "bob"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "*"}, "user-info")),
+					},
+					expectedCache: &expectedCache{
+						modeIdx: map[string]string{
+							"many-groups-impersonater": "impersonate:user-info",
+						},
+						modes: map[string]expectedModeCache{
+							"impersonate:user-info": {
+								outer: map[impersonationCacheKey]*user.DefaultInfo{
+									outerCacheKey(&user.DefaultInfo{
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4"},
+									}, &user.DefaultInfo{Name: "many-groups-impersonater"}, getPodRequest): {
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+									},
+								},
+								inner: map[innerKey]*user.DefaultInfo{
+									{
+										wantedUser: &user.DefaultInfo{
+											Name:   "bob",
+											Groups: []string{"group1", "group2", "group3", "group4"},
+										},
+										requestor: &user.DefaultInfo{Name: "many-groups-impersonater"},
+									}: {
+										Name:   "bob",
+										Groups: []string{"group1", "group2", "group3", "group4", "system:authenticated"},
+									},
+								},
+							},
+						},
+					},
+					expectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			name: "many-extras-wildcard-allowed",
+			requests: []testRequest{
+				{
+					request: getPodRequest,
+					requestor: &user.DefaultInfo{
+						Name: "many-extras-impersonater",
+					},
+					impersonatedUser: &user.DefaultInfo{
+						Name: "alice",
+						Extra: map[string][]string{
+							"scopes.example.com/key1": {"val1"},
+							"scopes.example.com/key2": {"val2"},
+							"scopes.example.com/key3": {"val3"},
+							"scopes.example.com/key4": {"val4"},
+						},
+					},
+					expectedImpersonatedUser: &user.DefaultInfo{
+						Name:   "alice",
+						Groups: []string{"system:authenticated"},
+						Extra: map[string][]string{
+							"scopes.example.com/key1": {"val1"},
+							"scopes.example.com/key2": {"val2"},
+							"scopes.example.com/key3": {"val3"},
+							"scopes.example.com/key4": {"val4"},
+						},
+					},
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "alice"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "*", Name: "*"}, "user-info")),
+					},
+					expectedCache: &expectedCache{
+						modeIdx: map[string]string{
+							"many-extras-impersonater": "impersonate:user-info",
+						},
+						modes: map[string]expectedModeCache{
+							"impersonate:user-info": {
+								outer: map[impersonationCacheKey]*user.DefaultInfo{
+									outerCacheKey(&user.DefaultInfo{
+										Name: "alice",
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									}, &user.DefaultInfo{Name: "many-extras-impersonater"}, getPodRequest): {
+										Name:   "alice",
+										Groups: []string{"system:authenticated"},
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									},
+								},
+								inner: map[innerKey]*user.DefaultInfo{
+									{
+										wantedUser: &user.DefaultInfo{
+											Name: "alice",
+											Extra: map[string][]string{
+												"scopes.example.com/key1": {"val1"},
+												"scopes.example.com/key2": {"val2"},
+												"scopes.example.com/key3": {"val3"},
+												"scopes.example.com/key4": {"val4"},
+											},
+										},
+										requestor: &user.DefaultInfo{Name: "many-extras-impersonater"},
+									}: {
+										Name:   "alice",
+										Groups: []string{"system:authenticated"},
+										Extra: map[string][]string{
+											"scopes.example.com/key1": {"val1"},
+											"scopes.example.com/key2": {"val2"},
+											"scopes.example.com/key3": {"val3"},
+											"scopes.example.com/key4": {"val4"},
+										},
+									},
+								},
+							},
+						},
+					},
+					expectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			name: "mixed-groups-extras-wildcard-denied-individuals-allowed",
+			requests: []testRequest{
+				{
+					request: getPodRequest,
+					requestor: &user.DefaultInfo{
+						Name: "mixed-impersonater",
+					},
+					impersonatedUser: &user.DefaultInfo{
+						Name:   "frank",
+						Groups: []string{"dev", "ops", "security", "audit"},
+						Extra: map[string][]string{
+							"tags.io/env": {"prod", "staging", "dev"},
+						},
+					},
+					expectedImpersonatedUser: &user.DefaultInfo{
+						Name:   "frank",
+						Groups: []string{"dev", "ops", "security", "audit", "system:authenticated"},
+						Extra: map[string][]string{
+							"tags.io/env": {"prod", "staging", "dev"},
+						},
+					},
+					expectedAuthzChecks: []expectedAuthzCheck{
+						// impersonate-on check passes
+						expectAllow(withImpersonateOnAttributes(getPodRequest, "user-info")),
+						// user check passes
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "frank"}, "user-info")),
+						// wildcard groups check FAILS (mixed-impersonater doesn't allow wildcard groups)
+						expectDeny(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "*"}, "user-info")),
+						// individual group checks PASS - demonstrating fallback after wildcard failure
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "dev"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "ops"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "security"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "groups", Name: "audit"}, "user-info")),
+						// individual extra checks PASS (wildcard not attempted for extras with single subresource)
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "tags.io/env", Name: "prod"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "tags.io/env", Name: "staging"}, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "userextras", Subresource: "tags.io/env", Name: "dev"}, "user-info")),
+					},
+					expectedCache: &expectedCache{
+						modeIdx: map[string]string{
+							"mixed-impersonater": "impersonate:user-info",
+						},
+						modes: map[string]expectedModeCache{
+							"impersonate:user-info": {
+								outer: map[impersonationCacheKey]*user.DefaultInfo{
+									outerCacheKey(&user.DefaultInfo{
+										Name:   "frank",
+										Groups: []string{"dev", "ops", "security", "audit"},
+										Extra: map[string][]string{
+											"tags.io/env": {"prod", "staging", "dev"},
+										},
+									}, &user.DefaultInfo{Name: "mixed-impersonater"}, getPodRequest): {
+										Name:   "frank",
+										Groups: []string{"dev", "ops", "security", "audit", "system:authenticated"},
+										Extra: map[string][]string{
+											"tags.io/env": {"prod", "staging", "dev"},
+										},
+									},
+								},
+								inner: map[innerKey]*user.DefaultInfo{
+									{
+										wantedUser: &user.DefaultInfo{
+											Name:   "frank",
+											Groups: []string{"dev", "ops", "security", "audit"},
+											Extra: map[string][]string{
+												"tags.io/env": {"prod", "staging", "dev"},
+											},
+										},
+										requestor: &user.DefaultInfo{Name: "mixed-impersonater"},
+									}: {
+										Name:   "frank",
+										Groups: []string{"dev", "ops", "security", "audit", "system:authenticated"},
+										Extra: map[string][]string{
+											"tags.io/env": {"prod", "staging", "dev"},
+										},
+									},
+								},
+							},
+						},
 					},
 					expectedCode: http.StatusOK,
 				},
@@ -949,9 +1284,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						Name:   "bob",
 						Groups: []string{"system:authenticated"},
 					},
-					expectedAttributes: []authorizer.AttributesRecord{
-						withImpersonateOnAttributes(getDeploymentRequest, "user-info"),
-						withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "bob"}, "user-info"),
+					expectedAuthzChecks: []expectedAuthzCheck{
+						expectAllow(withImpersonateOnAttributes(getDeploymentRequest, "user-info")),
+						expectAllow(withConstrainedImpersonationAttributes(authorizer.AttributesRecord{Resource: "users", Name: "bob"}, "user-info")),
 					},
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
@@ -984,7 +1319,8 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 						Name:   "bob",
 						Groups: []string{"system:authenticated"},
 					},
-					expectedCode: http.StatusOK,
+					expectedAuthzChecks: nil, // no authz checks for cached request
+					expectedCode:        http.StatusOK,
 					expectedCache: &expectedCache{
 						modeIdx: map[string]string{
 							userImpersonator.Name: "impersonate:user-info",
