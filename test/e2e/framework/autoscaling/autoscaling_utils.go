@@ -17,10 +17,11 @@ limitations under the License.
 package autoscaling
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -43,10 +44,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	kubectlportforward "k8s.io/kubectl/pkg/cmd/portforward"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -214,37 +215,40 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	podName := pods.Items[0].Name
 
-	// Set up port-forward
 	config, err := framework.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
+	buf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	streams := genericiooptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: errBuf,
 	}
 
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
-	stopChan := make(chan struct{})
+	stopChan := make(chan struct{}, 1)
 	readyChan := make(chan struct{})
 
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
+	portForwardOptions := kubectlportforward.NewDefaultPortForwardOptions(streams)
+	portForwardOptions.Namespace = emc.namespace
+	portForwardOptions.PodName = podName
+	portForwardOptions.RESTClient = emc.clientSet.CoreV1().RESTClient()
+	portForwardOptions.Config = config
+	portForwardOptions.PodClient = emc.clientSet.CoreV1()
+	portForwardOptions.Address = []string{"127.0.0.1"}
+	portForwardOptions.Ports = []string{":6443"}
+	portForwardOptions.StopChannel = stopChan
+	portForwardOptions.ReadyChannel = readyChan
+
+	if err := portForwardOptions.Validate(); err != nil {
+		return fmt.Errorf("failed to validate port-forward options: %w", err)
 	}
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- fw.ForwardPorts()
+		errChan <- portForwardOptions.RunPortForwardContext(ctx)
 	}()
 
 	select {
@@ -257,12 +261,20 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	defer close(stopChan)
 
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
-	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
+	// parse local port from stdout
+	output := buf.String()
+	parts := strings.Split(strings.TrimSpace(output), " ")
+	if len(parts) < 3 {
+		return fmt.Errorf("unable to parse local port from port-forward output: %q", output)
 	}
-	localPort := forwardedPorts[0].Local
+	_, localPortStr, err := net.SplitHostPort(parts[2])
+	if err != nil {
+		return fmt.Errorf("failed to split host:port from %q: %w", parts[2], err)
+	}
+	localPort, err := strconv.Atoi(localPortStr)
+	if err != nil {
+		return fmt.Errorf("failed to convert local port %q to int: %w", localPortStr, err)
+	}
 
 	// Build URL and make request
 	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
