@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,10 +88,10 @@ func (f *fakeLeases) SetKeysWithoutValidation(keys []string) error {
 	for _, ipStr := range keys {
 		// key := path.Join(f.baseKey, ipStr) // path is not imported, using simple concat for tests or import it
 		key := f.baseKey + ipStr
-		err := f.storage.Create(apirequest.NewDefaultContext(), key, &corev1.Endpoints{
+		err := f.storage.Create(apirequest.NewDefaultContext(), key, &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{Name: ipStr},
-			Subsets: []corev1.EndpointSubset{{
-				Addresses: []corev1.EndpointAddress{{IP: ipStr}},
+			Endpoints: []discoveryv1.Endpoint{{
+				Addresses: []string{ipStr},
 			}},
 		}, nil, 0)
 		if err != nil {
@@ -484,9 +485,9 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
-	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+	newFunc := func() runtime.Object { return &discoveryv1.EndpointSlice{} }
+	newListFunc := func() runtime.Object { return &discoveryv1.EndpointSliceList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, discoveryv1.SchemeGroupVersion)
 
 	stopTests := []struct {
 		testName         string
@@ -616,9 +617,9 @@ func TestApiserverShutdown(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
-	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+	newFunc := func() runtime.Object { return &discoveryv1.EndpointSlice{} }
+	newListFunc := func() runtime.Object { return &discoveryv1.EndpointSliceList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, discoveryv1.SchemeGroupVersion)
 
 	reconcileTests := []struct {
 		testName                string
@@ -749,8 +750,14 @@ func TestLeaseStorageFiltered(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	newFunc := func() runtime.Object {
+		return &discoveryv1.EndpointSlice{}
+	}
+
+	newListFunc := func() runtime.Object {
+		return &discoveryv1.EndpointSliceList{}
+	}
+
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	baseKey := "/" + uuid.New().String() + "/masterleases/"
@@ -773,9 +780,6 @@ func TestLeaseStorageFiltered(t *testing.T) {
 		t.Fatalf("unexpected error listing leases: %v", err)
 	}
 
-	// 0.0.0.0 is invalid.
-	// 1.2.3.4 and 10.0.0.1 are valid global unicast.
-	// 127.0.0.1 is loopback, and since there are global unicast ones, it should be filtered.
 	expectedLeases := []string{"1.2.3.4", "10.0.0.1"}
 	sort.Strings(leases)
 	sort.Strings(expectedLeases)
@@ -788,8 +792,12 @@ func TestLeaseStorageLoopback(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	newFunc := func() runtime.Object {
+		return &corev1.Endpoints{}
+	}
+	newListFunc := func() runtime.Object {
+		return &corev1.EndpointsList{}
+	}
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	baseKey := "/" + uuid.New().String() + "/masterleases/"
@@ -811,7 +819,6 @@ func TestLeaseStorageLoopback(t *testing.T) {
 		t.Fatalf("unexpected error listing leases: %v", err)
 	}
 
-	// 127.0.0.1 should be allowed if it is the only one (for integration tests)
 	expectedLeases := []string{"127.0.0.1"}
 	if !reflect.DeepEqual(leases, expectedLeases) {
 		t.Errorf("expected %v got: %v", expectedLeases, leases)
@@ -822,9 +829,9 @@ func TestLeaseUpdateInvalid(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
-	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+	newFunc := func() runtime.Object { return &discoveryv1.EndpointSlice{} }
+	newListFunc := func() runtime.Object { return &discoveryv1.EndpointSliceList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, discoveryv1.SchemeGroupVersion)
 
 	baseKey := "/" + uuid.New().String() + "/masterleases/"
 	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
@@ -840,7 +847,7 @@ func TestLeaseUpdateInvalid(t *testing.T) {
 		t.Errorf("expected error updating invalid lease, got nil")
 	}
 
-	// Try to update with loopback IP (should be allowed now)
+	// Try to update with loopback IP
 	err = fakeLeases.UpdateLease("127.0.0.1")
 	if err != nil {
 		t.Errorf("unexpected error updating loopback lease: %v", err)

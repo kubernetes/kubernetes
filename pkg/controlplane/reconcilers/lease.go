@@ -33,6 +33,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
@@ -70,7 +71,7 @@ var _ Leases = &storageLeases{}
 
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
-	ipInfoList := &corev1.EndpointsList{}
+	ipInfoList := &discoveryv1.EndpointSliceList{}
 	storageOpts := storage.ListOptions{
 		ResourceVersion:      "0",
 		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
@@ -83,8 +84,8 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 
 	ipList := make([]string, 0, len(ipInfoList.Items))
 	for _, ipInfo := range ipInfoList.Items {
-		if len(ipInfo.Subsets) > 0 && len(ipInfo.Subsets[0].Addresses) > 0 && len(ipInfo.Subsets[0].Addresses[0].IP) > 0 {
-			ip := ipInfo.Subsets[0].Addresses[0].IP
+		if len(ipInfo.Endpoints) > 0 && len(ipInfo.Endpoints[0].Addresses) > 0 {
+			ip := ipInfo.Endpoints[0].Addresses[0]
 			if isValidEndpointIP(ip) {
 				ipList = append(ipList, ip)
 			} else {
@@ -125,13 +126,20 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		return fmt.Errorf("cannot update lease for invalid master IP %q", ip)
 	}
 	key := path.Join(s.baseKey, ip)
-	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
+	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &discoveryv1.EndpointSlice{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
-		existing := input.(*corev1.Endpoints)
-		existing.Subsets = []corev1.EndpointSubset{
+		existing := input.(*discoveryv1.EndpointSlice)
+		existing.Endpoints = []discoveryv1.Endpoint{
 			{
-				Addresses: []corev1.EndpointAddress{{IP: ip}},
+				Addresses: []string{ip},
 			},
+		}
+
+		// Set AddressType based on IP
+		if netutils.IsIPv6String(ip) {
+			existing.AddressType = discoveryv1.AddressTypeIPv6
+		} else {
+			existing.AddressType = discoveryv1.AddressTypeIPv4
 		}
 
 		// leaseTime needs to be in seconds
@@ -152,7 +160,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
-	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+	return s.storage.Delete(apirequest.NewDefaultContext(), key, &discoveryv1.EndpointSlice{}, nil, rest.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 }
 
 func (s *storageLeases) Destroy() {
