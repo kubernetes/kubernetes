@@ -27,6 +27,8 @@ package v1
 type NodeFeaturesApplyConfiguration struct {
 	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
 	SupplementalGroupsPolicy *bool `json:"supplementalGroupsPolicy,omitempty"`
+	// ContainerUlimits is set to true if the runtime supports per-container ulimits.
+	ContainerUlimits *bool `json:"containerUlimits,omitempty"`
 }
 
 // NodeFeaturesApplyConfiguration constructs a declarative configuration of the NodeFeatures type for use with
@@ -40,5 +42,13 @@ func NodeFeatures() *NodeFeaturesApplyConfiguration {
 // If called multiple times, the SupplementalGroupsPolicy field is set to the value of the last call.
 func (b *NodeFeaturesApplyConfiguration) WithSupplementalGroupsPolicy(value bool) *NodeFeaturesApplyConfiguration {
 	b.SupplementalGroupsPolicy = &value
+	return b
+}
+
+// WithContainerUlimits sets the ContainerUlimits field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ContainerUlimits field is set to the value of the last call.
+func (b *NodeFeaturesApplyConfiguration) WithContainerUlimits(value bool) *NodeFeaturesApplyConfiguration {
+	b.ContainerUlimits = &value
 	return b
 }

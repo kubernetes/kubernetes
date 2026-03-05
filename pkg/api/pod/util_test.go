@@ -5924,6 +5924,197 @@ func TestPodFileKeyRefInUse(t *testing.T) {
 	}
 }
 
+func TestDropContainerUlimitsInUse(t *testing.T) {
+	testUlimits := []api.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}}
+
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		oldPodSpec     *api.PodSpec
+		newPodSpec     *api.PodSpec
+		expectedSpec   *api.PodSpec
+	}{
+		{
+			name:           "feature enabled - keep ulimits",
+			featureEnabled: true,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+			},
+		},
+		{
+			name:           "feature disabled and old spec not using ulimits - drop ulimits",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+				InitContainers: []api.Container{{
+					Name:            "i",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+				EphemeralContainers: []api.EphemeralContainer{{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:            "e",
+						SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+					},
+				}},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: nil},
+				}},
+				InitContainers: []api.Container{{
+					Name:            "i",
+					SecurityContext: &api.SecurityContext{Ulimits: nil},
+				}},
+				EphemeralContainers: []api.EphemeralContainer{{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:            "e",
+						SecurityContext: &api.SecurityContext{Ulimits: nil},
+					},
+				}},
+			},
+		},
+		{
+			name:           "feature disabled and old spec using ulimits - keep ulimits",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "old",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+			},
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name:            "c",
+					SecurityContext: &api.SecurityContext{Ulimits: testUlimits},
+				}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, tc.featureEnabled)
+			newPodSpecCopy := tc.newPodSpec.DeepCopy()
+			dropContainerUlimitsInUse(newPodSpecCopy, tc.oldPodSpec)
+			if diff := cmp.Diff(tc.expectedSpec, newPodSpecCopy); diff != "" {
+				t.Errorf("new pod changed (-want,+got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestContainerUlimitsInUse(t *testing.T) {
+	testUlimits := []api.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}}
+	testCases := []struct {
+		name     string
+		podSpec  *api.PodSpec
+		expected bool
+	}{
+		{name: "nil pod spec", podSpec: nil, expected: false},
+		{
+			name: "ulimits in container",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{{SecurityContext: &api.SecurityContext{Ulimits: testUlimits}}},
+			},
+			expected: true,
+		},
+		{
+			name: "ulimits in init container",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{{SecurityContext: &api.SecurityContext{Ulimits: testUlimits}}},
+			},
+			expected: true,
+		},
+		{
+			name: "ulimits in ephemeral container",
+			podSpec: &api.PodSpec{
+				EphemeralContainers: []api.EphemeralContainer{{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{SecurityContext: &api.SecurityContext{Ulimits: testUlimits}},
+				}},
+			},
+			expected: true,
+		},
+		{
+			name: "no ulimits",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{{Name: "c"}},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := containerUlimitsInUse(tc.podSpec)
+			if got != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestAllowContainerUlimitsValidationOption(t *testing.T) {
+	testUlimits := []api.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}}
+	testCases := []struct {
+		name           string
+		oldPodSpec     *api.PodSpec
+		featureEnabled bool
+		want           bool
+	}{
+		{
+			name:           "feature enabled",
+			featureEnabled: true,
+			want:           true,
+		},
+		{
+			name:           "feature disabled",
+			featureEnabled: false,
+			want:           false,
+		},
+		{
+			name: "feature disabled but old pod uses ulimits",
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{{SecurityContext: &api.SecurityContext{Ulimits: testUlimits}}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, tc.featureEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowContainerUlimitsValidation {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowContainerUlimitsValidation)
+			}
+		})
+	}
+}
+
 func TestValidateContainerRestartRulesOption(t *testing.T) {
 	policyNever := api.ContainerRestartPolicyNever
 	testCases := []struct {

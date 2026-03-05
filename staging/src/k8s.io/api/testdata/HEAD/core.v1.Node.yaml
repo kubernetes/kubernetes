@@ -95,6 +95,7 @@ status:
   declaredFeatures:
   - declaredFeaturesValue
   features:
+    containerUlimits: true
     supplementalGroupsPolicy: true
   images:
   - names:

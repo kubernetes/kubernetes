@@ -170,7 +170,8 @@
       }
     ],
     "features": {
-      "supplementalGroupsPolicy": true
+      "supplementalGroupsPolicy": true,
+      "containerUlimits": true
     },
     "declaredFeatures": [
       "declaredFeaturesValue"

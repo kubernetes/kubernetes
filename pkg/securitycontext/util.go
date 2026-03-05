@@ -22,6 +22,8 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // HasWindowsHostProcessRequest returns true if container should run as HostProcess container,
@@ -116,6 +118,10 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	if containerSc.ProcMount != nil {
 		effectiveSc.ProcMount = new(v1.ProcMountType)
 		*effectiveSc.ProcMount = *containerSc.ProcMount
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) && containerSc.Ulimits != nil {
+		effectiveSc.Ulimits = containerSc.Ulimits
 	}
 
 	return effectiveSc
