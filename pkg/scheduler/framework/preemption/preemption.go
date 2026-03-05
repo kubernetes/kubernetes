@@ -60,27 +60,24 @@ type Interface interface {
 	OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64
 }
 
+// Evaluator is a preemption evaluator. It runs preemption logic with a given Interface.
 type Evaluator struct {
 	PluginName string
 	Handler    fwk.Handle
 	PodLister  corelisters.PodLister
 	PdbLister  policylisters.PodDisruptionBudgetLister
 
-	enableAsyncPreemption bool
-
-	*Executor
 	Interface
 }
 
-func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+// NewEvaluator create a new Evaluator.
+func NewEvaluator(pluginName string, fh fwk.Handle, i Interface) *Evaluator {
 	return &Evaluator{
-		PluginName:            pluginName,
-		Handler:               fh,
-		PodLister:             fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		PdbLister:             fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		enableAsyncPreemption: enableAsyncPreemption,
-		Executor:              newExecutor(fh),
-		Interface:             i,
+		PluginName: pluginName,
+		Handler:    fh,
+		PodLister:  fh.SharedInformerFactory().Core().V1().Pods().Lister(),
+		PdbLister:  fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
+		Interface:  i,
 	}
 }
 
@@ -161,13 +158,16 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
-	// 5) Perform preparation work before nominating the selected candidate.
-	if ev.enableAsyncPreemption {
-		ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
-	} else {
-		if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
+	// 5) Actuate the preemption.
+	executor := ev.Handler.PreemptionExecutor()
+	if executor != nil {
+		if status := executor.ActuatePreemption(ctx, bestCandidate.Name(), bestCandidate.Victims(), pod, ev.PluginName); !status.IsSuccess() {
 			return nil, status
 		}
+	} else {
+		// This should not happen outside of tests.
+		logger.Error(errors.New("preemption executor is not set"), "Cannot actuate preemption", "pod", klog.KObj(pod))
+		return nil, fwk.NewStatus(fwk.Error, "preemption executor is not set")
 	}
 
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success)

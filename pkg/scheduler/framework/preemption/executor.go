@@ -29,12 +29,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -50,7 +51,7 @@ type Executor struct {
 	mu sync.RWMutex
 	fh fwk.Handle
 
-	podLister corelisters.PodLister
+	fts feature.Features
 
 	// preempting is a set that records the pods that are currently triggering preemption asynchronously,
 	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
@@ -64,13 +65,13 @@ type Executor struct {
 	PreemptPod func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error
 }
 
-// newExecutor creates a new preemption executor.
-func newExecutor(fh fwk.Handle) *Executor {
+// NewExecutor creates a new preemption executor.
+func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	e := &Executor{
 		fh:                           fh,
-		podLister:                    fh.SharedInformerFactory().Core().V1().Pods().Lister(),
 		preempting:                   sets.New[types.UID](),
 		lastVictimsPendingPreemption: make(map[types.UID]pendingVictim),
+		fts:                          fts,
 	}
 
 	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
@@ -133,6 +134,25 @@ func newExecutor(fh fwk.Handle) *Executor {
 	}
 
 	return e
+}
+
+// ActuatePreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
+// victims to be evicted.
+func (e *Executor) ActuatePreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
+	candidate := candidate{
+		victims: victims,
+		name:    targetNode,
+	}
+
+	if e.fts.EnableAsyncPreemption {
+		e.prepareCandidateAsync(&candidate, preemptorPod, pluginName)
+	} else {
+		if status := e.prepareCandidate(ctx, &candidate, preemptorPod, pluginName); !status.IsSuccess() {
+			return status
+		}
+	}
+
+	return fwk.NewStatus(fwk.Success)
 }
 
 // prepareCandidateAsync triggers a goroutine for some preparation work:
@@ -302,8 +322,9 @@ func (e *Executor) IsPodRunningPreemption(podUID types.UID) bool {
 		// Since pod is in `preempting` but last victim is not registered yet, the async preemption is pending.
 		return true
 	}
+	podLister := e.fh.SharedInformerFactory().Core().V1().Pods().Lister()
 	// Pod is waiting for preemption of one last victim. We can check if the victim has already been deleted.
-	victimPod, err := e.podLister.Pods(victim.namespace).Get(victim.name)
+	victimPod, err := podLister.Pods(victim.namespace).Get(victim.name)
 	if err != nil {
 		// Victim already deleted, preemption is done.
 		return false

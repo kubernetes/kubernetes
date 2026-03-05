@@ -82,13 +82,14 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
 
-	clientSet        clientset.Interface
-	kubeConfig       *restclient.Config
-	eventRecorder    events.EventRecorder
-	informerFactory  informers.SharedInformerFactory
-	sharedDRAManager fwk.SharedDRAManager
-	podGroupManager  fwk.PodGroupManager
-	logger           klog.Logger
+	clientSet          clientset.Interface
+	kubeConfig         *restclient.Config
+	eventRecorder      events.EventRecorder
+	informerFactory    informers.SharedInformerFactory
+	sharedDRAManager   fwk.SharedDRAManager
+	podGroupManager    fwk.PodGroupManager
+	logger             klog.Logger
+	preemptionExecutor fwk.PreemptionExecutor
 
 	sharedCSIManager fwk.CSIManager
 
@@ -539,6 +540,14 @@ func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {
 
 func (f *frameworkImpl) SetAPICacher(c fwk.APICacher) {
 	f.apiCacher = c
+}
+
+func (f *frameworkImpl) SetPreemptionExecutor(executor fwk.PreemptionExecutor) {
+	f.preemptionExecutor = executor
+}
+
+func (f *frameworkImpl) PreemptionExecutor() fwk.PreemptionExecutor {
+	return f.preemptionExecutor
 }
 
 // Close closes each plugin, when they implement io.Closer interface.

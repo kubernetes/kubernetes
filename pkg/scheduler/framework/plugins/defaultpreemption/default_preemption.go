@@ -103,7 +103,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		fts:  fts,
 		args: *args,
 	}
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl)
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
@@ -135,7 +135,11 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if pl.Evaluator.IsPodRunningPreemption(p.GetUID()) {
+	executor := pl.fh.PreemptionExecutor()
+	if executor == nil {
+		return nil
+	}
+	if executor.IsPodRunningPreemption(p.GetUID()) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil
