@@ -2,9 +2,13 @@
 
 approvers:
   - enj
-  - sig-api-machinery-approvers
+  - deads2k
+  - jpbetz
+  - sttts
 reviewers:
   - michaelasp
-  - sig-api-machinery-reviewers
+  - deads2k
+  - jpbetz
+  - sttts
 labels:
   - sig/api-machinery

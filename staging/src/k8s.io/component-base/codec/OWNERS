@@ -4,8 +4,12 @@
 # decoding KRM style manifests.
 
 approvers:
-  - sig-api-machinery-api-approvers
+  - deads2k
+  - jpbetz
+  - sttts
 reviewers:
-  - sig-api-machinery-api-reviewers
+  - deads2k
+  - jpbetz
+  - sttts
 labels:
   - sig/api-machinery

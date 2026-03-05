@@ -6,10 +6,14 @@
 # each release.
 
 approvers:
-  - sig-api-machinery-api-approvers
+  - deads2k
+  - jpbetz
+  - sttts
   - release-engineering-approvers
 reviewers:
-  - sig-api-machinery-api-reviewers
+  - deads2k
+  - jpbetz
+  - sttts
   - release-managers
 labels:
   - sig/api-machinery
