@@ -163,11 +163,14 @@ func createPodWithExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, 
 // verifyPodRunningWithClaim verifies a pod is running and has a valid ResourceClaim.
 func verifyPodRunningWithClaim(tCtx ktesting.TContext, b *drautils.Builder, pod *v1.Pod, resourceName v1.ResourceName) {
 	namespace := tCtx.Namespace()
-	b.TestPod(tCtx, pod)
+	// Extended resources don't inject device parameters as environment variables,
+	// so we just verify the pod is running without checking for device parameter env vars.
+	err := e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod)
+	tCtx.ExpectNoError(err, "start pod")
 	tCtx.Logf("Pod %q is running", pod.Name)
 
 	// Get updated pod to check status
-	pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+	pod, err = tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod to check status")
 
 	// Verify pod.status.extendedResourceClaimStatus contains the mapping
