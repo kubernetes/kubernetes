@@ -49,29 +49,30 @@ func ValidateResourcePoolStatusRequestStatusUpdate(request, oldRequest *resource
 func validateResourcePoolStatusRequestSpec(spec *resource.ResourcePoolStatusRequestSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Driver is required
+	// Driver is required - covered by +k8s:required and +k8s:format=k8s-long-name DV tags
 	if spec.Driver == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), "driver name is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), "driver name is required").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
+		allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"), corevalidation.FormatCovered, corevalidation.SizeCovered)...)
 	}
 
 	// PoolName is optional, but if provided, must be non-empty and valid
+	// Covered by +k8s:format=k8s-resource-pool-name DV tag
 	if spec.PoolName != nil {
 		if *spec.PoolName == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("poolName"), "poolName must not be empty when specified"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("poolName"), *spec.PoolName, "must not be empty when specified").MarkCoveredByDeclarative())
 		} else {
-			allErrs = append(allErrs, validatePoolName(*spec.PoolName, fldPath.Child("poolName"))...)
+			allErrs = append(allErrs, validatePoolName(*spec.PoolName, fldPath.Child("poolName")).MarkCoveredByDeclarative()...)
 		}
 	}
 
-	// Limit validation
+	// Limit validation - covered by +k8s:minimum=1 and +k8s:maximum=1000 DV tags
 	if spec.Limit != nil {
 		if *spec.Limit < 1 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("limit"), *spec.Limit, "must be at least 1"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("limit"), *spec.Limit, "must be at least 1").MarkCoveredByDeclarative())
 		}
 		if *spec.Limit > resource.ResourcePoolStatusRequestLimitMax {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("limit"), *spec.Limit, "must not exceed 1000"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("limit"), *spec.Limit, "must not exceed 1000").MarkCoveredByDeclarative())
 		}
 	}
 
@@ -81,8 +82,8 @@ func validateResourcePoolStatusRequestSpec(spec *resource.ResourcePoolStatusRequ
 func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.ResourcePoolStatusRequestStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Once observationTime is set, status becomes immutable (request is complete)
-	if oldStatus != nil && oldStatus.ObservationTime != nil {
+	// Once status is set, it becomes immutable (request is complete)
+	if oldStatus != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status, oldStatus, fldPath)...)
 		return allErrs
 	}
@@ -98,12 +99,13 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	}
 
 	// Validate validation errors: max 10 entries, max 256 chars each
+	// Covered by +k8s:maxItems=10 and +k8s:eachVal=+k8s:maxLength=256 DV tags
 	if len(status.ValidationErrors) > 10 {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("validationErrors"), len(status.ValidationErrors), 10))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("validationErrors"), len(status.ValidationErrors), 10).MarkCoveredByDeclarative())
 	}
 	for i, msg := range status.ValidationErrors {
 		if len(msg) > 256 {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("validationErrors").Index(i), msg, 256))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("validationErrors").Index(i), msg, 256).MarkCoveredByDeclarative())
 		}
 	}
 
@@ -111,8 +113,9 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	allErrs = append(allErrs, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
 
 	// TotalMatchingPools must be non-negative if specified
+	// Covered by +k8s:minimum=0 DV tag
 	if status.TotalMatchingPools != nil && *status.TotalMatchingPools < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("totalMatchingPools"), *status.TotalMatchingPools, "must be non-negative"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("totalMatchingPools"), *status.TotalMatchingPools, "must be non-negative").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
@@ -121,51 +124,63 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 func validatePoolStatus(pool resource.PoolStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Driver is required
+	// Driver is required — covered by +k8s:required and +k8s:format DV tags
 	if pool.Driver == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateDriverName(pool.Driver, fldPath.Child("driver"))...)
+		allErrs = append(allErrs, validateDriverName(pool.Driver, fldPath.Child("driver"), corevalidation.FormatCovered, corevalidation.SizeCovered)...)
 	}
 
-	// PoolName is required
+	// PoolName is required — covered by +k8s:required and +k8s:format DV tags
 	if pool.PoolName == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("poolName"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("poolName"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validatePoolName(pool.PoolName, fldPath.Child("poolName"))...)
+		allErrs = append(allErrs, validatePoolName(pool.PoolName, fldPath.Child("poolName")).MarkCoveredByDeclarative()...)
 	}
 
 	// NodeName is optional, but if provided, must be valid
+	// Covered by +k8s:format=k8s-long-name DV tag
 	if pool.NodeName != nil {
 		if *pool.NodeName == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), "nodeName must not be empty when specified"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), "nodeName must not be empty when specified").MarkCoveredByDeclarative())
 		} else {
 			allErrs = append(allErrs, validateNodeName(*pool.NodeName, fldPath.Child("nodeName"))...)
 		}
 	}
 
-	// Device counts must be non-negative when specified
-	if pool.TotalDevices != nil && *pool.TotalDevices < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("totalDevices"), *pool.TotalDevices, "must be non-negative"))
+	// Required pointer fields must not be nil — covered by +k8s:required DV tags
+	// Minimum values covered by +k8s:minimum=0 DV tags
+	if pool.TotalDevices == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("totalDevices"), "").MarkCoveredByDeclarative())
+	} else if *pool.TotalDevices < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("totalDevices"), *pool.TotalDevices, "must be non-negative").MarkCoveredByDeclarative())
 	}
-	if pool.AllocatedDevices != nil && *pool.AllocatedDevices < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("allocatedDevices"), *pool.AllocatedDevices, "must be non-negative"))
+	if pool.AllocatedDevices == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("allocatedDevices"), "").MarkCoveredByDeclarative())
+	} else if *pool.AllocatedDevices < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("allocatedDevices"), *pool.AllocatedDevices, "must be non-negative").MarkCoveredByDeclarative())
 	}
-	if pool.AvailableDevices != nil && *pool.AvailableDevices < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableDevices"), *pool.AvailableDevices, "must be non-negative"))
+	if pool.AvailableDevices == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("availableDevices"), "").MarkCoveredByDeclarative())
+	} else if *pool.AvailableDevices < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableDevices"), *pool.AvailableDevices, "must be non-negative").MarkCoveredByDeclarative())
 	}
-	if pool.UnavailableDevices != nil && *pool.UnavailableDevices < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("unavailableDevices"), *pool.UnavailableDevices, "must be non-negative"))
+	if pool.UnavailableDevices == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("unavailableDevices"), "").MarkCoveredByDeclarative())
+	} else if *pool.UnavailableDevices < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("unavailableDevices"), *pool.UnavailableDevices, "must be non-negative").MarkCoveredByDeclarative())
 	}
 
-	// SliceCount must be positive
+	// SliceCount must be positive — covered by +k8s:minimum=1 DV tag
 	if pool.SliceCount < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("sliceCount"), pool.SliceCount, "must be at least 1"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("sliceCount"), pool.SliceCount, "must be at least 1").MarkCoveredByDeclarative())
 	}
 
-	// Generation must be non-negative
-	if pool.Generation != nil && *pool.Generation < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), *pool.Generation, "must be non-negative"))
+	// Generation is required and must be non-negative — covered by +k8s:required and +k8s:minimum=0 DV tags
+	if pool.Generation == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("generation"), "").MarkCoveredByDeclarative())
+	} else if *pool.Generation < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), *pool.Generation, "must be non-negative").MarkCoveredByDeclarative())
 	}
 
 	return allErrs

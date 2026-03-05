@@ -19,8 +19,6 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:prerelease-lifecycle-gen=true
 // +k8s:openapi-model-package=io.k8s.api.resource.v1alpha1
-// +k8s:validation-gen=TypeMeta
-// +k8s:validation-gen-input=k8s.io/api/resource/v1alpha1
 
 // +groupName=resource.k8s.io
 

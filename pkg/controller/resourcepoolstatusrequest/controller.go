@@ -116,7 +116,7 @@ func NewController(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newReq := new.(*resourcev1alpha1.ResourcePoolStatusRequest)
-			if newReq.Status == nil || newReq.Status.ObservationTime == nil {
+			if newReq.Status == nil {
 				c.enqueueRequest(logger, new)
 			}
 		},
@@ -209,8 +209,8 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		return nil
 	}
 
-	// Skip if already processed (status.observationTime is set)
-	if request.Status != nil && request.Status.ObservationTime != nil {
+	// Skip if already processed (status is set)
+	if request.Status != nil {
 		logger.V(4).Info("Request already processed, skipping", "request", key)
 		return nil
 	}
@@ -445,8 +445,8 @@ func (c *Controller) enqueueRequest(logger klog.Logger, obj interface{}) {
 		return
 	}
 
-	// Skip if already processed
-	if request.Status != nil && request.Status.ObservationTime != nil {
+	// Skip if already processed (status is set)
+	if request.Status != nil {
 		return
 	}
 
@@ -454,8 +454,8 @@ func (c *Controller) enqueueRequest(logger klog.Logger, obj interface{}) {
 }
 
 // cleanupExpiredRequests deletes ResourcePoolStatusRequests that have exceeded their TTL.
-// Completed requests (with observationTime set) are deleted after completedRequestTTL.
-// Pending requests (without observationTime) are deleted after pendingRequestTTL.
+// Completed requests (with status set) are deleted after completedRequestTTL.
+// Pending requests (without status) are deleted after pendingRequestTTL.
 func (c *Controller) cleanupExpiredRequests(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 
@@ -487,9 +487,13 @@ func (c *Controller) cleanupExpiredRequests(ctx context.Context) {
 
 // shouldDeleteRequest determines if a request should be deleted based on TTL.
 func (c *Controller) shouldDeleteRequest(request *resourcev1alpha1.ResourcePoolStatusRequest) bool {
-	if request.Status != nil && request.Status.ObservationTime != nil {
+	if request.Status != nil {
 		// Completed request: check against completedRequestTTL
-		return isOlderThan(request.Status.ObservationTime.Time, completedRequestTTL)
+		if request.Status.ObservationTime != nil {
+			return isOlderThan(request.Status.ObservationTime.Time, completedRequestTTL)
+		}
+		// Status set but no ObservationTime (edge case); use creation time
+		return isOlderThan(request.CreationTimestamp.Time, completedRequestTTL)
 	}
 	// Pending request: check against pendingRequestTTL based on creation time
 	return isOlderThan(request.CreationTimestamp.Time, pendingRequestTTL)

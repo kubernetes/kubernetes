@@ -30,14 +30,13 @@ import (
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	// ObservationTime is the timestamp when the controller calculated this status.
-	// Once set, the request is considered complete and will not be reprocessed.
-	// Users should delete and recreate the request to get updated information.
 	ObservationTime *v1.Time `json:"observationTime,omitempty"`
 	// Pools contains the status of each pool matching the request filters.
 	// The list is sorted by driver, then pool name.
 	// When omitted, no pools matched the request filters.
 	Pools []PoolStatusApplyConfiguration `json:"pools,omitempty"`
 	// Conditions provide information about the state of the request.
+	// At least one condition will always be set when the status is populated.
 	//
 	// Known condition types:
 	// - "Complete": True when the request has been processed successfully
@@ -45,6 +44,7 @@ type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	// ValidationErrors contains any validation errors encountered while processing
 	// the request. If present, the request may have partial or no results.
+	// Maximum 10 entries, each up to 256 characters.
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 	// Truncation indicates whether the response was truncated due to the limit.
 	// Set to "Truncated" when there are more pools matching the filter criteria

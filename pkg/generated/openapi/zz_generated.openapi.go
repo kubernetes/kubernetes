@@ -48998,7 +48998,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequest(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. The request follows a request/response pattern similar to CertificateSigningRequest - create a request, and the controller populates the status.\n\nOnce status.observationTime is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. The request follows a request/response pattern similar to CertificateSigningRequest - create a request, and the controller populates the status.\n\nOnce status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -49031,7 +49031,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequest(ref common.Ref
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is populated by the controller with the calculated pool status. Once observationTime is set, the status is considered complete and immutable.",
+							Description: "Status is populated by the controller with the calculated pool status. Once set, the status is considered complete and immutable.",
 							Ref:         ref(resourcev1alpha1.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -49141,7 +49141,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 				Properties: map[string]spec.Schema{
 					"observationTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ObservationTime is the timestamp when the controller calculated this status. Once set, the request is considered complete and will not be reprocessed. Users should delete and recreate the request to get updated information.",
+							Description: "ObservationTime is the timestamp when the controller calculated this status.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -49176,7 +49176,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Conditions provide information about the state of the request.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+							Description: "Conditions provide information about the state of the request. At least one condition will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49195,7 +49195,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results.",
+							Description: "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results. Maximum 10 entries, each up to 256 characters.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

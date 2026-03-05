@@ -45,10 +45,10 @@ func (PoolStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourcePoolStatusRequest = map[string]string{
-	"":         "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. The request follows a request/response pattern similar to CertificateSigningRequest - create a request, and the controller populates the status.\n\nOnce status.observationTime is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+	"":         "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. The request follows a request/response pattern similar to CertificateSigningRequest - create a request, and the controller populates the status.\n\nOnce status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec defines the filters for which pools to include in the status. The spec is immutable once created.",
-	"status":   "Status is populated by the controller with the calculated pool status. Once observationTime is set, the status is considered complete and immutable.",
+	"status":   "Status is populated by the controller with the calculated pool status. Once set, the status is considered complete and immutable.",
 }
 
 func (ResourcePoolStatusRequest) SwaggerDoc() map[string]string {
@@ -78,10 +78,10 @@ func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
 
 var map_ResourcePoolStatusRequestStatus = map[string]string{
 	"":                   "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
-	"observationTime":    "ObservationTime is the timestamp when the controller calculated this status. Once set, the request is considered complete and will not be reprocessed. Users should delete and recreate the request to get updated information.",
+	"observationTime":    "ObservationTime is the timestamp when the controller calculated this status.",
 	"pools":              "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name. When omitted, no pools matched the request filters.",
-	"conditions":         "Conditions provide information about the state of the request.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
-	"validationErrors":   "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results.",
+	"conditions":         "Conditions provide information about the state of the request. At least one condition will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+	"validationErrors":   "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results. Maximum 10 entries, each up to 256 characters.",
 	"truncation":         "Truncation indicates whether the response was truncated due to the limit. Set to \"Truncated\" when there are more pools matching the filter criteria than were returned, or \"None\" when the response includes all matching pools.",
 	"totalMatchingPools": "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
 }

@@ -110,7 +110,7 @@ message PoolStatus {
 // based on the provided filters. The request follows a request/response pattern similar
 // to CertificateSigningRequest - create a request, and the controller populates the status.
 //
-// Once status.observationTime is set, the request is considered complete and will not
+// Once status is set, the request is considered complete and will not
 // be reprocessed. Users should delete and recreate requests to get updated information.
 message ResourcePoolStatusRequest {
   // Standard object metadata
@@ -121,10 +121,11 @@ message ResourcePoolStatusRequest {
   // The spec is immutable once created.
   //
   // +required
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   optional ResourcePoolStatusRequestSpec spec = 2;
 
   // Status is populated by the controller with the calculated pool status.
-  // Once observationTime is set, the status is considered complete and immutable.
+  // Once set, the status is considered complete and immutable.
   //
   // +optional
   // +k8s:optional
@@ -175,14 +176,13 @@ message ResourcePoolStatusRequestSpec {
   // +k8s:optional
   // +default=100
   // +k8s:minimum=1
+  // +k8s:maximum=1000
   optional int32 limit = 3;
 }
 
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 message ResourcePoolStatusRequestStatus {
   // ObservationTime is the timestamp when the controller calculated this status.
-  // Once set, the request is considered complete and will not be reprocessed.
-  // Users should delete and recreate the request to get updated information.
   //
   // +required
   // +k8s:required
@@ -199,6 +199,7 @@ message ResourcePoolStatusRequestStatus {
   repeated PoolStatus pools = 2;
 
   // Conditions provide information about the state of the request.
+  // At least one condition will always be set when the status is populated.
   //
   // Known condition types:
   // - "Complete": True when the request has been processed successfully
@@ -216,12 +217,14 @@ message ResourcePoolStatusRequestStatus {
 
   // ValidationErrors contains any validation errors encountered while processing
   // the request. If present, the request may have partial or no results.
+  // Maximum 10 entries, each up to 256 characters.
   //
   // +optional
   // +k8s:optional
   // +listType=atomic
   // +k8s:listType=atomic
   // +k8s:maxItems=10
+  // +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=256
   repeated string validationErrors = 4;
 
   // Truncation indicates whether the response was truncated due to the limit.

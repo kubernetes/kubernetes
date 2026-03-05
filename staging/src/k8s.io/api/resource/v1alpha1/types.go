@@ -30,7 +30,7 @@ import (
 // based on the provided filters. The request follows a request/response pattern similar
 // to CertificateSigningRequest - create a request, and the controller populates the status.
 //
-// Once status.observationTime is set, the request is considered complete and will not
+// Once status is set, the request is considered complete and will not
 // be reprocessed. Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequest struct {
 	metav1.TypeMeta `json:",inline"`
@@ -42,10 +42,11 @@ type ResourcePoolStatusRequest struct {
 	// The spec is immutable once created.
 	//
 	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	Spec ResourcePoolStatusRequestSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status is populated by the controller with the calculated pool status.
-	// Once observationTime is set, the status is considered complete and immutable.
+	// Once set, the status is considered complete and immutable.
 	//
 	// +optional
 	// +k8s:optional
@@ -86,6 +87,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:optional
 	// +default=100
 	// +k8s:minimum=1
+	// +k8s:maximum=1000
 	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
 }
 
@@ -98,8 +100,6 @@ const ResourcePoolStatusRequestLimitMax int32 = 1000
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 type ResourcePoolStatusRequestStatus struct {
 	// ObservationTime is the timestamp when the controller calculated this status.
-	// Once set, the request is considered complete and will not be reprocessed.
-	// Users should delete and recreate the request to get updated information.
 	//
 	// +required
 	// +k8s:required
@@ -116,6 +116,7 @@ type ResourcePoolStatusRequestStatus struct {
 	Pools []PoolStatus `json:"pools,omitempty" protobuf:"bytes,2,rep,name=pools"`
 
 	// Conditions provide information about the state of the request.
+	// At least one condition will always be set when the status is populated.
 	//
 	// Known condition types:
 	// - "Complete": True when the request has been processed successfully
@@ -133,12 +134,14 @@ type ResourcePoolStatusRequestStatus struct {
 
 	// ValidationErrors contains any validation errors encountered while processing
 	// the request. If present, the request may have partial or no results.
+	// Maximum 10 entries, each up to 256 characters.
 	//
 	// +optional
 	// +k8s:optional
 	// +listType=atomic
 	// +k8s:listType=atomic
 	// +k8s:maxItems=10
+	// +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=256
 	ValidationErrors []string `json:"validationErrors,omitempty" protobuf:"bytes,4,rep,name=validationErrors"`
 
 	// Truncation indicates whether the response was truncated due to the limit.
@@ -219,7 +222,7 @@ type PoolStatus struct {
 	// +required
 	// +k8s:required
 	// +k8s:minimum=0
-	UnavailableDevices *int32 `json:"unavailableDevices" protobuf:"varint,7,opt,name=unavailableDevices"`
+	UnavailableDevices *int32 `json:"unavailableDevices,omitempty" protobuf:"varint,7,opt,name=unavailableDevices"`
 
 	// SliceCount is the number of ResourceSlices that make up this pool.
 	//
@@ -235,7 +238,7 @@ type PoolStatus struct {
 	// +required
 	// +k8s:required
 	// +k8s:minimum=0
-	Generation *int64 `json:"generation" protobuf:"varint,9,opt,name=generation"`
+	Generation *int64 `json:"generation,omitempty" protobuf:"varint,9,opt,name=generation"`
 }
 
 // TruncationStatus is a string enum indicating whether the response was truncated.

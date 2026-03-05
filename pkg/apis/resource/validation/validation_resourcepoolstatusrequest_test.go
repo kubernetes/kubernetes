@@ -55,6 +55,17 @@ var validResourcePoolStatusRequestSpec = resource.ResourcePoolStatusRequestSpec{
 	Limit:    ptr.To(int32(100)),
 }
 
+var validPoolStatus = resource.PoolStatus{
+	Driver:             "test.example.com",
+	PoolName:           "pool-1",
+	TotalDevices:       ptr.To(int32(4)),
+	AllocatedDevices:   ptr.To(int32(2)),
+	AvailableDevices:   ptr.To(int32(2)),
+	UnavailableDevices: ptr.To(int32(0)),
+	SliceCount:         1,
+	Generation:         ptr.To(int64(1)),
+}
+
 func TestValidateResourcePoolStatusRequest(t *testing.T) {
 	goodName := "my-request"
 	badName := "!@#$%^"
@@ -107,48 +118,48 @@ func TestValidateResourcePoolStatusRequest(t *testing.T) {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver: "",
 			}),
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "driver"), "driver name is required")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "driver"), "driver name is required").MarkCoveredByDeclarative()},
 		},
 		"invalid-driver-name": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver: "invalid driver!",
 			}),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), "invalid driver!", dns1123SubdomainErrorMsg)},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), "invalid driver!", dns1123SubdomainErrorMsg).MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-name": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver:   "test.example.com",
 				PoolName: ptr.To("invalid pool!"),
 			}),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), "invalid pool!", dns1123SubdomainErrorMsg)},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), "invalid pool!", dns1123SubdomainErrorMsg).MarkCoveredByDeclarative()},
 		},
 		"empty-pool-name": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver:   "test.example.com",
 				PoolName: ptr.To(""),
 			}),
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "poolName"), "poolName must not be empty when specified")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), "", "must not be empty when specified").MarkCoveredByDeclarative()},
 		},
 		"limit-zero": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver: "test.example.com",
 				Limit:  ptr.To(int32(0)),
 			}),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(0), "must be at least 1")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(0), "must be at least 1").MarkCoveredByDeclarative()},
 		},
 		"limit-negative": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver: "test.example.com",
 				Limit:  ptr.To(int32(-1)),
 			}),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(-1), "must be at least 1")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(-1), "must be at least 1").MarkCoveredByDeclarative()},
 		},
 		"limit-exceeds-max": {
 			request: testResourcePoolStatusRequest(goodName, resource.ResourcePoolStatusRequestSpec{
 				Driver: "test.example.com",
 				Limit:  ptr.To(int32(1001)),
 			}),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(1001), "must not exceed 1000")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "limit"), int32(1001), "must not exceed 1000").MarkCoveredByDeclarative()},
 		},
 	}
 
@@ -242,14 +253,15 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 					TotalMatchingPools: ptr.To(int32(2)),
 					Pools: []resource.PoolStatus{
 						{
-							Driver:           "test.example.com",
-							PoolName:         "pool-1",
-							NodeName:         ptr.To("node-1"),
-							TotalDevices:     ptr.To(int32(4)),
-							AllocatedDevices: ptr.To(int32(2)),
-							AvailableDevices: ptr.To(int32(2)),
-							SliceCount:       1,
-							Generation:       ptr.To(int64(1)),
+							Driver:             "test.example.com",
+							PoolName:           "pool-1",
+							NodeName:           ptr.To("node-1"),
+							TotalDevices:       ptr.To(int32(4)),
+							AllocatedDevices:   ptr.To(int32(2)),
+							AvailableDevices:   ptr.To(int32(2)),
+							UnavailableDevices: ptr.To(int32(0)),
+							SliceCount:         1,
+							Generation:         ptr.To(int64(1)),
 						},
 					},
 					Conditions: []metav1.Condition{
@@ -264,7 +276,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				return r
 			}(),
 		},
-		"status-immutable-after-observation-time-set": {
+		"status-immutable-after-status-set": {
 			oldRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
@@ -291,106 +303,79 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.Driver = ""
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:     "", // missing
-							PoolName:   "pool-1",
-							SliceCount: 1,
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("driver"), "")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("driver"), "").MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-missing-pool-name": {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.PoolName = ""
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:     "test.example.com",
-							PoolName:   "", // missing
-							SliceCount: 1,
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("poolName"), "")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("poolName"), "").MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-negative-total-devices": {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.TotalDevices = ptr.To(int32(-1))
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:       "test.example.com",
-							PoolName:     "pool-1",
-							TotalDevices: ptr.To(int32(-1)),
-							SliceCount:   1,
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("totalDevices"), int32(-1), "must be non-negative")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("totalDevices"), int32(-1), "must be non-negative").MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-negative-allocated-devices": {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.AllocatedDevices = ptr.To(int32(-1))
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:           "test.example.com",
-							PoolName:         "pool-1",
-							AllocatedDevices: ptr.To(int32(-1)),
-							SliceCount:       1,
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("allocatedDevices"), int32(-1), "must be non-negative")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("allocatedDevices"), int32(-1), "must be non-negative").MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-zero-slice-count": {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.SliceCount = 0
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:     "test.example.com",
-							PoolName:   "pool-1",
-							SliceCount: 0, // must be at least 1
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("sliceCount"), int32(0), "must be at least 1")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("sliceCount"), int32(0), "must be at least 1").MarkCoveredByDeclarative()},
 		},
 		"invalid-pool-negative-generation": {
 			oldRequest: baseRequest(),
 			newRequest: func() *resource.ResourcePoolStatusRequest {
 				r := baseRequest()
+				pool := *validPoolStatus.DeepCopy()
+				pool.Generation = ptr.To(int64(-1))
 				r.Status = &resource.ResourcePoolStatusRequestStatus{
-					Pools: []resource.PoolStatus{
-						{
-							Driver:     "test.example.com",
-							PoolName:   "pool-1",
-							SliceCount: 1,
-							Generation: ptr.To(int64(-1)),
-						},
-					},
+					Pools: []resource.PoolStatus{pool},
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("generation"), int64(-1), "must be non-negative")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("generation"), int64(-1), "must be non-negative").MarkCoveredByDeclarative()},
 		},
 		"invalid-negative-total-matching-pools": {
 			oldRequest: baseRequest(),
@@ -401,7 +386,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "totalMatchingPools"), int32(-1), "must be non-negative")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "totalMatchingPools"), int32(-1), "must be non-negative").MarkCoveredByDeclarative()},
 		},
 		"too-many-validation-errors": {
 			oldRequest: baseRequest(),
@@ -416,7 +401,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "validationErrors"), 11, 10)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "validationErrors"), 11, 10).MarkCoveredByDeclarative()},
 		},
 		"validation-error-too-long": {
 			oldRequest: baseRequest(),
@@ -427,7 +412,31 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				}
 				return r
 			}(),
-			wantFailures: field.ErrorList{field.TooLong(field.NewPath("status", "validationErrors").Index(0), strings.Repeat("x", 257), 256)},
+			wantFailures: field.ErrorList{field.TooLong(field.NewPath("status", "validationErrors").Index(0), strings.Repeat("x", 257), 256).MarkCoveredByDeclarative()},
+		},
+		"invalid-pool-nil-required-fields": {
+			oldRequest: baseRequest(),
+			newRequest: func() *resource.ResourcePoolStatusRequest {
+				r := baseRequest()
+				r.Status = &resource.ResourcePoolStatusRequestStatus{
+					Pools: []resource.PoolStatus{
+						{
+							Driver:     "test.example.com",
+							PoolName:   "pool-1",
+							SliceCount: 1,
+							// All required pointer fields are nil
+						},
+					},
+				}
+				return r
+			}(),
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("status", "pools").Index(0).Child("totalDevices"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("status", "pools").Index(0).Child("allocatedDevices"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("status", "pools").Index(0).Child("availableDevices"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("status", "pools").Index(0).Child("unavailableDevices"), "").MarkCoveredByDeclarative(),
+				field.Required(field.NewPath("status", "pools").Index(0).Child("generation"), "").MarkCoveredByDeclarative(),
+			},
 		},
 	}
 

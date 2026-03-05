@@ -338,7 +338,7 @@ func TestSkipProcessedRequest(t *testing.T) {
 			Driver: "test.example.com",
 		},
 		Status: &resourcev1alpha1.ResourcePoolStatusRequestStatus{
-			ObservationTime: &now, // Already processed
+			ObservationTime: &now, // Status is set — request already processed
 		},
 	}
 
@@ -524,7 +524,7 @@ func TestShouldDeleteRequest(t *testing.T) {
 				Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 					Driver: "test.example.com",
 				},
-				// No ObservationTime - request is pending
+				// No status - request is pending
 			},
 			expectedDelete: false,
 		},
@@ -538,7 +538,7 @@ func TestShouldDeleteRequest(t *testing.T) {
 				Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
 					Driver: "test.example.com",
 				},
-				// No ObservationTime - request is pending but expired
+				// No status - pending request expired
 			},
 			expectedDelete: true,
 		},

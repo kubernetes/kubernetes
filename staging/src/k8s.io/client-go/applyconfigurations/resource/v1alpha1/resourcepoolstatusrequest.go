@@ -34,7 +34,7 @@ import (
 // based on the provided filters. The request follows a request/response pattern similar
 // to CertificateSigningRequest - create a request, and the controller populates the status.
 //
-// Once status.observationTime is set, the request is considered complete and will not
+// Once status is set, the request is considered complete and will not
 // be reprocessed. Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequestApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
@@ -44,7 +44,7 @@ type ResourcePoolStatusRequestApplyConfiguration struct {
 	// The spec is immutable once created.
 	Spec *ResourcePoolStatusRequestSpecApplyConfiguration `json:"spec,omitempty"`
 	// Status is populated by the controller with the calculated pool status.
-	// Once observationTime is set, the status is considered complete and immutable.
+	// Once set, the status is considered complete and immutable.
 	Status *ResourcePoolStatusRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 

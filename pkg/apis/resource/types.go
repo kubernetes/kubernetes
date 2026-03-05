@@ -2010,7 +2010,7 @@ type DeviceTaintRuleList struct {
 // based on the provided filters. The request follows a request/response pattern similar
 // to CertificateSigningRequest - create a request, and the controller populates the status.
 //
-// Once status.observationTime is set, the request is considered complete and will not
+// Once status is set, the request is considered complete and will not
 // be reprocessed. Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequest struct {
 	metav1.TypeMeta
@@ -2059,8 +2059,6 @@ const ResourcePoolStatusRequestLimitMax int32 = 1000
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 type ResourcePoolStatusRequestStatus struct {
 	// ObservationTime is the timestamp when the controller calculated this status.
-	// Once set, the request is considered complete and will not be reprocessed.
-	// Users should delete and recreate the request to get updated information.
 	// +optional
 	ObservationTime *metav1.Time
 
@@ -2074,7 +2072,6 @@ type ResourcePoolStatusRequestStatus struct {
 	// Known condition types:
 	// - "Complete": True when the request has been processed successfully
 	// - "Failed": True when the request could not be processed
-	//
 	// +optional
 	Conditions []metav1.Condition
 

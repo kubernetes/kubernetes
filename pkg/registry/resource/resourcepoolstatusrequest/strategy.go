@@ -131,7 +131,8 @@ func (*resourcePoolStatusRequestStatusStrategy) PrepareForUpdate(ctx context.Con
 func (r *resourcePoolStatusRequestStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newRequest := obj.(*resource.ResourcePoolStatusRequest)
 	oldRequest := old.(*resource.ResourcePoolStatusRequest)
-	return validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
+	allErrs := validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
 }
 
 // WarningsOnUpdate returns warnings for the given update.
