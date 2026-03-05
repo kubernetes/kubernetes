@@ -18,7 +18,6 @@ package job
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -27,12 +26,16 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -40,6 +43,63 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
+
+// newGangSchedulingJob creates a Job that meets gang scheduling eligibility criteria.
+func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
+	indexed := batch.IndexedCompletion
+	return &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID(name + "-uid"),
+		},
+		Spec: batch.JobSpec{
+			Parallelism:    ptr.To(parallelism),
+			Completions:    ptr.To(parallelism),
+			CompletionMode: &indexed,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"job-name": name},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"job-name": name},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Image: "test"}},
+				},
+			},
+		},
+	}
+}
+
+// newControllerWithSchedulingInformers creates a Job controller with Workload and PodGroup
+// informers wired up, suitable for testing scheduling manager functionality.
+func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kubeClient *fake.Clientset) (*Controller, informers.SharedInformerFactory) {
+	t.Helper()
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	jm, err := newControllerWithClock(ctx,
+		sharedInformers.Core().V1().Pods(),
+		sharedInformers.Batch().V1().Jobs(),
+		kubeClient,
+		realClock,
+		sharedInformers.Scheduling().V1alpha2().Workloads(),
+		sharedInformers.Scheduling().V1alpha2().PodGroups(),
+	)
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
+	jm.podControl = &controller.FakePodControl{}
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+	jm.workloadStoreSynced = alwaysReady
+	jm.podGroupStoreSynced = alwaysReady
+	return jm, sharedInformers
+}
 
 func TestIsGangSchedulingEligible(t *testing.T) {
 	indexed := batch.IndexedCompletion
@@ -157,14 +217,14 @@ func TestBuildPodGroupTemplates(t *testing.T) {
 			jobName:      "my-training-job",
 			parallelism:  8,
 			completions:  8,
-			wantName:     "my-training-job-worker-0",
+			wantName:     "worker-0",
 			wantMinCount: 8,
 		},
 		"single template with small parallelism": {
 			jobName:      "small-job",
 			parallelism:  2,
 			completions:  2,
-			wantName:     "small-job-worker-0",
+			wantName:     "worker-0",
 			wantMinCount: 2,
 		},
 	}
@@ -303,7 +363,7 @@ func TestComputePodGroupName(t *testing.T) {
 	}
 }
 
-func TestComputePodGroupName_Truncation(t *testing.T) {
+func TestComputePodGroupNameTruncation(t *testing.T) {
 	// When both names are long, each gets roughly half the available space.
 	longWL := strings.Repeat("w", 200)
 	longTPL := strings.Repeat("t", 200)
@@ -339,254 +399,215 @@ func TestComputePodGroupName_Truncation(t *testing.T) {
 	}
 }
 
-// newGangSchedulingJob creates a Job that meets gang scheduling eligibility criteria.
-func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
-	indexed := batch.IndexedCompletion
-	return &batch.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: metav1.NamespaceDefault,
-			UID:       types.UID(name + "-uid"),
-		},
-		Spec: batch.JobSpec{
-			Parallelism:    ptr.To(parallelism),
-			Completions:    ptr.To(parallelism),
-			CompletionMode: &indexed,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job-name": name},
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"job-name": name},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "test"}},
-				},
-			},
-		},
-	}
-}
-
-// newControllerWithSchedulingInformers creates a Job controller with Workload and PodGroup
-// informers wired up, suitable for testing scheduling manager functionality.
-func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kubeClient *fake.Clientset) (*Controller, informers.SharedInformerFactory) {
-	t.Helper()
-	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	jm, err := newControllerWithClock(ctx,
-		sharedInformers.Core().V1().Pods(),
-		sharedInformers.Batch().V1().Jobs(),
-		kubeClient,
-		realClock,
-		sharedInformers.Scheduling().V1alpha2().Workloads(),
-		sharedInformers.Scheduling().V1alpha2().PodGroups(),
-	)
-	if err != nil {
-		t.Fatalf("Error creating Job controller: %v", err)
-	}
-	jm.podControl = &controller.FakePodControl{}
-	jm.podStoreSynced = alwaysReady
-	jm.jobStoreSynced = alwaysReady
-	jm.workloadStoreSynced = alwaysReady
-	jm.podGroupStoreSynced = alwaysReady
-	return jm, sharedInformers
-}
-
-func TestEnsureWorkloadAndPodGroup_NotEligible(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	clientSet := fake.NewClientset()
-	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
-
-	// Job with parallelism=1 is not eligible.
-	job := newJob(1, 1, 0, batch.IndexedCompletion)
-	pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if pg != nil {
-		t.Errorf("expected nil PodGroup for non-eligible Job, got %v", pg)
-	}
-}
-
-func TestEnsureWorkloadAndPodGroup_CreatesObjects(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	clientSet := fake.NewClientset()
-	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
-
-	job := newGangSchedulingJob("test-job", 4)
-
-	// With no pods and no existing objects, it should create both Workload and PodGroup.
-	pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if pg == nil {
-		t.Fatal("expected non-nil PodGroup")
-	}
-
-	// Verify the Workload was created.
-	workloadName := computeWorkloadName(job)
-	wl, err := clientSet.SchedulingV1alpha2().Workloads(job.Namespace).Get(ctx, workloadName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("expected Workload to be created, got error: %v", err)
-	}
-
-	// Verify Workload spec.
-	if wl.Spec.ControllerRef == nil {
-		t.Fatal("Workload should have controllerRef")
-	}
-	if wl.Spec.ControllerRef.Name != job.Name {
-		t.Errorf("Workload controllerRef.Name = %q, want %q", wl.Spec.ControllerRef.Name, job.Name)
-	}
-	if len(wl.Spec.PodGroupTemplates) != 1 {
-		t.Fatalf("expected 1 PodGroupTemplate, got %d", len(wl.Spec.PodGroupTemplates))
-	}
-	if wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
-		t.Fatal("expected gang scheduling policy")
-	}
-	if wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount != 4 {
-		t.Errorf("minCount = %d, want 4", wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount)
-	}
-
-	// Verify Workload ownerRef.
-	if len(wl.OwnerReferences) != 1 {
-		t.Fatalf("expected 1 ownerReference, got %d", len(wl.OwnerReferences))
-	}
-	if wl.OwnerReferences[0].Kind != "Job" {
-		t.Errorf("ownerRef kind = %q, want Job", wl.OwnerReferences[0].Kind)
-	}
-	if wl.OwnerReferences[0].Name != job.Name {
-		t.Errorf("ownerRef name = %q, want %q", wl.OwnerReferences[0].Name, job.Name)
-	}
-
-	// Verify the PodGroup was created.
-	pgName := computePodGroupName(wl.Name, wl.Spec.PodGroupTemplates[0].Name)
-	createdPG, err := clientSet.SchedulingV1alpha2().PodGroups(job.Namespace).Get(ctx, pgName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("expected PodGroup to be created, got error: %v", err)
-	}
-
-	// Verify PodGroup spec.
-	if createdPG.Spec.PodGroupTemplateRef == nil {
-		t.Fatal("PodGroup should have podGroupTemplateRef")
-	}
-	if createdPG.Spec.PodGroupTemplateRef.WorkloadName != wl.Name {
-		t.Errorf("PodGroup templateRef.workloadName = %q, want %q", createdPG.Spec.PodGroupTemplateRef.WorkloadName, wl.Name)
-	}
-
-	// Verify PodGroup has two ownerRefs (Job + Workload).
-	if len(createdPG.OwnerReferences) != 2 {
-		t.Fatalf("expected 2 ownerReferences, got %d", len(createdPG.OwnerReferences))
-	}
-	var hasJobOwner, hasWorkloadOwner bool
-	for _, ref := range createdPG.OwnerReferences {
-		if ref.Kind == "Job" && ref.Name == job.Name {
-			hasJobOwner = true
-		}
-		if ref.Kind == "Workload" && ref.Name == wl.Name {
-			hasWorkloadOwner = true
-		}
-	}
-	if !hasJobOwner {
-		t.Error("PodGroup missing Job ownerReference")
-	}
-	if !hasWorkloadOwner {
-		t.Error("PodGroup missing Workload ownerReference")
-	}
-}
-
-func TestEnsureWorkloadAndPodGroup_SkipsWhenHasPods(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	clientSet := fake.NewClientset()
-	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
-
-	job := newGangSchedulingJob("test-job", 4)
-	existingPods := []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: job.Namespace}}}
-
-	// With existing pods but no Workload, should return nil (don't create late).
-	pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, existingPods)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if pg != nil {
-		t.Errorf("expected nil PodGroup when Job has pods but no Workload, got %v", pg)
-	}
-}
-
-func TestEnsureWorkloadAndPodGroup_DiscoversExistingObjects(t *testing.T) {
+func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	job := newGangSchedulingJob("test-job", 4)
-
-	// Pre-create Workload and PodGroup.
-	workloadName := computeWorkloadName(job)
-	templateName := fmt.Sprintf("%s-worker-0", job.Name)
+	baseJob := newGangSchedulingJob("test-job", 4)
+	workloadName := computeWorkloadName(baseJob)
+	templateName := "worker-0"
 	podGroupName := computePodGroupName(workloadName, templateName)
 
-	existingWorkload := &schedulingv1alpha2.Workload{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      workloadName,
-			Namespace: job.Namespace,
-			UID:       "workload-uid",
-		},
-		Spec: schedulingv1alpha2.WorkloadSpec{
-			ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
-				APIGroup: "batch",
-				Kind:     "Job",
-				Name:     job.Name,
+	makeWorkload := func(name, jobName string) *schedulingv1alpha2.Workload {
+		return &schedulingv1alpha2.Workload{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID(name + "-uid"),
 			},
-			PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
-				{
-					Name: templateName,
-					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha2.GangSchedulingPolicy{
-							MinCount: 4,
+			Spec: schedulingv1alpha2.WorkloadSpec{
+				ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+					APIGroup: "batch",
+					Kind:     "Job",
+					Name:     jobName,
+				},
+				PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+					{
+						Name: templateName,
+						SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 4},
 						},
 					},
 				},
 			},
-		},
+		}
 	}
-	existingPG := &schedulingv1alpha2.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podGroupName,
-			Namespace: job.Namespace,
-			UID:       "podgroup-uid",
-		},
-		Spec: schedulingv1alpha2.PodGroupSpec{
-			PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-				WorkloadName:         workloadName,
-				PodGroupTemplateName: templateName,
+
+	makePodGroup := func(name, wlName string) *schedulingv1alpha2.PodGroup {
+		return &schedulingv1alpha2.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID(name + "-uid"),
 			},
+			Spec: schedulingv1alpha2.PodGroupSpec{
+				PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+					WorkloadName:         wlName,
+					PodGroupTemplateName: templateName,
+				},
+			},
+		}
+	}
+
+	testCases := map[string]struct {
+		job               *batch.Job
+		pods              []*v1.Pod
+		existingWorkloads []*schedulingv1alpha2.Workload
+		existingPodGroups []*schedulingv1alpha2.PodGroup
+
+		// When true, create reactors return AlreadyExists and inject objects
+		// into the informer cache (simulating another controller winning the race).
+		simulateAlreadyExists bool
+
+		wantPodGroup     bool
+		wantPodGroupName string
+	}{
+		"not eligible: parallelism=1": {
+			job: newJob(1, 1, 0, batch.IndexedCompletion),
+		},
+		"creates both Workload and PodGroup when no pods exist": {
+			job:              baseJob,
+			wantPodGroup:     true,
+			wantPodGroupName: podGroupName,
+		},
+		"skips creation when Job has pods but no Workload": {
+			job:  baseJob,
+			pods: []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}},
+		},
+		"discovers existing Workload and PodGroup": {
+			job:               baseJob,
+			existingWorkloads: []*schedulingv1alpha2.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{makePodGroup(podGroupName, workloadName)},
+			wantPodGroup:      true,
+			wantPodGroupName:  podGroupName,
+		},
+		"discovers existing objects even when pods exist": {
+			job:               baseJob,
+			pods:              []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}},
+			existingWorkloads: []*schedulingv1alpha2.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{makePodGroup(podGroupName, workloadName)},
+			wantPodGroup:      true,
+			wantPodGroupName:  podGroupName,
+		},
+		"workload found but no PodGroup returns nil": {
+			job:               baseJob,
+			existingWorkloads: []*schedulingv1alpha2.Workload{makeWorkload("user-workload", baseJob.Name)},
+		},
+		"retries on AlreadyExists": {
+			job:                   baseJob,
+			simulateAlreadyExists: true,
+			wantPodGroup:          true,
+			wantPodGroupName:      podGroupName,
+		},
+		"discovers user-created (BYO) Workload without ownerRef": {
+			job: baseJob,
+			existingWorkloads: []*schedulingv1alpha2.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-created-workload",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("user-wl-uid"),
+					},
+					Spec: schedulingv1alpha2.WorkloadSpec{
+						ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+							APIGroup: "batch",
+							Kind:     "Job",
+							Name:     baseJob.Name,
+						},
+						PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+							{
+								Name: templateName,
+								SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+									Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 4},
+								},
+							},
+						},
+					},
+				},
+			},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-created-pg",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("user-pg-uid"),
+					},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+							WorkloadName:         "user-created-workload",
+							PodGroupTemplateName: templateName,
+						},
+					},
+				},
+			},
+			wantPodGroup:     true,
+			wantPodGroupName: "user-created-pg",
+		},
+		"schedulingGroup already set (opt-out)": {
+			job: func() *batch.Job {
+				j := newGangSchedulingJob("opt-out-job", 4)
+				j.Spec.Template.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+					PodGroupName: ptr.To("external-pg"),
+				}
+				return j
+			}(),
 		},
 	}
 
-	clientSet := fake.NewClientset(existingWorkload, existingPG)
-	jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var objs []runtime.Object
+			for _, wl := range tc.existingWorkloads {
+				objs = append(objs, wl)
+			}
+			for _, pg := range tc.existingPodGroups {
+				objs = append(objs, pg)
+			}
+			clientSet := fake.NewClientset(objs...)
+			jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
 
-	// Populate the informer caches.
-	sharedInformers.Start(ctx.Done())
-	sharedInformers.WaitForCacheSync(ctx.Done())
+			if tc.simulateAlreadyExists {
+				wlIndexer := sharedInformers.Scheduling().V1alpha2().Workloads().Informer().GetIndexer()
+				pgIndexer := sharedInformers.Scheduling().V1alpha2().PodGroups().Informer().GetIndexer()
+				wlToInject := makeWorkload(workloadName, tc.job.Name)
+				pgToInject := makePodGroup(podGroupName, workloadName)
 
-	// Should discover the existing objects instead of creating new ones.
-	pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if pg == nil {
-		t.Fatal("expected non-nil PodGroup")
-	}
-	if pg.Name != podGroupName {
-		t.Errorf("PodGroup name = %q, want %q", pg.Name, podGroupName)
+				clientSet.PrependReactor("create", "workloads", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					wlIndexer.Add(wlToInject)
+					return true, nil, apierrors.NewAlreadyExists(schedulingv1alpha2.Resource("workloads"), workloadName)
+				})
+				clientSet.PrependReactor("create", "podgroups", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					pgIndexer.Add(pgToInject)
+					return true, nil, apierrors.NewAlreadyExists(schedulingv1alpha2.Resource("podgroups"), podGroupName)
+				})
+			}
+
+			sharedInformers.Start(ctx.Done())
+			sharedInformers.WaitForCacheSync(ctx.Done())
+
+			pg, err := jm.ensureWorkloadAndPodGroup(ctx, tc.job, tc.pods)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantPodGroup {
+				if pg == nil {
+					t.Fatal("expected non-nil PodGroup")
+				}
+				if tc.wantPodGroupName != "" && pg.Name != tc.wantPodGroupName {
+					t.Errorf("PodGroup name = %q, want %q", pg.Name, tc.wantPodGroupName)
+				}
+			} else if pg != nil {
+				t.Errorf("expected nil PodGroup, got %v", pg)
+			}
+		})
 	}
 }
 
-func TestEnsureWorkload_UnsupportedTemplateCount(t *testing.T) {
+func TestEnsureWorkloadUnsupportedTemplateCount(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	job := newGangSchedulingJob("test-job", 4)
 	workloadName := computeWorkloadName(job)
 
-	// Pre-create a Workload with 2 PodGroupTemplates (unsupported in alpha).
 	existingWorkload := &schedulingv1alpha2.Workload{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      workloadName,
@@ -610,8 +631,7 @@ func TestEnsureWorkload_UnsupportedTemplateCount(t *testing.T) {
 	sharedInformers.Start(ctx.Done())
 	sharedInformers.WaitForCacheSync(ctx.Done())
 
-	// Should return nil without error (falls back to normal scheduling).
-	wl, err := jm.ensureWorkload(ctx, job, false)
+	wl, err := jm.ensureWorkload(ctx, job)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -624,7 +644,6 @@ func TestCreateWorkloadForJob(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientSet := fake.NewClientset()
 	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
-
 	job := newGangSchedulingJob("my-job", 8)
 
 	wl, err := jm.createWorkloadForJob(ctx, job)
@@ -640,7 +659,6 @@ func TestCreateWorkloadForJob(t *testing.T) {
 		t.Errorf("workload namespace = %q, want %q", wl.Namespace, job.Namespace)
 	}
 
-	// Verify controllerRef.
 	if wl.Spec.ControllerRef == nil {
 		t.Fatal("expected controllerRef")
 	}
@@ -652,7 +670,6 @@ func TestCreateWorkloadForJob(t *testing.T) {
 		t.Errorf("unexpected controllerRef (-got +want):\n%s", diff)
 	}
 
-	// Verify templates.
 	if len(wl.Spec.PodGroupTemplates) != 1 {
 		t.Fatalf("expected 1 template, got %d", len(wl.Spec.PodGroupTemplates))
 	}
@@ -661,7 +678,6 @@ func TestCreateWorkloadForJob(t *testing.T) {
 		t.Errorf("expected gang minCount=8, got %+v", tpl.SchedulingPolicy)
 	}
 
-	// Verify ownerRef.
 	if len(wl.OwnerReferences) != 1 || wl.OwnerReferences[0].Name != job.Name {
 		t.Errorf("unexpected ownerReferences: %v", wl.OwnerReferences)
 	}
@@ -673,7 +689,7 @@ func TestCreatePodGroupForWorkload(t *testing.T) {
 	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
 
 	job := newGangSchedulingJob("my-job", 4)
-	templateName := fmt.Sprintf("%s-worker-0", job.Name)
+	templateName := "worker-0"
 
 	workload := &schedulingv1alpha2.Workload{
 		ObjectMeta: metav1.ObjectMeta{
@@ -705,7 +721,6 @@ func TestCreatePodGroupForWorkload(t *testing.T) {
 		t.Errorf("PodGroup name = %q, want %q", pg.Name, expectedName)
 	}
 
-	// Verify templateRef.
 	if pg.Spec.PodGroupTemplateRef == nil {
 		t.Fatal("expected podGroupTemplateRef")
 	}
@@ -716,18 +731,16 @@ func TestCreatePodGroupForWorkload(t *testing.T) {
 		t.Errorf("templateRef.podGroupTemplateName = %q, want %q", pg.Spec.PodGroupTemplateRef.PodGroupTemplateName, templateName)
 	}
 
-	// Verify scheduling policy was copied.
 	if pg.Spec.SchedulingPolicy.Gang == nil || pg.Spec.SchedulingPolicy.Gang.MinCount != 4 {
 		t.Errorf("expected copied gang policy with minCount=4, got %+v", pg.Spec.SchedulingPolicy)
 	}
 
-	// Verify two ownerRefs.
 	if len(pg.OwnerReferences) != 2 {
 		t.Fatalf("expected 2 ownerReferences, got %d", len(pg.OwnerReferences))
 	}
 }
 
-func TestCreatePodGroupForWorkload_NoTemplates(t *testing.T) {
+func TestCreatePodGroupForWorkloadNoTemplates(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientSet := fake.NewClientset()
 	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
@@ -751,124 +764,229 @@ func TestDiscoverWorkloadForJob(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	job := newGangSchedulingJob("test-job", 4)
 
-	t.Run("not found returns nil", func(t *testing.T) {
-		clientSet := fake.NewClientset()
-		jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
-		sharedInformers.Start(ctx.Done())
-		sharedInformers.WaitForCacheSync(ctx.Done())
-
-		wl, err := jm.discoverWorkloadForJob(ctx, job)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if wl != nil {
-			t.Errorf("expected nil, got %v", wl)
-		}
-	})
-
-	t.Run("found returns workload", func(t *testing.T) {
-		workloadName := computeWorkloadName(job)
-		existing := &schedulingv1alpha2.Workload{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      workloadName,
-				Namespace: job.Namespace,
+	testCases := map[string]struct {
+		workloads        []*schedulingv1alpha2.Workload
+		wantWorkloadName string
+	}{
+		"not found returns nil": {},
+		"found by controllerRef": {
+			workloads: []*schedulingv1alpha2.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-chosen-name",
+						Namespace: job.Namespace,
+					},
+					Spec: schedulingv1alpha2.WorkloadSpec{
+						ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+							APIGroup: "batch",
+							Kind:     "Job",
+							Name:     job.Name,
+						},
+					},
+				},
 			},
-		}
-		clientSet := fake.NewClientset(existing)
-		jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
-		sharedInformers.Start(ctx.Done())
-		sharedInformers.WaitForCacheSync(ctx.Done())
+			wantWorkloadName: "user-chosen-name",
+		},
+		"ignores workload without controllerRef": {
+			workloads: []*schedulingv1alpha2.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "orphan-workload",
+						Namespace: job.Namespace,
+					},
+				},
+			},
+		},
+		"ignores workload referencing different job": {
+			workloads: []*schedulingv1alpha2.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "other-workload",
+						Namespace: job.Namespace,
+					},
+					Spec: schedulingv1alpha2.WorkloadSpec{
+						ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+							APIGroup: "batch",
+							Kind:     "Job",
+							Name:     "different-job",
+						},
+					},
+				},
+			},
+		},
+		"ambiguous returns nil with event": {
+			workloads: []*schedulingv1alpha2.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "workload-1",
+						Namespace: job.Namespace,
+					},
+					Spec: schedulingv1alpha2.WorkloadSpec{
+						ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+							APIGroup: "batch",
+							Kind:     "Job",
+							Name:     job.Name,
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "workload-2",
+						Namespace: job.Namespace,
+					},
+					Spec: schedulingv1alpha2.WorkloadSpec{
+						ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+							APIGroup: "batch",
+							Kind:     "Job",
+							Name:     job.Name,
+						},
+					},
+				},
+			},
+		},
+	}
 
-		wl, err := jm.discoverWorkloadForJob(ctx, job)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if wl == nil {
-			t.Fatal("expected Workload, got nil")
-		}
-		if wl.Name != workloadName {
-			t.Errorf("name = %q, want %q", wl.Name, workloadName)
-		}
-	})
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var objs []runtime.Object
+			for _, wl := range tc.workloads {
+				objs = append(objs, wl)
+			}
+			clientSet := fake.NewClientset(objs...)
+			jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
+			sharedInformers.Start(ctx.Done())
+			sharedInformers.WaitForCacheSync(ctx.Done())
+
+			wl, err := jm.discoverWorkloadForJob(ctx, job)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantWorkloadName != "" {
+				if wl == nil {
+					t.Fatal("expected Workload, got nil")
+				}
+				if wl.Name != tc.wantWorkloadName {
+					t.Errorf("name = %q, want %q", wl.Name, tc.wantWorkloadName)
+				}
+			} else if wl != nil {
+				t.Errorf("expected nil, got %v", wl)
+			}
+		})
+	}
 }
 
 func TestDiscoverPodGroupForWorkload(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	templateName := "my-template"
+	job := newGangSchedulingJob("test-job", 4)
 	workload := &schedulingv1alpha2.Workload{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-workload",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: schedulingv1alpha2.WorkloadSpec{
-			PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
-				{Name: templateName},
+	}
+
+	testCases := map[string]struct {
+		podGroups        []*schedulingv1alpha2.PodGroup
+		wantPodGroupName string
+	}{
+		"not found returns nil": {},
+		"found by podGroupTemplateRef": {
+			podGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-chosen-pg",
+						Namespace: workload.Namespace,
+					},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+							WorkloadName: workload.Name,
+						},
+					},
+				},
+			},
+			wantPodGroupName: "user-chosen-pg",
+		},
+		"ignores podgroup without ref": {
+			podGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "orphan-pg",
+						Namespace: workload.Namespace,
+					},
+				},
+			},
+		},
+		"ignores podgroup referencing different workload": {
+			podGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "other-pg",
+						Namespace: workload.Namespace,
+					},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+							WorkloadName: "different-workload",
+						},
+					},
+				},
+			},
+		},
+		"unsupported structure returns nil": {
+			podGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pg-1",
+						Namespace: workload.Namespace,
+					},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+							WorkloadName: workload.Name,
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pg-2",
+						Namespace: workload.Namespace,
+					},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+							WorkloadName: workload.Name,
+						},
+					},
+				},
 			},
 		},
 	}
 
-	t.Run("not found returns nil", func(t *testing.T) {
-		clientSet := fake.NewClientset()
-		jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
-		sharedInformers.Start(ctx.Done())
-		sharedInformers.WaitForCacheSync(ctx.Done())
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var objs []runtime.Object
+			for _, pg := range tc.podGroups {
+				objs = append(objs, pg)
+			}
+			clientSet := fake.NewClientset(objs...)
+			jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
+			sharedInformers.Start(ctx.Done())
+			sharedInformers.WaitForCacheSync(ctx.Done())
 
-		pg, err := jm.discoverPodGroupForWorkload(ctx, workload)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if pg != nil {
-			t.Errorf("expected nil, got %v", pg)
-		}
-	})
-
-	t.Run("found returns podgroup", func(t *testing.T) {
-		pgName := computePodGroupName(workload.Name, templateName)
-		existing := &schedulingv1alpha2.PodGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      pgName,
-				Namespace: workload.Namespace,
-			},
-		}
-		clientSet := fake.NewClientset(existing)
-		jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
-		sharedInformers.Start(ctx.Done())
-		sharedInformers.WaitForCacheSync(ctx.Done())
-
-		pg, err := jm.discoverPodGroupForWorkload(ctx, workload)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if pg == nil {
-			t.Fatal("expected PodGroup, got nil")
-		}
-		if pg.Name != pgName {
-			t.Errorf("name = %q, want %q", pg.Name, pgName)
-		}
-	})
-
-	t.Run("no templates returns nil", func(t *testing.T) {
-		noTemplatesWL := &schedulingv1alpha2.Workload{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "empty-workload",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: schedulingv1alpha2.WorkloadSpec{},
-		}
-		clientSet := fake.NewClientset()
-		jm, sharedInformers := newControllerWithSchedulingInformers(ctx, t, clientSet)
-		sharedInformers.Start(ctx.Done())
-		sharedInformers.WaitForCacheSync(ctx.Done())
-
-		pg, err := jm.discoverPodGroupForWorkload(ctx, noTemplatesWL)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if pg != nil {
-			t.Errorf("expected nil for workload with no templates, got %v", pg)
-		}
-	})
+			pg, err := jm.discoverPodGroupForWorkload(ctx, job, workload)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantPodGroupName != "" {
+				if pg == nil {
+					t.Fatal("expected PodGroup, got nil")
+				}
+				if pg.Name != tc.wantPodGroupName {
+					t.Errorf("name = %q, want %q", pg.Name, tc.wantPodGroupName)
+				}
+			} else if pg != nil {
+				t.Errorf("expected nil, got %v", pg)
+			}
+		})
+	}
 }
 
 func TestEnqueueJobFromOwnerRef(t *testing.T) {
@@ -992,7 +1110,6 @@ func TestAddSchedulingInformers(t *testing.T) {
 	clientSet := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, controller.NoResyncPeriodFunc())
 
-	// Create controller without scheduling informers.
 	jm, err := newControllerWithClock(ctx,
 		sharedInformers.Core().V1().Pods(),
 		sharedInformers.Batch().V1().Jobs(),
@@ -1004,7 +1121,6 @@ func TestAddSchedulingInformers(t *testing.T) {
 		t.Fatalf("Error creating controller: %v", err)
 	}
 
-	// Verify listers are nil before adding informers.
 	if jm.workloadLister != nil {
 		t.Error("workloadLister should be nil before addSchedulingInformers")
 	}
@@ -1021,7 +1137,6 @@ func TestAddSchedulingInformers(t *testing.T) {
 		t.Fatalf("addSchedulingInformers failed: %v", err)
 	}
 
-	// Verify listers are set after adding informers.
 	if jm.workloadLister == nil {
 		t.Error("workloadLister should be set after addSchedulingInformers")
 	}
@@ -1036,16 +1151,14 @@ func TestAddSchedulingInformers(t *testing.T) {
 	}
 }
 
-func TestEnsureWorkloadAndPodGroup_FeatureGateDisabled(t *testing.T) {
+func TestEnsureWorkloadAndPodGroupFeatureGateDisabled(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	// Ensure the feature gate is disabled (it's alpha/default-off, but be explicit).
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.EnableWorkloadWithJob: false,
 	})
 
 	clientSet := fake.NewClientset()
-	// Create controller without scheduling informers (simulating feature gate off).
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, controller.NoResyncPeriodFunc())
 	jm, err := newControllerWithClock(ctx,
 		sharedInformers.Core().V1().Pods(),
@@ -1060,9 +1173,6 @@ func TestEnsureWorkloadAndPodGroup_FeatureGateDisabled(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	// The controller's workloadLister is nil, so ensureWorkloadAndPodGroup
-	// would panic if called. The feature gate check in syncJob prevents that.
-	// Verify the feature gate is off.
 	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
 		t.Fatal("expected EnableWorkloadWithJob to be disabled")
 	}

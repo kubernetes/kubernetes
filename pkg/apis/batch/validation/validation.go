@@ -32,11 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -634,8 +632,7 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
 
-	// prevent changes to parallelism for gang-scheduled Jobs.
-	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if opts.RejectParallelismChangeForGangScheduledJob {
 		if isGangSchedulingCandidate(oldSpec) && !ptr.Equal(spec.Parallelism, oldSpec.Parallelism) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("parallelism"),
 				"cannot change parallelism for a gang-scheduled Job (completionMode=Indexed, completions=parallelism)"))
@@ -1097,6 +1094,8 @@ type JobValidationOptions struct {
 	RequirePrefixedLabels bool
 	// Allow mutable pod resources
 	AllowMutablePodResources bool
+	// Reject parallelism changes for gang-scheduled Jobs
+	RejectParallelismChangeForGangScheduledJob bool
 }
 
 type JobStatusValidationOptions struct {

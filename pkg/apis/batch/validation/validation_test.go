@@ -30,14 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -2610,14 +2606,14 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		old               batch.Job
-		update            func(*batch.Job)
-		enableFeatureGate bool
-		wantErr           *field.Error
+		old     batch.Job
+		update  func(*batch.Job)
+		opts    JobValidationOptions
+		wantErr *field.Error
 	}{
 		"gang candidate with parallelism change is forbidden": {
-			old:               gangCandidateJob(),
-			enableFeatureGate: true,
+			old:  gangCandidateJob(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
@@ -2627,9 +2623,9 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 			},
 		},
 		"gang candidate with parallelism unchanged is allowed": {
-			old:               gangCandidateJob(),
-			enableFeatureGate: true,
-			update:            func(job *batch.Job) {},
+			old:    gangCandidateJob(),
+			opts:   JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {},
 		},
 		"non-candidate completions != parallelism with parallelism change is allowed": {
 			old: func() batch.Job {
@@ -2637,7 +2633,7 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 				j.Spec.Completions = ptr.To[int32](10)
 				return j
 			}(),
-			enableFeatureGate: true,
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
@@ -2649,14 +2645,13 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 				j.Spec.Completions = nil
 				return j
 			}(),
-			enableFeatureGate: true,
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
 		},
-		"feature gate disabled allows parallelism change": {
-			old:               gangCandidateJob(),
-			enableFeatureGate: false,
+		"option disabled allows parallelism change": {
+			old: gangCandidateJob(),
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
@@ -2668,7 +2663,7 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 				j.Spec.Completions = ptr.To[int32](1)
 				return j
 			}(),
-			enableFeatureGate: true,
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](3)
 			},
@@ -2681,7 +2676,7 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 				}
 				return j
 			}(),
-			enableFeatureGate: true,
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
@@ -2691,14 +2686,9 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if tc.enableFeatureGate {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnableWorkloadWithJob, true)
-			}
 			update := tc.old.DeepCopy()
 			tc.update(update)
-			errs := ValidateJobUpdate(update, &tc.old, JobValidationOptions{})
+			errs := ValidateJobUpdate(update, &tc.old, tc.opts)
 			var wantErrs field.ErrorList
 			if tc.wantErr != nil {
 				wantErrs = append(wantErrs, tc.wantErr)

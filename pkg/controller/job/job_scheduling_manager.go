@@ -26,11 +26,13 @@ import (
 	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	"k8s.io/client-go/tools/cache"
+	retry "k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
@@ -48,7 +50,6 @@ func isGangSchedulingEligible(job *batch.Job) bool {
 	if !isIndexedJob(job) {
 		return false
 	}
-	// All pods must run concurrently for gang scheduling to apply.
 	if job.Spec.Completions == nil || *job.Spec.Completions != *job.Spec.Parallelism {
 		return false
 	}
@@ -59,139 +60,165 @@ func isGangSchedulingEligible(job *batch.Job) bool {
 }
 
 // ensureWorkloadAndPodGroup discovers or creates Workload and PodGroup for the given Job.
-// It returns the PodGroup if the Job has associated scheduling objects, or nil if:
-// - the feature is not applicable (not eligible, has pods, etc.)
-// - creation is not needed and no existing objects were found
+// It returns the PodGroup if the Job has associated scheduling objects, or nil if the
+// Job is not eligible or no objects were found and creation is not applicable.
 //
-// The method only creates objects when the Job has no pods yet.
+// The method first attempts to discover an existing Workload (which may have been
+// created by the Job controller, a user, or a higher-level controller).
+// If a Workload is found, it discovers the associated PodGroup and returns it.
+//
+// If no Workload is found, creation is only attempted when the Job has no pods
+// (no active or terminal pods). This prevents creating scheduling objects for Jobs
+// that predate the feature gate being enabled.
 func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.Job, pods []*v1.Pod) (*schedulingv1alpha2.PodGroup, error) {
 	if !isGangSchedulingEligible(job) {
 		return nil, nil
 	}
 
-	hasPods := len(pods) > 0
-
-	workload, err := jm.ensureWorkload(ctx, job, hasPods)
-	if err != nil {
-		return nil, err
-	}
-	if workload == nil {
-		return nil, nil
-	}
-
-	return jm.ensurePodGroup(ctx, job, workload, hasPods)
-}
-
-// ensureWorkload discovers an existing Workload for the Job, or creates one if
-// the Job has no pods yet. Returns nil without error when creation should be
-// skipped (e.g., Job already has pods) or when the Workload has an unsupported structure.
-func (jm *Controller) ensureWorkload(ctx context.Context, job *batch.Job, hasPods bool) (*schedulingv1alpha2.Workload, error) {
-	logger := klog.FromContext(ctx)
-
+	// Try to discover existing Workload and PodGroup.
 	workload, err := jm.discoverWorkloadForJob(ctx, job)
 	if err != nil {
 		return nil, fmt.Errorf("discovering Workload for Job %s/%s: %w", job.Namespace, job.Name, err)
 	}
+	if workload != nil {
+		podGroup, err := jm.discoverPodGroupForWorkload(ctx, job, workload)
+		if err != nil {
+			return nil, fmt.Errorf("discovering PodGroup for Workload %s/%s: %w", workload.Namespace, workload.Name, err)
+		}
+		return podGroup, nil
+	}
 
-	// if no Workload found and Job already has pods, don't create one.
-	if workload == nil && hasPods {
+	// No existing Workload found. Only create when the Job has no pods.
+	if len(pods) > 0 {
 		return nil, nil
 	}
 
-	// if no Workload found and no pods, create one.
-	if workload == nil {
+	workload, err = jm.ensureWorkload(ctx, job)
+	if err != nil || workload == nil {
+		return nil, err
+	}
+	return jm.ensurePodGroup(ctx, job, workload)
+}
+
+// ensureWorkload creates a new Workload for the Job. If the create call returns
+// AlreadyExists, it falls back to discovery. Returns nil without error when the
+// Workload has an unsupported structure (PodGroupTemplates != 1 for alpha).
+func (jm *Controller) ensureWorkload(ctx context.Context, job *batch.Job) (*schedulingv1alpha2.Workload, error) {
+	logger := klog.FromContext(ctx)
+
+	var workload *schedulingv1alpha2.Workload
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var err error
 		workload, err = jm.createWorkloadForJob(ctx, job)
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				// another actor created it concurrently, re-discover.
-				logger.V(4).Info("workload already exists, re-discovering", "job", klog.KObj(job))
-				workload, err = jm.discoverWorkloadForJob(ctx, job)
-				if err != nil {
-					return nil, fmt.Errorf("re-discovering Workload for Job %s/%s after AlreadyExists: %w", job.Namespace, job.Name, err)
-				}
-				if workload == nil {
-					return nil, fmt.Errorf("workload for Job %s/%s not found after AlreadyExists", job.Namespace, job.Name)
-				}
-			} else {
-				return nil, fmt.Errorf("creating Workload for Job %s/%s: %w", job.Namespace, job.Name, err)
+		if apierrors.IsAlreadyExists(err) {
+			if workload, err = jm.discoverWorkloadForJob(ctx, job); err != nil {
+				return err
 			}
 		}
+		return err
+	})
+	if err != nil {
+		logger.V(2).Error(err, "Failed to create Workload for Job", "job", klog.KObj(job))
+		return nil, err
 	}
 
-	// validate the Workload has a supported structure.
+	// validate the Workload has a supported structure for alpha.
 	if len(workload.Spec.PodGroupTemplates) != 1 {
 		logger.V(2).Info("workload has unsupported number of PodGroupTemplates, falling back to normal scheduling",
-			"job", klog.KObj(job), "workload", klog.KObj(workload), "templateCount", len(workload.Spec.PodGroupTemplates))
-		jm.recorder.Eventf(job, v1.EventTypeWarning, "UnsupportedWorkloadStructure",
-			"Workload %s has %d PodGroupTemplates (expected 1), falling back to normal scheduling",
-			workload.Name, len(workload.Spec.PodGroupTemplates))
+			"job", klog.KObj(job), "workload", klog.KObj(workload), "PodGroupTemplateCount", len(workload.Spec.PodGroupTemplates))
 		return nil, nil
 	}
 
 	return workload, nil
 }
 
-// ensurePodGroup discovers an existing PodGroup for the Workload, or creates one
-// if the Job has no pods yet. Returns nil without error when creation should be
-// skipped (e.g., Job already has pods but no PodGroup exists yet).
-func (jm *Controller) ensurePodGroup(ctx context.Context, job *batch.Job, workload *schedulingv1alpha2.Workload, hasPods bool) (*schedulingv1alpha2.PodGroup, error) {
+// ensurePodGroup creates a PodGroup for the Workload.
+func (jm *Controller) ensurePodGroup(ctx context.Context, job *batch.Job, workload *schedulingv1alpha2.Workload) (*schedulingv1alpha2.PodGroup, error) {
 	logger := klog.FromContext(ctx)
 
-	podGroup, err := jm.discoverPodGroupForWorkload(ctx, workload)
-	if err != nil {
-		return nil, fmt.Errorf("discovering PodGroup for Workload %s/%s: %w", workload.Namespace, workload.Name, err)
-	}
-
-	// if no PodGroup found and Job already has pods, return nil.
-	// The pods may have been created before PodGroup creation completed.
-	if podGroup == nil && hasPods {
-		return nil, nil
-	}
-
-	// if no PodGroup found and no pods, create one.
-	if podGroup == nil {
+	var podGroup *schedulingv1alpha2.PodGroup
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var err error
 		podGroup, err = jm.createPodGroupForWorkload(ctx, job, workload)
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				logger.V(4).Info("PodGroup already exists, re-discovering", "job", klog.KObj(job))
-				podGroup, err = jm.discoverPodGroupForWorkload(ctx, workload)
-				if err != nil {
-					return nil, fmt.Errorf("re-discovering PodGroup for Workload %s/%s after AlreadyExists: %w", workload.Namespace, workload.Name, err)
-				}
-				if podGroup == nil {
-					return nil, fmt.Errorf("PodGroup for Workload %s/%s not found after AlreadyExists", workload.Namespace, workload.Name)
-				}
-			} else {
-				return nil, fmt.Errorf("creating PodGroup for Workload %s/%s: %w", job.Namespace, workload.Name, err)
+		if apierrors.IsAlreadyExists(err) {
+			if podGroup, err = jm.discoverPodGroupForWorkload(ctx, job, workload); err != nil {
+				return err
 			}
 		}
+		return err
+	})
+	if err != nil {
+		logger.V(2).Error(err, "Failed to create PodGroup for Workload", "workload", klog.KObj(workload), "job", klog.KObj(job))
+		return nil, err
 	}
 
 	return podGroup, nil
 }
 
-// discoverWorkloadForJob finds an existing Workload for the given Job by looking
-// up the deterministic name produced by computeWorkloadName.
+// workloadReferencesJob returns true if the Workload's spec.controllerRef
+// points to the given Job.
+func workloadReferencesJob(wl *schedulingv1alpha2.Workload, job *batch.Job) bool {
+	ref := wl.Spec.ControllerRef
+	return ref != nil &&
+		ref.APIGroup == "batch" &&
+		ref.Kind == "Job" &&
+		ref.Name == job.Name
+}
+
+// discoverWorkloadForJob finds an existing Workload for the given Job by listing
+// all Workloads in the namespace and matching on spec.controllerRef.
+// Returns nil if no matching Workload is found. Returns nil and emits an event
+// if more than one Workload references the same Job (ambiguous).
 func (jm *Controller) discoverWorkloadForJob(ctx context.Context, job *batch.Job) (*schedulingv1alpha2.Workload, error) {
-	workload, err := jm.workloadLister.Workloads(job.Namespace).Get(computeWorkloadName(job))
-	if apierrors.IsNotFound(err) {
+	allWorkloads, err := jm.workloadLister.Workloads(job.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	var matched []*schedulingv1alpha2.Workload
+	for _, wl := range allWorkloads {
+		if workloadReferencesJob(wl, job) {
+			matched = append(matched, wl)
+		}
+	}
+	if len(matched) > 1 {
+		jm.recorder.Eventf(job, v1.EventTypeWarning, "AmbiguousWorkload",
+			"Found %d Workloads referencing Job %s, falling back to normal scheduling for job %s/%s",
+			len(matched), job.Name, job.Namespace, job.Name)
 		return nil, nil
 	}
-	return workload, err
+	if len(matched) == 1 {
+		return matched[0], nil
+	}
+	return nil, nil
 }
 
 // discoverPodGroupForWorkload finds an existing PodGroup for the given Workload
-// by looking up the deterministic name produced by computePodGroupName.
-func (jm *Controller) discoverPodGroupForWorkload(ctx context.Context, workload *schedulingv1alpha2.Workload) (*schedulingv1alpha2.PodGroup, error) {
-	if len(workload.Spec.PodGroupTemplates) == 0 {
+// by listing all PodGroups in the namespace and matching on
+// spec.podGroupTemplateRef.workloadName.
+func (jm *Controller) discoverPodGroupForWorkload(ctx context.Context, job *batch.Job, workload *schedulingv1alpha2.Workload) (*schedulingv1alpha2.PodGroup, error) {
+	allPodGroups, err := jm.podGroupLister.PodGroups(workload.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	var matched []*schedulingv1alpha2.PodGroup
+	for _, pg := range allPodGroups {
+		if pg.Spec.PodGroupTemplateRef != nil &&
+			pg.Spec.PodGroupTemplateRef.WorkloadName == workload.Name {
+			matched = append(matched, pg)
+		}
+	}
+
+	// for alpha, we only support one PodGroup per Workload.
+	if len(matched) == 1 {
+		return matched[0], nil
+	}
+	if len(matched) > 1 {
+		jm.recorder.Eventf(workload, v1.EventTypeWarning, "AmbiguousPodGroup",
+			"Found %d PodGroups referencing Workload %s, falling back to normal scheduling for job %s/%s",
+			len(matched), workload.Name, job.Namespace, job.Name)
 		return nil, nil
 	}
-	pgName := computePodGroupName(workload.Name, workload.Spec.PodGroupTemplates[0].Name)
-	podGroup, err := jm.podGroupLister.PodGroups(workload.Namespace).Get(pgName)
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
-	return podGroup, err
+	return nil, nil
 }
 
 // buildPodGroupTemplates constructs the PodGroupTemplate slice for a Job's Workload.
@@ -201,7 +228,7 @@ func (jm *Controller) discoverPodGroupForWorkload(ctx context.Context, workload 
 func buildPodGroupTemplates(job *batch.Job) []schedulingv1alpha2.PodGroupTemplate {
 	return []schedulingv1alpha2.PodGroupTemplate{
 		{
-			Name: fmt.Sprintf("%s-worker-0", job.Name),
+			Name: fmt.Sprintf("worker-%d", 0),
 			SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
 				Gang: &schedulingv1alpha2.GangSchedulingPolicy{
 					MinCount: *job.Spec.Parallelism,
@@ -240,7 +267,7 @@ func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) 
 	}
 
 	jm.recorder.Eventf(job, v1.EventTypeNormal, "WorkloadCreated",
-		"Created Workload %s with gang scheduling (minCount=%d)", created.Name, *job.Spec.Parallelism)
+		"Created Workload %s for Job %s", created.Name, job.Name)
 	return created, nil
 }
 
@@ -283,8 +310,6 @@ func (jm *Controller) createPodGroupForWorkload(ctx context.Context, job *batch.
 		return nil, err
 	}
 
-	jm.recorder.Eventf(job, v1.EventTypeNormal, "PodGroupCreated",
-		"Created PodGroup %s for Workload %s", created.Name, workload.Name)
 	return created, nil
 }
 

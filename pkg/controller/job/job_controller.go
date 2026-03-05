@@ -202,7 +202,10 @@ var (
 // in sync with their corresponding Job objects.
 // workloadInformer and podGroupInformer are optional and should be provided when
 // the EnableWorkloadWithJob feature gate is enabled.
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer) (*Controller, error) {
+func NewController(ctx context.Context,
+	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
+	kubeClient clientset.Interface, workloadInformer schedulinginformers.WorkloadInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer) (*Controller, error) {
 	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{}, workloadInformer, podGroupInformer)
 }
 
@@ -299,8 +302,13 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
-	// setup Workload and PodGroup informers.
-	if workloadInformer != nil && podGroupInformer != nil {
+	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		if workloadInformer == nil {
+			return nil, fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.EnableWorkloadWithJob)
+		}
+		if podGroupInformer == nil {
+			return nil, fmt.Errorf("pod group informer is required when the feature gate %q is enabled", features.EnableWorkloadWithJob)
+		}
 		if err := jm.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
 			return nil, err
 		}
@@ -332,11 +340,8 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	}()
 
 	syncFuncs := []cache.InformerSynced{jm.podStoreSynced, jm.jobStoreSynced}
-	if jm.workloadStoreSynced != nil {
-		syncFuncs = append(syncFuncs, jm.workloadStoreSynced)
-	}
-	if jm.podGroupStoreSynced != nil {
-		syncFuncs = append(syncFuncs, jm.podGroupStoreSynced)
+	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		syncFuncs = append(syncFuncs, jm.workloadStoreSynced, jm.podGroupStoreSynced)
 	}
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncFuncs...) {
 		return
@@ -1013,7 +1018,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	// ensure Workload and PodGroup exist for eligible Jobs.
 	// This must happen before pod management so that pods can reference the PodGroup.
 	var podGroup *schedulingv1alpha2.PodGroup
-	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) && jm.workloadLister != nil {
+	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
 		podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
 		if err != nil {
 			return fmt.Errorf("ensuring Workload and PodGroup for Job %s/%s: %w", job.Namespace, job.Name, err)
@@ -1879,8 +1884,10 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
-		// set schedulingGroup and PodGroup ownerRef for eligible Jobs.
-		if jobCtx.podGroup != nil {
+		// Set schedulingGroup and PodGroup ownerRef for eligible Jobs.
+		// If the template already has schedulingGroup set, a higher-level
+		// controller owns the scheduling objects (do not overwrite).
+		if jobCtx.podGroup != nil && podTemplate.Spec.SchedulingGroup == nil {
 			pg := jobCtx.podGroup
 			podTemplate.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
 				PodGroupName: &pg.Name,

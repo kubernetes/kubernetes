@@ -1467,18 +1467,18 @@ done`}
 			err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, "", completions)
 			framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensuring job succeeded")
-		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectNoError(err, "failed to get job")
-		for _, cond := range job.Status.Conditions {
-			if cond.Type == batchv1.JobComplete {
-				gomega.Expect(cond.Status).Should(gomega.Equal(v1.ConditionTrue))
+			ginkgo.By("Ensuring job succeeded")
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "failed to get job")
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobComplete {
+					gomega.Expect(cond.Status).Should(gomega.Equal(v1.ConditionTrue))
+				}
 			}
-		}
-		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
-		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
-	})
+			gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
+			gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
+			gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		})
 
 	/*
 		Testname: Allow updating pod resources for suspended Jobs
