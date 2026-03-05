@@ -2365,4 +2365,8 @@ rules:
       - staging/src/k8s.io/externaljwt
 recursive-delete-patterns:
 - '*/.gitattributes'
-default-go-version: 1.26.0
+# minimum version with GOTOOLCHAIN support
+# should be older than the version used by any of our modules in any
+# current branch, that way GOTOOLCHAIN logic will select the module's minimum
+# version when working with that module
+default-go-version: 1.21.0
