@@ -917,7 +917,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 			}
 			// this is an invariant; when invoked, the unsafe deletion flow should always see the option enabled
 			if got := ptr.Deref(unsafeFlowObserved.Ignore, false); unsafeFlowObserved.Invoked == 1 && !got {
-				t.Errorf("IgnoreStoreReadErrorWithClusterBreakingPotential should be %t for the unsafe deletion flow, but got: %t", false, got)
+				t.Errorf("Invariant failed, IgnoreStoreReadErrorWithClusterBreakingPotential should always be set to %t for the unsafe deletion flow, but got: %t", true, got)
 			}
 
 			// certain annotation should be added in unsafe delete
@@ -1045,7 +1045,7 @@ func TestDeleteCollectionWithUnsafeDeletionFlow(t *testing.T) {
 			}
 
 			if want, got := test.deleterInvoked, observed.Invoked; want != got {
-				t.Errorf("expected the deleter to be ivoked %d times, but got: %d", want, got)
+				t.Errorf("expected the deleter to be invoked %d times, but got: %d", want, got)
 			}
 			// if invoked, the deleter should never see the ignore option enabled
 			if got := ptr.Deref(observed.Ignore, false); test.deleterInvoked == 1 && got {
@@ -1064,7 +1064,7 @@ func TestDeleteCollectionWithUnsafeDeletionFlow(t *testing.T) {
 func newRequest(t *testing.T, ignoreReadErr *bool) *http.Request {
 	t.Helper()
 
-	req, err := http.NewRequest(http.MethodGet, "/test", io.NopCloser(strings.NewReader("")))
+	req, err := http.NewRequest(http.MethodDelete, "/test", io.NopCloser(strings.NewReader("")))
 	if err != nil {
 		t.Fatalf("unexpected error creating a new http.Request: %v", err)
 	}
@@ -1125,7 +1125,10 @@ type deletionFlowTracker struct {
 	Ignore  *bool // the ignore option passed to Delete
 }
 
-// implements a fake GracefulDeleter
+// implements a fake GracefulDeleter.
+// TODO: this is not thread safe if concurrent Delete calls are made by a
+// test, tests are expected to invoke Delete serially, if that is to chage
+// we need to implement locking to keept it concurrency safe.
 type fakeRegistry struct {
 	tracker *deletionFlowTracker
 }
