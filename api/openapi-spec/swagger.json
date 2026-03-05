@@ -20275,15 +20275,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationSpec",
-          "description": "Specification of the migration."
+          "description": "spec is the specification of the migration."
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationStatus",
-          "description": "Status of the migration."
+          "description": "status is the status of the migration."
         }
       },
       "type": "object",
@@ -20303,7 +20303,7 @@
           "type": "string"
         },
         "items": {
-          "description": "Items is the list of StorageVersionMigration",
+          "description": "items is the list of StorageVersionMigration.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.storagemigration.v1beta1.StorageVersionMigration"
           },
@@ -20315,7 +20315,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
-          "description": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         }
       },
       "required": [
@@ -20335,7 +20335,7 @@
       "properties": {
         "resource": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.GroupResource",
-          "description": "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable."
+          "description": "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable."
         }
       },
       "required": [
@@ -20347,7 +20347,7 @@
       "description": "Status of the storage version migration.",
       "properties": {
         "conditions": {
-          "description": "The latest available observations of the migration's current state.",
+          "description": "conditions is the latest available observations of the migration's current state.",
           "items": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
           },
@@ -20360,7 +20360,7 @@
           "x-kubernetes-patch-strategy": "merge"
         },
         "resourceVersion": {
-          "description": "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+          "description": "resourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
           "type": "string"
         }
       },

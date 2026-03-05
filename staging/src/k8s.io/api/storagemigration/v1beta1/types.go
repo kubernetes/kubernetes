@@ -29,21 +29,21 @@ import (
 // storage version.
 type StorageVersionMigration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata.
+	// metadata is standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the migration.
+	// spec is the specification of the migration.
 	// +optional
 	Spec StorageVersionMigrationSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	// Status of the migration.
+	// status is the status of the migration.
 	// +optional
 	Status StorageVersionMigrationStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // Spec of the storage version migration.
 type StorageVersionMigrationSpec struct {
-	// The resource that is being migrated. The migrator sends requests to
+	// resource is the resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
 	Resource metav1.GroupResource `json:"resource" protobuf:"bytes,1,opt,name=resource"`
@@ -62,14 +62,14 @@ const (
 
 // Status of the storage version migration.
 type StorageVersionMigrationStatus struct {
-	// The latest available observations of the migration's current state.
+	// conditions is the latest available observations of the migration's current state.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-	// ResourceVersion to compare with the GC cache for performing the migration.
+	// resourceVersion to compare with the GC cache for performing the migration.
 	// This is the current resource version of given group, version and resource when
 	// kube-controller-manager first observes this StorageVersionMigration resource.
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
@@ -82,10 +82,10 @@ type StorageVersionMigrationStatus struct {
 type StorageVersionMigrationList struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard list metadata
+	// metadata is standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Items is the list of StorageVersionMigration
+	// items is the list of StorageVersionMigration.
 	Items []StorageVersionMigration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
