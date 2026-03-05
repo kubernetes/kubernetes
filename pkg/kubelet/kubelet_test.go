@@ -311,6 +311,7 @@ func newTestKubeletWithImageList(
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
+	kubelet.podCgroupsInitialized = make(map[types.UID]struct{})
 	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: kubelet.SyncPod,
@@ -5108,4 +5109,80 @@ func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alterna
 	}
 
 	return caCertBytes, leafCertBytes, key, err
+}
+
+func TestPodCgroupInitializedTracking(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	uid := types.UID("test-pod-uid")
+
+	// Initially not tracked
+	if kl.isPodCgroupInitialized(uid) {
+		t.Error("Pod cgroup should not be marked initialized before markPodCgroupInitialized")
+	}
+
+	// Mark initialized
+	kl.markPodCgroupInitialized(uid)
+	if !kl.isPodCgroupInitialized(uid) {
+		t.Error("Pod cgroup should be marked initialized after markPodCgroupInitialized")
+	}
+
+	// Idempotent
+	kl.markPodCgroupInitialized(uid)
+	if !kl.isPodCgroupInitialized(uid) {
+		t.Error("Pod cgroup should still be marked initialized after duplicate call")
+	}
+
+	// Clear
+	kl.clearPodCgroupInitialized(uid)
+	if kl.isPodCgroupInitialized(uid) {
+		t.Error("Pod cgroup should not be marked initialized after clearPodCgroupInitialized")
+	}
+
+	// Clear non-existent is a no-op
+	kl.clearPodCgroupInitialized(types.UID("nonexistent"))
+}
+
+func TestHandlePodRemovesClearsPodCgroupInitialized(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "remove-test-uid",
+			Name:      "remove-test-pod",
+			Namespace: "default",
+		},
+	}
+
+	// Simulate that EnsureExists was called for this pod during SyncPod
+	kl.markPodCgroupInitialized(pod.UID)
+	if !kl.isPodCgroupInitialized(pod.UID) {
+		t.Fatal("Pod cgroup should be marked initialized")
+	}
+
+	// Add the pod to the manager so HandlePodRemoves can find it
+	kl.podManager.AddPod(pod)
+
+	// Remove the pod
+	kl.HandlePodRemoves(tCtx, []*v1.Pod{pod})
+
+	// Should no longer be tracked
+	if kl.isPodCgroupInitialized(pod.UID) {
+		t.Error("Pod cgroup should not be marked initialized after HandlePodRemoves")
+	}
 }

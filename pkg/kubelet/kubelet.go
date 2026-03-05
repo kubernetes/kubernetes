@@ -722,6 +722,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerLogManager = containerLogManager
 
 	klet.reasonCache = NewReasonCache()
+	klet.podCgroupsInitialized = make(map[types.UID]struct{})
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(
 		klet,
@@ -1566,6 +1567,40 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podCgroupsInitializedLock protects podCgroupsInitialized.
+	podCgroupsInitializedLock sync.RWMutex
+	// podCgroupsInitialized tracks pod UIDs for which EnsureExists has
+	// been called during this kubelet process lifetime. This distinguishes
+	// pods whose cgroups were already set up (pcm.Exists() returning false
+	// is a validation issue) from pods inherited from a previous kubelet
+	// lifetime that genuinely need cgroup migration.
+	podCgroupsInitialized map[types.UID]struct{}
+}
+
+// markPodCgroupInitialized records that EnsureExists has been called for
+// this pod during the current kubelet process lifetime.
+func (kl *Kubelet) markPodCgroupInitialized(uid types.UID) {
+	kl.podCgroupsInitializedLock.Lock()
+	defer kl.podCgroupsInitializedLock.Unlock()
+	kl.podCgroupsInitialized[uid] = struct{}{}
+}
+
+// isPodCgroupInitialized returns true if EnsureExists was called for this
+// pod during the current kubelet process lifetime.
+func (kl *Kubelet) isPodCgroupInitialized(uid types.UID) bool {
+	kl.podCgroupsInitializedLock.RLock()
+	defer kl.podCgroupsInitializedLock.RUnlock()
+	_, ok := kl.podCgroupsInitialized[uid]
+	return ok
+}
+
+// clearPodCgroupInitialized removes a pod from the cgroup tracking set.
+// Called when a pod is removed to prevent unbounded memory growth.
+func (kl *Kubelet) clearPodCgroupInitialized(uid types.UID) {
+	kl.podCgroupsInitializedLock.Lock()
+	defer kl.podCgroupsInitializedLock.Unlock()
+	delete(kl.podCgroupsInitialized, uid)
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2113,9 +2148,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 		// Don't kill containers in pod if pod's cgroups already
-		// exists or the pod is running for the first time
+		// exists or the pod is running for the first time.
+		// Also skip the kill if we already called EnsureExists for
+		// this pod in the current kubelet lifetime — pcm.Exists()
+		// returning false after EnsureExists indicates a cgroup
+		// validation issue, not a need for cgroup migration.
 		podKilled := false
-		if !pcm.Exists(pod) && !firstSync {
+		if !pcm.Exists(pod) && !firstSync && !kl.isPodCgroupInitialized(pod.UID) {
 			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 			if err := kl.killPod(ctx, pod, p, nil); err == nil {
 				podKilled = true
@@ -2151,6 +2190,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
+				kl.markPodCgroupInitialized(pod.UID)
 
 				if err = kl.containerRuntime.UpdateActuatedPodLevelResources(pod); err != nil {
 					return false, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
@@ -2446,6 +2486,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		if err := pcm.Destroy(logger, name); err != nil {
 			return err
 		}
+		kl.clearPodCgroupInitialized(pod.UID)
 		logger.V(4).Info("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}
 
@@ -2997,6 +3038,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		kl.podCertificateManager.ForgetPod(ctx, pod)
 		kl.podManager.RemovePod(pod)
 		kl.allocationManager.RemovePod(pod.UID)
+		kl.clearPodCgroupInitialized(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
