@@ -285,6 +285,9 @@ type Framework interface {
 	// SetAPICacher sets the APICacher
 	SetAPICacher(apiCacher fwk.APICacher)
 
+	// SetPreemptionExecutor sets the PreemptionExecutor
+	SetPreemptionExecutor(executor fwk.PreemptionExecutor)
+
 	// Close calls Close method of each plugin.
 	Close() error
 }

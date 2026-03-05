@@ -470,7 +470,7 @@ func TestPostFilter(t *testing.T) {
 					cache := internalcache.New(ctx, apiDispatcher)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
-
+				f.SetPreemptionExecutor(preemption.NewExecutor(f, feature.Features{}))
 				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
 				if err != nil {
 					t.Fatal(err)
@@ -2262,10 +2262,10 @@ func TestPreempt(t *testing.T) {
 					if _, s, _ := schedFramework.RunPreFilterPlugins(ctx, state, testPod); !s.IsSuccess() {
 						t.Errorf("Unexpected preFilterStatus: %v", s)
 					}
-					// Call preempt and check the expected results.
 					features := feature.Features{
 						EnableAsyncPreemption: asyncPreemptionEnabled,
 					}
+					schedFramework.SetPreemptionExecutor(preemption.NewExecutor(schedFramework, features))
 					pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFramework, features)
 					if err != nil {
 						t.Fatal(err)
@@ -2285,6 +2285,17 @@ func TestPreempt(t *testing.T) {
 					}
 					if diff := cmp.Diff(test.want, res); diff != "" {
 						t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+					}
+
+					// Actuate preemption to mock the behavior of PostFilter plugin to verify test results
+					if status.IsSuccess() {
+						v := extenderv1.Victims{
+							Pods: res.Victims,
+						}
+						// Use the framework's PreemptionExecutor injected earlier
+						if actStatus := schedFramework.PreemptionExecutor().ActuatePreemption(ctx, res.NominatingInfo.NominatedNodeName, &v, testPod, pl.Evaluator.PluginName); !actStatus.IsSuccess() {
+							t.Fatalf("unexpected error in actuating preemption: %v", actStatus.AsError())
+						}
 					}
 
 					if asyncPreemptionEnabled {

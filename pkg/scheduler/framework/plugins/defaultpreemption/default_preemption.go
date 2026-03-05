@@ -103,7 +103,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		fts:  fts,
 		args: *args,
 	}
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, nil)
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
@@ -123,7 +123,22 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
+	executor := pl.fh.PreemptionExecutor()
+	if executor == nil {
+		return nil, fwk.NewStatus(fwk.Error, "preemption executor is nil")
+	}
+
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
+
+	// Actuate preemptions if evaluator found a candidate for the pod.
+	if status.IsSuccess() {
+		v := extenderv1.Victims{
+			Pods: result.Victims,
+		}
+		if status := executor.ActuatePreemption(ctx, result.NominatingInfo.NominatedNodeName, &v, pod, pl.Evaluator.PluginName); !status.IsSuccess() {
+			return nil, status
+		}
+	}
 	msg := status.Message()
 	if len(msg) > 0 {
 		return result, fwk.NewStatus(status.Code(), "preemption: "+msg)
@@ -135,7 +150,11 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if pl.Evaluator.IsPodRunningPreemption(p.GetUID()) {
+	executor := pl.fh.PreemptionExecutor()
+	if executor == nil {
+		return nil
+	}
+	if executor.IsPodRunningPreemption(p.GetUID()) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil

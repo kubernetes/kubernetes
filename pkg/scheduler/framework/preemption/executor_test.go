@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -57,45 +57,28 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
-// fakePodLister helps test IsPodRunningPreemption logic without worrying about cache synchronization issues.
-// Current list of pods is set using field pods.
-type fakePodLister struct {
-	corelisters.PodLister
-	pods map[string]*v1.Pod
+type fakeHandleForLister struct {
+	fwk.Handle
+	informerFactory informers.SharedInformerFactory
 }
 
-func (m *fakePodLister) Pods(namespace string) corelisters.PodNamespaceLister {
-	return &fakePodNamespaceLister{pods: m.pods}
-}
-
-// fakePodNamespaceLister helps test IsPodRunningPreemption logic without worrying about cache synchronization issues.
-// Current list of pods is set using field pods.
-type fakePodNamespaceLister struct {
-	corelisters.PodNamespaceLister
-	pods map[string]*v1.Pod
-}
-
-func (m *fakePodNamespaceLister) Get(name string) (*v1.Pod, error) {
-	if pod, ok := m.pods[name]; ok {
-		return pod, nil
-	}
-	// Important: Return the standard IsNotFound error for a fake cache miss.
-	return nil, apierrors.NewNotFound(v1.Resource("pods"), name)
+func (f *fakeHandleForLister) SharedInformerFactory() informers.SharedInformerFactory {
+	return f.informerFactory
 }
 
 func TestIsPodRunningPreemption(t *testing.T) {
 	var (
-		victim1 = st.MakePod().Name("victim1").UID("victim1").
+		victim1 = st.MakePod().Namespace("ns").Name("victim1").UID("victim1").
 			Node("node").SchedulerName("sch").Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
 
-		victim2 = st.MakePod().Name("victim2").UID("victim2").
+		victim2 = st.MakePod().Namespace("ns").Name("victim2").UID("victim2").
 			Node("node").SchedulerName("sch").Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
 
-		victimWithDeletionTimestamp = st.MakePod().Name("victim-deleted").UID("victim-deleted").
+		victimWithDeletionTimestamp = st.MakePod().Namespace("ns").Name("victim-deleted").UID("victim-deleted").
 						Node("node").SchedulerName("sch").Priority(midPriority).
 						Terminating().
 						Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -191,11 +174,16 @@ func TestIsPodRunningPreemption(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%v", tt.name), func(t *testing.T) {
 
-			fakeLister := &fakePodLister{
-				pods: tt.podsInPodLister,
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			for _, pod := range tt.podsInPodLister {
+				e := informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pod)
+				if e != nil {
+					t.Errorf("Failed to add pod %v to indexer: %v", pod, e)
+				}
 			}
 			a := &Executor{
-				podLister:                    fakeLister,
+				fh:                           &fakeHandleForLister{informerFactory: informerFactory},
 				preempting:                   tt.preemptingSet,
 				lastVictimsPendingPreemption: tt.lastVictimSet,
 			}
@@ -606,7 +594,7 @@ func TestPrepareCandidate(t *testing.T) {
 						fwk.SetAPICacher(apicache.New(nil, cache))
 					}
 
-					executor := newExecutor(fwk)
+					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 
 					if asyncPreemptionEnabled {
 						executor.prepareCandidateAsync(tt.candidate, tt.preemptor, "test-plugin")
@@ -833,7 +821,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					fwk.SetAPICacher(apicache.New(nil, cache))
 				}
 
-				executor := newExecutor(fwk)
+				executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 				// preemptPodCallsCounter helps verify if the last victim pod gets preempted after other victims.
 				preemptPodCallsCounter := 0
 				preemptFunc := executor.PreemptPod
@@ -1066,7 +1054,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			executor := newExecutor(fwk)
+			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 
 			// Run the actual preemption.
 			executor.prepareCandidateAsync(candidate, preemptor, "test-plugin")
@@ -1272,7 +1260,7 @@ func TestPreemptPod(t *testing.T) {
 				}
 				fwk.AddWaitingPod(victimPod, pluginsWaitTime)
 			}
-			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, &FakePreemptionScorePostFilterPlugin{}, false)
+			pe := NewExecutor(fwk, feature.Features{})
 
 			err = pe.PreemptPod(ctx, &candidate{}, preemptorPod, victimPod, "test-plugin")
 			if err != nil {
