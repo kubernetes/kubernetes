@@ -22,6 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	policyloader "k8s.io/kubernetes/pkg/admission/plugin/policy/manifest/loader"
 	webhookloader "k8s.io/kubernetes/pkg/admission/plugin/webhook/manifest/loader"
 )
 
@@ -67,6 +68,20 @@ func newManifestLoaders() *initializer.ManifestLoaders {
 				return nil, "", err
 			}
 			return result.Configurations, result.Hash, nil
+		},
+		LoadValidatingPolicyManifests: func(dir string) ([]*admissionregistrationv1.ValidatingAdmissionPolicy, []*admissionregistrationv1.ValidatingAdmissionPolicyBinding, string, error) {
+			manifests, err := policyloader.LoadValidatingManifestsFromDirectory(dir)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			return manifests.Policies, manifests.Bindings, manifests.Hash, nil
+		},
+		LoadMutatingPolicyManifests: func(dir string) ([]*admissionregistrationv1.MutatingAdmissionPolicy, []*admissionregistrationv1.MutatingAdmissionPolicyBinding, string, error) {
+			manifests, err := policyloader.LoadMutatingManifestsFromDirectory(dir)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			return manifests.Policies, manifests.Bindings, manifests.Hash, nil
 		},
 	}
 }

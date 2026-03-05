@@ -119,6 +119,12 @@ type ValidatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistratio
 // MutatingWebhookManifestLoadFunc loads MutatingWebhookConfiguration manifests from a directory.
 type MutatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.MutatingWebhookConfiguration, string, error)
 
+// ValidatingPolicyManifestLoadFunc loads ValidatingAdmissionPolicy manifests from a directory.
+type ValidatingPolicyManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.ValidatingAdmissionPolicy, []*admissionregistrationv1api.ValidatingAdmissionPolicyBinding, string, error)
+
+// MutatingPolicyManifestLoadFunc loads MutatingAdmissionPolicy manifests from a directory.
+type MutatingPolicyManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.MutatingAdmissionPolicy, []*admissionregistrationv1api.MutatingAdmissionPolicyBinding, string, error)
+
 // ManifestLoaders provides functions to load admission configurations from static manifest files
 // with scheme-based defaulting and validation.
 type ManifestLoaders struct {
@@ -126,6 +132,10 @@ type ManifestLoaders struct {
 	LoadValidatingWebhookManifests ValidatingWebhookManifestLoadFunc
 	// LoadMutatingWebhookManifests loads MutatingWebhookConfiguration manifests.
 	LoadMutatingWebhookManifests MutatingWebhookManifestLoadFunc
+	// LoadValidatingPolicyManifests loads ValidatingAdmissionPolicy manifests.
+	LoadValidatingPolicyManifests ValidatingPolicyManifestLoadFunc
+	// LoadMutatingPolicyManifests loads MutatingAdmissionPolicy manifests.
+	LoadMutatingPolicyManifests MutatingPolicyManifestLoadFunc
 }
 
 // WantsManifestLoaders is implemented by admission plugins that load configurations
