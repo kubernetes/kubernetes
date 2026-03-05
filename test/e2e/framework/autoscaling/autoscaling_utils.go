@@ -259,21 +259,30 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+
 	defer close(stopChan)
 
 	// parse local port from stdout
 	output := buf.String()
-	parts := strings.Split(strings.TrimSpace(output), " ")
-	if len(parts) < 3 {
+	localPort := 0
+	for _, line := range strings.Split(output, "\n") {
+		if strings.HasPrefix(line, "Forwarding from") {
+			parts := strings.Split(line, " ")
+			if len(parts) >= 3 {
+				_, localPortStr, err := net.SplitHostPort(parts[2])
+				if err == nil {
+					p, err := strconv.Atoi(localPortStr)
+					if err == nil {
+						localPort = p
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if localPort == 0 {
 		return fmt.Errorf("unable to parse local port from port-forward output: %q", output)
-	}
-	_, localPortStr, err := net.SplitHostPort(parts[2])
-	if err != nil {
-		return fmt.Errorf("failed to split host:port from %q: %w", parts[2], err)
-	}
-	localPort, err := strconv.Atoi(localPortStr)
-	if err != nil {
-		return fmt.Errorf("failed to convert local port %q to int: %w", localPortStr, err)
 	}
 
 	// Build URL and make request
