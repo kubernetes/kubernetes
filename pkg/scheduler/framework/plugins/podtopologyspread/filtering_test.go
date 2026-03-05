@@ -2682,7 +2682,20 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "terminating Pods should be excluded",
+			// Terminating pods are excluded from per-zone match counts (TpValueToMatchNum) so
+			// that node-a (with only a terminating pod) remains attractive for rolling updates
+			// (#87621). However, they ARE included when computing the global minimum
+			// (CriticalPaths / minMatchNum) to prevent artificially deflating the baseline and
+			// making other zones unschedulable (#116629).
+			//
+			// Concretely: node-a has 1 terminating pod (exclusive count=0, inclusive count=1),
+			// node-b has 1 running pod (count=1 both ways).
+			//   minMatchNum (from inclusive) = min(1,1) = 1
+			//   skew(node-b) = 1 + 1 - 1 = 1 ≤ maxSkew(1) → Success  (was Unschedulable before the fix)
+			//   skew(node-a) = 0 + 1 - 1 = 0 ≤ maxSkew(1) → Success
+			// Scheduling preference for node-a over node-b is preserved through scoring
+			// (PreScore still uses countPodsMatchSelector which excludes terminating pods).
+			name: "terminating Pods excluded from per-zone counts but included in global minimum",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
@@ -2696,7 +2709,10 @@ func TestSingleConstraint(t *testing.T) {
 			},
 			wantStatusCode: map[string]fwk.Code{
 				"node-a": fwk.Success,
-				"node-b": fwk.Unschedulable,
+				// node-b is now also schedulable (skew=1≤maxSkew=1) because minMatchNum is
+				// raised to 1 by counting the terminating pod on node-a in the global minimum.
+				// Scheduling preference for node-a over node-b is preserved through scoring.
+				"node-b": fwk.Success,
 			},
 		},
 		{
@@ -2722,6 +2738,43 @@ func TestSingleConstraint(t *testing.T) {
 				"node-b": fwk.Success, // in real case, it's Unschedulable
 				"node-x": fwk.Unschedulable,
 				"node-y": fwk.Unschedulable,
+			},
+		},
+		{
+			// Regression test for issue #116629.
+			// 3 zones: A has 1 running pod, B has 1 running pod, C has 1 terminating pod.
+			// maxSkew=1, DoNotSchedule, topologyKey="zone".
+			//
+			// Before the fix (#116629):
+			//   TpValueToMatchNum: A=1, B=1, C=0   (terminating pod excluded)
+			//   minMatchNum = 0
+			//   skew(A) = 1+1-0 = 2 > maxSkew(1) → Unschedulable  ← wrong; causes deadlock
+			//   when VolumeBinding also restricts the pod to zone A
+			//
+			// After the fix:
+			//   tpValueToMatchNumIncl: A=1, B=1, C=1 (terminating pod counted for global min)
+			//   minMatchNum = 1
+			//   skew(A) = 1+1-1 = 1 ≤ maxSkew(1) → Success ✓
+			//   skew(B) = 1+1-1 = 1 ≤ maxSkew(1) → Success ✓
+			//   skew(C) = 0+1-1 = 0 ≤ maxSkew(1) → Success ✓
+			name: "terminating Pod in zone C must not deflate minMatchNum and block zones A and B (#116629)",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "A").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "B").Obj(),
+				st.MakeNode().Name("node-c").Label("zone", "C").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c").Node("node-c").Label("foo", "").Terminating().Obj(),
+			},
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-c": fwk.Success,
 			},
 		},
 		{
