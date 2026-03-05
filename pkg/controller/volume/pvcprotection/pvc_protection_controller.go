@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -300,6 +302,36 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 		return err
 	}
 	logger.V(3).Info("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
+	return nil
+}
+
+func (c *Controller) updateUnusedSinceStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, isUsed bool) error {
+	switch {
+	case isUsed && pvc.Status.UnusedSince != nil:
+		return c.updateUnusedSince(ctx, pvc, nil)
+	case !isUsed && pvc.Status.UnusedSince == nil:
+		now := metav1.Now()
+		return c.updateUnusedSince(ctx, pvc, &now)
+	default:
+		return nil
+	}
+}
+
+func (c *Controller) updateUnusedSince(ctx context.Context, pvc *v1.PersistentVolumeClaim, ts *metav1.Time) error {
+	claimClone := pvc.DeepCopy()
+	claimClone.Status.UnusedSince = ts
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(ctx, claimClone, metav1.UpdateOptions{})
+	logger := klog.FromContext(ctx)
+	if err != nil {
+		logger.Error(err, "Error updating unusedSince in PVC status", "PVC", klog.KObj(pvc))
+		return err
+	}
+
+	if ts == nil {
+		logger.V(3).Info("Cleared unusedSince in PVC status", "PVC", klog.KObj(pvc))
+	} else {
+		logger.V(3).Info("Updated unusedSince in PVC status", "PVC", klog.KObj(pvc), "unusedSince", ts.UTC().Format(time.RFC3339Nano))
+	}
 	return nil
 }
 
