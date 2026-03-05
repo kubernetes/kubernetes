@@ -119,9 +119,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			tasEnabled:   true,
 		},
 		"empty scheduling constraints": {
-			input:        mkValidPodGroup(setSchedulingConstraints()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "must specify one of: `topologyConstraints`").WithOrigin("union")},
-			tasEnabled:   true,
+			input:      mkValidPodGroup(setSchedulingConstraints()),
+			tasEnabled: true,
 		},
 		"topology constraint with empty topology key": {
 			input:        mkValidPodGroup(setTopologyKey(0, "")),

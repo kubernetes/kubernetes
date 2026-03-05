@@ -106,18 +106,9 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
-var unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupSchedulingConstraints_ = validate.NewUnionMembership(validate.NewUnionMember("topologyConstraints"))
-
 // Validate_PodGroupSchedulingConstraints validates an instance of PodGroupSchedulingConstraints according
 // to declarative validation rules in the API schema.
 func Validate_PodGroupSchedulingConstraints(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupSchedulingConstraints) (errs field.ErrorList) {
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupSchedulingConstraints_, func(obj *schedulingv1alpha2.PodGroupSchedulingConstraints) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.TopologyConstraints != nil
-	})...)
-
 	// field schedulingv1alpha2.PodGroupSchedulingConstraints.TopologyConstraints
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha2.TopologyConstraint, oldValueCorrelated bool) (errs field.ErrorList) {

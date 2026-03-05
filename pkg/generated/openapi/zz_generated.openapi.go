@@ -53855,7 +53855,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingConstraints(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "TopologyConstraints defines the topology constraints for the pod group. This field is required but we might loosen this assumption in the future if more types of constraints are added.",
+							Description: "TopologyConstraints defines the topology constraints for the pod group.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

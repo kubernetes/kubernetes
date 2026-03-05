@@ -353,8 +353,6 @@ type WorkloadPodGroupTemplateReference struct {
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 type PodGroupSchedulingConstraints struct {
 	// TopologyConstraints defines the topology constraints for the pod group.
-	// This field is required but we might loosen this assumption in the future
-	// if more types of constraints are added.
 	//
 	// +optional
 	// +listType=atomic
