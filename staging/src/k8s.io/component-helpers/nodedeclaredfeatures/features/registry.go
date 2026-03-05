@@ -28,4 +28,5 @@ import (
 var AllFeatures = []nodedeclaredfeatures.Feature{
 	restartallcontainers.Feature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
+	inplacepodresize.NonSidecarInitContainerResizeFeature,
 }
