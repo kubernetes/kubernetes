@@ -22,4 +22,7 @@ ADD kube-addons.sh /opt/
 ADD kube-addons-main.sh /opt/
 ADD kubectl /usr/local/bin/
 
+RUN adduser --disabled-password --gecos "" --uid 10001 addon-manager
+USER addon-manager
+
 CMD ["/opt/kube-addons-main.sh"]
