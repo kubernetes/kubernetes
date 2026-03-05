@@ -160,6 +160,12 @@ func class(name, driver string) *resourceapi.DeviceClass {
 	}
 }
 
+func classWithRequiresNodePreparation(name, driver string, requiresNodePreparation bool) *resourceapi.DeviceClass {
+	c := class(name, driver)
+	c.Spec.RequiresNodePreparation = ptr.To(requiresNodePreparation)
+	return c
+}
+
 // generate a DeviceClass object with the given name and a driver CEL selector.
 // driver name is assumed to be the same as the class name.
 // shared condition is explicitly set.
@@ -686,6 +692,12 @@ func (in wrapDeviceRequestAllocationResult) withConsumedCapacity(shareID *apityp
 	return *out
 }
 
+func (in wrapDeviceRequestAllocationResult) withRequiresNodePreparation(requiresNodePreparation bool) resourceapi.DeviceRequestAllocationResult {
+	out := in.DeepCopy()
+	out.RequiresNodePreparation = ptr.To(requiresNodePreparation)
+	return *out
+}
+
 func capacityRequests(request *resource.Quantity) *resourceapi.CapacityRequirements {
 	return &resourceapi.CapacityRequirements{
 		Requests: requirements(request),
@@ -984,6 +996,17 @@ func TestAllocator(t *testing.T,
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"simple-with-node-preparation-disabled": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(classWithRequiresNodePreparation(classA, driverA, false)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:             node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withRequiresNodePreparation(false),
 			)},
 		},
 		"other-node": {
