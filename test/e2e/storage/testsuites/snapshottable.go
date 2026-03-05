@@ -404,7 +404,7 @@ func deleteVolumeSnapshot(ctx context.Context, f *framework.Framework, dc dynami
 	vs := sr.Vs
 
 	// Wait for the Snapshot to be actually deleted from API server
-	err := storageutils.WaitForNamespacedGVRDeletion(ctx, dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetNamespace(), framework.Poll, f.Timeouts.SnapshotDelete)
+	err := storageutils.WaitForNamespacedGVRDeletion(ctx, dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
 	framework.ExpectNoError(err)
 
 	switch pattern.SnapshotDeletionPolicy {
