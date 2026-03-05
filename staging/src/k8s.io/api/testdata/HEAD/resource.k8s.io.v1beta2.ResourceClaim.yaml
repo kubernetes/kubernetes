@@ -116,6 +116,7 @@ status:
         driver: driverValue
         pool: poolValue
         request: requestValue
+        requiresNodePreparation: true
         shareID: shareIDValue
         tolerations:
         - effect: effectValue

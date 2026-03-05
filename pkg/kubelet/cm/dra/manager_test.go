@@ -802,9 +802,7 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 		},
 		{
 			description: "skip node preparation when disabled by allocation result",
-			pod: func() *v1.Pod {
-				return genTestPod()
-			}(),
+			pod:         genTestPod(),
 			claim: func() *resourceapi.ResourceClaim {
 				claim := genTestClaim(claimName, "driver-without-plugin", deviceName, podUID)
 				claim.Status.Allocation.Devices.Results[0].RequiresNodePreparation = ptr.To(false)

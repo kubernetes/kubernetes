@@ -165,7 +165,8 @@
             "shareID": "shareIDValue",
             "consumedCapacity": {
               "consumedCapacityKey": "0"
-            }
+            },
+            "requiresNodePreparation": true
           }
         ],
         "config": [
