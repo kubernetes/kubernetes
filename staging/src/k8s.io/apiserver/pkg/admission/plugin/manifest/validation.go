@@ -28,6 +28,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
+// StaticConfigSuffix is the reserved suffix for manifest-based admission configurations.
+// Resources with names ending in this suffix can only be created via static manifest
+// files loaded at API server startup, not through the REST API.
+// NOTE: This constant is duplicated in pkg/apis/admissionregistration/validation/static_suffix.go
+// because that package cannot import from staging. Keep both in sync.
+const StaticConfigSuffix = ".static.k8s.io"
+
 // ValidateStaticManifestsDir validates the staticManifestsDir config field.
 // It checks the feature gate is enabled, the path is absolute, exists, and is a directory.
 func ValidateStaticManifestsDir(staticManifestsDir string) error {
