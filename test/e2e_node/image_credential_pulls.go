@@ -93,12 +93,47 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 
 				for _, pullPolicy := range []v1.PullPolicy{v1.PullIfNotPresent, v1.PullNever} {
 					framework.Context(string(pullPolicy), func() {
-						commonTestCases(f, &testImage, pullPolicy, &testNode, testSecret, credsPolicy == kubeletconfig.NeverVerify)
+						statusOnInvalidCreds := v1.PodPending
+						pullingOnInvalidCreds := true
+						if credsPolicy == kubeletconfig.NeverVerify {
+							statusOnInvalidCreds = v1.PodRunning
+							pullingOnInvalidCreds = false
+						}
+
+						framework.It("pod without PullSecret accessing previously pulled private image", func(ctx context.Context) {
+							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, nil, testNode, statusOnInvalidCreds, pullingOnInvalidCreds)
+						})
+						framework.It("pod with invalid PullSecret accessing previously pulled private image", func(ctx context.Context) {
+							invalidSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &v1.Secret{
+								ObjectMeta: metav1.ObjectMeta{GenerateName: f.UniqueName},
+								Type:       v1.SecretTypeDockerConfigJson,
+								Data: map[string][]byte{
+									v1.DockerConfigJsonKey: []byte(`{"auths":{"somerepo.com": {"auth": "aW52YWxpZHVzZXI6aW52YWxpZHBhc3N3b3Jk"}}}`),
+								},
+							}, metav1.CreateOptions{})
+							framework.ExpectNoError(err)
+
+							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, invalidSecret, testNode, statusOnInvalidCreds, pullingOnInvalidCreds)
+						})
+						framework.It("pod with the same PullSecret accessing previously pulled image", func(ctx context.Context) {
+							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, testSecret, testNode, v1.PodRunning, false)
+						})
+						framework.It("pod with the same credentials in a different secret accessing previously pulled image", func(ctx context.Context) {
+							newSecret := testSecret.DeepCopy()
+							newSecret.Name = ""
+							newSecret.ResourceVersion = ""
+							newSecret.GenerateName = f.UniqueName
+							newSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret, metav1.CreateOptions{})
+							framework.ExpectNoError(err)
+							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, newSecret, testNode, v1.PodRunning, false)
+						})
 
 						switch credsPolicy {
 						case kubeletconfig.NeverVerifyAllowlistedImages:
 							framework.Context("[NeverVerifyAllowListedImages specific tests]", func() {
+								tempRemoveImagePulledRecord(f, &testImageID)
 								tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+									initialConfig.ImagePullCredentialsVerificationPolicy = string(credsPolicy)
 									initialConfig.PreloadedImagesVerificationAllowlist = []string{path.Join(registryAddress, "pause")}
 								})
 
@@ -121,40 +156,3 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 		} // for credsPolicy
 	}) // framework.Describe()
 })
-
-func commonTestCases(f *framework.Framework, testImage *string, pullPolicy v1.PullPolicy, testNode *string, testSecret *v1.Secret, shouldRunWithInvalidCreds bool) {
-	statusOnInvalidCreds := v1.PodPending
-	pullingOnInvalidCreds := true
-	if shouldRunWithInvalidCreds {
-		statusOnInvalidCreds = v1.PodRunning
-		pullingOnInvalidCreds = false
-	}
-
-	framework.It("pod without PullSecret accessing previously pulled private image", func(ctx context.Context) {
-		_ = e2ecommonnode.ImagePullTest(ctx, f, *testImage, pullPolicy, nil, *testNode, statusOnInvalidCreds, pullingOnInvalidCreds)
-	})
-	framework.It("pod with invalid PullSecret accessing previously pulled private image", func(ctx context.Context) {
-		invalidSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: f.UniqueName},
-			Type:       v1.SecretTypeDockerConfigJson,
-			Data: map[string][]byte{
-				v1.DockerConfigJsonKey: []byte(`{"auths":{"somerepo.com": {"auth": "aW52YWxpZHVzZXI6aW52YWxpZHBhc3N3b3Jk"}}}`),
-			},
-		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		_ = e2ecommonnode.ImagePullTest(ctx, f, *testImage, pullPolicy, invalidSecret, *testNode, statusOnInvalidCreds, pullingOnInvalidCreds)
-	})
-	framework.It("pod with the same PullSecret accessing previously pulled image", func(ctx context.Context) {
-		_ = e2ecommonnode.ImagePullTest(ctx, f, *testImage, pullPolicy, testSecret, *testNode, v1.PodRunning, false)
-	})
-	framework.It("pod with the same credentials in a different secret accessing previously pulled image", func(ctx context.Context) {
-		newSecret := testSecret.DeepCopy()
-		newSecret.Name = ""
-		newSecret.ResourceVersion = ""
-		newSecret.GenerateName = f.UniqueName
-		newSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		_ = e2ecommonnode.ImagePullTest(ctx, f, *testImage, pullPolicy, newSecret, *testNode, v1.PodRunning, false)
-	})
-}
