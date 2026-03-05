@@ -158,7 +158,7 @@ func createPodWithExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, 
 // verifyPodRunningWithClaim verifies a pod is running and has a valid ResourceClaim.
 func verifyPodRunningWithClaim(tCtx ktesting.TContext, b *drautils.Builder, pod *v1.Pod, resourceName v1.ResourceName) {
 	namespace := tCtx.Namespace()
-	b.TestPod(tCtx, pod)
+	b.TestPod(tCtx, pod, "container_0_request_0", "true")
 	tCtx.Logf("Pod %q is running", pod.Name)
 
 	// Get updated pod to check status
