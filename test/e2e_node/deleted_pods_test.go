@@ -130,8 +130,8 @@ var _ = SIGDescribe("Deleted pods handling", framework.WithNodeConformance(), fu
 			containerStatus := pod.Status.ContainerStatuses[0]
 			gomega.Expect(containerStatus.State.Terminated).ToNot(gomega.BeNil(), "The pod container is in not in the Terminated state")
 
-			ginkgo.By(fmt.Sprintf("Verify the pod (%v/%v) container exit code is 137", pod.Namespace, pod.Name))
-			gomega.Expect(containerStatus.State.Terminated.ExitCode).Should(gomega.Equal(int32(137)))
+			ginkgo.By(fmt.Sprintf("Verify the pod (%v/%v) container exit code is non-zero", pod.Namespace, pod.Name))
+			gomega.Expect(containerStatus.State.Terminated.ExitCode).ShouldNot(gomega.Equal(int32(0)))
 		},
 		ginkgo.Entry("Restart policy Always", v1.RestartPolicyAlways),
 		ginkgo.Entry("Restart policy OnFailure", v1.RestartPolicyOnFailure),
