@@ -19,6 +19,8 @@ package slice
 
 import (
 	"slices"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // CopyStrings copies the contents of the specified string slice
@@ -71,6 +73,22 @@ func RemoveString(slice []string, s string, modifier func(s string) string) []st
 		// Sanitize for unit tests so we don't need to distinguish empty array
 		// and nil.
 		newSlice = nil
+	}
+	return newSlice
+}
+
+func UniqueString(slice []string) []string {
+	if slice == nil {
+		return nil
+	}
+	newSlice := make([]string, 0, len(slice))
+	uniqKeys := sets.New[string]()
+	for _, item := range slice {
+		if uniqKeys.Has(item) {
+			continue
+		}
+		newSlice = append(newSlice, item)
+		uniqKeys.Insert(item)
 	}
 	return newSlice
 }
