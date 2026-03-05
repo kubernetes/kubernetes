@@ -511,7 +511,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Expect(driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: newClaim.Name, UID: newClaim.UID}}), "Only new claim should be prepared now because new pod is running.")
 		})
 
-		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
+		f.It("DaemonSet with admin access", func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := f.ClientSet.CoreV1().Namespaces().Apply(ctx,
 				applyv1.Namespace(f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
@@ -2753,7 +2753,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		driver.WithKubelet = false
 		b := drautils.NewBuilder(f, driver)
 
-		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
+		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", func(ctx context.Context) {
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.ExternalClaim()
 			claim.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
