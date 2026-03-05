@@ -297,10 +297,20 @@ type PlacementPluginScores struct {
 
 const (
 	// MaxNodeScore is the maximum score a Score plugin is expected to return.
-	MaxNodeScore int64 = 100
+	//
+	// Deprecated: use MaxScore instead.
+	MaxNodeScore int64 = MaxScore
 
 	// MinNodeScore is the minimum score a Score plugin is expected to return.
-	MinNodeScore int64 = 0
+	//
+	// Deprecated: use MinScore instead.
+	MinNodeScore int64 = MinScore
+
+	// MaxScore is the maximum score a Score or PlacementScore plugin is expected to return.
+	MaxScore int64 = 100
+
+	// MinScore is the minimum score a Score or PlacementScore plugin is expected to return.
+	MinScore int64 = 0
 
 	// MaxTotalScore is the maximum total score.
 	MaxTotalScore int64 = math.MaxInt64
