@@ -1725,6 +1725,21 @@ func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
 	return gomega.HaveField("Spec.NodeName", gstruct.PointTo(gomega.Equal(nodeName)))
 }
 
+// podHasAllocatedResourcesStatus checks if a pod has any allocatedResourcesStatus
+// entries, indicating the DRA health pipeline is active and processing updates.
+func podHasAllocatedResourcesStatus(f *framework.Framework, namespace, podName string) (bool, error) {
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if len(cs.AllocatedResourcesStatus) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // This helper function queries the main API server for the pod's status.
 func getDeviceHealthFromAPIServer(f *framework.Framework, namespace, podName, driverName, claimName, poolName, deviceName string) (string, error) {
 	// Get the Pod object from the API server
@@ -1898,6 +1913,11 @@ func setupAndVerifyHealthyPod(
 	ginkgo.By("Waiting for the pod to be running")
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
+	ginkgo.By("Waiting for DRA health pipeline to be active (allocatedResourcesStatus present)")
+	gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+		return podHasAllocatedResourcesStatus(f, pod.Namespace, pod.Name)
+	}).WithTimeout(60 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrueBecause("Pod should have allocatedResourcesStatus entries once DRA health pipeline is active"))
+
 	ginkgo.By("Forcing a 'Healthy' status update to establish a baseline")
 	plugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
 		PoolName:   poolName,
@@ -1908,7 +1928,7 @@ func setupAndVerifyHealthyPod(
 	ginkgo.By("Verifying device health is now Healthy in the pod status")
 	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
 		return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolName, deviceName)
-	}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Equal("Healthy"), "Device health should be Healthy after explicit update")
+	}).WithTimeout(60*time.Second).WithPolling(1*time.Second).Should(gomega.Equal("Healthy"), "Device health should be Healthy after explicit update")
 
 	return pod, claimName, poolName, deviceName
 }
