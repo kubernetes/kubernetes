@@ -119,7 +119,7 @@ type TLSConfig struct {
 	// +optional
 	ClientCert string `json:"clientCert,omitempty"`
 
-	// tlsServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
+	// tlsServerName is used to check server certificate. If tlsServerName is empty, the hostname used to contact the server is used.
 	// +optional
 	TLSServerName string `json:"tlsServerName,omitempty"`
 }

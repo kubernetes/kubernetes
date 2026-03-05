@@ -147,7 +147,7 @@ type TLSConfig struct {
 	// +optional
 	ClientCert string
 
-	// tlsServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
+	// tlsServerName is used to check server certificate. If tlsServerName is empty, the hostname used to contact the server is used.
 	// +optional
 	TLSServerName string
 }

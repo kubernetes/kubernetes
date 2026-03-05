@@ -18,16 +18,10 @@ package egressselector
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -42,87 +36,62 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	oidctest "k8s.io/kubernetes/test/integration/apiserver/oidc"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 )
 
 func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath string) {
 	t.Helper()
 
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caKey, err := testutils.NewPrivateKey()
 	require.NoError(t, err, "Failed to generate CA key")
 
-	caTemplate := &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "Test CA"},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-	}
-
-	caCertDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	caCert, err := certutil.NewSelfSignedCACert(certutil.Config{
+		CommonName: "Test CA",
+	}, caKey)
 	require.NoError(t, err, "Failed to create CA certificate")
 
-	caCert, err := x509.ParseCertificate(caCertDER)
-	require.NoError(t, err, "Failed to parse CA certificate")
-
-	serverKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	serverKey, err := testutils.NewPrivateKey()
 	require.NoError(t, err, "Failed to generate server key")
 
-	serverTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject:      pkix.Name{CommonName: serverName},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{serverName},
-	}
-
-	serverCertDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caCert, &serverKey.PublicKey, caKey)
+	serverCert, err := testutils.NewSignedCert(&certutil.Config{
+		CommonName: serverName,
+		AltNames:   certutil.AltNames{DNSNames: []string{serverName}},
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}, serverKey, caCert, caKey)
 	require.NoError(t, err, "Failed to create server certificate")
 
-	clientKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	clientKey, err := testutils.NewPrivateKey()
 	require.NoError(t, err, "Failed to generate client key")
 
-	clientTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(3),
-		Subject:      pkix.Name{CommonName: "test-client"},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	clientCertDER, err := x509.CreateCertificate(rand.Reader, clientTemplate, caCert, &clientKey.PublicKey, caKey)
+	clientCert, err := testutils.NewSignedCert(&certutil.Config{
+		CommonName: "test-client",
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}, clientKey, caCert, caKey)
 	require.NoError(t, err, "Failed to create client certificate")
 
 	caCertPath = filepath.Join(tempDir, "ca.crt")
-	caCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCertDER})
-	require.NoError(t, os.WriteFile(caCertPath, caCertPEM, 0600), "Failed to write CA cert")
+	require.NoError(t, os.WriteFile(caCertPath, testutils.EncodeCertPEM(caCert), 0600), "Failed to write CA cert")
 
 	serverCertPath = filepath.Join(tempDir, "server.crt")
 	serverKeyPath = filepath.Join(tempDir, "server.key")
-	serverCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
-	require.NoError(t, os.WriteFile(serverCertPath, serverCertPEM, 0600), "Failed to write server cert")
+	require.NoError(t, os.WriteFile(serverCertPath, testutils.EncodeCertPEM(serverCert), 0600), "Failed to write server cert")
 
-	serverKeyBytes, err := x509.MarshalECPrivateKey(serverKey)
+	serverKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(serverKey)
 	require.NoError(t, err, "Failed to marshal server key")
-	serverKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: serverKeyBytes})
 	require.NoError(t, os.WriteFile(serverKeyPath, serverKeyPEM, 0600), "Failed to write server key")
 
 	clientCertPath = filepath.Join(tempDir, "client.crt")
 	clientKeyPath = filepath.Join(tempDir, "client.key")
-	clientCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER})
-	require.NoError(t, os.WriteFile(clientCertPath, clientCertPEM, 0600), "Failed to write client cert")
+	require.NoError(t, os.WriteFile(clientCertPath, testutils.EncodeCertPEM(clientCert), 0600), "Failed to write client cert")
 
-	clientKeyBytes, err := x509.MarshalECPrivateKey(clientKey)
+	clientKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(clientKey)
 	require.NoError(t, err, "Failed to marshal client key")
-	clientKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: clientKeyBytes})
 	require.NoError(t, os.WriteFile(clientKeyPath, clientKeyPEM, 0600), "Failed to write client key")
 
 	return caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath
@@ -137,12 +106,10 @@ func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath s
 		return "", fmt.Errorf("failed to load server cert: %w", err)
 	}
 
-	caCertPEM, err := os.ReadFile(caCertPath)
+	clientCAs, err := certutil.NewPool(caCertPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read CA cert: %w", err)
+		return "", fmt.Errorf("failed to load CA cert pool: %w", err)
 	}
-	clientCAs := x509.NewCertPool()
-	clientCAs.AppendCertsFromPEM(caCertPEM)
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
@@ -322,7 +289,7 @@ egressSelections:
 `, proxyAddr, caCertPath, clientCertPath, clientKeyPath, tc.tlsServerName)
 
 			authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
