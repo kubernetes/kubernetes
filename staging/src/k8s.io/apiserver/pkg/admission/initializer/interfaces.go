@@ -17,6 +17,7 @@ limitations under the License.
 package initializer
 
 import (
+	admissionregistrationv1api "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -103,4 +104,32 @@ type WantsSchemaResolver interface {
 type WantsExcludedAdmissionResources interface {
 	SetExcludedAdmissionResources(excludedAdmissionResources []schema.GroupResource)
 	admission.InitializationValidator
+}
+
+// WantsAPIServerID defines a function which sets the API server ID for admission plugins
+// that need it (e.g., for metrics labeling in HA setups).
+type WantsAPIServerID interface {
+	SetAPIServerID(apiServerID string)
+	admission.InitializationValidator
+}
+
+// ValidatingWebhookManifestLoadFunc loads ValidatingWebhookConfiguration manifests from a directory.
+type ValidatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.ValidatingWebhookConfiguration, string, error)
+
+// MutatingWebhookManifestLoadFunc loads MutatingWebhookConfiguration manifests from a directory.
+type MutatingWebhookManifestLoadFunc func(dir string) ([]*admissionregistrationv1api.MutatingWebhookConfiguration, string, error)
+
+// ManifestLoaders provides functions to load admission configurations from static manifest files
+// with scheme-based defaulting and validation.
+type ManifestLoaders struct {
+	// LoadValidatingWebhookManifests loads ValidatingWebhookConfiguration manifests.
+	LoadValidatingWebhookManifests ValidatingWebhookManifestLoadFunc
+	// LoadMutatingWebhookManifests loads MutatingWebhookConfiguration manifests.
+	LoadMutatingWebhookManifests MutatingWebhookManifestLoadFunc
+}
+
+// WantsManifestLoaders is implemented by admission plugins that load configurations
+// from static manifest files and need scheme-based defaulting and validation.
+type WantsManifestLoaders interface {
+	SetManifestLoaders(loaders *ManifestLoaders)
 }
