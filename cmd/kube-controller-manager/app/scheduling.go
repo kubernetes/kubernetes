@@ -39,7 +39,7 @@ func newPodGroupProtectionControllerDescriptor() *ControllerDescriptor {
 }
 
 func newPodGroupProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("podgroup-protection-controller")
+	client, err := controllerContext.NewClient(controllerName)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func newPodGroupProtectionController(ctx context.Context, controllerContext Cont
 		client,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the PodGroup protection controller: %w", err)
+		return nil, fmt.Errorf("failed to init %s: %w", controllerName, err)
 	}
 
 	return newControllerLoop(func(ctx context.Context) {

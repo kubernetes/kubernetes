@@ -634,7 +634,7 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 
 	if opts.RejectParallelismChangeForGangScheduledJob {
 		if isGangSchedulingCandidate(oldSpec) && !ptr.Equal(spec.Parallelism, oldSpec.Parallelism) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("parallelism"),
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("parallelism"), spec.Parallelism,
 				"cannot change parallelism for a gang-scheduled Job (completionMode=Indexed, completions=parallelism)"))
 		}
 	}

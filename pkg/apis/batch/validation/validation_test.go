@@ -2611,14 +2611,14 @@ func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
 		opts    JobValidationOptions
 		wantErr *field.Error
 	}{
-		"gang candidate with parallelism change is forbidden": {
+		"gang candidate with parallelism change is invalid": {
 			old:  gangCandidateJob(),
 			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
 			update: func(job *batch.Job) {
 				job.Spec.Parallelism = ptr.To[int32](2)
 			},
 			wantErr: &field.Error{
-				Type:  field.ErrorTypeForbidden,
+				Type:  field.ErrorTypeInvalid,
 				Field: "spec.parallelism",
 			},
 		},
