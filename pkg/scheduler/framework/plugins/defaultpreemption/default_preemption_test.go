@@ -1879,6 +1879,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		pods                []*v1.Pod
 		nodes               []string
 		nominatedNodeStatus *fwk.Status
+		features            feature.Features
 		expected            bool
 	}{
 		{
@@ -1920,6 +1921,18 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			nodes:    []string{"node1"},
 			expected: true,
 		},
+		{
+			name:     "Pod with WorkloadRef with TAS disabled",
+			pod:      st.MakePod().Name("p_with_podgroup").WorkloadRef(&v1.WorkloadReference{Name: "foo"}).Obj(),
+			features: feature.Features{EnableTopologyAwareWorkloadScheduling: false},
+			expected: true,
+		},
+		{
+			name:     "Pod with WorkloadRef with TAS enabled",
+			pod:      st.MakePod().Name("p_with_podgroup").WorkloadRef(&v1.WorkloadReference{Name: "foo"}).Obj(),
+			features: feature.Features{EnableTopologyAwareWorkloadScheduling: true},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -1950,7 +1963,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, test.features)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -25,9 +25,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/utils/ptr"
@@ -215,7 +217,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		return
 	}
 
-	result := sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, podGroupInfo)
+	result := sched.podGroupSchedulingAlgorithm(podGroupCycleCtx, schedFwk, podGroupInfo)
 	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 
 	// submitPodGroupAlgorithmResult can dispatch binding goroutines, so should be called with the noncancelable ctx.
@@ -465,5 +467,86 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 	case podGroupWaitingOnPreemption:
 		logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods)
 		metrics.PodGroupWaitingOnPreemption(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
+	}
+}
+
+// placementResult associates pod group algorithm result with the placement.
+// The placement information can be used by the placement score plugins.
+type placementResult struct {
+	podGroupAlgorithmResult
+	placement *fwk.Placement
+}
+
+// podGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the pod group and selects the best one.
+// First it runs placement generator plugins to create a list of placements.
+// Placement is a set of nodes that will be considered when scheduling a pod group.
+// Then for each placement it tries to schedule the pod group through podGroupSchedulingDefaultAlgorithm.
+// Finally, it runs placement scorer plugins to select the best placement.
+func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo) podGroupAlgorithmResult {
+	logger := klog.FromContext(ctx)
+	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
+	if err != nil {
+		return sched.podGroupAlgorithmFailure(ctx, podGroupInfo, fwk.AsStatus(err))
+	}
+
+	// TODO: kubernetes/enhancements#5732 - run placement generator plugins to get the set of placements
+	placements := []*fwk.Placement{
+		{
+			Nodes: allNodes,
+		},
+	}
+
+	results := make([]placementResult, len(placements))
+	successfulResults := make([]placementResult, 0, len(placements))
+
+	for i, placement := range placements {
+		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
+		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
+		if err != nil {
+			return sched.podGroupAlgorithmFailure(ctx, podGroupInfo, fwk.AsStatus(err))
+		}
+		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, podGroupInfo)
+		sched.nodeInfoSnapshot.ForgetPlacement()
+
+		results[i] = placementResult{
+			podGroupAlgorithmResult: result,
+			placement:               placement,
+		}
+
+		if result.status != podGroupUnschedulable {
+			successfulResults = append(successfulResults, results[i])
+		}
+	}
+
+	if len(successfulResults) == 0 {
+		// We need to send events and set the status for pods in case all simulations were infeasible.
+		// The selection of which simulation we report is arbitrary for now, but may change in the future.
+		return results[0].podGroupAlgorithmResult
+	}
+
+	// TODO: kubernetes/enhancements#5732 - run placement scorer plugins to select the best placement
+	return successfulResults[0].podGroupAlgorithmResult
+}
+
+// podGroupAlgorithmFailure creates podGroupAlgorithmResult in cases where a podgroup-wide error occurred.
+func (sched *Scheduler) podGroupAlgorithmFailure(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, status *fwk.Status) podGroupAlgorithmResult {
+	schedulingResult := podGroupAlgorithmResult{
+		status: podGroupUnschedulable,
+	}
+	for _, podInfo := range podGroupInfo.QueuedPodInfos {
+		schedulingResult.podResults = append(schedulingResult.podResults, algorithmResult{
+			podCtx: sched.initPodSchedulingContext(ctx, podInfo.Pod),
+			status: status,
+		})
+	}
+	return schedulingResult
+}
+
+// podGroupSchedulingAlgorithm attempts to schedule pods in the pod group according to the policy and constraints and returns the scheduling result for each pod in the pod group.
+func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo) podGroupAlgorithmResult {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		return sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, podGroupInfo)
+	} else {
+		return sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, podGroupInfo)
 	}
 }

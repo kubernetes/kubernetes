@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -4741,5 +4742,90 @@ func queuedPodInfoForPod(pod *v1.Pod) *framework.QueuedPodInfo {
 		PodInfo: &framework.PodInfo{
 			Pod: pod,
 		},
+	}
+}
+
+func TestEvaluateNominatedNode(t *testing.T) {
+	tests := map[string]struct {
+		allNodes       []*v1.Node
+		placementNodes []string
+		pod            *v1.Pod
+		wantNodeList   []string
+		wantError      bool
+	}{
+		"When NNN is present in both snapshot and placement, returns node": {
+			allNodes: []*v1.Node{
+				st.MakeNode().Name("n1").Obj(),
+				st.MakeNode().Name("n2").Obj(),
+			},
+			placementNodes: []string{"n1"},
+			pod:            st.MakePod().NominatedNodeName("n1").Obj(),
+			wantNodeList:   []string{"n1"},
+		},
+		"When NNN is present in snapshot but not in placement, returns success": {
+			allNodes: []*v1.Node{
+				st.MakeNode().Name("n1").Obj(),
+				st.MakeNode().Name("n2").Obj(),
+			},
+			placementNodes: []string{"n1"},
+			pod:            st.MakePod().NominatedNodeName("n2").Obj(),
+			wantError:      false,
+		},
+		"When NNN is not present in snapshot, returns error": {
+			allNodes: []*v1.Node{
+				st.MakeNode().Name("n1").Obj(),
+				st.MakeNode().Name("n2").Obj(),
+			},
+			placementNodes: []string{"n1"},
+			pod:            st.MakePod().NominatedNodeName("n3").Obj(),
+			wantError:      true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot(nil, tt.allNodes)
+			placement := &fwk.Placement{}
+			for _, nodeName := range tt.placementNodes {
+				node, err := snapshot.Get(nodeName)
+				if err != nil {
+					t.Fatalf("Error getting node %s: %v", nodeName, err)
+				}
+				placement.Nodes = append(placement.Nodes, node)
+			}
+			err := snapshot.AssumePlacement(placement)
+			if err != nil {
+				t.Fatalf("AssumePlacement failed: %v", err)
+			}
+			fw, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+			)
+			if err != nil {
+				t.Fatalf("NewFramework failed: %v", err)
+			}
+			sched := &Scheduler{
+				nodeInfoSnapshot: snapshot,
+			}
+
+			gotNodes, err := sched.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", framework.Diagnosis{})
+
+			if (err != nil) != tt.wantError {
+				t.Errorf("Unexpected error, want error: %v, got: %v", tt.wantError, err)
+			}
+			gotNodeNames := make([]string, len(gotNodes))
+			for i, n := range gotNodes {
+				gotNodeNames[i] = n.Node().Name
+			}
+			if diff := cmp.Diff(tt.wantNodeList, gotNodeNames, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Unexpected nodes (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

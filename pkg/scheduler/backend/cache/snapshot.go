@@ -27,6 +27,17 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
+// placementNodes stores nodes that are present in the current placement.
+// Placement is a limited set of nodes that is used in the pod group scheduling cycle.
+type placementNodes struct {
+	// nodeInfoList contains the list of nodes in the placement.
+	// This is useful for quickly returning the entire list to the caller.
+	nodeInfoList []fwk.NodeInfo
+	// nodeInfoSet contains the set of nodes in the placement.
+	// This is useful for quickly checking if a node belongs the the placement.
+	nodeInfoSet sets.Set[string]
+}
+
 // Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
 // snapshot at the beginning of each scheduling cycle and uses it for its operations in that cycle.
 type Snapshot struct {
@@ -46,6 +57,12 @@ type Snapshot struct {
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
+
+	// placementNodes stores nodes that are present in the current placement.
+	// If placement is not set, this is nil.
+	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
+	// This field should be cleared once the pod group has been checked for the placement.
+	placementNodes *placementNodes
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -171,8 +188,13 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
-// NumNodes returns the number of nodes in the snapshot.
-func (s *Snapshot) NumNodes() int {
+// NumNodesInPlacement returns the number of nodes in the snapshot for the current placement.
+// If no placement is set, it returns the number of nodes in the snapshot.
+// This function is not thread safe so it should be executed when no other routines can write to the snapshot.
+func (s *Snapshot) NumNodesInPlacement() int {
+	if s.placementNodes != nil {
+		return len(s.placementNodes.nodeInfoList)
+	}
 	return len(s.nodeInfoList)
 }
 
@@ -271,4 +293,67 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 		}
 	}
 	logger.Error(nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPods))
+}
+
+// AssumePlacement sets placement context in the snapshot.
+// The snapshot should not be updated if a placement is assumed.
+// The placement should be unset with ForgetPlacement once it's no longer needed.
+// This function should only be used by the scheduler to limit the node candidates for scheduling.
+// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+func (s *Snapshot) AssumePlacement(placement *fwk.Placement) error {
+	if len(placement.Nodes) == len(s.nodeInfoList) {
+		// All nodes in placement, meaning we can treat it the same as no placement and avoid copying the buffer.
+		s.ForgetPlacement()
+		return nil
+	}
+	s.placementNodes = &placementNodes{
+		nodeInfoList: placement.Nodes,
+		nodeInfoSet:  sets.New[string](),
+	}
+	for _, node := range placement.Nodes {
+		snapshotNode, ok := s.nodeInfoMap[node.Node().Name]
+		if !ok {
+			s.ForgetPlacement()
+			return fmt.Errorf("node %s in placement is not present in snapshot", node.Node().Name)
+		}
+		if snapshotNode != node {
+			s.ForgetPlacement()
+			return fmt.Errorf("node %s in placement is not the same instance as in the snapshot", node.Node().Name)
+		}
+		s.placementNodes.nodeInfoSet.Insert(node.Node().Name)
+	}
+	return nil
+}
+
+// ForgetPlacement clears placement.
+// This function should only be used by the scheduler once the pods have been considered for that placement.
+// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+func (s *Snapshot) ForgetPlacement() {
+	s.placementNodes = nil
+}
+
+// GetNodeInPlacement returns the NodeInfo of the given node name within the current placement.
+// If no placement is set, this is equivalent to Get.
+// Placement is typically set in the pod group scheduling cycle.
+// This function should only be used by the scheduler to limit the node candidates for scheduling.
+// Plugins normally do not need this information.
+// This function is not thread safe so it should be executed when no other routines can write to the snapshot.
+func (s *Snapshot) GetNodeInPlacement(nodeName string) (fwk.NodeInfo, error) {
+	if s.placementNodes == nil || s.placementNodes.nodeInfoSet.Has(nodeName) {
+		return s.Get(nodeName)
+	}
+	return nil, fmt.Errorf("node %q not found in placement", nodeName)
+}
+
+// ListNodesInPlacement returns the list of nodes in the snapshot within the current placement.
+// If no placement is set, this is equivalent to List.
+// Placement is typically set in the pod group scheduling cycle.
+// This function should only be used by the scheduler to limit the node candidates for scheduling.
+// Plugins normally do not need this information.
+// This function is not thread safe so it should be executed when no other routines can write to the snapshot.
+func (s *Snapshot) ListNodesInPlacement() ([]fwk.NodeInfo, error) {
+	if s.placementNodes == nil {
+		return s.List()
+	}
+	return s.placementNodes.nodeInfoList, nil
 }

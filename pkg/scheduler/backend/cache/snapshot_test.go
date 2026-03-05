@@ -397,8 +397,8 @@ func TestNewSnapshot(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := NewSnapshot(test.pods, test.nodes)
 
-			if test.expectedNumNodes != snapshot.NumNodes() {
-				t.Errorf("unexpected number of nodes, want: %v, got: %v", test.expectedNumNodes, snapshot.NumNodes())
+			if test.expectedNumNodes != snapshot.NumNodesInPlacement() {
+				t.Errorf("unexpected number of nodes, want: %v, got: %v", test.expectedNumNodes, snapshot.NumNodesInPlacement())
 			}
 
 			for i, node := range test.nodes {
@@ -582,6 +582,217 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestSnapshot_Placement(t *testing.T) {
+	tt := []struct {
+		name           string
+		initialNodes   []string
+		placementNodes []string
+		testFn         func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement)
+	}{
+		{
+			name:           "When placement is not set, nodes in placement are same as nodes in snapshot",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{}, // unused
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				// We intentionally don't use snapshot.AssumePlacement here
+				numNodes := snapshot.NumNodesInPlacement()
+				if numNodes != 3 {
+					t.Errorf("unexpected number of nodes from NumNodesInPlacement, want: %v, got: %v", 3, numNodes)
+				}
+				nodes, err := snapshot.ListNodesInPlacement()
+				if err != nil {
+					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
+				}
+				if len(nodes) != 3 {
+					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 3, len(nodes))
+				}
+				_, err = snapshot.GetNodeInPlacement("n1")
+				if err != nil {
+					t.Errorf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
+				}
+			},
+		},
+		{
+			name:           "When placement is set, nodes in placement are the nodes from the provided placement",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{"n2", "n3"},
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				err := snapshot.AssumePlacement(placement)
+				if err != nil {
+					t.Fatalf("got unexpected error from AssumePlacement %v", err)
+				}
+				numNodes := snapshot.NumNodesInPlacement()
+				if numNodes != 2 {
+					t.Errorf("unexpected number of nodes from NumNodesInPlacement, want: %v, got: %v", 2, numNodes)
+				}
+				nodes, err := snapshot.ListNodesInPlacement()
+				if err != nil {
+					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
+				}
+				if len(nodes) != 2 {
+					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 2, len(nodes))
+				}
+				_, err = snapshot.GetNodeInPlacement("n1")
+				if err == nil {
+					t.Errorf("expected GetNodeInPlacement not to find node but instead got nil error")
+				}
+				_, err = snapshot.GetNodeInPlacement("n3")
+				if err != nil {
+					t.Errorf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
+				}
+			},
+		},
+		{
+			name:           "When placement is set, List and Get are not affected and still use snapshot nodes",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{"n2", "n3"},
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				err := snapshot.AssumePlacement(placement)
+				if err != nil {
+					t.Fatalf("got unexpected error from AssumePlacement %v", err)
+				}
+				nodes, err := snapshot.List()
+				if err != nil {
+					t.Fatalf("unexpected error from List %v", err)
+				}
+				if len(nodes) != 3 {
+					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 3, len(nodes))
+				}
+				_, err = snapshot.Get("n1")
+				if err != nil {
+					t.Errorf("expected Get to find node but instead got unexpected error %v", err)
+				}
+			},
+		},
+		{
+			name:           "When placement is cleared through ForgetPlacement, nodes in placement are same as nodes in snapshot",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{"n2", "n3"},
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				err := snapshot.AssumePlacement(placement)
+				if err != nil {
+					t.Fatalf("got unexpected error from AssumePlacement %v", err)
+				}
+				snapshot.ForgetPlacement()
+				numNodes := snapshot.NumNodesInPlacement()
+				if numNodes != 3 {
+					t.Errorf("unexpected number of nodes from NumNodesInPlacement, want: %v, got: %v", 3, numNodes)
+				}
+				nodes, err := snapshot.ListNodesInPlacement()
+				if err != nil {
+					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
+				}
+				if len(nodes) != 3 {
+					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 3, len(nodes))
+				}
+				_, err = snapshot.GetNodeInPlacement("n1")
+				if err != nil {
+					t.Errorf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
+				}
+			},
+		},
+		{
+			name:           "When placement uses nodes that point to a different instance than snapshot, AssumePlacement returns error and placement is not set",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{"n2"},
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				placement.Nodes[0] = placement.Nodes[0].Snapshot()
+				err := snapshot.AssumePlacement(placement)
+				if err == nil {
+					t.Fatalf("expected AssumePlacement to return error due to no match between placement and snapshot node instance but got nil")
+				}
+				// ensure the placement is cleared
+				numNodes := snapshot.NumNodesInPlacement()
+				if numNodes != 3 {
+					t.Errorf("unexpected number of nodes from NumNodesInPlacement, want: %v, got: %v", 3, numNodes)
+				}
+				nodes, err := snapshot.ListNodesInPlacement()
+				if err != nil {
+					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
+				}
+				if len(nodes) != 3 {
+					t.Errorf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 3, len(nodes))
+				}
+				_, err = snapshot.GetNodeInPlacement("n1")
+				if err != nil {
+					t.Errorf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
+				}
+			},
+		},
+		{
+			name:           "When placement is set, the effect of AssumePod is visible in nodes in placement",
+			initialNodes:   []string{"n1", "n2", "n3"},
+			placementNodes: []string{"n2"},
+			testFn: func(t *testing.T, snapshot *Snapshot, placement *fwk.Placement) {
+				err := snapshot.AssumePlacement(placement)
+				if err != nil {
+					t.Fatalf("unexpected error from AssumePlacement %v", err)
+				}
+				pod := st.MakePod().Name("pod-1").UID("pod-1").Node("n2").Obj()
+				podInfo, err := framework.NewPodInfo(pod)
+				if err != nil {
+					t.Fatalf("unexpected error from NewPodInfo %v", err)
+				}
+				err = snapshot.AssumePod(podInfo)
+				if err != nil {
+					t.Fatalf("unexpected error from AssumePod: %v", err)
+				}
+				nodes, err := snapshot.ListNodesInPlacement()
+				if err != nil {
+					t.Fatalf("unexpected error from ListNodesInPlacement %v", err)
+				}
+				if len(nodes) != 1 {
+					t.Fatalf("unexpected number of nodes from ListNodesInPlacement, want: %v, got: %v", 1, len(nodes))
+				}
+				node, err := snapshot.GetNodeInPlacement("n2")
+				if err != nil {
+					t.Fatalf("expected GetNodeInPlacement to find node but instead got unexpected error %v", err)
+				}
+				if nodes[0] != node {
+					t.Errorf("node from ListNodesInPlacement is not the same instance as from GetNodeInPlacement")
+				}
+				snapshotNode, err := snapshot.Get("n2")
+				if err != nil {
+					t.Fatalf("expected Get to find node but instead of unexpected error: %v", err)
+				}
+				if snapshotNode != node {
+					t.Fatalf("node from Get is not the same instance as from GetNodeInPlacement")
+				}
+				pods := node.GetPods()
+				if len(pods) != 1 {
+					t.Fatalf("unexpected number of pods on node, want: %v, got: %v", 1, len(pods))
+				}
+				if diff := cmp.Diff(podInfo, pods[0], cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+					t.Errorf("pod from placement is not equal to pod from snapshot (-want +got):\n%s", diff)
+				}
+			},
+		},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			initialNodes := []*v1.Node{}
+			for _, n := range tc.initialNodes {
+				initialNodes = append(initialNodes, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: n}})
+			}
+
+			snapshot := NewSnapshot([]*v1.Pod{}, initialNodes)
+			placementNodes := []fwk.NodeInfo{}
+			for _, n := range tc.placementNodes {
+				node, ok := snapshot.nodeInfoMap[n]
+				if !ok {
+					node = framework.NewNodeInfo()
+					node.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: n}})
+				}
+				placementNodes = append(placementNodes, node)
+			}
+
+			tc.testFn(t, snapshot, &fwk.Placement{
+				Nodes: placementNodes,
+			})
 		})
 	}
 }

@@ -186,6 +186,11 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
+	if nodeSnapshot.placementNodes != nil {
+		logger.Error(nil, "UpdateSnapshot called with assumed placement. This is unexpected. Placement will be cleared.")
+		nodeSnapshot.ForgetPlacement()
+	}
+
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
 
