@@ -260,7 +260,8 @@ func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, s
 		case apierrors.IsNotFound(err):
 			klog.FromContext(ctx).V(4).Info("Expected claim missing, continuing to pick up in next iteration", "PVC", klog.KObj(claim))
 		case err != nil:
-			return false, fmt.Errorf("Could not retrieve claim %s for %s when checking PVC deletion policy", claimName, pod.Name)
+			return false, fmt.Errorf(
+				"Could not retrieve claim %s for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
 			if !isClaimOwnerUpToDate(logger, claim, set, pod) {
 				return false, nil
@@ -385,13 +386,13 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 		case apierrors.IsNotFound(err):
 			err := spc.objectMgr.CreateClaim(&claim, set)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to create PVC %s: %s", claim.Name, err))
+				errs = append(errs, fmt.Errorf("failed to create PVC %s: %w", claim.Name, err))
 			}
 			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
 		case err != nil:
-			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
+			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %w", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
 		default:
 			if pvc.DeletionTimestamp != nil {
