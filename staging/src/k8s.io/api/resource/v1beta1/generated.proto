@@ -307,8 +307,9 @@ message CELDeviceSelector {
   // before referencing them.
   //
   // Common errors:
-  // - "no such key": Use has() macro, optional chaining (.?), or orValue()
-  //   for optional fields. See CEL Optional Types for details:
+  // - "no such key": Use optional chaining (.? followed by orValue())
+  //   or guarding the check with has() for optional fields.
+  //   See CEL Optional Types for details:
   //   https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
   //
   // For more CEL expression syntax and examples, see:
