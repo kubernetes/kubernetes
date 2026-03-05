@@ -1924,3 +1924,47 @@ func TestWaitForMultipleConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestConditionalWaitCheckConditionHandlesMalformedConditions(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []interface{}
+		expectMet  bool
+	}{
+		{
+			name: "single malformed condition item",
+			conditions: []interface{}{
+				"not-a-map",
+			},
+			expectMet: false,
+		},
+		{
+			name: "malformed condition followed by matching condition",
+			conditions: []interface{}{
+				"not-a-map",
+				map[string]interface{}{
+					"type":   "Ready",
+					"status": "True",
+				},
+			},
+			expectMet: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
+			require.NoError(t, unstructured.SetNestedSlice(obj.Object, tc.conditions, "status", "conditions"))
+
+			w := ConditionalWait{
+				conditionName:   "Ready",
+				conditionStatus: "True",
+				errOut:          io.Discard,
+			}
+
+			met, err := w.checkCondition(obj)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectMet, met)
+		})
+	}
+}
