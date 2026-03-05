@@ -664,12 +664,20 @@ type Placement struct {
 	Nodes []NodeInfo
 }
 
+// ProposedAssignment associates pod of a pod group with a proposed node assignment, determined in pod group scheduling cycle.
+type ProposedAssignment interface {
+	// GetPod returns the pod that has the proposed node assignment.
+	GetPod() *v1.Pod
+	// GetNodeName returns the name of the proposed node for the pod.
+	GetNodeName() string
+}
+
 // PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.
 // Can be used in the pod group scheduling cycle to determine the best placement for a pod group.
 type PodGroupAssignments struct {
 	*Placement
-	// ProposedAssignments maps pods to the nodes (by name) that were determined for a given placement
+	// ProposedAssignments associates pods with proposed nodes that were determined for a given placement
 	// during the pod group scheduling cycle.
 	// The pods are guaranteed to also be present in the PodGroupInfo.
-	ProposedAssignments map[*v1.Pod]string
+	ProposedAssignments []ProposedAssignment
 }
