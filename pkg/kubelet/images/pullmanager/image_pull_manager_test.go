@@ -17,21 +17,27 @@ limitations under the License.
 package pullmanager
 
 import (
+	"context"
+	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	ctesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -1177,7 +1183,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			}
 			f.intentCounters.Store(tt.image, tt.pullsInFlight)
 			origIntentCounter := f.getIntentCounterForImage(tt.image)
-			f.RecordImagePulled(tCtx, tt.image, tt.imageRef, tt.creds)
+			f.RecordImagePulled(tCtx, tt.image, tt.imageRef, tt.creds, false)
 			require.Equal(t, f.getIntentCounterForImage(tt.image), origIntentCounter-1, "intent counter for %s was not decremented", tt.image)
 
 			for _, fname := range tt.expectPulled {
@@ -1214,12 +1220,33 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 	}
 }
 
+type digestSearchingFakeRuntime struct {
+	*ctesting.FakeRuntime
+}
+
+func (r *digestSearchingFakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSpec) (string, error) {
+	r.FakeRuntime.Lock()
+	defer r.FakeRuntime.Unlock()
+
+	r.FakeRuntime.CalledFunctions = append(r.FakeRuntime.CalledFunctions, "GetImageRef")
+	for _, i := range r.FakeRuntime.ImageList {
+		if i.ID == image.Image || slices.Index(i.RepoDigests, image.Image) != -1 {
+			return i.ID, nil
+		}
+	}
+	return "", r.FakeRuntime.InspectErr
+}
+
 func TestFileBasedImagePullManager_initialize(t *testing.T) {
-	imageService := &ctesting.FakeRuntime{
+	imageService := &digestSearchingFakeRuntime{&ctesting.FakeRuntime{
 		ImageList: []container.Image{
 			{
 				ID:       "testimageref1",
 				RepoTags: []string{"repo.repo/test/test:docker", "docker.io/testing/test:something"},
+				RepoDigests: []string{
+					"docker.io/testing/test@sha256:33735bd63cf84d7e388d9f6d297d348c523c044410f553bd878c6d7829612735",
+					"docker.io/testing/test-different@sha256:248defba80845ccb7696df349108f66ebdc63d7378208e072ead75054c702336",
+				},
 			},
 			{
 				ID:          "testimageref2",
@@ -1240,6 +1267,28 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				RepoDigests: []string{"repo.repo/test/test@dgst4", "repo.repo/test/notatest@dgst44"},
 			},
 		},
+	}}
+
+	testedPulledRecords := map[string]kubeletconfiginternal.ImagePulledRecord{
+		"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": {
+			ImageRef: "testimage-anonpull",
+			CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+				"docker.io/testing/test": {NodePodsAccessible: true},
+			},
+		},
+		"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": {
+			ImageRef: "testimageref",
+			CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+				"docker.io/testing/test": {
+					KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+						{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+					},
+				},
+			},
+		},
+		"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": {
+			ImageRef: "testemptycredmapping",
+		},
 	}
 
 	tests := []struct {
@@ -1247,7 +1296,7 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 		existingIntents       []string
 		existingPulledRecords []string
 		expectedIntents       sets.Set[string]
-		expectedPulled        sets.Set[string]
+		expectedPulled        map[string]kubeletconfiginternal.ImagePulledRecord
 	}{
 		{
 			name: "no pulling/pulled records",
@@ -1259,10 +1308,11 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
 			},
-			expectedPulled: sets.New(
-				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
-				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
-				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"),
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": testedPulledRecords["sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"],
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": testedPulledRecords["sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"],
+			},
 		},
 		{
 			name: "pulling intent that matches an existing image - no matching pulled record",
@@ -1274,12 +1324,14 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 			existingIntents: []string{
 				"sha256-f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af",
 			},
-			expectedPulled: sets.New(
-				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
-				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
-				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
-				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096",
-			),
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": testedPulledRecords["sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"],
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": testedPulledRecords["sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+				},
+			},
 		},
 		{
 			name: "pulling intent that matches an existing image - a pull record matches",
@@ -1291,11 +1343,11 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 			existingIntents: []string{
 				"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
 			},
-			expectedPulled: sets.New(
-				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
-				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
-				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
-			),
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": testedPulledRecords["sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"],
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": testedPulledRecords["sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"],
+			},
 		},
 		{
 			name: "multiple pulling intents that match existing images",
@@ -1308,12 +1360,162 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
 				"sha256-f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af",
 			},
-			expectedPulled: sets.New(
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": testedPulledRecords["sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"],
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": testedPulledRecords["sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+				},
+			},
+		},
+		{
+			name: "pulling intent that does not match any existing image",
+			existingIntents: []string{
+				"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56",
+			},
+			expectedIntents: sets.New(
+				"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56",
+			),
+		},
+		{
+			name: "mix of matching and non-matching pulling intents",
+			existingPulledRecords: []string{
 				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
-				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096",
+			},
+			existingIntents: []string{
+				"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
+				"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56",
+			},
+			expectedIntents: sets.New(
+				"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56",
 			),
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064": testedPulledRecords["sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"],
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991": testedPulledRecords["sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"],
+			},
+		},
+		{
+			name: "single record needs imageRef remapping to ID",
+			existingPulledRecords: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-0553787e9ca19226fc076aa7e59a4dbb797ef6bcae363e443b535dbec5fd4898",
+			},
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+					CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+						"docker.io/testing/test": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single record needs imageRef remapping to ID; target exists",
+			existingPulledRecords: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-0553787e9ca19226fc076aa7e59a4dbb797ef6bcae363e443b535dbec5fd4898",
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096",
+			},
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+					CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+						"docker.io/testing/test": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+								{UID: "testsecretuid-different", Namespace: "different-ns", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "two records needs imageRef remapping to same ID",
+			existingPulledRecords: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-0553787e9ca19226fc076aa7e59a4dbb797ef6bcae363e443b535dbec5fd4898",
+				"sha256-e9ee0ffa9117588ad23ca6962c24bcb52e9848b90415f2f9616f73f73b09bf10",
+			},
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+					CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+						"docker.io/testing/test": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+						"docker.io/testing/test-different": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "two records needs imageRef remapping to same ID; target exists",
+			existingPulledRecords: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-0553787e9ca19226fc076aa7e59a4dbb797ef6bcae363e443b535dbec5fd4898",
+				"sha256-e9ee0ffa9117588ad23ca6962c24bcb52e9848b90415f2f9616f73f73b09bf10",
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096",
+			},
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+					CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+						"docker.io/testing/test": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+								{UID: "testsecretuid-different", Namespace: "different-ns", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+						"docker.io/testing/test-different": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single record needs imageRef remapping to ID, pulling intent exists for the image",
+			existingPulledRecords: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-0553787e9ca19226fc076aa7e59a4dbb797ef6bcae363e443b535dbec5fd4898",
+			},
+			existingIntents: []string{
+				"sha256-f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af",
+			},
+			expectedPulled: map[string]kubeletconfiginternal.ImagePulledRecord{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a": testedPulledRecords["sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"],
+				"sha256-d77ed7480bc819274ea7a4dba5b2699b2d3f73c6e578762df42e5a8224771096": {
+					ImageRef: "testimageref1",
+					CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+						"docker.io/testing/test": {
+							KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+								{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -1362,20 +1564,42 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				t.Fatalf("there was an error processing file in the test output pulling dir: %v", err)
 			}
 
-			gotPulled := sets.New[string]()
+			if !gotIntents.Equal(tt.expectedIntents) {
+				t.Errorf("difference between expected and received pull intent files: %v", cmp.Diff(tt.expectedIntents, gotIntents))
+			}
+
+			gotPulledFiles := sets.New[string]()
+			gotPulledRecords := make(map[string]*kubeletconfiginternal.ImagePulledRecord)
+
 			if err := processDirFiles(pulledDir, func(filePath string, fileContent []byte) error {
-				gotPulled.Insert(filepath.Base(filePath))
+				fileName := filepath.Base(filePath)
+				gotPulledFiles.Insert(fileName)
+				record, _, err := decodePulledRecord(decoder, fileContent)
+				if err != nil {
+					return fmt.Errorf("failed to decode pulled record file %s: %w", fileName, err)
+				}
+				gotPulledRecords[fileName] = record
 				return nil
 			}); err != nil {
 				t.Fatalf("there was an error processing file in the test output pulled dir: %v", err)
 			}
 
-			if !gotIntents.Equal(tt.expectedIntents) {
-				t.Errorf("difference between expected and received pull intent files: %v", cmp.Diff(tt.expectedIntents, gotIntents))
+			expectedPulledFiles := sets.New(slices.Collect(maps.Keys(tt.expectedPulled))...)
+			if !gotPulledFiles.Equal(expectedPulledFiles) {
+				t.Errorf("difference between expected and received pull record files: %v", cmp.Diff(expectedPulledFiles, gotPulledFiles))
 			}
 
-			if !gotPulled.Equal(tt.expectedPulled) {
-				t.Errorf("difference between expected and received pull record files: %v", cmp.Diff(tt.expectedPulled, gotPulled))
+			for fileName, expectedRecord := range tt.expectedPulled {
+				gotRecord, ok := gotPulledRecords[fileName]
+				if !ok {
+					t.Errorf("expected pulled record file %s not found in test output pulled dir", fileName)
+					continue
+				}
+				gotRecord.LastUpdatedTime = expectedRecord.LastUpdatedTime // ignore LastUpdatedTime in comparisons
+
+				if !reflect.DeepEqual(gotRecord, &expectedRecord) {
+					t.Errorf("pulled record file %s content mismatch: %v", fileName, cmp.Diff(expectedRecord, *gotRecord))
+				}
 			}
 		})
 	}

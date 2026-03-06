@@ -130,7 +130,7 @@ func (f *fsPullRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image s
 		return err
 	}
 
-	return writeFile(f.pullingDir, cacheFilename(image), intentBytes.Bytes())
+	return writeFile(f.pullingDir, CacheFilename(image), intentBytes.Bytes())
 }
 
 func (f *fsPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal.ImagePullIntent, error) {
@@ -150,7 +150,7 @@ func (f *fsPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal
 }
 
 func (f *fsPullRecordsAccessor) ImagePullIntentExists(image string) (bool, error) {
-	intentRecordPath := filepath.Join(f.pullingDir, cacheFilename(image))
+	intentRecordPath := filepath.Join(f.pullingDir, CacheFilename(image))
 	intentBytes, err := os.ReadFile(intentRecordPath)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -167,7 +167,7 @@ func (f *fsPullRecordsAccessor) ImagePullIntentExists(image string) (bool, error
 }
 
 func (f *fsPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
-	err := os.Remove(filepath.Join(f.pullingDir, cacheFilename(image)))
+	err := os.Remove(filepath.Join(f.pullingDir, CacheFilename(image)))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (f *fsPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image 
 }
 
 func (f *fsPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
-	recordBytes, err := os.ReadFile(filepath.Join(f.pulledDir, cacheFilename(imageRef)))
+	recordBytes, err := os.ReadFile(filepath.Join(f.pulledDir, CacheFilename(imageRef)))
 	if os.IsNotExist(err) {
 		return nil, false, nil
 	} else if err != nil {
@@ -213,11 +213,11 @@ func (f *fsPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulle
 		return fmt.Errorf("failed to serialize ImagePulledRecord: %w", err)
 	}
 
-	return writeFile(f.pulledDir, cacheFilename(pulledRecord.ImageRef), recordBytes.Bytes())
+	return writeFile(f.pulledDir, CacheFilename(pulledRecord.ImageRef), recordBytes.Bytes())
 }
 
 func (f *fsPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
-	err := os.Remove(filepath.Join(f.pulledDir, cacheFilename(imageRef)))
+	err := os.Remove(filepath.Join(f.pulledDir, CacheFilename(imageRef)))
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -269,7 +269,7 @@ func countCacheFiles(dirName string) (uint, error) {
 	return cacheFilesCount, nil
 }
 
-func cacheFilename(image string) string {
+func CacheFilename(image string) string {
 	return fmt.Sprintf("%s%x", cacheFilesSHA256Prefix, sha256.Sum256([]byte(image)))
 }
 

@@ -91,6 +91,29 @@ func pullerTestCases() []pullerTestCase {
 	)
 }
 
+const imageNoPullIDName = "image-no-pull-id:latest"
+
+type noPullIDImageServiceWrapper struct {
+	ImageService
+}
+
+func (w *noPullIDImageServiceWrapper) PullImage(
+	ctx context.Context,
+	image ImageSpec,
+	credentials []credentialprovider.TrackedAuthConfig,
+	podSandboxConfig *runtimeapi.PodSandboxConfig,
+) (
+	imageRef, imageID string,
+	pullCreds *credentialprovider.TrackedAuthConfig,
+	err error,
+) {
+	imageRef, imageID, pullCreds, err = w.ImageService.PullImage(ctx, image, credentials, podSandboxConfig)
+	if image.Image == imageNoPullIDName {
+		imageID = ""
+	}
+	return imageRef, imageID, pullCreds, err
+}
+
 // noFGPullerTestCases returns all test cases that test the default behavior without any
 // feature gate required
 func noFGPullerTestCases() []pullerTestCase {
@@ -428,6 +451,41 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 					}, ""},
 			},
 			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "true"),
+		},
+		{
+			testName:       "[KubeletEnsureSecretPulledImages] image not present, pull; container runtime does not return image ID",
+			containerImage: imageNoPullIDName,
+			policy:         v1.PullIfNotPresent,
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"another_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+				},
+			},
+			pullSecrets:    []v1.Secret{makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "testuid"}, "docker.io/library/present_image")},
+			inspectErr:     nil,
+			pullerErr:      nil,
+			qps:            0.0,
+			burst:          0,
+			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}, ""},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}, ""},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize", "GetImageRef"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}, ""},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "false", "true"),
 		},
 		{
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown secret to image pull manager, pull",
@@ -802,7 +860,7 @@ func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(ctx context.Cont
 	return m.mustAttemptReturn, nil
 }
 
-func (m *mockImagePullManagerWithTracking) RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
+func (m *mockImagePullManagerWithTracking) RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials, _ bool) {
 	m.recordedCredentials = credentials
 }
 
@@ -878,7 +936,7 @@ func pullerTestEnv(
 		keyring = &credentialprovider.BasicDockerKeyring{}
 	}
 
-	puller = NewImageManager(fakeRecorder, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	puller = NewImageManager(fakeRecorder, keyring, &noPullIDImageServiceWrapper{fakeRuntime}, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 

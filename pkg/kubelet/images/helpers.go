@@ -44,9 +44,9 @@ type throttledImageService struct {
 	limiter flowcontrol.RateLimiter
 }
 
-func (ts throttledImageService) PullImage(ctx context.Context, image kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+func (ts throttledImageService) PullImage(ctx context.Context, image kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, *credentialprovider.TrackedAuthConfig, error) {
 	if ts.limiter.TryAccept() {
 		return ts.ImageService.PullImage(ctx, image, credentials, podSandboxConfig)
 	}
-	return "", nil, fmt.Errorf("pull QPS exceeded")
+	return "", "", nil, fmt.Errorf("pull QPS exceeded")
 }

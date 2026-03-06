@@ -165,9 +165,13 @@ type ImageService interface {
 	// It returns a reference (digest or ID) to the pulled image and the credentials
 	// that were used to pull the image. If the returned credentials are nil, the
 	// pull was anonymous.
-	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)
-	// GetImageRef gets the reference (digest or ID) of the image which has already been in
-	// the local storage. It returns ("", nil) if the image isn't in the local storage.
+	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, imageID string, pullCreds *credentialprovider.TrackedAuthConfig, err error)
+	// GetImageRef MUST return an ID of the image which has already been in the local storage.
+	// It returns ("", nil) if the image isn't in the local storage.
+	//
+	// BE CAREFUL when using this function - the return value might be different
+	// from what container runtime returns as ImageRef in some CRI API messages
+	// because ImageRef is only vaguely defined.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
 	// ListImages gets all images currently on the machine.
 	ListImages(ctx context.Context) ([]Image, error)

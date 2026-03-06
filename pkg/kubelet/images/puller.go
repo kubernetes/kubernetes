@@ -28,6 +28,7 @@ import (
 
 type pullResult struct {
 	imageRef        string
+	imageID         string
 	imageSize       uint64
 	err             error
 	pullDuration    time.Duration
@@ -59,14 +60,15 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 			defer func() { <-pip.tokens }()
 		}
 		startTime := time.Now()
-		imageRef, creds, err := pip.imageService.PullImage(ctx, spec, credentials, podSandboxConfig)
+		imageRef, imageID, creds, err := pip.imageService.PullImage(ctx, spec, credentials, podSandboxConfig)
 		var size uint64
-		if err == nil && imageRef != "" {
+		if err == nil && (imageID != "" || imageRef != "") {
 			// Getting the image size with best effort, ignoring the error.
 			size, _ = pip.imageService.GetImageSize(ctx, spec)
 		}
 		pullChan <- pullResult{
 			imageRef:        imageRef,
+			imageID:         imageID,
 			imageSize:       size,
 			err:             err,
 			pullDuration:    time.Since(startTime),
@@ -110,14 +112,15 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		startTime := time.Now()
-		imageRef, creds, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.credentials, pullRequest.podSandboxConfig)
+		imageRef, imageID, creds, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.credentials, pullRequest.podSandboxConfig)
 		var size uint64
-		if err == nil && imageRef != "" {
+		if err == nil && (imageID != "" || imageRef != "") {
 			// Getting the image size with best effort, ignoring the error.
 			size, _ = sip.imageService.GetImageSize(pullRequest.ctx, pullRequest.spec)
 		}
 		pullRequest.pullChan <- pullResult{
 			imageRef:  imageRef,
+			imageID:   imageID,
 			imageSize: size,
 			err:       err,
 			// Note: pullDuration includes getting the image size.

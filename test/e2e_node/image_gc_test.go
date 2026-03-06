@@ -61,7 +61,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			pod := innocentPod()
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
-			_, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
+			_, _, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
 			framework.ExpectNoError(err)
 
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
@@ -81,7 +81,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			pod := innocentPod()
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
-			_, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
+			_, _, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
 			framework.ExpectNoError(err)
 
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})

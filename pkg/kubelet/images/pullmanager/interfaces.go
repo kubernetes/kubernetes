@@ -49,7 +49,15 @@ type ImagePullManager interface {
 	// to `true`.
 	//
 	// `image` is the content of the pod's container `image` field.
-	RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials)
+	//
+	// `keepDanglingPullingRecord` is useful in cases we need to keep the pulling
+	// record dangling in case where we were unable to resolve the ImageRef we
+	// got from PullImageResponse to an image ID so that we fail closed in
+	// MustAttemmptImagePull (image ID will be missing in cache but the image is
+	// recorded as pulling => must Pull).
+	// `keepDanglingPullingRecord` will be removed when Ensure Secret Pulled Images
+	// goes GA.
+	RecordImagePulled(ctx context.Context, image, imageID string, credentials *kubeletconfiginternal.ImagePullCredentials, keepDanglingPullingRecord bool)
 	// RecordImagePullFailed should be called if an image failed to pull.
 	//
 	// Internally, it lowers its reference counter for the given image. If the
@@ -72,9 +80,9 @@ type ImagePullManager interface {
 	// was found in the cache.
 	//
 	// `image` is the content of the pod's container `image` field.
-	MustAttemptImagePull(ctx context.Context, image, imageRef string, getPodCredentials GetPodCredentials) (bool, error)
+	MustAttemptImagePull(ctx context.Context, image, imageID string, getPodCredentials GetPodCredentials) (bool, error)
 	// PruneUnknownRecords deletes all of the cache ImagePulledRecords for each of the images
-	// whose imageRef does not appear in the `imageList` iff such an record was last updated
+	// whose imageID does not appear in the `imageList` iff such an record was last updated
 	// _before_ the `until` timestamp.
 	//
 	// This method is only expected to be called by the kubelet's image garbage collector.
@@ -109,13 +117,13 @@ type PullRecordsAccessor interface {
 	// the results. A list of records that were successfully read and an aggregated
 	// error is returned in that case.
 	ListImagePulledRecords() ([]*kubeletconfiginternal.ImagePulledRecord, error)
-	// GetImagePulledRecord fetches an ImagePulledRecord for the given `imageRef`.
-	// If a file for the `imageRef` is present but the contents cannot be decoded,
+	// GetImagePulledRecord fetches an ImagePulledRecord for the given `imageID`.
+	// If a file for the `imageID` is present but the contents cannot be decoded,
 	// it returns a exists=true with err equal to the decoding error.
-	GetImagePulledRecord(imageRef string) (record *kubeletconfiginternal.ImagePulledRecord, exists bool, err error)
+	GetImagePulledRecord(imageID string) (record *kubeletconfiginternal.ImagePulledRecord, exists bool, err error)
 	// WriteImagePulledRecord writes an ImagePulledRecord into the database.
 	WriteImagePulledRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePulledRecord) error
-	// DeleteImagePulledRecord removes an ImagePulledRecord for `imageRef` from the
+	// DeleteImagePulledRecord removes an ImagePulledRecord for `imageID` from the
 	// database.
-	DeleteImagePulledRecord(logger klog.Logger, imageRef string) error
+	DeleteImagePulledRecord(logger klog.Logger, imageID string) error
 }

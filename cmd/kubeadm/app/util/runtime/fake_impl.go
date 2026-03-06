@@ -47,8 +47,9 @@ type FakeImpl struct {
 		err error
 	}
 	pullImageReturns struct {
-		res string
-		err error
+		imageRef string
+		imageID  string
+		err      error
 	}
 	removePodSandboxReturns struct {
 		res error
@@ -119,17 +120,18 @@ func (fake *FakeImpl) NewRemoteRuntimeServiceReturns(res cri.RuntimeService, err
 }
 
 // PullImage returns the pull image.
-func (fake *FakeImpl) PullImage(context.Context, cri.ImageManagerService, *v1.ImageSpec, *v1.AuthConfig, *v1.PodSandboxConfig) (string, error) {
+func (fake *FakeImpl) PullImage(context.Context, cri.ImageManagerService, *v1.ImageSpec, *v1.AuthConfig, *v1.PodSandboxConfig) (string, string, error) {
 	fakeReturns := fake.pullImageReturns
-	return fakeReturns.res, fakeReturns.err
+	return fakeReturns.imageRef, fakeReturns.imageID, fakeReturns.err
 }
 
 // PullImageReturns sets the return values for the PullImage method.
-func (fake *FakeImpl) PullImageReturns(res string, err error) {
+func (fake *FakeImpl) PullImageReturns(imageRef, imageID string, err error) {
 	fake.pullImageReturns = struct {
-		res string
-		err error
-	}{res, err}
+		imageRef string
+		imageID  string
+		err      error
+	}{imageRef, imageID, err}
 }
 
 // RemovePodSandbox removes the pod sandbox.

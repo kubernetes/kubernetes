@@ -1282,7 +1282,7 @@ func (_c *MockRuntime_ListPodSandboxMetrics_Call) RunAndReturn(run func(ctx cont
 }
 
 // PullImage provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+func (_mock *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, string, *credentialprovider.TrackedAuthConfig, error) {
 	ret := _mock.Called(ctx, image, credentials, podSandboxConfig)
 
 	if len(ret) == 0 {
@@ -1290,9 +1290,10 @@ func (_mock *MockRuntime) PullImage(ctx context.Context, image container.ImageSp
 	}
 
 	var r0 string
-	var r1 *credentialprovider.TrackedAuthConfig
-	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)); ok {
+	var r1 string
+	var r2 *credentialprovider.TrackedAuthConfig
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) (string, string, *credentialprovider.TrackedAuthConfig, error)); ok {
 		return returnFunc(ctx, image, credentials, podSandboxConfig)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) string); ok {
@@ -1300,19 +1301,24 @@ func (_mock *MockRuntime) PullImage(ctx context.Context, image container.ImageSp
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) *credentialprovider.TrackedAuthConfig); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) string); ok {
 		r1 = returnFunc(ctx, image, credentials, podSandboxConfig)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*credentialprovider.TrackedAuthConfig)
-		}
+		r1 = ret.Get(1).(string)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) *credentialprovider.TrackedAuthConfig); ok {
 		r2 = returnFunc(ctx, image, credentials, podSandboxConfig)
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(*credentialprovider.TrackedAuthConfig)
+		}
 	}
-	return r0, r1, r2
+	if returnFunc, ok := ret.Get(3).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) error); ok {
+		r3 = returnFunc(ctx, image, credentials, podSandboxConfig)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
 }
 
 // MockRuntime_PullImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PullImage'
@@ -1357,12 +1363,12 @@ func (_c *MockRuntime_PullImage_Call) Run(run func(ctx context.Context, image co
 	return _c
 }
 
-func (_c *MockRuntime_PullImage_Call) Return(s string, trackedAuthConfig *credentialprovider.TrackedAuthConfig, err error) *MockRuntime_PullImage_Call {
-	_c.Call.Return(s, trackedAuthConfig, err)
+func (_c *MockRuntime_PullImage_Call) Return(imageRef string, imageID string, pullCreds *credentialprovider.TrackedAuthConfig, err error) *MockRuntime_PullImage_Call {
+	_c.Call.Return(imageRef, imageID, pullCreds, err)
 	return _c
 }
 
-func (_c *MockRuntime_PullImage_Call) RunAndReturn(run func(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)) *MockRuntime_PullImage_Call {
+func (_c *MockRuntime_PullImage_Call) RunAndReturn(run func(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, string, *credentialprovider.TrackedAuthConfig, error)) *MockRuntime_PullImage_Call {
 	_c.Call.Return(run)
 	return _c
 }
