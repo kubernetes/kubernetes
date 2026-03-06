@@ -18,7 +18,6 @@ package validators
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -231,13 +230,13 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 	case codetags.ArgTypeString:
 		return value, codetags.ValueTypeString, nil
 	case codetags.ArgTypeInt:
-		intVal, err := strconv.Atoi(value)
+		intVal, err := util.ParseInt(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid integer: %w", err)
 		}
 		return intVal, codetags.ValueTypeInt, nil
 	case codetags.ArgTypeBool:
-		boolVal, err := strconv.ParseBool(value)
+		boolVal, err := util.ParseBool(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid boolean: %w", err)
 		}

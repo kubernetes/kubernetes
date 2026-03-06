@@ -504,3 +504,67 @@ func TestParseInt(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBool(t *testing.T) {
+	type testcase struct {
+		name          string
+		in            string
+		expectedOut   bool
+		expectedError bool
+	}
+
+	testcases := []testcase{
+		{
+			name:          "canonical true",
+			in:            "true",
+			expectedOut:   true,
+			expectedError: false,
+		},
+		{
+			name:          "canonical false",
+			in:            "false",
+			expectedOut:   false,
+			expectedError: false,
+		},
+		{
+			name:          "non-canonical 1",
+			in:            "1",
+			expectedOut:   false,
+			expectedError: true,
+		},
+		{
+			name:          "non-canonical 0",
+			in:            "0",
+			expectedOut:   false,
+			expectedError: true,
+		},
+		{
+			name:          "non-canonical True",
+			in:            "True",
+			expectedOut:   false,
+			expectedError: true,
+		},
+		{
+			name:          "invalid",
+			in:            "notabool",
+			expectedOut:   false,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := ParseBool(tc.in)
+			switch {
+			case tc.expectedError && err == nil:
+				t.Error("expected an error but did not receive one")
+			case !tc.expectedError && err != nil:
+				t.Errorf("received an unexpected error: %v", err)
+			}
+
+			if out != tc.expectedOut {
+				t.Errorf("expected an output value of %v but got %v", tc.expectedOut, out)
+			}
+		})
+	}
+}
