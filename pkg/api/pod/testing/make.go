@@ -323,6 +323,12 @@ func SetContainerRestartPolicy(policy api.ContainerRestartPolicy) TweakContainer
 	}
 }
 
+func SetContainerRestartPolicyRules(rules ...api.ContainerRestartRule) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.RestartPolicyRules = rules
+	}
+}
+
 func MakePodStatus(tweaks ...TweakPodStatus) api.PodStatus {
 	ps := api.PodStatus{}
 
