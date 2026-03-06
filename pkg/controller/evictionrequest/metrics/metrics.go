@@ -38,31 +38,32 @@ var (
 			Help:           "Whether the named interceptor is active for the EvictionRequest (1 = active)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "interceptor"},
+		[]string{"namespace", "evictionrequest", "target", "interceptor"},
 	)
 
-	// ProcessedInterceptor tracks the number of processed interceptors per
-	// EvictionRequest.
+	// ProcessedInterceptor tracks whether an interceptor has been processed
+	// for a given EvictionRequest. The interceptor label identifies which
+	// interceptor has been processed.
 	ProcessedInterceptor = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
 			Name:           "processed_interceptor",
-			Help:           "Number of processed interceptors per EvictionRequest",
+			Help:           "Whether the named interceptor has been processed for the EvictionRequest (1 = processed)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest"},
+		[]string{"namespace", "evictionrequest", "target", "interceptor"},
 	)
 
-	// ActiveRequester tracks the number of active requesters per
-	// EvictionRequest.
+	// ActiveRequester tracks active requesters per EvictionRequest.
+	// The requester label identifies the requester by name (1 = active).
 	ActiveRequester = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
 			Name:           "active_requester",
-			Help:           "Number of active requesters per EvictionRequest",
+			Help:           "Whether the named requester is active for the EvictionRequest (1 = active)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest"},
+		[]string{"namespace", "evictionrequest", "target", "requester"},
 	)
 
 	// PodInterceptors tracks the number of available interceptors for the
@@ -70,11 +71,11 @@ var (
 	PodInterceptors = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "pod_interceptors",
-			Help:           "Number of available interceptors for the target pod",
+			Name:           "target_interceptors",
+			Help:           "Number of available interceptors for the target",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest"},
+		[]string{"namespace", "evictionrequest", "target"},
 	)
 )
 

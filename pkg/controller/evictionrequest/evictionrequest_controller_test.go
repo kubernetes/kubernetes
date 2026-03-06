@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -1017,75 +1019,94 @@ func TestSyncHandler_ObservedGenerationSet(t *testing.T) {
 	}
 }
 
-func TestSyncLabelHandler_SyncsLabels(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-
-	pod := newPod("default", "test-pod", "test-uid")
-	pod.Labels = map[string]string{
-		"app":     "myapp",
-		"version": "v1",
+func TestSyncLabelHandler(t *testing.T) {
+	testCases := []struct {
+		name           string
+		podLabels      map[string]string
+		erLabels       map[string]string
+		expectedLabels map[string]string
+	}{
+		{
+			name: "syncs pod labels to eviction request",
+			podLabels: map[string]string{
+				"app":     "myapp",
+				"version": "v1",
+			},
+			erLabels: map[string]string{
+				"existing": "label",
+			},
+			expectedLabels: map[string]string{
+				"existing": "label",
+				"app":      "myapp",
+				"version":  "v1",
+			},
+		},
+		{
+			name: "pod labels overwrite eviction request labels",
+			podLabels: map[string]string{
+				"app": "pod-value",
+			},
+			erLabels: map[string]string{
+				"app": "er-value",
+			},
+			expectedLabels: map[string]string{
+				"app": "pod-value",
+			},
+		},
+		{
+			name:      "nil pod labels with existing er labels",
+			podLabels: nil,
+			erLabels: map[string]string{
+				"existing": "label",
+			},
+			expectedLabels: map[string]string{
+				"existing": "label",
+			},
+		},
+		{
+			name: "pod labels with nil er labels",
+			podLabels: map[string]string{
+				"app": "myapp",
+			},
+			erLabels: nil,
+			expectedLabels: map[string]string{
+				"app": "myapp",
+			},
+		},
+		{
+			name:           "both nil labels",
+			podLabels:      nil,
+			erLabels:       nil,
+			expectedLabels: nil,
+		},
 	}
 
-	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Labels = map[string]string{
-		"existing": "label",
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 
-	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, nil)
+			pod := newPod("default", "test-pod", "test-uid")
+			pod.Labels = tc.podLabels
 
-	// Sync labels
-	err := c.syncLabelHandler(ctx, "default/test-pod")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			er := newEvictionRequest("default", "test-pod", "test-uid")
+			er.Labels = tc.erLabels
 
-	// Verify labels were synced
-	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("failed to get eviction request: %v", err)
-	}
+			c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, nil)
 
-	// Should have both existing and pod labels
-	if updated.Labels["existing"] != "label" {
-		t.Error("expected existing label to be preserved")
-	}
-	if updated.Labels["app"] != "myapp" {
-		t.Error("expected pod label 'app' to be synced")
-	}
-	if updated.Labels["version"] != "v1" {
-		t.Error("expected pod label 'version' to be synced")
-	}
-}
+			err := c.syncLabelHandler(ctx, "default/test-pod")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-func TestSyncLabelHandler_PodLabelsOverwrite(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+			updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get eviction request: %v", err)
+			}
 
-	pod := newPod("default", "test-pod", "test-uid")
-	pod.Labels = map[string]string{
-		"app": "pod-value", // This should overwrite
-	}
-
-	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Labels = map[string]string{
-		"app": "er-value", // This should be overwritten
-	}
-
-	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, nil)
-
-	// Sync labels
-	err := c.syncLabelHandler(ctx, "default/test-pod")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Verify pod label overwrote EvictionRequest label
-	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("failed to get eviction request: %v", err)
-	}
-
-	if updated.Labels["app"] != "pod-value" {
-		t.Errorf("expected pod label to overwrite, got %s", updated.Labels["app"])
+			if diff := cmp.Diff(tc.expectedLabels, updated.Labels); diff != "" {
+				t.Errorf("unexpected labels (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

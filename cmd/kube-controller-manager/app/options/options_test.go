@@ -545,6 +545,13 @@ func TestValidateFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "concurrent eviction request syncs set to 0",
+			flags: []string{
+				"--concurrent-eviction-request-syncs=0",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -1264,6 +1271,16 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must be greater than 0",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1298,6 +1315,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &DeviceTaintEvictionControllerOptions{
 				&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
 					ConcurrentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 10,
 				},
 			},
 		},
@@ -1437,6 +1463,30 @@ func TestValidateControllersOptions(t *testing.T) {
 					ConcurrentTTLSyncs: 8,
 				},
 			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions valid",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 5,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions zero syncs",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must be greater than 0",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions nil",
+			expectErrors: false,
+			options:      (*EvictionRequestControllerOptions)(nil),
 		},
 	}
 

@@ -82,6 +82,15 @@ func (t targetInfo) isTerminal() bool {
 	return false
 }
 
+// targetType returns the type of the eviction target (e.g. "pod").
+func (t targetInfo) targetType() string {
+	switch {
+	case t.spec.Pod != nil:
+		return "pod"
+	}
+	return "unknown"
+}
+
 // name returns the found target's name, or "" if unavailable.
 func (t targetInfo) name() string {
 	switch {
