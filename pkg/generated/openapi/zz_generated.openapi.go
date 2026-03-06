@@ -1285,6 +1285,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		metav1.Preconditions{}.OpenAPIModelName():                                                                       schema_pkg_apis_meta_v1_Preconditions(ref),
 		metav1.RootPaths{}.OpenAPIModelName():                                                                           schema_pkg_apis_meta_v1_RootPaths(ref),
 		metav1.ServerAddressByClientCIDR{}.OpenAPIModelName():                                                           schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
+		metav1.ShardInfo{}.OpenAPIModelName():                                                                           schema_pkg_apis_meta_v1_ShardInfo(ref),
 		metav1.Status{}.OpenAPIModelName():                                                                              schema_pkg_apis_meta_v1_Status(ref),
 		metav1.StatusCause{}.OpenAPIModelName():                                                                         schema_pkg_apis_meta_v1_StatusCause(ref),
 		metav1.StatusDetails{}.OpenAPIModelName():                                                                       schema_pkg_apis_meta_v1_StatusDetails(ref),
@@ -61299,16 +61300,17 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 							Format:      "int64",
 						},
 					},
-					"sharded": {
+					"shardInfo": {
 						SchemaProps: spec.SchemaProps{
-							Description: "sharded indicates this list is a filtered subset of the full list, as selected by a shard selector on the request. Clients should not cache sharded list responses as a full representation of the collection.",
-							Type:        []string{"boolean"},
-							Format:      "",
+							Description: "shardInfo is set when the list is a filtered subset of the full collection, as selected by a shard selector on the request. It echoes back the selector so clients can verify which shard they received and merge sharded responses. Clients should not cache sharded list responses as a full representation of the collection.",
+							Ref:         ref(metav1.ShardInfo{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
+		Dependencies: []string{
+			metav1.ShardInfo{}.OpenAPIModelName()},
 	}
 }
 
@@ -61405,7 +61407,7 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selector is a shard selector that restricts the list of returned objects using a functional grammar. The format is a comma-separated list of requirements, where each requirement is: shardRange(fieldPath,hexStart,hexEnd). The fieldPath specifies which metadata field to hash (e.g. object.metadata.uid). hexStart/hexEnd define the inclusive lower and exclusive upper bounds of the FNV-1a hash range. Empty bounds mean unbounded. Example: shardRange(object.metadata.uid,0000000000000000,8000000000000000) Requires the ShardedListandWatch feature gate to be enabled.",
+							Description: "selector is a shard selector that restricts the list of returned objects using a functional grammar. The format is a comma-separated list of requirements, where each requirement is: shardRange(fieldPath,hexStart,hexEnd).\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are required lowercase hex strings defining the inclusive lower and exclusive upper bounds. Values are compared over the 64-bit FNV-1a hash space, where each object's field value is hashed with hash/fnv.New64a(). The full hash range is [0000000000000000, 10000000000000000) — note the exclusive upper bound is 2^64, a 17-character hex value.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid,0x0000000000000000,0x8000000000000000)\n    shard 1: shardRange(object.metadata.uid,0x8000000000000000,0x10000000000000000)\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid,0x0000000000000000,0x4000000000000000)\n    shard 1: shardRange(object.metadata.uid,0x4000000000000000,0x8000000000000000)\n    shard 2: shardRange(object.metadata.uid,0x8000000000000000,0xc000000000000000)\n    shard 3: shardRange(object.metadata.uid,0xc000000000000000,0x10000000000000000)\n\nRequires the ShardedListandWatch feature gate to be enabled.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -61986,6 +61988,28 @@ func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallb
 					},
 				},
 				Required: []string{"clientCIDR", "serverAddress"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_meta_v1_ShardInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ShardInfo describes the shard selector that was applied to produce a list response. Its presence on a list response indicates the list is a filtered subset.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "selector is the shard selector string from the request, echoed back so clients can verify which shard they received and merge responses from multiple shards.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"selector"},
 			},
 		},
 	}

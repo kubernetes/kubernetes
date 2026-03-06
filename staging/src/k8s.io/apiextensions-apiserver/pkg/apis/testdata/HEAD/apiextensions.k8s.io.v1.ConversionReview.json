@@ -37,7 +37,9 @@
         "resourceVersion": "resourceVersionValue",
         "continue": "continueValue",
         "remainingItemCount": 4,
-        "sharded": true
+        "shardInfo": {
+          "selector": "selectorValue"
+        }
       },
       "status": "statusValue",
       "message": "messageValue",

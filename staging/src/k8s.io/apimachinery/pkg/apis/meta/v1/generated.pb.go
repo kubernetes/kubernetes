@@ -105,6 +105,8 @@ func (m *RootPaths) Reset() { *m = RootPaths{} }
 
 func (m *ServerAddressByClientCIDR) Reset() { *m = ServerAddressByClientCIDR{} }
 
+func (m *ShardInfo) Reset() { *m = ShardInfo{} }
+
 func (m *Status) Reset() { *m = Status{} }
 
 func (m *StatusCause) Reset() { *m = StatusCause{} }
@@ -1100,14 +1102,18 @@ func (m *ListMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	i--
-	if m.Sharded {
-		dAtA[i] = 1
-	} else {
-		dAtA[i] = 0
+	if m.ShardInfo != nil {
+		{
+			size, err := m.ShardInfo.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
 	}
-	i--
-	dAtA[i] = 0x28
 	if m.RemainingItemCount != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.RemainingItemCount))
 		i--
@@ -1775,6 +1781,34 @@ func (m *ServerAddressByClientCIDR) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	i -= len(m.ClientCIDR)
 	copy(dAtA[i:], m.ClientCIDR)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ClientCIDR)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ShardInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ShardInfo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ShardInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Selector)
+	copy(dAtA[i:], m.Selector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Selector)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -2555,7 +2589,10 @@ func (m *ListMeta) Size() (n int) {
 	if m.RemainingItemCount != nil {
 		n += 1 + sovGenerated(uint64(*m.RemainingItemCount))
 	}
-	n += 2
+	if m.ShardInfo != nil {
+		l = m.ShardInfo.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -2804,6 +2841,17 @@ func (m *ServerAddressByClientCIDR) Size() (n int) {
 	l = len(m.ClientCIDR)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.ServerAddress)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ShardInfo) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Selector)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -3190,7 +3238,7 @@ func (this *ListMeta) String() string {
 		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
 		`Continue:` + fmt.Sprintf("%v", this.Continue) + `,`,
 		`RemainingItemCount:` + valueToStringGenerated(this.RemainingItemCount) + `,`,
-		`Sharded:` + fmt.Sprintf("%v", this.Sharded) + `,`,
+		`ShardInfo:` + strings.Replace(this.ShardInfo.String(), "ShardInfo", "ShardInfo", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3376,6 +3424,16 @@ func (this *ServerAddressByClientCIDR) String() string {
 	s := strings.Join([]string{`&ServerAddressByClientCIDR{`,
 		`ClientCIDR:` + fmt.Sprintf("%v", this.ClientCIDR) + `,`,
 		`ServerAddress:` + fmt.Sprintf("%v", this.ServerAddress) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ShardInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ShardInfo{`,
+		`Selector:` + fmt.Sprintf("%v", this.Selector) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6739,10 +6797,10 @@ func (m *ListMeta) Unmarshal(dAtA []byte) error {
 			}
 			m.RemainingItemCount = &v
 		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sharded", wireType)
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShardInfo", wireType)
 			}
-			var v int
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -6752,12 +6810,28 @@ func (m *ListMeta) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				v |= int(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			m.Sharded = bool(v != 0)
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ShardInfo == nil {
+				m.ShardInfo = &ShardInfo{}
+			}
+			if err := m.ShardInfo.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -9034,6 +9108,88 @@ func (m *ServerAddressByClientCIDR) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ServerAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ShardInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ShardInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ShardInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Selector = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
