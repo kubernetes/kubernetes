@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	configv1alpha "k8s.io/cloud-provider/config/v1alpha1"
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -164,11 +165,17 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
 	defer c.EventBroadcaster.Shutdown()
 
+	externalConfig := &configv1alpha.CloudControllerManagerConfiguration{}
+	if err := configv1alpha.Convert_config_CloudControllerManagerConfiguration_To_v1alpha1_CloudControllerManagerConfiguration(&c.ComponentConfig, externalConfig, nil); err != nil {
+		return fmt.Errorf("unable to convert configz: %w", err)
+	}
+	externalConfig.SetGroupVersionKind(configv1alpha.SchemeGroupVersion.WithKind("CloudControllerManagerConfiguration"))
+
 	// setup /configz endpoint
-	if cz, err := configz.New(ConfigzName); err == nil {
-		cz.Set(c.ComponentConfig)
-	} else {
-		klog.Errorf("unable to register configz: %v", err)
+	if cz, err := configz.New(ConfigzName); err != nil {
+		return fmt.Errorf("unable to register configz: %w", err)
+	} else if err := cz.Set(externalConfig); err != nil {
+		return fmt.Errorf("unable to set configz: %w", err)
 	}
 
 	// Setup any health checks we will want to use.
