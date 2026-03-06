@@ -22,14 +22,19 @@ import (
 )
 
 // EnhanceRuntimeError provides a more helpful error message for "no such key" errors.
+// It detects CEL runtime errors that occur when accessing non-existent map keys
+// and adds a hint about using optional field access patterns.
 // For all other errors, it returns the error unchanged.
+//
+// Note: This function focuses on enhancing the CEL error message itself.
+// Additional context (like device ID) should be added by the caller when wrapping the error.
 func EnhanceRuntimeError(err error) error {
 	if err == nil {
 		return nil
 	}
 
 	if strings.HasPrefix(err.Error(), "no such key:") {
-		return fmt.Errorf("%w. Consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields", err)
+		return fmt.Errorf("%w. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields", err)
 	}
 
 	// Not a "no such key" error, return unchanged.
