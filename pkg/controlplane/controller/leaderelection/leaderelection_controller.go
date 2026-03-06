@@ -75,7 +75,7 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 	defer func() {
 		err := c.leaseInformer.Informer().RemoveEventHandler(c.leaseRegistration)
@@ -95,7 +95,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	// This controller is leader elected and may start after informers have already started. List on startup.
 	lcs, err := c.leaseCandidateInformer.Lister().List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to list lease candidates")
 		return
 	}
 	for _, lc := range lcs {
@@ -166,7 +166,7 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 	}
 
 	intervalForRequeue, err := c.reconcileElectionStep(ctx, key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Failed to reconcile election step")
 	if intervalForRequeue != noRequeue {
 		defer c.queue.AddAfter(key, intervalForRequeue)
 	}
