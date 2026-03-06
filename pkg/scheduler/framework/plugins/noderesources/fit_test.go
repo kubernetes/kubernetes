@@ -2173,19 +2173,22 @@ func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 }
 
 func TestFitSignPod(t *testing.T) {
+	testFitSignPod(ktesting.Init(t))
+}
+func testFitSignPod(tCtx ktesting.TContext) {
 	tests := map[string]struct {
-		name                      string
-		pod                       *v1.Pod
-		enableDRAExtendedResource bool
-		expectedFragments         []fwk.SignFragment
-		expectedStatusCode        fwk.Code
+		name                       string
+		pod                        *v1.Pod
+		disableDRAExtendedResource bool
+		expectedFragments          []fwk.SignFragment
+		expectedStatusCode         fwk.Code
 	}{
 		"pod with CPU and memory requests": {
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
 				v1.ResourceCPU:    "1000m",
 				v1.ResourceMemory: "2000",
 			}).Obj(),
-			enableDRAExtendedResource: false,
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Req(map[v1.ResourceName]string{
 					v1.ResourceCPU:    "1000m",
@@ -2195,8 +2198,8 @@ func TestFitSignPod(t *testing.T) {
 			expectedStatusCode: fwk.Success,
 		},
 		"best-effort pod with no requests": {
-			pod:                       st.MakePod().Obj(),
-			enableDRAExtendedResource: false,
+			pod:                        st.MakePod().Obj(),
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Obj(), ResourceRequestsOptions{})},
 			},
@@ -2210,7 +2213,7 @@ func TestFitSignPod(t *testing.T) {
 				v1.ResourceCPU:    "1500m",
 				v1.ResourceMemory: "3000",
 			}).Obj(),
-			enableDRAExtendedResource: false,
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Container("container1").Req(map[v1.ResourceName]string{
 					v1.ResourceCPU:    "500m",
@@ -2224,37 +2227,66 @@ func TestFitSignPod(t *testing.T) {
 		},
 		"DRA extended resource enabled - returns unschedulable": {
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1000m",
-				v1.ResourceMemory: "2000",
+				v1.ResourceCPU:                        "1000m",
+				v1.ResourceMemory:                     "2000",
+				v1.ResourceName(extendedResourceName): "1",
 			}).Obj(),
-			enableDRAExtendedResource: true,
-			expectedFragments:         nil,
-			expectedStatusCode:        fwk.Unschedulable,
+			disableDRAExtendedResource: false,
+			expectedFragments:          nil,
+			expectedStatusCode:         fwk.Unschedulable,
+		},
+		"DRA extended resource disabled": {
+			pod: st.MakePod().Req(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:                        "1000m",
+					v1.ResourceMemory:                     "2000",
+					v1.ResourceName(extendedResourceName): "1",
+				}).Obj(),
+			disableDRAExtendedResource: true,
+			expectedFragments: []fwk.SignFragment{
+				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().
+					Container("container1").Req(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:                        "1000m",
+						v1.ResourceMemory:                     "2000",
+						v1.ResourceName(extendedResourceName): "1",
+					}).Obj(), ResourceRequestsOptions{})},
+			},
+			expectedStatusCode: fwk.Success,
 		},
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			runOpts := []runtime.Option{}
+			var testDRAManager *dynamicresources.DefaultDRAManager
+			if !test.disableDRAExtendedResource {
+				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
+				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
+			}
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
+			defer func() {
+				tCtx.Cancel("test has completed")
+				runtime.WaitForShutdown(fh)
+			}()
 
-			fh, _ := runtime.NewFramework(ctx, nil, nil)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
-				EnableDRAExtendedResource: test.enableDRAExtendedResource,
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+				EnableDRAExtendedResource: !test.disableDRAExtendedResource,
 			})
 			if err != nil {
-				t.Fatalf("failed to create plugin: %v", err)
+				tCtx.Fatalf("failed to create plugin: %v", err)
 			}
 
 			fit := p.(*Fit)
-			fragments, status := fit.SignPod(ctx, test.pod)
+			fragments, status := fit.SignPod(tCtx, test.pod)
 
 			if status.Code() != test.expectedStatusCode {
-				t.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
+				tCtx.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
 			}
 
 			if test.expectedStatusCode == fwk.Success {
 				if diff := cmp.Diff(test.expectedFragments, fragments); diff != "" {
-					t.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
+					tCtx.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
 				}
 			}
 		})
