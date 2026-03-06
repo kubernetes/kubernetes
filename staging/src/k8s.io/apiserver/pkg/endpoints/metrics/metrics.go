@@ -130,7 +130,7 @@ var (
 			// dependant on user configuration.
 			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -172,7 +172,7 @@ var (
 			Subsystem:      APIServerComponent,
 			Name:           "watch_events_total",
 			Help:           "Number of events sent in watch clients",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)
@@ -182,7 +182,7 @@ var (
 			Name:           "watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
 			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)
@@ -233,7 +233,7 @@ var (
 			Name:           "request_filter_duration_seconds",
 			Help:           "Request filter latency distribution in seconds, for each filter type",
 			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0, 10.0, 15.0, 30.0},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"filter"},
 	)
