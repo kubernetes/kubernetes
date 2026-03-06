@@ -19,8 +19,16 @@ package authorizer
 import (
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
+	"slices"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ErrorConditionEvaluationNotSupported is returned by authorizer implementations
@@ -40,6 +48,8 @@ var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not 
 // Decision equality must be checked with Decision.Equal, not reflect.DeepEqual.
 type ConditionsAwareDecision struct {
 	unconditionalDecision Decision
+
+	conditionsMap ConditionsMap
 
 	reason string
 	err    error
@@ -107,14 +117,31 @@ func (d ConditionsAwareDecision) IsNoOpinion() bool {
 	return d.unconditionalDecision == DecisionNoOpinion
 }
 
+// IsConditionsMap returns true if the decision is a conditional response
+// with a map of conditions to evaluate.
+func (d ConditionsAwareDecision) IsConditionsMap() bool {
+	return len(d.conditionsMap.conditions) != 0
+}
+
 // IsDenied returns true if the decision is an unconditional Deny.
 func (d ConditionsAwareDecision) IsDenied() bool {
 	// The decision is a Deny whenever none of the other modes apply
-	// NOTE: A Conditional decision is encoded as
-	// d.unconditionalDecision == 0 == decisionDeny && d.conditionSet != nil, so it
+	// NOTE: A conditional decision is encoded as
+	// d.unconditionalDecision == 0 == decisionDeny && d.conditionMap.conditions != nil, so it
 	// is not enough to check d.unconditionalDecision == decisionDeny
 	// This is because the zero value of the struct must be a Deny
-	return !d.IsAllowed() && !d.IsNoOpinion()
+	return !d.IsAllowed() && !d.IsNoOpinion() && !d.IsConditionsMap()
+}
+
+// IsUnconditional is true if d is Allowed, Denied or NoOpinion.
+func (d ConditionsAwareDecision) IsUnconditional() bool {
+	return d.IsAllowed() || d.IsDenied() || d.IsNoOpinion()
+}
+
+// ConditionsMap returns the ConditionsMap, which is non-empty
+// if and only if IsConditionsMap is true.
+func (d ConditionsAwareDecision) ConditionsMap() ConditionsMap {
+	return d.conditionsMap
 }
 
 func (d ConditionsAwareDecision) Reason() string {
@@ -137,13 +164,257 @@ func (d ConditionsAwareDecision) String() string {
 	if d.IsNoOpinion() {
 		return fmt.Sprintf("NoOpinion(%q, %s)", d.reason, errStr)
 	}
+	if d.IsConditionsMap() {
+		return fmt.Sprintf("ConditionsMap(target=%q, type=%q, len=%d, reason=%q, err=%s)", d.conditionsMap.conditionTarget, d.conditionsMap.conditionType, len(d.conditionsMap.conditions), d.reason, errStr)
+	}
 	// Deny is written such that if none of the other modes apply,
 	// IsDenied() is true.
 	return fmt.Sprintf("Deny(%q, %s)", d.reason, errStr)
 }
 
-// ConditionsMap is a map of conditions of a given type.
+// Maximum limits for conditions and condition sets.
+const (
+	// MaxConditionsPerSet is the maximum number of conditions allowed in a single ConditionsMap.
+	MaxConditionsPerSet = 128
+	// MaxConditionBytes is the maximum size in bytes for a single Condition.Condition and Condition.Description string.
+	MaxConditionBytes = 10240
+)
+
+// ConditionEffect specifies how a condition evaluating to true should be handled.
+type ConditionEffect string
+
+const (
+	// ConditionEffectDeny means that if this condition evaluates to true,
+	// the ConditionsMap necessarily evaluates to Deny. No further authorizers
+	// are consulted.
+	ConditionEffectDeny ConditionEffect = "Deny"
+
+	// ConditionEffectNoOpinion means that if this condition evaluates to true,
+	// the given authorizer's ConditionsMap cannot evaluate to Allow anymore, but
+	// necessarily Deny or NoOpinion, depending on whether there are any true
+	// EffectDeny conditions.
+	// However, later authorizers in the chain can still Allow or Deny.
+	// It is effectively a softer deny that just overrides the authorizer's own
+	// allow policies.
+	ConditionEffectNoOpinion ConditionEffect = "NoOpinion"
+
+	// ConditionEffectAllow means that if this condition evaluates to true,
+	// the ConditionsMap evaluates to Allow, unless any Deny/NoOpinion condition
+	// also evaluates to true (in which case the Deny/NoOpinion conditions have
+	// precedence).
+	ConditionEffectAllow ConditionEffect = "Allow"
+)
+
+// Validate validates that the given ConditionEffect is known to the system.
+func (e ConditionEffect) Validate() error {
+	if !supportedConditionEffects.Has(e) {
+		return fmt.Errorf("condition effect %q not supported. Supported effects are: %v", e, slices.Sorted(maps.Keys(supportedConditionEffects)))
+	}
+	return nil
+}
+
+var supportedConditionEffects = sets.New(ConditionEffectDeny, ConditionEffectNoOpinion, ConditionEffectAllow)
+
+// ConditionType represents a type of authorization conditions.
+// Should be formatted as a Kubernetes label key.
+// Any domain suffix of *.k8s.io or *.kubernetes.io is reserved.
+type ConditionType string
+
+func (ct ConditionType) Validate() error {
+	if errs := content.IsLabelKey(string(ct)); len(errs) > 0 {
+		return fmt.Errorf("invalid condition type %q: %s", ct, strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// Condition represents a single condition to be evaluated against ConditionsData.
+// A condition is a pure, deterministic function from ConditionsData to a boolean.
+type Condition struct {
+	// Condition is an opaque string that represents the condition to be evaluated.
+	// It is a pure, deterministic function from ConditionsData to a boolean.
+	// Might or might not be human-readable. Maximum MaxConditionBytes bytes.
+	Condition string
+
+	// Effect specifies how the condition evaluating to "true" should be treated.
+	Effect ConditionEffect
+
+	// Description is an optional human-friendly description that can be shown
+	// as an error message or for debugging.
+	Description string
+}
+
+// validateCondition validates a single Condition.
+func (cond Condition) Validate(id string) error {
+	// Validate ID as a label key.
+	if errs := content.IsLabelKey(id); len(errs) > 0 {
+		return fmt.Errorf("invalid condition ID %q: %s", id, strings.Join(errs, "; "))
+	}
+
+	// Validate Condition strings length.
+	if len(cond.Condition) == 0 {
+		return fmt.Errorf("condition %q has empty Condition string", id)
+	}
+	if len(cond.Condition) > MaxConditionBytes {
+		return fmt.Errorf("condition %q exceeds maximum length of %d bytes (saw %d bytes)", id, MaxConditionBytes, len(cond.Condition))
+	}
+	if len(cond.Description) > MaxConditionBytes {
+		return fmt.Errorf("condition description %q exceeds maximum length of %d bytes (saw %d bytes)", id, MaxConditionBytes, len(cond.Condition))
+	}
+
+	return cond.Effect.Validate()
+}
+
+// ConditionsMap is a map of conditions of a given type, and represents
+// the conditional decision from the authorizer.
+// It must be constructed through DecisionConditional.
 type ConditionsMap struct {
+	// conditionTarget represents what data the conditions are written against.
+	conditionTarget ConditionsTarget
+
+	// conditionType is the format/encoding/language of the conditions in this set.
+	// Any type starting with `k8s.io/` is reserved for Kubernetes condition types.
+	// Validated as a label key.
+	conditionType ConditionType
+
+	// conditions is the set of conditions to evaluate.
+	// The string ID uniquely identifies the condition within the scope of the authorizer
+	// that authored the condition. Validated as a Kubernetes label key, i.e.
+	// (<DNS1123 subdomain>/)[-A-Za-z0-9_.]{1,63}.
+	// IDs with the 'k8s.io/' prefix are reserved for Kubernetes.
+	conditions map[string]Condition
+}
+
+// Type returns the condition type (format/encoding/language) of the conditions
+// in this set.
+func (c ConditionsMap) Type() ConditionType {
+	return c.conditionType
+}
+
+// Conditions returns the conditions in this set. The returned slice must not be
+// modified.
+func (c ConditionsMap) Conditions() iter.Seq2[string, Condition] {
+	return func(yield func(string, Condition) bool) {
+		for id, cond := range c.conditions {
+			if !yield(id, cond) {
+				return
+			}
+		}
+	}
+}
+
+func (c ConditionsMap) DenyConditions() iter.Seq2[string, Condition] {
+	return func(yield func(string, Condition) bool) {
+		for id, cond := range c.conditions {
+			if cond.Effect != ConditionEffectDeny {
+				continue
+			}
+			if !yield(id, cond) {
+				return
+			}
+		}
+	}
+}
+
+func (c ConditionsMap) NoOpinionConditions() iter.Seq2[string, Condition] {
+	return func(yield func(string, Condition) bool) {
+		for id, cond := range c.conditions {
+			if cond.Effect != ConditionEffectNoOpinion {
+				continue
+			}
+			if !yield(id, cond) {
+				return
+			}
+		}
+	}
+}
+
+func (c ConditionsMap) AllowConditions() iter.Seq2[string, Condition] {
+	return func(yield func(string, Condition) bool) {
+		for id, cond := range c.conditions {
+			if cond.Effect != ConditionEffectAllow {
+				continue
+			}
+			if !yield(id, cond) {
+				return
+			}
+		}
+	}
+}
+
+// ConditionsAwareDecisionConditionMap creates a ConditionsMap decision. One can use maps.All to create an iterator from a map[string]Condition.
+func ConditionsAwareDecisionConditionMap(conditionTarget ConditionsTarget, conditionType ConditionType, conditionsIter iter.Seq2[string, Condition], reason string, err error) ConditionsAwareDecision {
+	conditionMap := map[string]Condition{}
+	seenIDs := sets.New[string]()
+	errlist := []error{}
+	hasDenyEffect := false
+	makeFailClosedError := func(err error) ConditionsAwareDecision {
+		if hasDenyEffect {
+			return ConditionsAwareDecisionDeny("failed closed", err)
+		}
+		return ConditionsAwareDecisionNoOpinion("failed closed", err)
+	}
+	for id, condition := range conditionsIter {
+		// Fail closed if there are unknown effects
+		if err := condition.Effect.Validate(); err != nil {
+			return ConditionsAwareDecisionDeny("failed closed", err)
+		}
+		if condition.Effect == ConditionEffectDeny {
+			hasDenyEffect = true
+		}
+		if seenIDs.Has(id) {
+			errlist = append(errlist, fmt.Errorf("duplicate condition ID %q", id))
+			continue
+		}
+		seenIDs.Insert(id)
+
+		if err := condition.Validate(id); err != nil {
+			errlist = append(errlist, err)
+			continue
+		}
+		conditionMap[id] = condition
+		// defensively stop directly when having seen too many conditions
+		if len(conditionMap) > MaxConditionsPerSet {
+			return ConditionsAwareDecisionDeny("failed closed", fmt.Errorf("too many conditions: %d exceeds maximum of %d", len(conditionMap), MaxConditionsPerSet))
+		}
+	}
+
+	// check errors before len(ConditionsMap) == 0, as some errors might have made the map be empty
+	// although there were items in the iterator
+	if err := utilerrors.NewAggregate(errlist); err != nil {
+		// the error is returned first here, not in the loop, to make sure we saw all conditions,
+		// and fail closed with deny if there were any deny conditions
+		return makeFailClosedError(err)
+	}
+
+	// an empty ConditionsMap always evaluates to NoOpinion
+	// ignore conditionType being invalid or the feature gate not being set in this case, as it does not matter
+	if len(conditionMap) == 0 {
+		return ConditionsAwareDecisionNoOpinion("empty ConditionsMap", err)
+	}
+
+	// Do not allow constructing Conditional decisions when the feature gate is off
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		return makeFailClosedError(fmt.Errorf("cannot construct conditional decision: the ConditionalAuthorization feature gate is disabled"))
+	}
+
+	if err := conditionTarget.Validate(); err != nil {
+		return makeFailClosedError(err)
+	}
+
+	if err := conditionType.Validate(); err != nil {
+		return makeFailClosedError(err)
+	}
+
+	return ConditionsAwareDecision{
+		unconditionalDecision: 0,
+		conditionsMap: ConditionsMap{
+			conditionTarget: conditionTarget,
+			conditionType:   conditionType,
+			conditions:      conditionMap,
+		},
+		reason: reason,
+		err:    err,
+	}
 }
 
 // BuiltinConditionsMapEvaluators represents a list of builtin
@@ -194,7 +465,27 @@ func (pref ConditionsEncodingPreference) IncludeDescription() bool {
 	return pref.includeDescription
 }
 
+// ConditionsTarget represents a target data set a condition is set to evaluate against.
+type ConditionsTarget string
+
+const (
+	// ConditionsTargetAdmissionControl represents that a condition can be written against
+	// the data available in admission, for example, Object and OldObject.
+	ConditionsTargetAdmissionControl ConditionsTarget = "AdmissionControl"
+)
+
+// Validate validates that the given ConditionsTarget is known to the system.
+func (t ConditionsTarget) Validate() error {
+	if !supportedTargets.Has(t) {
+		return fmt.Errorf("conditions target %q not supported. Supported targets are: %v", t, slices.Sorted(maps.Keys(supportedTargets)))
+	}
+	return nil
+}
+
+var supportedTargets = sets.New(ConditionsTargetAdmissionControl)
+
 // ConditionsData is an enum type for various evaluation targets conditions
 // can be written against.
 type ConditionsData struct {
+	target ConditionsTarget
 }
