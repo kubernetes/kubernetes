@@ -79,7 +79,7 @@ func TestShardedList(t *testing.T) {
 	// Create a batch of configmaps.
 	const numObjects = 20
 	created := make([]*v1.ConfigMap, 0, numObjects)
-	for i := 0; i < numObjects; i++ {
+	for range numObjects {
 		cm, err := client.CoreV1().ConfigMaps(ns.Name).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "shard-test-",
@@ -94,7 +94,7 @@ func TestShardedList(t *testing.T) {
 	const numShards = 3
 	allFound := make(map[string]bool)
 
-	for shard := 0; shard < numShards; shard++ {
+	for shard := range numShards {
 		selector := shardSelectorString(shard, numShards)
 		list, err := client.CoreV1().ConfigMaps(ns.Name).List(ctx, metav1.ListOptions{
 			Selector: selector,
@@ -150,7 +150,7 @@ func TestShardedWatch(t *testing.T) {
 
 	// Start a watch per shard.
 	watchers := make([]watch.Interface, numShards)
-	for shard := 0; shard < numShards; shard++ {
+	for shard := range numShards {
 		w, err := client.CoreV1().ConfigMaps(ns.Name).Watch(ctx, metav1.ListOptions{
 			ResourceVersion: rv,
 			Selector:        shardSelectorString(shard, numShards),
@@ -166,7 +166,7 @@ func TestShardedWatch(t *testing.T) {
 	const numObjects = 10
 	expectedShard := make(map[string]int) // UID -> shard index
 
-	for i := 0; i < numObjects; i++ {
+	for range numObjects {
 		cm, err := client.CoreV1().ConfigMaps(ns.Name).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "shard-watch-",
@@ -175,7 +175,7 @@ func TestShardedWatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create configmap: %v", err)
 		}
-		for shard := 0; shard < numShards; shard++ {
+		for shard := range numShards {
 			if objectInShard(string(cm.UID), shard, numShards) {
 				expectedShard[string(cm.UID)] = shard
 				break
@@ -189,7 +189,7 @@ func TestShardedWatch(t *testing.T) {
 		received[i] = make(map[string]bool)
 	}
 
-	for shard := 0; shard < numShards; shard++ {
+	for shard := range numShards {
 		collectEvents(t, watchers[shard], received[shard], expectedShard)
 	}
 
@@ -198,7 +198,7 @@ func TestShardedWatch(t *testing.T) {
 		if !received[expectedIdx][uid] {
 			t.Errorf("UID %s: expected in shard %d but not received", uid, expectedIdx)
 		}
-		for other := 0; other < numShards; other++ {
+		for other := range numShards {
 			if other != expectedIdx && received[other][uid] {
 				t.Errorf("UID %s: received in shard %d but expected only in shard %d", uid, other, expectedIdx)
 			}
@@ -280,7 +280,7 @@ func TestShardedListComplete(t *testing.T) {
 
 	// An empty/everything selector should return all objects without sharded=true.
 	const numObjects = 5
-	for i := 0; i < numObjects; i++ {
+	for range numObjects {
 		_, err := client.CoreV1().ConfigMaps(ns.Name).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "complete-",
