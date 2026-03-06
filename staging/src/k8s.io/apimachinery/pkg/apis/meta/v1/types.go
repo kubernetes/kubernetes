@@ -92,6 +92,12 @@ type ListMeta struct {
 	// should not rely on the remainingItemCount to be set or to be exact.
 	// +optional
 	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
+
+	// sharded indicates this list is a filtered subset of the full list, as selected by a
+	// shard selector on the request. Clients should not cache sharded list responses as a
+	// full representation of the collection.
+	// +optional
+	Sharded bool `json:"sharded,omitempty" protobuf:"varint,5,opt,name=sharded"`
 }
 
 // Field path constants that are specific to the internal API
@@ -430,6 +436,16 @@ type ListOptions struct {
 	// compatibility reasons) and to false otherwise.
 	// +optional
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
+
+	// selector is a shard selector that restricts the list of returned objects using a
+	// functional grammar. The format is a comma-separated list of requirements, where each
+	// requirement is: shardRange(fieldPath,hexStart,hexEnd). The fieldPath specifies which
+	// metadata field to hash (e.g. object.metadata.uid). hexStart/hexEnd define the inclusive
+	// lower and exclusive upper bounds of the FNV-1a hash range. Empty bounds mean unbounded.
+	// Example: shardRange(object.metadata.uid,0000000000000000,8000000000000000)
+	// Requires the ShardedListandWatch feature gate to be enabled.
+	// +optional
+	Selector string `json:"selector,omitempty" protobuf:"bytes,15,opt,name=selector"`
 }
 
 const (
