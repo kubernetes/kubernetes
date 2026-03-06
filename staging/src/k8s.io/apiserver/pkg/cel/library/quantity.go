@@ -139,8 +139,6 @@ func Quantity() cel.EnvOption {
 
 var quantityLib = &quantity{}
 
-const zeroDivErrMsg = "division by zero error"
-
 type quantity struct{}
 
 func (*quantity) LibraryName() string {
@@ -390,7 +388,7 @@ func quantityDivideIntDefaultRounding(arg ref.Val, div ref.Val) ref.Val {
 	}
 
 	if denominator == 0 {
-		panic(zeroDivErrMsg)
+		return types.NewErr("division by zero")
 	}
 
 	copy := *q
@@ -412,7 +410,7 @@ func quantityIntegerDivision(arg ref.Val, div ref.Val) ref.Val {
 	}
 
 	if denominator == 0 {
-		panic(zeroDivErrMsg)
+		return types.NewErr("division by zero")
 	}
 
 	copy := *q
@@ -439,7 +437,7 @@ func quantityDivideIntRound(args ...ref.Val) ref.Val {
 	}
 
 	if denominator == 0 {
-		panic(zeroDivErrMsg)
+		return types.NewErr("division by zero")
 	}
 
 	if roundVal > 10 || roundVal < 0 {
