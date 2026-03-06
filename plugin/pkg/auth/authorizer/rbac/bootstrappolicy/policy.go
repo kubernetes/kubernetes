@@ -293,23 +293,25 @@ func NodeRules() []rbacv1.PolicyRule {
 
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbacv1.ClusterRole {
-	monitoringRules := []rbacv1.PolicyRule{
-		rbacv1helpers.NewRule("get").URLs(
-			"/metrics", "/metrics/slis",
-			"/livez", "/readyz", "/healthz",
-			"/livez/*", "/readyz/*", "/healthz/*",
-		).RuleOrDie(),
-
-		// Needed for kubelet metrics
-		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
+	monitoringURLs := []string{
+		"/metrics", "/metrics/slis",
+		"/livez", "/readyz", "/healthz",
+		"/livez/*", "/readyz/*", "/healthz/*",
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/flagz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/flagz")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/statusz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/statusz")
+	}
+
+	monitoringRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("get").URLs(monitoringURLs...).RuleOrDie(),
+
+		// Needed for kubelet metrics
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
 	}
 
 	roles := []rbacv1.ClusterRole{

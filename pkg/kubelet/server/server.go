@@ -319,17 +319,16 @@ func NewServer(
 	server.InstallAuthNotRequiredHandlers(ctx)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		logger.Info("Adding debug handlers to kubelet server")
-		server.InstallAuthRequiredHandlers(ctx)
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler, kubeCfg.EnableSystemLogQuery)
 		server.InstallProfilingHandler(kubeCfg.EnableProfilingHandler, kubeCfg.EnableContentionProfiling)
 		server.InstallDebugFlagsHandler(kubeCfg.EnableDebugFlagsHandler)
+		// must be done last so all paths are included in /statusz
+		server.InstallAuthRequiredHandlers(ctx)
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
-
-	server.installStatusZ()
 
 	return server
 }
@@ -394,7 +393,14 @@ func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelr
 	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", append(opts, otelrestful.WithTracerProvider(tp))...))
 }
 
-func (s *Server) installStatusZ() {
+func (s *Server) InstallZPages() {
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
+	}
+	// must be done last so all paths are included in /statusz
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
 		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
@@ -605,13 +611,6 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		if s.flagz != nil {
-			s.addMetricsBucketMatcher("flagz")
-			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
-		}
-	}
-
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
@@ -633,6 +632,9 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
 	}
+
+	// must be done last so all paths are included in /statusz
+	s.InstallZPages()
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message

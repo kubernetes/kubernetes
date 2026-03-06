@@ -1052,6 +1052,7 @@ items:
     name: system:monitoring
   rules:
   - nonResourceURLs:
+    - /flagz
     - /healthz
     - /healthz/*
     - /livez
@@ -1060,20 +1061,13 @@ items:
     - /metrics/slis
     - /readyz
     - /readyz/*
+    - /statusz
     verbs:
     - get
   - apiGroups:
     - ""
     resources:
     - nodes/metrics
-    verbs:
-    - get
-  - nonResourceURLs:
-    - /flagz
-    verbs:
-    - get
-  - nonResourceURLs:
-    - /statusz
     verbs:
     - get
 - apiVersion: rbac.authorization.k8s.io/v1
