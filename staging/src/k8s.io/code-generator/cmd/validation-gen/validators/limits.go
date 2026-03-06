@@ -191,7 +191,7 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mitv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         mitv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(mitv.ValidScopes()),
 		Description:    "Indicates that a list has a limit on its size.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
@@ -239,7 +239,7 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         mtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(mtv.ValidScopes()),
 		Description:    "Indicates that a numeric field has a minimum value.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",

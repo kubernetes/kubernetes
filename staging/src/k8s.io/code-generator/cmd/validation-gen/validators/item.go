@@ -251,7 +251,7 @@ func (itv itemTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         itv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(itv.ValidScopes()),
 		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
 		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",

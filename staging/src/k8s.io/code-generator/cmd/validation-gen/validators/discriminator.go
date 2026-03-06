@@ -132,7 +132,7 @@ func (mtv *discriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         mtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(mtv.ValidScopes()),
 		Description:    "Indicates that this field is a discriminator for state-based validation.",
 		Args: []TagArgDoc{{
 			Name:        "name",
@@ -216,7 +216,7 @@ func (mtv *memberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         mtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(mtv.ValidScopes()),
 		Description:    "Indicates that this field's validation depends on a discriminator.",
 		Args: []TagArgDoc{{
 			Name:        "", // positional

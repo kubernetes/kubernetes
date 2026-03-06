@@ -304,7 +304,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 func (rtv requirednessTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:    rtv.TagName(),
-		Scopes: rtv.ValidScopes().UnsortedList(),
+		Scopes: sets.List(rtv.ValidScopes()),
 	}
 
 	switch rtv.mode {

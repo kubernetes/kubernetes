@@ -135,7 +135,7 @@ func (utc updateTagCollector) Docs() TagDoc {
 	return TagDoc{
 		Tag:            utc.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         utc.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(utc.ValidScopes()),
 		PayloadsType:   codetags.ValueTypeString,
 		Description: "Provides constraints on the allowed update operations of a field. " +
 			"Currently supports non-list and non-map fields only. " +
