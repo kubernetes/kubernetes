@@ -26,8 +26,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// Attributes is an interface used by an Authorizer to get information about a request
-// that is used to make an authorization decision.
+// Attributes is an interface used by an Authorizer to get information about a
+// request's metadata, that is used to compute an uncondititional or conditional
+// authorization decision.
 type Attributes interface {
 	// GetUser returns the user.Info object to authorize
 	GetUser() user.Info
@@ -78,16 +79,67 @@ type Attributes interface {
 }
 
 // Authorizer makes an authorization decision based on information gained by making
-// zero or more calls to methods of the Attributes interface.  It returns nil when an action is
-// authorized, otherwise it returns an error.
+// zero or more calls to methods of the Attributes interface. It might return
+// an error together with any decision. It is up to the caller to decide whether
+// that error is critical or not.
 type Authorizer interface {
+	// Authorize returns an unconditional decision based on the Attributes alone.
 	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
+
+	// AuthorizeConditionsAware returns an unconditional, conditional, or unioned
+	// decision, where the error and reason is part of the Decision struct.
+	//
+	// encodingPreference allows the caller to tell the authorizer how it prefers the conditions to be
+	// encoded, e.g. in optimized or human-readable form.
+	// The authorizer is free to respect or ignore this preference.
+	//
+	// An authorizer who is not conditions-aware MUST implement this function as
+	// "return authorizer.ConditionsAwareDecisionFromParts(self.Authorize(ctx, a))",
+	// such that conditions-aware callers to this authorizer get the same output
+	// as if they called Authorize. Callers are only expected to call one of
+	// Authorize or AuthorizeConditionsAware, not both.
+	AuthorizeConditionsAware(ctx context.Context, a Attributes, encodingPreference ConditionsEncodingPreference) ConditionsAwareDecision
+
+	// EvaluateConditions evaluates a conditional or unioned ConditionsAwareDecision against previously-unknown data,
+	// and returns another ConditionsAwareDecision (with reason and error as part of the struct).
+	//
+	// A conditional decision may only be returned if the conditions depend on information
+	// not supplied in data.
+	//
+	// The authorizer might make use of the builtin evaluators, in case evaluation otherwise would be expensive.
+	//
+	// An authorizer who does not support conditions should fail closed and return
+	// ConditionsAwareDecisionDeny("", ErrorConditionEvaluationNotSupported)
+	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData, builtinEvaluators BuiltinConditionsMapEvaluators) ConditionsAwareDecision
 }
+
+// BuiltinConditionsMapEvaluator provides conditions evaluation capabilities for generic
+// condition types, for example, for conditions expressed using Kubernetes CEL syntax.
+type BuiltinConditionsMapEvaluator interface {
+	// BuiltinEvaluateConditions evaluates a conditions map given more information in ConditionData.
+	//
+	// The resulting Decision may be concrete (Allow/Deny/NoOpinion), or again conditional, if the
+	// data in ConditionData is partial. The returned decision must not be of the union variant.
+	//
+	// If the builtin evaluator does not know how to evaluate the given decision, it should just
+	// return nil, nil.
+	BuiltinEvaluateConditions(ctx context.Context, conditionsMap ConditionsMap, data ConditionsData) (fullyEvaluatedDecision *ConditionsAwareDecision, err error)
+}
+
+var _ Authorizer = AuthorizerFunc(nil)
 
 type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, string, error)
 
 func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, string, error) {
 	return f(ctx, a)
+}
+
+func (f AuthorizerFunc) AuthorizeConditionsAware(ctx context.Context, a Attributes, _ ConditionsEncodingPreference) ConditionsAwareDecision {
+	return ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+func (f AuthorizerFunc) EvaluateConditions(_ context.Context, _ ConditionsAwareDecision, _ ConditionsData, _ BuiltinConditionsMapEvaluators) ConditionsAwareDecision {
+	return ConditionsAwareDecisionDeny("", ErrorConditionEvaluationNotSupported)
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
@@ -172,6 +224,8 @@ func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
 	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
 }
 
+// Decision represents an final, unconditional authorization decision.
+// The zero value (0) of Decision is DecisionDeny.
 type Decision int
 
 const (
@@ -180,7 +234,8 @@ const (
 	// DecisionAllow means that an authorizer decided to allow the action.
 	DecisionAllow
 	// DecisionNoOpinion means that an authorizer has no opinion on whether
-	// to allow or deny an action.
+	// to allow or deny an action. If there are multiple unioned authorizers,
+	// this means that the request can thus get allowed by some later authorizer.
 	DecisionNoOpinion
 )
 
