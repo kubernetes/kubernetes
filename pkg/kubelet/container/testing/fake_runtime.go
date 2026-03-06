@@ -463,6 +463,14 @@ func (f *FakeRuntime) CheckpointContainer(_ context.Context, options *runtimeapi
 	return f.Err
 }
 
+func (f *FakeRuntime) CheckpointPod(_ context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "CheckpointPod")
+	return f.Err
+}
+
 func (f *FakeRuntime) ListMetricDescriptors(_ context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	f.Lock()
 	defer f.Unlock()
