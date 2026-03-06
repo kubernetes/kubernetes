@@ -23,18 +23,30 @@ import (
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// newCondition creates a new ConditionApplyConfiguration.
-func newCondition(
+// setCondition creates or updates a condition in the apply configuration,
+// preserving the LastTransitionTime when the status has not changed.
+// Inspired by k8s.io/apimachinery/pkg/api/meta.SetStatusCondition.
+func setCondition(
+	existingConditions []metav1.Condition,
 	conditionType coordinationv1alpha1.EvictionRequestConditionType,
 	status metav1.ConditionStatus,
 	reason, message string,
 ) *metav1ac.ConditionApplyConfiguration {
+	now := metav1.Now()
+	transitionTime := now
+
+	existing := meta.FindStatusCondition(existingConditions, string(conditionType))
+	if existing != nil && existing.Status == status {
+		// Status unchanged, so we preserve the original transition time
+		transitionTime = existing.LastTransitionTime
+	}
+
 	return metav1ac.Condition().
 		WithType(string(conditionType)).
 		WithStatus(status).
 		WithReason(reason).
 		WithMessage(message).
-		WithLastTransitionTime(metav1.Now())
+		WithLastTransitionTime(transitionTime)
 }
 
 // isTerminal returns true if the EvictionRequest has reached

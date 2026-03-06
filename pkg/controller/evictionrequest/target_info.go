@@ -18,12 +18,14 @@ package evictionrequest
 
 import (
 	"fmt"
-	"time"
 
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
+
+var _ metav1.ObjectMetaAccessor = &targetInfo{}
 
 // targetInfo abstracts over the eviction target so that callers can ask
 // semantic questions ("is the target valid?", "is it gone?") rather than
@@ -38,6 +40,17 @@ type targetInfo struct {
 // a nil pod with a non-nil spec.Pod means the pod was not found.
 func newTargetInfo(spec coordinationv1alpha1.EvictionTarget, pod *v1.Pod) targetInfo {
 	return targetInfo{spec: spec, pod: pod}
+}
+
+// GetObjectMeta returns the target's ObjectMeta, or nil if the target is unavailable.
+func (t targetInfo) GetObjectMeta() metav1.Object {
+	switch {
+	case t.spec.Pod != nil:
+		if t.pod != nil {
+			return t.pod
+		}
+	}
+	return nil
 }
 
 // isGone reports whether the original target no longer exists. This is true
@@ -66,11 +79,20 @@ func (t targetInfo) isValidTarget() (bool, string) {
 		if string(t.pod.UID) != t.spec.Pod.UID {
 			return false, fmt.Sprintf("Pod UID mismatch: expected %s, got %s", t.spec.Pod.UID, string(t.pod.UID))
 		}
-		if t.pod.Spec.WorkloadRef != nil {
+		if t.hasWorkloadRef() {
 			return false, fmt.Sprintf("Target pod %s is part of a Workload. Eviction of such pods is currently not supported.", t.pod.Name)
 		}
 	}
 	return true, ""
+}
+
+// hasWorkloadRef reports whether the target belongs to a Workload.
+func (t targetInfo) hasWorkloadRef() bool {
+	switch {
+	case t.pod != nil:
+		return t.pod.Spec.WorkloadRef != nil
+	}
+	return false
 }
 
 // isTerminal reports whether the target has reached a terminal lifecycle state.
@@ -89,28 +111,6 @@ func (t targetInfo) targetType() string {
 		return "pod"
 	}
 	return "unknown"
-}
-
-// name returns the found target's name, or "" if unavailable.
-func (t targetInfo) name() string {
-	switch {
-	case t.pod != nil:
-		return t.pod.Name
-	}
-	return ""
-}
-
-// deletionTimestamp returns the target's deletion timestamp, or nil if the
-// target is unavailable or has not been deleted.
-func (t targetInfo) deletionTimestamp() time.Time {
-	switch {
-	case t.pod != nil:
-		timestamp := t.pod.DeletionTimestamp
-		if timestamp != nil {
-			return timestamp.Time
-		}
-	}
-	return time.Time{}
 }
 
 // evictionInterceptors returns the interceptors declared on the target, or nil
