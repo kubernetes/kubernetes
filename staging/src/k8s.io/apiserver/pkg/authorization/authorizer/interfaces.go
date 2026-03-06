@@ -263,6 +263,10 @@ func DecisionPartsFromConditionsAware(d ConditionsAwareDecision) (Decision, stri
 	case d.IsNoOpinion():
 		return DecisionNoOpinion, d.Reason(), d.Error()
 	default:
-		return DecisionDeny, "failed closed", fmt.Errorf("tried to return conditional decision to conditions-unaware authorizer")
+		failClosed := d.FailClosedDecision(fmt.Errorf("tried to return conditional decision to conditions-unaware authorizer"))
+		if failClosed.IsNoOpinion() {
+			return DecisionNoOpinion, failClosed.Reason(), failClosed.Error()
+		}
+		return DecisionDeny, failClosed.Reason(), failClosed.Error()
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validate/content"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -150,6 +151,21 @@ func (d ConditionsAwareDecision) Reason() string {
 
 func (d ConditionsAwareDecision) Error() error {
 	return d.err
+}
+
+// FailClosedDecision returns either a Deny or NoOpinion Decision to fail closed
+// whenever processing a decision fails. If the decision contains one or
+// more Deny conditions, the Decision must be Deny, as that could have been the
+// answer if the evaluation had been successful. Otherwise, NoOpinion is returned.
+func (d ConditionsAwareDecision) FailClosedDecision(err error) ConditionsAwareDecision {
+	if d.IsAllowed() || d.IsNoOpinion() {
+		return ConditionsAwareDecisionNoOpinion("failed closed", err)
+	}
+	if d.IsConditionsMap() {
+		return d.conditionsMap.FailClosedDecision(err)
+	}
+	// => d.IsDenied() == true
+	return ConditionsAwareDecisionDeny("failed closed", err)
 }
 
 // String returns a human-readable representation of the decision.
@@ -285,16 +301,21 @@ type ConditionsMap struct {
 }
 
 // Type returns the condition type (format/encoding/language) of the conditions
-// in this set.
+// in this map.
 func (c ConditionsMap) Type() ConditionType {
 	return c.conditionType
 }
 
-// Conditions returns the conditions in this set. The returned slice must not be
-// modified.
+// Target returns the condition target of the conditions in this map.
+func (c ConditionsMap) Target() ConditionsTarget {
+	return c.conditionTarget
+}
+
+// Conditions returns all conditions in this map, sorted by ID.
 func (c ConditionsMap) Conditions() iter.Seq2[string, Condition] {
 	return func(yield func(string, Condition) bool) {
-		for id, cond := range c.conditions {
+		for _, id := range slices.Sorted(maps.Keys(c.conditions)) {
+			cond := c.conditions[id]
 			if !yield(id, cond) {
 				return
 			}
@@ -302,9 +323,11 @@ func (c ConditionsMap) Conditions() iter.Seq2[string, Condition] {
 	}
 }
 
+// DenyConditions returns the Deny conditions in this map, sorted by ID.
 func (c ConditionsMap) DenyConditions() iter.Seq2[string, Condition] {
 	return func(yield func(string, Condition) bool) {
-		for id, cond := range c.conditions {
+		for _, id := range slices.Sorted(maps.Keys(c.conditions)) {
+			cond := c.conditions[id]
 			if cond.Effect != ConditionEffectDeny {
 				continue
 			}
@@ -315,9 +338,11 @@ func (c ConditionsMap) DenyConditions() iter.Seq2[string, Condition] {
 	}
 }
 
+// NoOpinionConditions returns the NoOpinion conditions in this map, sorted by ID.
 func (c ConditionsMap) NoOpinionConditions() iter.Seq2[string, Condition] {
 	return func(yield func(string, Condition) bool) {
-		for id, cond := range c.conditions {
+		for _, id := range slices.Sorted(maps.Keys(c.conditions)) {
+			cond := c.conditions[id]
 			if cond.Effect != ConditionEffectNoOpinion {
 				continue
 			}
@@ -328,9 +353,11 @@ func (c ConditionsMap) NoOpinionConditions() iter.Seq2[string, Condition] {
 	}
 }
 
+// AllowConditions returns the Allow conditions in this map, sorted by ID.
 func (c ConditionsMap) AllowConditions() iter.Seq2[string, Condition] {
 	return func(yield func(string, Condition) bool) {
-		for id, cond := range c.conditions {
+		for _, id := range slices.Sorted(maps.Keys(c.conditions)) {
+			cond := c.conditions[id]
 			if cond.Effect != ConditionEffectAllow {
 				continue
 			}
@@ -339,6 +366,19 @@ func (c ConditionsMap) AllowConditions() iter.Seq2[string, Condition] {
 			}
 		}
 	}
+}
+
+// FailClosedDecision returns either a Deny or NoOpinion Decision to fail closed
+// whenever evaluating a ConditionSet fails. If the ConditionSet has one or
+// more Deny conditions, the Decision must be Deny, as that could have been the
+// answer if the evaluation had been successful. Otherwise, NoOpinion is returned.
+func (c ConditionsMap) FailClosedDecision(err error) ConditionsAwareDecision {
+	for _, cond := range c.conditions {
+		if cond.Effect == ConditionEffectDeny {
+			return ConditionsAwareDecisionDeny("failed closed", err)
+		}
+	}
+	return ConditionsAwareDecisionNoOpinion("failed closed", err)
 }
 
 // ConditionsAwareDecisionConditionMap creates a ConditionsMap decision. One can use maps.All to create an iterator from a map[string]Condition.
@@ -417,6 +457,101 @@ func ConditionsAwareDecisionConditionMap(conditionTarget ConditionsTarget, condi
 	}
 }
 
+// EvaluateConditionsMap evaluates the conditions in the map into a concrete Allow/Deny/NoOpinion Decision, given an
+// evaluation function with a given supported condition type.
+// This is a reference implementation that other conditional authorizers can use if convenient.
+// The returned boolean quantifies whether the evaluation succeeded, that is, did _not_ have to fail closed
+// due to a critical error. This allows the caller to take different actions depending of if evaluation was successful or not.
+func EvaluateConditionsMap(conditionsMap ConditionsMap, supportedConditionTarget ConditionsTarget, supportedConditionType ConditionType, eval func(string) (bool, error)) (ConditionsAwareDecision, bool) {
+	if conditionsMap.Target() != supportedConditionTarget {
+		return conditionsMap.FailClosedDecision(fmt.Errorf("unsupported condition target: %q, expected: %q", conditionsMap.Target(), supportedConditionTarget)), false
+	}
+	if conditionsMap.Type() != supportedConditionType {
+		return conditionsMap.FailClosedDecision(fmt.Errorf("unsupported condition type: %q, expected: %q", conditionsMap.Type(), supportedConditionType)), false
+	}
+
+	denyErrors := []error{}
+	appliedDenyReasons := []string{}
+	for id, cond := range conditionsMap.DenyConditions() {
+		applies, err := eval(cond.Condition)
+		if err != nil {
+			denyErrors = append(denyErrors, fmt.Errorf("Deny condition %q produced error: %w", id, err))
+			continue
+		}
+		if applies {
+			reason := fmt.Sprintf("condition %q denied the request", id)
+			if len(cond.Description) != 0 {
+				reason += fmt.Sprintf(" with description %q", cond.Description)
+			}
+			appliedDenyReasons = append(appliedDenyReasons, reason)
+			continue
+		}
+	}
+	// If any deny conditions evaluated to true, return Deny
+	if len(appliedDenyReasons) != 0 {
+		return ConditionsAwareDecisionDeny(fmt.Sprintf("%v", appliedDenyReasons), nil), true
+	}
+	// If any deny errors were encountered, fail closed
+	if len(denyErrors) != 0 {
+		return ConditionsAwareDecisionDeny("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(denyErrors)), false
+	}
+
+	noOpinionErrors := []error{}
+	appliedNoOpinionReasons := []string{}
+	for id, cond := range conditionsMap.NoOpinionConditions() {
+		applies, err := eval(cond.Condition)
+		if err != nil {
+			noOpinionErrors = append(noOpinionErrors, fmt.Errorf("NoOpinion condition %q produced error: %w", id, err))
+			continue
+		}
+		if applies {
+			reason := fmt.Sprintf("condition %q evaluated to NoOpinion", id)
+			if len(cond.Description) != 0 {
+				reason += fmt.Sprintf(" with description %q", cond.Description)
+			}
+			appliedNoOpinionReasons = append(appliedNoOpinionReasons, reason)
+			continue
+		}
+	}
+	// If any NoOpinion conditions evaluated to true, return NoOpinion
+	if len(appliedNoOpinionReasons) != 0 {
+		return ConditionsAwareDecisionNoOpinion(fmt.Sprintf("%v", appliedNoOpinionReasons), nil), true
+	}
+	// If any NoOpinion errors were encountered, fail closed to NoOpinion as if the conditions would have matched
+	if len(noOpinionErrors) != 0 {
+		return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(noOpinionErrors)), false
+	}
+
+	allowErrors := []error{}
+	appliedAllowReasons := []string{}
+	for id, cond := range conditionsMap.AllowConditions() {
+		applies, err := eval(cond.Condition)
+		if err != nil {
+			allowErrors = append(allowErrors, fmt.Errorf("Allow condition %q produced error: %w", id, err))
+			continue
+		}
+		if applies {
+			reason := fmt.Sprintf("condition %q allowed the request", id)
+			if len(cond.Description) != 0 {
+				reason += fmt.Sprintf(" with description %q", cond.Description)
+			}
+			appliedAllowReasons = append(appliedAllowReasons, reason)
+			continue
+		}
+	}
+	// If there were at least one Allow condition that applied, then evaluation is successful, even if there
+	// were some errors that happened. Those are in this case considered warnings.
+	if len(appliedAllowReasons) != 0 {
+		return ConditionsAwareDecisionAllow(fmt.Sprintf("%v", appliedAllowReasons), utilerrors.NewAggregate(allowErrors)), true
+	}
+	// However, if no Allow condition evaluated to true, but at least one errored, return that as an error to the caller
+	if len(allowErrors) != 0 {
+		return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(allowErrors)), false
+	}
+	// Otherwise, no condition evaluated to true, and no condition errored. This means a simple NoOpinion.
+	return ConditionsAwareDecisionNoOpinion("no conditions matched", nil), true
+}
+
 // BuiltinConditionsMapEvaluators represents a list of builtin
 // conditions evaluators, that may be used to evaluate a ConditionMap
 // before performing e.g. expensive webhook calls.
@@ -484,8 +619,60 @@ func (t ConditionsTarget) Validate() error {
 
 var supportedTargets = sets.New(ConditionsTargetAdmissionControl)
 
+// MakeConditionsDataAdmissionControl constructs a ConditionsData struct with
+// conditions data available during admission.
+func MakeConditionsDataAdmissionControl(data ConditionsDataAdmissionControl) ConditionsData {
+	return ConditionsData{
+		target:    ConditionsTargetAdmissionControl,
+		admission: data,
+	}
+}
+
 // ConditionsData is an enum type for various evaluation targets conditions
 // can be written against.
+// This struct upholds the invariants that:
+// a) Target() is always non-empty
+// b) At most one of the target getters return something non-nil
 type ConditionsData struct {
-	target ConditionsTarget
+	target    ConditionsTarget
+	admission ConditionsDataAdmissionControl
+}
+
+// Target returns the target of this data set
+func (d ConditionsData) Target() ConditionsTarget {
+	if len(d.target) == 0 {
+		return ConditionsTargetAdmissionControl
+	}
+	return d.target
+}
+
+// AdmissionControl returns the admission control-related data, if set.
+// Callers must verify that the return value is non-nil before using.
+func (d ConditionsData) AdmissionControl() ConditionsDataAdmissionControl {
+	return d.admission
+}
+
+// AdmissionOperation represents the admission operation,
+// for example CREATE, UPDATE, DELETE. The constants are
+// defined in k8s.io/apiserver/pkg/admission, but the
+// type is defined here, because this package is more generic
+// than the admission package (thus avoiding import cycles)
+type AdmissionOperation string
+
+// ConditionsDataAdmissionControl is a subset of the admission.Attributes,
+// against which authorization conditions may be written.
+type ConditionsDataAdmissionControl interface {
+	// GetOperation is the operation being performed
+	GetOperation() AdmissionOperation
+	// GetOperationOptions is the options for the operation being performed
+	GetOperationOptions() runtime.Object
+	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
+	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
+	// However, a value of false for this does not mean that the modification will be persisted, because it
+	// could still be rejected by a subsequent validation step.
+	IsDryRun() bool
+	// GetObject is the object from the incoming request prior to default values being applied
+	GetObject() runtime.Object
+	// GetOldObject is the existing object. Only populated for UPDATE and DELETE requests.
+	GetOldObject() runtime.Object
 }

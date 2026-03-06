@@ -21,9 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/cel-go/cel"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -417,4 +424,422 @@ func TestCreateConditionsMapFeatureDisabled(t *testing.T) {
 	if !strings.Contains(d.Error().Error(), "ConditionalAuthorization feature gate is disabled") {
 		t.Error("Expected error to tell about feature gate being disabled")
 	}
+}
+
+var _ authorizer.Authorizer = sampleAuthorizer{}
+
+type sampleAuthorizer struct{}
+
+func (a sampleAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionPartsFromConditionsAware(a.AuthorizeConditionsAware(ctx, attrs, authorizer.ConditionsEncodingPreferenceOptimized()))
+}
+
+func (a sampleAuthorizer) AuthorizeConditionsAware(ctx context.Context, attrs authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	switch attrs.GetUser().GetName() {
+	case "alice":
+		return authorizer.ConditionsAwareDecisionAllow("", nil)
+	case "bob":
+		return authorizer.ConditionsAwareDecisionDeny("", nil)
+	case "carol":
+		// allow carol to read anything, but require seting the owner=carol label on writes
+		switch attrs.GetVerb() {
+		case "list":
+			return authorizer.ConditionsAwareDecisionAllow("", nil)
+		case "update":
+			return authorizer.ConditionsAwareDecisionConditionMap(authorizer.ConditionsTargetAdmissionControl, "test-cel-conditions-type", maps.All(map[string]authorizer.Condition{
+				"owner-label-is-set": {
+					Condition: `
+						(oldObject != null ? (has(oldObject.metadata) && has(oldObject.metadata.labels) && has(oldObject.metadata.labels.owner) && oldObject.metadata.labels.owner == "carol") : true) &&
+						(object != null ? (has(object.metadata) && has(object.metadata.labels) && has(object.metadata.labels.owner) && object.metadata.labels.owner == "carol") : true)
+					`,
+					Effect: authorizer.ConditionEffectAllow,
+				},
+			}), "", nil)
+		default:
+			return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+		}
+	case "dave":
+		// allow dave to read anything, but never set the classified label on writes
+		switch attrs.GetVerb() {
+		case "list":
+			return authorizer.ConditionsAwareDecisionAllow("", nil)
+		case "create", "update", "delete":
+			return authorizer.ConditionsAwareDecisionConditionMap(authorizer.ConditionsTargetAdmissionControl, "test-cel-conditions-type", maps.All(map[string]authorizer.Condition{
+				"deny-supersecret-label-on-oldObject": {
+					Condition: "oldObject != null && has(oldObject.metadata) && has(oldObject.metadata.labels) && has(oldObject.metadata.labels.supersecret)",
+					Effect:    authorizer.ConditionEffectDeny,
+				},
+				"deny-supersecret-label-on-object": {
+					Condition: "object != null && has(object.metadata) && has(object.metadata.labels) && has(object.metadata.labels.supersecret)",
+					Effect:    authorizer.ConditionEffectDeny,
+				},
+			}), "", nil)
+		default:
+			return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+		}
+	default:
+		return authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+	}
+}
+
+func (a sampleAuthorizer) EvaluateConditions(ctx context.Context, unevaluated authorizer.ConditionsAwareDecision, data authorizer.ConditionsData, builtin authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	if unevaluated.IsUnconditional() {
+		return unevaluated
+	}
+	/* TODO
+	if unevaluated.IsConditionalChain() {
+		return unevaluated.FailClosedDecision(), errors.New("conditionschain unsupported")
+	}*/
+	if data.AdmissionControl() == nil {
+		return unevaluated.FailClosedDecision(errors.New("only supports conditions for write requests"))
+	}
+
+	return celEvaluateConditions(unevaluated.ConditionsMap(), data.AdmissionControl())
+}
+
+func objWithLabels(lbls map[string]string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{Object: map[string]any{}}
+	if len(lbls) > 0 {
+		obj.SetLabels(lbls)
+	}
+	return obj
+}
+
+func TestSampleAuthorizer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+	type evalCase struct {
+		name      string
+		object    *unstructured.Unstructured
+		oldObject *unstructured.Unstructured
+		// the first case is with ConditionsModeNone, the second with ConditionsModeHumanReadable
+		authorizeDecision [2]string
+		finalDecision     [2]string
+	}
+
+	tests := []struct {
+		name  string
+		attrs authorizer.AttributesRecord
+		cases []evalCase
+	}{
+		// alice: unconditional allow for all verbs
+		{
+			name: "alice list",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "alice"},
+				Verb: "list",
+			},
+			cases: []evalCase{
+				{name: "allow", authorizeDecision: [2]string{`Allow("", <nil>)`, `Allow("", <nil>)`}},
+			},
+		},
+		{
+			name: "alice create",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "alice"},
+				Verb: "create",
+			},
+			cases: []evalCase{
+				{name: "allow", authorizeDecision: [2]string{`Allow("", <nil>)`, `Allow("", <nil>)`}},
+			},
+		},
+		// bob: unconditional deny for all verbs
+		{
+			name: "bob list",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "bob"},
+				Verb: "list",
+			},
+			cases: []evalCase{
+				{name: "deny", authorizeDecision: [2]string{`Deny("", <nil>)`, `Deny("", <nil>)`}},
+			},
+		},
+		{
+			name: "bob create",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "bob"},
+				Verb: "create",
+			},
+			cases: []evalCase{
+				{name: "deny", authorizeDecision: [2]string{`Deny("", <nil>)`, `Deny("", <nil>)`}},
+			},
+		},
+		// carol: allow reads, conditional writes (EffectAllow on owner=carol)
+		{
+			name: "carol list",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "carol"},
+				Verb: "list",
+			},
+			cases: []evalCase{
+				{name: "allow", authorizeDecision: [2]string{`Allow("", <nil>)`, `Allow("", <nil>)`}},
+			},
+		},
+		{
+			name: "carol update",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "carol"},
+				Verb: "update",
+			},
+			cases: []evalCase{
+				{
+					name:      "both objects with owner=carol",
+					object:    objWithLabels(map[string]string{"owner": "carol"}),
+					oldObject: objWithLabels(map[string]string{"owner": "carol"}),
+					authorizeDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=1, reason="", err=<nil>)`,
+					},
+					finalDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`Allow("[condition \"owner-label-is-set\" allowed the request]", <nil>)`,
+					},
+				},
+				{
+					name:      "old with owner=carol, new without",
+					object:    objWithLabels(map[string]string{"owner": "carol"}),
+					oldObject: objWithLabels(nil),
+					authorizeDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=1, reason="", err=<nil>)`,
+					},
+					finalDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion("no conditions matched", <nil>)`,
+					},
+				},
+				{
+					name:      "new with owner=carol, old with owner=alice",
+					object:    objWithLabels(map[string]string{"owner": "alice"}),
+					oldObject: objWithLabels(map[string]string{"owner": "carol"}),
+					authorizeDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=1, reason="", err=<nil>)`,
+					},
+					finalDecision: [2]string{
+						`NoOpinion("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion("no conditions matched", <nil>)`,
+					},
+				},
+			},
+		},
+		{
+			name: "carol unsupported verb",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "carol"},
+				Verb: "patch",
+			},
+			cases: []evalCase{
+				{name: "no opinion", authorizeDecision: [2]string{`NoOpinion("", <nil>)`, `NoOpinion("", <nil>)`}},
+			},
+		},
+		// dave: allow reads, conditional writes (EffectDeny on supersecret label)
+		{
+			name: "dave list",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "dave"},
+				Verb: "list",
+			},
+			cases: []evalCase{
+				{name: "allow", authorizeDecision: [2]string{`Allow("", <nil>)`, `Allow("", <nil>)`}},
+			},
+		},
+
+		{
+			name: "dave update",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "dave"},
+				Verb: "update",
+			},
+			cases: []evalCase{
+				{
+					name:              "both objects with supersecret",
+					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
+					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `Deny("[condition \"deny-supersecret-label-on-object\" denied the request condition \"deny-supersecret-label-on-oldObject\" denied the request]", <nil>)`},
+				},
+				{
+					name:              "new with supersecret old without",
+					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
+					oldObject:         objWithLabels(nil),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `Deny("[condition \"deny-supersecret-label-on-object\" denied the request]", <nil>)`},
+				},
+				{
+					name:              "new without old with supersecret",
+					object:            objWithLabels(nil),
+					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `Deny("[condition \"deny-supersecret-label-on-oldObject\" denied the request]", <nil>)`},
+				},
+				{
+					name:              "both without supersecret",
+					object:            objWithLabels(map[string]string{"safe": "true"}),
+					oldObject:         objWithLabels(map[string]string{"safe": "true"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion("no conditions matched", <nil>)`},
+				},
+			},
+		},
+		{
+			name: "dave create",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "dave"},
+				Verb: "create",
+			},
+			cases: []evalCase{
+				{
+					name:              "create with supersecret",
+					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `Deny("[condition \"deny-supersecret-label-on-object\" denied the request]", <nil>)`},
+				},
+				{
+					name:              "create without supersecret",
+					object:            objWithLabels(map[string]string{"safe": "true"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion("no conditions matched", <nil>)`},
+				},
+			},
+		},
+		{
+			name: "dave delete",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "dave"},
+				Verb: "delete",
+			},
+			cases: []evalCase{
+				{
+					name:              "delete with supersecret on old object",
+					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `Deny("[condition \"deny-supersecret-label-on-oldObject\" denied the request]", <nil>)`},
+				},
+				{
+					name:              "delete without supersecret on old object",
+					oldObject:         objWithLabels(map[string]string{"safe": "true"}),
+					authorizeDecision: [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(target="AdmissionControl", type="test-cel-conditions-type", len=2, reason="", err=<nil>)`},
+					finalDecision:     [2]string{`Deny("failed closed", "tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion("no conditions matched", <nil>)`},
+				},
+			},
+		},
+		{
+			name: "dave unsupported verb",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "dave"},
+				Verb: "patch",
+			},
+			cases: []evalCase{
+				{name: "no opinion", authorizeDecision: [2]string{`NoOpinion("", <nil>)`, `NoOpinion("", <nil>)`}},
+			},
+		},
+		// unknown user: no opinion
+		{
+			name: "unknown user get",
+			attrs: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "unknown"},
+				Verb: "list",
+			},
+			cases: []evalCase{
+				{name: "no opinion", authorizeDecision: [2]string{`NoOpinion("", <nil>)`, `NoOpinion("", <nil>)`}},
+			},
+		},
+	}
+
+	authz := sampleAuthorizer{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, tc := range tt.cases {
+				// if only the authorization decision is specified, the final one is the same
+				if len(tc.finalDecision[0]) == 0 && len(tc.finalDecision[1]) == 0 {
+					tc.finalDecision[0] = tc.authorizeDecision[0]
+					tc.finalDecision[1] = tc.authorizeDecision[1]
+				}
+				for i, supportsConditions := range [2]bool{false, true} {
+					t.Run(fmt.Sprintf("%s/%t", tc.name, supportsConditions), func(t *testing.T) {
+						var decision authorizer.ConditionsAwareDecision
+						if supportsConditions {
+							decision = authz.AuthorizeConditionsAware(t.Context(), tt.attrs, authorizer.ConditionsEncodingPreferenceOptimized())
+						} else {
+							decision = authorizer.ConditionsAwareDecisionFromParts(authz.Authorize(t.Context(), tt.attrs))
+						}
+
+						if decision.String() != tc.authorizeDecision[i] {
+							t.Errorf("got Authorize() decision %s, want %s", decision.String(), tc.authorizeDecision[i])
+						}
+
+						// Only object and oldObject is used in celEvaluateConditions, so let all other values be zero here, as they are anyways unused.
+						data := authorizer.MakeConditionsDataAdmissionControl(admission.NewAttributesRecord(tc.object, tc.oldObject, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil))
+
+						final := authz.EvaluateConditions(t.Context(), decision, data, nil)
+						if final.String() != tc.finalDecision[i] {
+							t.Errorf("got Evaluate() decision %s, want %s", final.String(), tc.finalDecision[i])
+						}
+					})
+				}
+			}
+		})
+	}
+}
+
+func celEvaluateConditions(conditionsMap authorizer.ConditionsMap, admissionData authorizer.ConditionsDataAdmissionControl) authorizer.ConditionsAwareDecision {
+	env, err := cel.NewEnv(
+		cel.Variable("object", cel.DynType),
+		cel.Variable("oldObject", cel.DynType),
+	)
+	if err != nil {
+		return conditionsMap.FailClosedDecision(fmt.Errorf("failed to create CEL env: %v", err))
+	}
+
+	obj, err := objectToResolveVal(admissionData.GetObject())
+	if err != nil {
+		return conditionsMap.FailClosedDecision(fmt.Errorf("failed to convert object to CEL ref.Val: %v", err))
+	}
+
+	oldObj, err := objectToResolveVal(admissionData.GetOldObject())
+	if err != nil {
+		return conditionsMap.FailClosedDecision(fmt.Errorf("failed to convert object to CEL ref.Val: %v", err))
+	}
+
+	vars := map[string]any{
+		"object":    obj,
+		"oldObject": oldObj,
+	}
+
+	evaluated, _ := authorizer.EvaluateConditionsMap(conditionsMap, authorizer.ConditionsTargetAdmissionControl, "test-cel-conditions-type", func(expr string) (bool, error) {
+		return evalCEL(env, expr, vars)
+	})
+	return evaluated
+}
+
+// evalCEL compiles and evaluates a single CEL expression, returning true/false.
+func evalCEL(env *cel.Env, expr string, vars map[string]any) (bool, error) {
+	ast, issues := env.Compile(expr)
+	if issues != nil && issues.Err() != nil {
+		return false, fmt.Errorf("CEL compile error for %q: %v", expr, issues.Err())
+	}
+	prg, err := env.Program(ast)
+	if err != nil {
+		return false, fmt.Errorf("CEL program error for %q: %v", expr, err)
+	}
+	out, _, err := prg.Eval(vars)
+	if err != nil {
+		return false, fmt.Errorf("CEL eval error for %q: %v", expr, err)
+	}
+	result, ok := out.Value().(bool)
+	if !ok {
+		return false, fmt.Errorf("CEL expression %q did not return bool, got %T", expr, out.Value())
+	}
+	return result, nil
+}
+
+func objectToResolveVal(r runtime.Object) (interface{}, error) {
+	if r == nil || reflect.ValueOf(r).IsNil() {
+		return nil, nil
+	}
+	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
