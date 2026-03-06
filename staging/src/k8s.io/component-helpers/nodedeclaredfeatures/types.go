@@ -63,8 +63,6 @@ type Feature interface {
 type FeatureRequirements struct {
 	// EnabledFeatureGates lists feature gate strings that the feature depends on.
 	EnabledFeatureGates []string
-	// StaticConfig lists keys from StaticConfiguration that the feature depends on and their expected values.
-	StaticConfig map[string]string
 }
 
 // FeatureGate is an interface that abstracts feature gate checking.
@@ -73,17 +71,10 @@ type FeatureGate interface {
 	Enabled(key string) bool
 }
 
-// StaticConfiguration provides a view of a node's static configuration required for feature discovery.
-type StaticConfiguration struct {
-	// Add configuration fields here as required by registered features.
-}
-
 // NodeConfiguration provides a generic view of a node's static configuration.
 type NodeConfiguration struct {
 	// FeatureGates holds an implementation of the FeatureGate interface.
 	FeatureGates FeatureGate
-	// StaticConfig holds node static configuration.
-	StaticConfig StaticConfiguration
 	// Version holds the current node version. This is used for full semantic version comparisons
 	// with Feature.MaxVersion() to determine if a feature needs to be reported.
 	Version *version.Version

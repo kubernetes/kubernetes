@@ -37,11 +37,8 @@ func (a FeatureGateAdapter) Enabled(key string) bool {
 // discoverNodeDeclaredFeatures determines the final set of node features to be declared by using the discovery library.
 func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	adaptedFG := FeatureGateAdapter{FeatureGate: utilfeature.DefaultFeatureGate}
-	// Add fields from node configuration fields as needed by registered features.
-	staticConfig := nodedeclaredfeatures.StaticConfiguration{}
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
 		FeatureGates: adaptedFG,
-		StaticConfig: staticConfig,
 		Version:      kl.version,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)

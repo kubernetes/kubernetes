@@ -115,7 +115,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "Feature Enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 			},
 			expected: []string{"FeatureA"},
 		},
@@ -143,7 +142,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "feature past max version",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 				Version:      featureMaxVersion.AddMinor(1),
 			},
 			expected: []string{}, // Not published
@@ -152,7 +150,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "feature past max version - pre-release version",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 				Version:      version.MustParse("1.39.0-alpha.2.39+049eafd34dfbd2"),
 			},
 			expected: []string{}, // Not published
