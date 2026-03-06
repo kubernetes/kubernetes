@@ -87,7 +87,7 @@ type ManagerImpl struct {
 	// unhealthyDevices contains all the unhealthy devices and their exported device IDs.
 	unhealthyDevices map[string]sets.Set[string]
 
-	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
+	// allocatedDevices contains committed and reserved deviceIds, keyed by resourceName.
 	allocatedDevices map[string]sets.Set[string]
 
 	// podDevices contains pod to allocated device mapping.
@@ -126,6 +126,17 @@ type sourcesReadyStub struct{}
 
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.Set[string]
+
+// regenerateAllocatedDevicesLocked rebuilds allocatedDevices from committed
+// allocations and in-flight reservations tracked by podDevices.
+func (m *ManagerImpl) regenerateAllocatedDevicesLocked() {
+	m.allocatedDevices = m.podDevices.devices()
+}
+
+func (m *ManagerImpl) rollbackReservationLocked(podUID, contName, resource string) {
+	m.podDevices.rollbackReservation(podUID, contName, resource)
+	m.regenerateAllocatedDevicesLocked()
+}
 
 func (s *sourcesReadyStub) AddSource(_ string) {}
 func (s *sourcesReadyStub) AllReady() bool     { return true }
@@ -557,7 +568,7 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 	defer m.mutex.Unlock()
 	podDevices, registeredDevs := cp.GetData()
 	m.podDevices.fromCheckpointData(logger, podDevices)
-	m.allocatedDevices = m.podDevices.devices()
+	m.regenerateAllocatedDevicesLocked()
 	for resource := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
 		// will stay zero till the corresponding device plugin re-registers.
@@ -596,15 +607,21 @@ func (m *ManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
 	logger.V(3).Info("Pods to be removed", "podUIDs", sets.List(podsToBeRemoved))
 	m.podDevices.delete(sets.List(podsToBeRemoved))
 	// Regenerated allocatedDevices after we update pod allocation information.
-	m.allocatedDevices = m.podDevices.devices()
+	m.regenerateAllocatedDevicesLocked()
 }
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, resource string, required int, reusableDevices sets.Set[string]) (sets.Set[string], error) {
+func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, resource string, required int, reusableDevices sets.Set[string]) (allocated sets.Set[string], retErr error) {
 	logger := klog.FromContext(ctx)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	reservationCreated := false
+	defer func() {
+		if retErr != nil && reservationCreated {
+			m.rollbackReservationLocked(podUID, contName, resource)
+		}
+	}()
 	needed := required
 	// Gets list of devices that have already been allocated.
 	// This can happen if a container restarts for example.
@@ -665,14 +682,18 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		// No change, no work.
 		return nil, nil
 	}
+	if !m.podDevices.reserve(podUID, contName, resource) {
+		return nil, fmt.Errorf("device allocation already in progress for pod %q container %q resource %q", podUID, contName, resource)
+	}
+	reservationCreated = true
 
 	// Declare the list of allocated devices.
 	// This will be populated and returned below.
-	allocated := sets.New[string]()
+	allocated = sets.New[string]()
 
 	// Create a closure to help with device allocation
 	// Returns 'true' once no more devices need to be allocated.
-	allocateRemainingFrom := func(devices sets.Set[string]) bool {
+	allocateRemainingFrom := func(devices sets.Set[string], allowAllocated bool) (bool, error) {
 		// When we call callGetPreferredAllocationIfAvailable below, we will release
 		// the lock and call the device plugin. If someone calls ListResource concurrently,
 		// device manager will recalculate the allocatedDevices map. Some entries with
@@ -680,19 +701,36 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		if m.allocatedDevices[resource] == nil {
 			m.allocatedDevices[resource] = sets.New[string]()
 		}
-		for device := range devices.Difference(allocated) {
+		candidates := devices.Difference(allocated)
+		if !allowAllocated {
+			// The candidate sets may have been computed before a
+			// GetPreferredAllocation RPC released m.mutex. Revalidate them
+			// before reserving so a concurrent allocation cannot select the
+			// same device.
+			candidates = candidates.Difference(m.allocatedDevices[resource])
+		}
+		selected := sets.New[string]()
+		for device := range candidates {
 			m.allocatedDevices[resource].Insert(device)
 			allocated.Insert(device)
+			selected.Insert(device)
 			needed--
 			if needed == 0 {
-				return true
+				break
 			}
 		}
-		return false
+		if selected.Len() > 0 && !m.podDevices.addDevicesToReservation(podUID, contName, resource, selected) {
+			return false, fmt.Errorf("device reservation disappeared for pod %q container %q resource %q", podUID, contName, resource)
+		}
+		return needed == 0, nil
 	}
 
 	// Allocates from reusableDevices list first.
-	if allocateRemainingFrom(reusableDevices) {
+	allocationComplete, err := allocateRemainingFrom(reusableDevices, true)
+	if err != nil {
+		return nil, err
+	}
+	if allocationComplete {
 		return allocated, nil
 	}
 
@@ -715,12 +753,20 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		if err != nil {
 			return nil, err
 		}
-		if allocateRemainingFrom(preferred.Intersection(aligned)) {
+		allocationComplete, err = allocateRemainingFrom(preferred.Intersection(aligned), false)
+		if err != nil {
+			return nil, err
+		}
+		if allocationComplete {
 			return allocated, nil
 		}
 		// Then fallback to allocate from the aligned set if no preferred list
 		// is returned (or not enough devices are returned in that list).
-		if allocateRemainingFrom(aligned) {
+		allocationComplete, err = allocateRemainingFrom(aligned, false)
+		if err != nil {
+			return nil, err
+		}
+		if allocationComplete {
 			return allocated, nil
 		}
 
@@ -730,7 +776,11 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	// If we can't allocate all remaining devices from the set of aligned ones,
 	// then start by first allocating all the aligned devices (to ensure
 	// that the alignment guaranteed by the TopologyManager is honored).
-	if allocateRemainingFrom(aligned) {
+	allocationComplete, err = allocateRemainingFrom(aligned, false)
+	if err != nil {
+		return nil, err
+	}
+	if allocationComplete {
 		return allocated, nil
 	}
 
@@ -740,17 +790,29 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	if err != nil {
 		return nil, err
 	}
-	if allocateRemainingFrom(preferred.Intersection(available)) {
+	allocationComplete, err = allocateRemainingFrom(preferred.Intersection(available), false)
+	if err != nil {
+		return nil, err
+	}
+	if allocationComplete {
 		return allocated, nil
 	}
 
 	// Finally, if the plugin did not return a preferred allocation (or didn't
 	// return a large enough one), then fall back to allocating the remaining
 	// devices from the 'unaligned' and 'noAffinity' sets.
-	if allocateRemainingFrom(unaligned) {
+	allocationComplete, err = allocateRemainingFrom(unaligned, false)
+	if err != nil {
+		return nil, err
+	}
+	if allocationComplete {
 		return allocated, nil
 	}
-	if allocateRemainingFrom(noAffinity) {
+	allocationComplete, err = allocateRemainingFrom(noAffinity, false)
+	if err != nil {
+		return nil, err
+	}
+	if allocationComplete {
 		return allocated, nil
 	}
 
@@ -914,7 +976,7 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		m.mutex.Unlock()
 		if !ok {
 			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
+			m.rollbackReservationLocked(podUID, contName, resource)
 			m.mutex.Unlock()
 			return fmt.Errorf("unknown Device Plugin %s", resource)
 		}
@@ -926,15 +988,18 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		resp, err := eI.e.allocate(ctx, devs)
 		metrics.DevicePluginAllocationDuration.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
 		if err != nil {
-			// In case of allocation failure, we want to restore m.allocatedDevices
-			// to the actual allocated state from m.podDevices.
+			// In case of allocation failure, remove this reservation and
+			// restore m.allocatedDevices from the remaining podDevices state.
 			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
+			m.rollbackReservationLocked(podUID, contName, resource)
 			m.mutex.Unlock()
 			return err
 		}
 
 		if len(resp.ContainerResponses) == 0 {
+			m.mutex.Lock()
+			m.rollbackReservationLocked(podUID, contName, resource)
+			m.mutex.Unlock()
 			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
@@ -951,8 +1016,12 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 				allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
 			}
 		}
+		if !m.podDevices.commitReservation(podUID, contName, resource, allocDevicesWithNUMA, resp.ContainerResponses[0]) {
+			m.regenerateAllocatedDevicesLocked()
+			m.mutex.Unlock()
+			return fmt.Errorf("device reservation disappeared for pod %q container %q resource %q", podUID, contName, resource)
+		}
 		m.mutex.Unlock()
-		m.podDevices.insert(podUID, contName, resource, allocDevicesWithNUMA, resp.ContainerResponses[0])
 	}
 
 	if needsUpdateCheckpoint {
