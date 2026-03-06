@@ -90,3 +90,29 @@ func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes autho
 	}
 	return decision, reason, err
 }
+
+// AuthorizeConditionsAware delegates to the wrapped authorizer.
+func (a *instrumentedAuthorizer) AuthorizeConditionsAware(ctx context.Context, attributes authorizer.Attributes, encodingPreference authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	decision := a.delegate.AuthorizeConditionsAware(ctx, attributes, encodingPreference)
+	switch {
+	case decision.IsNoOpinion():
+		// non-terminal, not reported
+	case decision.IsAllowed():
+		// matches SubjectAccessReview status.allowed field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "allowed")
+	case decision.IsDenied():
+		// matches SubjectAccessReview status.denied field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "denied")
+	default:
+		// the ConditionsAwareDecision enforces that there are no other possible states
+		// than Allow/Deny/NoOpinion/ConditionsMap/Union. The latter two are conditional
+		// decisions.
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "conditional")
+	}
+	return decision
+}
+
+// EvaluateConditions is not supported by this authorizer, yet. TODO(luxas): Add a metric for evaluations.
+func (*instrumentedAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}

@@ -251,3 +251,18 @@ func (d Decision) String() string {
 		return fmt.Sprintf("Unknown (%d)", int(d))
 	}
 }
+
+// DecisionPartsFromConditionsAware turns a ConditionsAwareDecision into the
+// triple that Authorizer.Authorize expects.
+func DecisionPartsFromConditionsAware(d ConditionsAwareDecision) (Decision, string, error) {
+	switch {
+	case d.IsAllowed():
+		return DecisionAllow, d.Reason(), d.Error()
+	case d.IsDenied():
+		return DecisionDeny, d.Reason(), d.Error()
+	case d.IsNoOpinion():
+		return DecisionNoOpinion, d.Reason(), d.Error()
+	default:
+		return DecisionDeny, "failed closed", fmt.Errorf("tried to return conditional decision to conditions-unaware authorizer")
+	}
+}

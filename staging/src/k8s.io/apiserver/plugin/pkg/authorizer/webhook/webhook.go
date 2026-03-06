@@ -295,6 +295,16 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (w *WebhookAuthorizer) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(w.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*WebhookAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {
 	ret := &authorizationv1.ResourceAttributes{
 		Namespace:   attr.GetNamespace(),

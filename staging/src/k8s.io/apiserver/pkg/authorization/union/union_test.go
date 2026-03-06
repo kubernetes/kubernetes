@@ -37,6 +37,16 @@ func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attrib
 	return mock.decision, "", mock.err
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (mock *mockAuthzHandler) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(mock.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*mockAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 func TestAuthorizationSecondPasses(t *testing.T) {
 	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
 	handler2 := &mockAuthzHandler{decision: authorizer.DecisionAllow}

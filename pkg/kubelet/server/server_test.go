@@ -323,6 +323,17 @@ func (f *fakeAuth) GetRequestAttributes(ctx context.Context, u user.Info, req *h
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
 }
+
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (f *fakeAuth) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*fakeAuth) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 func (f *fakeAuth) AddListener(listener dynamiccertificates.Listener) {}
 func (f *fakeAuth) CurrentCABundleContent() []byte {
 	return f.currentCABundleContent()
