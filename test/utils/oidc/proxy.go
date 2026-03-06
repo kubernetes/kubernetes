@@ -17,76 +17,14 @@ limitations under the License.
 package oidc
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	certutil "k8s.io/client-go/util/cert"
-	utilsnet "k8s.io/utils/net"
 )
-
-const (
-	rsaKeyBitSize = 2048
-)
-
-// RSAGenerateKey generates an RSA key pair for testing.
-func RSAGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
-	t.Helper()
-
-	privateKey, err := rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
-	require.NoError(t, err)
-
-	return privateKey, &privateKey.PublicKey
-}
-
-// GenerateCert generates a self-signed certificate for localhost/127.0.0.1
-// and returns the cert bytes, key bytes, and file paths where they are stored.
-func GenerateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath string) {
-	t.Helper()
-
-	tempDir := t.TempDir()
-	certFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.crt")
-	keyFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.key")
-
-	cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures("localhost", []net.IP{utilsnet.ParseIPSloppy("127.0.0.1")}, nil, tempDir)
-	require.NoError(t, err)
-
-	return cert, key, certFilePath, keyFilePath
-}
-
-// WriteTempFile writes content to a temporary file and returns its path.
-// The file is automatically cleaned up when the test completes.
-func WriteTempFile(t *testing.T, content string) string {
-	t.Helper()
-	file, err := os.CreateTemp("", "oidc-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Remove(file.Name()); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
-		t.Fatal(err)
-	}
-	return file.Name()
-}
-
-// IndentCertificateAuthority indents the certificate authority to match
-// the format of the generated authentication config.
-func IndentCertificateAuthority(caCert string) string {
-	return strings.ReplaceAll(caCert, "\n", "\n        ")
-}
 
 // NewHTTPConnectProxyHandler returns an http.Handler that implements an HTTP CONNECT proxy.
 // When a CONNECT request is received, it dials the target, hijacks the client connection,
