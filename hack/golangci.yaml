@@ -556,6 +556,12 @@ linters:
         #
         # A useful hint for new code.
         - minmax
+        # simplify code by using go1.26's new(expr)
+        # should only be updated in old code where it really matters.
+        - newexpr
+        # use iterators instead of Len/At-style APIs
+        # should only be updated in old code where it really matters.
+        - stditerators
         # Suggest replacing omitempty with omitzero for struct fields.
         #
         # Disabled because might interfere

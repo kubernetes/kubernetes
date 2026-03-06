@@ -642,7 +642,7 @@ func (kl *Kubelet) recordNodeStatusEvent(logger klog.Logger, eventType, event st
 
 // recordEvent records an event for this node, the Kubelet's nodeRef is passed to the recorder
 func (kl *Kubelet) recordEvent(eventType, event, message string) {
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
+	kl.recorder.Eventf(kl.nodeRef, eventType, event, "%s", message)
 }
 
 // record if node schedulable change.
