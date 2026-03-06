@@ -119,33 +119,28 @@ func testExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, resourceT
 	}
 }
 
-// createDeviceClassForExtendedResource creates a DeviceClass for testing extended resources.
-// It creates the DeviceClass with a unique name, and returns its corresponding resource name.
+// createDeviceClassForExtendedResource gets or creates a DeviceClass for testing extended resources.
+// For explicit resource type, it creates a DeviceClass with a unique extendedResourceName and returns that name.
+// For implicit resource type, it returns the resource name derived from the existing DeviceClass created by the builder.
 func createDeviceClassForExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, resourceType string) v1.ResourceName {
-	var deviceClass *resourceapi.DeviceClass
-	var resourceName v1.ResourceName
-
-	if resourceType == resourceTypeExplicit {
-		// Framework automatically names it: b.ClassName() + "-explicit"
-		resourceName = v1.ResourceName(b.ExtendedResourceName(resourceTypeExplicit))
-		deviceClass = b.ClassWithExtendedResource(string(resourceName))
-	} else {
-		// Framework automatically names it
-		deviceClass = b.Class().DeviceClass
-		resourceName = v1.ResourceName(fmt.Sprintf("%s%s", resourceapi.ResourceDeviceClassPrefix, deviceClass.Name))
-	}
-
-	createdObjs := b.Create(tCtx, deviceClass)
-
-	// Verify ExtendedResourceName is present in the spec when using explicit resource name
-	if resourceType == resourceTypeExplicit {
+	switch resourceType {
+	case resourceTypeExplicit:
+		resourceName := v1.ResourceName(b.ExtendedResourceName(resourceTypeExplicit))
+		deviceClass := b.ClassWithExtendedResource(string(resourceName))
+		// Create the DeviceClass
+		createdObjs := b.Create(tCtx, deviceClass)
+		// Verify ExtendedResourceName is present in the spec
 		deviceClass = createdObjs[0].(*resourceapi.DeviceClass)
 		tCtx.Expect(deviceClass.Spec.ExtendedResourceName).ToNot(gomega.BeNil(), "DeviceClass.Spec.ExtendedResourceName should be set for explicit resource name")
+		tCtx.Logf("Created DeviceClass %q with extendedResourceName: %s", deviceClass.Name, resourceName)
+		return resourceName
+	case resourceTypeImplicit:
+		// The device class was already created by the builder, we only need the name.
+		return v1.ResourceName(fmt.Sprintf("%s%s", resourceapi.ResourceDeviceClassPrefix, b.ClassName()))
+	default:
+		tCtx.Fatalf("invalid resource type %q", resourceType)
+		return ""
 	}
-
-	tCtx.Logf("Created DeviceClass %q with extendedResourceName: %s", deviceClass.Name, resourceName)
-
-	return resourceName
 }
 
 // createPodWithExtendedResource creates a pod with the given name requesting an extended resource.
@@ -163,7 +158,7 @@ func createPodWithExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, 
 // verifyPodRunningWithClaim verifies a pod is running and has a valid ResourceClaim.
 func verifyPodRunningWithClaim(tCtx ktesting.TContext, b *drautils.Builder, pod *v1.Pod, resourceName v1.ResourceName) {
 	namespace := tCtx.Namespace()
-	b.TestPod(tCtx, pod)
+	b.TestPod(tCtx, pod, "container_0_request_0", "true")
 	tCtx.Logf("Pod %q is running", pod.Name)
 
 	// Get updated pod to check status
