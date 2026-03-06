@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 	_ "time/tzdata"
 
 	"github.com/google/go-cmp/cmp"
@@ -2583,12 +2584,16 @@ func TestValidateJobUpdate(t *testing.T) {
 }
 
 func TestValidateJobUpdateStatus(t *testing.T) {
+	now := time.Now()
+
 	cases := map[string]struct {
 		opts JobStatusValidationOptions
 
 		old      batch.Job
 		update   batch.Job
 		wantErrs field.ErrorList
+
+		cmpopts cmp.Options
 	}{
 		"valid": {
 			old: batch.Job{
@@ -2680,6 +2685,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 				{Type: field.ErrorTypeInvalid, Field: "status.terminating"},
 			},
+			cmpopts: cmp.Options{ignoreErrValueDetail},
 		},
 		"empty and duplicated uncounted pods": {
 			old: batch.Job{
@@ -2709,12 +2715,105 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.failed[3]"},
 				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods.failed[4]"},
 			},
+			cmpopts: cmp.Options{ignoreErrValueDetail},
+		},
+		"immutable startTime for unsuspended job: with non-nil startTime": {
+			opts: JobStatusValidationOptions{
+				RejectStartTimeUpdateForUnsuspendedJob: true,
+			},
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: &metav1.Time{
+						Time: now,
+					},
+					Active: 1,
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: &metav1.Time{
+						Time: now.Add(time.Second), // Attempt to change startTime
+					},
+					Active: 1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "status.startTime",
+					BadValue: &metav1.Time{
+						Time: now.Add(time.Second),
+					},
+					Detail: "field is immutable for unsuspended job once set",
+				},
+			},
+			cmpopts: cmp.Options{cmpopts.IgnoreFields(field.Error{}, "Origin")},
+		},
+		"immutable startTime for unsuspended job: with nil startTime": {
+			opts: JobStatusValidationOptions{
+				RejectStartTimeUpdateForUnsuspendedJob: true,
+			},
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: &metav1.Time{
+						Time: now,
+					},
+					Active: 1,
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+				},
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					StartTime: nil,
+					Active:    1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "status.startTime",
+					BadValue: (*metav1.Time)(nil),
+					Detail:   "field is immutable for unsuspended job once set",
+				},
+			},
+			cmpopts: cmp.Options{cmpopts.IgnoreFields(field.Error{}, "Origin")},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateJobUpdateStatus(&tc.update, &tc.old, tc.opts)
-			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+			if diff := cmp.Diff(tc.wantErrs, errs, tc.cmpopts); diff != "" {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
 		})
