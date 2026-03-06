@@ -18,13 +18,17 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"math/big"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/sample-controller/pkg/signals"
+
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
@@ -35,6 +39,8 @@ import (
 var (
 	masterURL  string
 	kubeconfig string
+	shard      int
+	shardTotal int
 )
 
 func main() {
@@ -44,6 +50,16 @@ func main() {
 	// set up signals so we handle the shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
 	logger := klog.FromContext(ctx)
+
+	var shardSelector string
+	if shard != -1 && shardTotal > 0 {
+		if shard >= shardTotal {
+			logger.Error(nil, "shard index must be less than shard total", "shard", shard, "total", shardTotal)
+			return
+		}
+		start, end := CalculateShardRange(shard, shardTotal)
+		shardSelector = fmt.Sprintf("shardRange(object.metadata.uid,%s,%s)", start, end)
+	}
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
@@ -63,8 +79,14 @@ func main() {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+	tweakListOptions := func(options *metav1.ListOptions) {
+		if shardSelector != "" {
+			options.Selector = shardSelector
+		}
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30, kubeinformers.WithTweakListOptions(tweakListOptions))
+	exampleInformerFactory := informers.NewSharedInformerFactoryWithOptions(exampleClient, time.Second*30, informers.WithTweakListOptions(tweakListOptions))
 
 	controller := NewController(ctx, kubeClient, exampleClient,
 		kubeInformerFactory.Apps().V1().Deployments(),
@@ -84,4 +106,36 @@ func main() {
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.IntVar(&shard, "shard", -1, "If set, the shard index to run. Must be used with --shard-total.")
+	flag.IntVar(&shardTotal, "shard-total", 0, "If set, the total number of shards. Must be used with --shard.")
+}
+
+// CalculateShardRange computes the [start, end) 16-char hex prefixes for a given shard
+// in the FNV-1a 64-bit hash space (0x0000000000000000 to 0xffffffffffffffff).
+// index is 0-based (0 to total-1).
+func CalculateShardRange(index, total int) (start, end string) {
+	if total <= 1 {
+		return "", "" // Match everything
+	}
+
+	// FNV-1a 64-bit: full range is [0, 2^64)
+	maxVal := new(big.Int).Lsh(big.NewInt(1), 64) // 2^64
+
+	span := new(big.Int).Div(maxVal, big.NewInt(int64(total)))
+	startVal := new(big.Int).Mul(span, big.NewInt(int64(index)))
+	endVal := new(big.Int).Mul(span, big.NewInt(int64(index+1)))
+
+	if index == total-1 {
+		end = "" // Unbounded upper
+	} else {
+		end = fmt.Sprintf("%016x", endVal)
+	}
+
+	if index == 0 {
+		start = "" // Unbounded lower
+	} else {
+		start = fmt.Sprintf("%016x", startVal)
+	}
+
+	return start, end
 }
