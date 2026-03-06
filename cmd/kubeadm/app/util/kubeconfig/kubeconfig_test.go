@@ -18,6 +18,7 @@ package kubeconfig
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
 	"reflect"
@@ -26,41 +27,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const (
-	configOut1 = `apiVersion: v1
-clusters:
-- cluster:
-    server: ""
-  name: k8s
-contexts:
-- context:
-    cluster: k8s
-    user: user1
-  name: user1@k8s
-current-context: user1@k8s
-kind: Config
-users:
-- name: user1
-  user:
-    token: abc
-`
-	configOut2 = `apiVersion: v1
-clusters:
-- cluster:
-    server: localhost:8080
-  name: kubernetes
-contexts:
-- context:
-    cluster: kubernetes
-    user: user2
-  name: user2@kubernetes
-current-context: user2@kubernetes
-kind: Config
-users:
-- name: user2
-  user:
-    token: cba
-`
+var (
+	//go:embed testdata/user1.yaml
+	configOut1 string
+	//go:embed testdata/user2.yaml
+	configOut2 string
 )
 
 type configClient struct {
