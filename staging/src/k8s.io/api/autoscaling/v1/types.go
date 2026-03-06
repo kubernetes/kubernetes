@@ -532,6 +532,18 @@ type ContainerResourceMetricStatus struct {
 	Container string `json:"container" protobuf:"bytes,4,opt,name=container"`
 }
 
+// MetricFetchStatusType indicates whether an external metric is operating normally, failing to be fetched or using a fallback value.
+type MetricFetchStatusType string
+
+const (
+	// MetricFetchHealthy indicates the metric is being retrieved successfully
+	MetricFetchHealthy MetricFetchStatusType = "Healthy"
+	// MetricFetchFailing indicates the metric is failing to be fetched
+	MetricFetchFailing MetricFetchStatusType = "Failing"
+	// MetricFetchFallback indicates the metric is using a fallback value due to retrieval failures
+	MetricFetchFallback MetricFetchStatusType = "Fallback"
+)
+
 // ExternalMetricStatus indicates the current value of a global metric
 // not associated with any Kubernetes object.
 type ExternalMetricStatus struct {
@@ -549,4 +561,15 @@ type ExternalMetricStatus struct {
 	// currentAverageValue is the current value of metric averaged over autoscaled pods.
 	// +optional
 	CurrentAverageValue *resource.Quantity `json:"currentAverageValue,omitempty" protobuf:"bytes,4,opt,name=currentAverageValue"`
+
+	// metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.
+	// +optional
+	// +featureGate=HPAExternalMetricFallback
+	MetricFetchStatus *MetricFetchStatusType `json:"metricFetchStatus,omitempty" protobuf:"bytes,5,opt,name=metricFetchStatus,casttype=MetricFetchStatus"`
+
+	// firstFailureTime is the timestamp of the first consecutive failure retrieving this metric.
+	// Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.
+	// +optional
+	// +featureGate=HPAExternalMetricFallback
+	FirstFailureTime *metav1.Time `json:"firstFailureTime,omitempty" protobuf:"bytes,6,opt,name=firstFailureTime"`
 }

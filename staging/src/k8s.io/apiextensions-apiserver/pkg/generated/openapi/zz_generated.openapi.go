@@ -373,12 +373,25 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"metricFetchStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"firstFailureTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 

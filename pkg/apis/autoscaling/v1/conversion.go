@@ -137,6 +137,13 @@ func Convert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *aut
 	if in.Current.AverageValue != nil {
 		out.CurrentAverageValue = in.Current.AverageValue
 	}
+	if in.FirstFailureTime != nil {
+		out.FirstFailureTime = in.FirstFailureTime
+	}
+	if in.MetricFetchStatus != nil {
+		out.MetricFetchStatus = (*autoscalingv1.MetricFetchStatusType)(in.MetricFetchStatus)
+	}
+
 	out.MetricSelector = in.Metric.Selector
 	return nil
 }
@@ -152,6 +159,14 @@ func Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *aut
 		Name:     in.MetricName,
 		Selector: in.MetricSelector,
 	}
+
+	if in.FirstFailureTime != nil {
+		out.FirstFailureTime = in.FirstFailureTime
+	}
+	if in.MetricFetchStatus != nil {
+		out.MetricFetchStatus = (*autoscaling.MetricFetchStatusType)(in.MetricFetchStatus)
+	}
+
 	return nil
 }
 

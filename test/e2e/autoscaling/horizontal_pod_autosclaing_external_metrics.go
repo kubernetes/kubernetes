@@ -164,7 +164,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics f
 		metricInFallback := false
 		for _, metricStatus := range currentHPA.Status.CurrentMetrics {
 			if metricStatus.Type == v2.ExternalMetricSourceType && metricStatus.External != nil {
-				if metricStatus.External.MetricFetchStatus == ptr.To(v2.MetricFetchFallback) {
+				if ptr.Equal(metricStatus.External.MetricFetchStatus, ptr.To(v2.MetricFetchFallback)) {
 					framework.Logf("External metric %s is in fallback state", metricStatus.External.Metric.Name)
 					metricInFallback = true
 				}

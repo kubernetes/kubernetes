@@ -337,14 +337,16 @@ func autoConvert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in 
 	// WARNING: in.MetricSelector requires manual conversion: does not exist in peer-type
 	// WARNING: in.CurrentValue requires manual conversion: does not exist in peer-type
 	// WARNING: in.CurrentAverageValue requires manual conversion: does not exist in peer-type
+	out.MetricFetchStatus = (*autoscaling.MetricFetchStatusType)(unsafe.Pointer(in.MetricFetchStatus))
+	out.FirstFailureTime = (*metav1.Time)(unsafe.Pointer(in.FirstFailureTime))
 	return nil
 }
 
 func autoConvert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *autoscalingv1.ExternalMetricStatus, s conversion.Scope) error {
 	// WARNING: in.Metric requires manual conversion: does not exist in peer-type
 	// WARNING: in.Current requires manual conversion: does not exist in peer-type
-	// WARNING: in.MetricFetchStatus requires manual conversion: does not exist in peer-type
-	// WARNING: in.FirstFailureTime requires manual conversion: does not exist in peer-type
+	out.MetricFetchStatus = (*autoscalingv1.MetricFetchStatusType)(unsafe.Pointer(in.MetricFetchStatus))
+	out.FirstFailureTime = (*metav1.Time)(unsafe.Pointer(in.FirstFailureTime))
 	return nil
 }
 
