@@ -118,7 +118,7 @@ var (
 			// Buckets for both 0.99 and 1.0 mean PromQL's histogram_quantile will reveal saturation
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1},
 			ConstLabels:    map[string]string{phase: "executing"},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		priorityLevel,
 	)
@@ -132,7 +132,7 @@ var (
 			// For executing: the denominator will be seats, so this metric will skew low.
 			// For waiting: total queue capacity is generally quite generous, so this metric will skew low.
 			Buckets:        []float64{0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.25, 0.5, 0.75, 1},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		LabelNamePhase, priorityLevel,
 	)
@@ -239,7 +239,7 @@ var (
 			Help:      "Nominal number of execution seats configured for each priority level",
 			// Remove this metric once all suppported releases have the equal nominal_limit_seats metric
 			DeprecatedVersion: "1.30.0",
-			StabilityLevel:    compbasemetrics.ALPHA,
+			StabilityLevel:    compbasemetrics.BETA,
 		},
 		[]string{priorityLevel},
 	)
@@ -271,7 +271,7 @@ var (
 			Help:      "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
 			// Remove this metric once all suppported releases have the equal current_executing_seats metric
 			DeprecatedVersion: "1.31.0",
-			StabilityLevel:    compbasemetrics.ALPHA,
+			StabilityLevel:    compbasemetrics.BETA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -293,7 +293,7 @@ var (
 			Name:           "request_execution_seconds",
 			Help:           "Duration of initial stage (for a WATCH) or any (for a non-WATCH) stage of request execution in the API Priority and Fairness subsystem",
 			Buckets:        requestDurationSecondsBuckets,
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{priorityLevel, flowSchema, "type"},
 	)
@@ -327,7 +327,7 @@ var (
 			// the upper bound comes from the maximum number of seats a request
 			// can occupy which is currently set at 10.
 			Buckets:        []float64{1, 2, 4, 8, 16, 32, 64, 100},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
