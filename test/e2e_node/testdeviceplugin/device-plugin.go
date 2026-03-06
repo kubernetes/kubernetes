@@ -189,12 +189,15 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 	// Create a client for the kubelet
 	client := kubeletdevicepluginv1beta1.NewRegistrationClient(conn)
 
+	registerCtx, registerCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer registerCancel()
+
 	// Register the device plugin with the kubelet
-	_, err = client.Register(ctx, &kubeletdevicepluginv1beta1.RegisterRequest{
+	_, err = client.Register(registerCtx, &kubeletdevicepluginv1beta1.RegisterRequest{
 		Version:      kubeletdevicepluginv1beta1.Version,
 		Endpoint:     devicePluginEndpoint,
 		ResourceName: resourceName,
-	})
+	}, grpc.WaitForReady(true))
 	if err != nil {
 		return err
 	}
