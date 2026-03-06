@@ -47,6 +47,7 @@ var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
+var _ fwk.PlacementScorePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -100,6 +101,7 @@ type Fit struct {
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	handle                                        fwk.Handle
 	*resourceAllocationScorer
+	placementScorer *resourceAllocationScorer
 }
 
 // ScoreExtensions of the Score plugin.
@@ -201,7 +203,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
 	}
-	if err := validation.ValidateNodeResourcesFitArgs(nil, args); err != nil {
+	if err := validation.ValidateNodeResourcesFitArgs(nil, args, fts); err != nil {
 		return nil, err
 	}
 
@@ -218,7 +220,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		scorer.DRACaches.celCache = cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableDRAConsumableCapacity})
 	}
 
-	return &Fit{
+	pl := &Fit{
 		ignoredResources:                              sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
@@ -229,7 +231,17 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		enableDRAExtendedResource:                     fts.EnableDRAExtendedResource,
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 		resourceAllocationScorer:                      scorer,
-	}, nil
+	}
+
+	if fts.EnableTopologyAwareWorkloadScheduling {
+		placementScorer, err := getScorer(args.PlacementScoringStrategy)
+		if err != nil {
+			return nil, err
+		}
+		pl.placementScorer = placementScorer
+	}
+
+	return pl, nil
 }
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
@@ -751,4 +763,14 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 	}
 
 	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+}
+
+// PlacementScoreExtensions is not used by this plugin.
+func (f *Fit) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+// ScorePlacement scores capacity ratio on all nodes in the placement including all assigned pod group pods' resource requests.
+func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	return f.placementScorer.scorePlacement(ctx, podGroup, placement)
 }

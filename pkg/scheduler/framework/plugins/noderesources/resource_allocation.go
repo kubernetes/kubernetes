@@ -501,3 +501,33 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 
 	return true, nil
 }
+
+func (r *resourceAllocationScorer) scorePlacement(
+	ctx context.Context,
+	podGroupInfo fwk.PodGroupInfo,
+	podGroupAssignments *fwk.PodGroupAssignments,
+) (int64, *fwk.Status) {
+	requested := make([]int64, len(r.resources))
+	// Calculate requests for the pod group pods scheduled for this placement
+	for _, assignment := range podGroupAssignments.ProposedAssignments {
+		pod := assignment.GetPod()
+		podRequests := r.calculatePodResourceRequestList(pod, r.resources)
+		for i := range len(r.resources) {
+			requested[i] += podRequests[i]
+		}
+	}
+	allocatable := make([]int64, len(r.resources))
+	allocated := make([]int64, len(r.resources))
+	// Calculate resources on all nodes in this placement
+	for _, node := range podGroupAssignments.Nodes {
+		_, nodeAllocated, nodeAllocatable := r.calculateNodeAllocatableRequest(ctx, node, requested, nil)
+		for i := range r.resources {
+			allocatable[i] += nodeAllocatable[i]
+			allocated[i] += nodeAllocated[i]
+			// requested includes both the already existing pods
+			// and the pod group pods that are being scheduled for this placement
+			requested[i] += nodeAllocated[i]
+		}
+	}
+	return r.scorer(requested, allocated, allocatable), nil
+}

@@ -674,9 +674,10 @@ func TestValidateFitArgs(t *testing.T) {
 		},
 	}
 	argsTest := []struct {
-		name   string
-		args   config.NodeResourcesFitArgs
-		expect string
+		features featuregatetesting.FeatureOverrides
+		name     string
+		args     config.NodeResourcesFitArgs
+		expect   string
 	}{
 		{
 			name: "IgnoredResources: too long value",
@@ -743,7 +744,7 @@ func TestValidateFitArgs(t *testing.T) {
 		{
 			name:   "ScoringStrategy: field is required",
 			args:   config.NodeResourcesFitArgs{},
-			expect: "ScoringStrategy field is required",
+			expect: "field is required",
 		},
 		{
 			name: "ScoringStrategy: type is unsupported",
@@ -763,11 +764,52 @@ func TestValidateFitArgs(t *testing.T) {
 			},
 			expect: "must be specified when type is RequestedToCapacityRatio",
 		},
+		{
+			name: "PlacementScoringStrategy: field is required",
+			features: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: defaultScoringStrategy,
+			},
+			expect: "field is required",
+		},
+		{
+			name: "PlacementScoringStrategy: type is unsupported",
+			features: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: defaultScoringStrategy,
+				PlacementScoringStrategy: &config.ScoringStrategy{
+					Type: "Invalid",
+				},
+			},
+			expect: `Unsupported value: "Invalid"`,
+		},
+		{
+			name: "PlacementScoringStrategy: requestedToCapacityRatio field is missing",
+			features: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: defaultScoringStrategy,
+				PlacementScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+				},
+			},
+			expect: "must be specified when type is RequestedToCapacityRatio",
+		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateNodeResourcesFitArgs(nil, &test.args)
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)
+			fts := schedfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate)
+			err := ValidateNodeResourcesFitArgs(nil, &test.args, fts)
 			if err != nil {
 				if test.expect == "" {
 					t.Errorf("case[%v]: unexpected validation error %v", test.name, err)
@@ -868,7 +910,7 @@ func TestValidateLeastAllocatedScoringStrategy(t *testing.T) {
 					Resources: test.resources,
 				},
 			}
-			err := ValidateNodeResourcesFitArgs(nil, &args)
+			err := ValidateNodeResourcesFitArgs(nil, &args, schedfeature.Features{})
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -963,7 +1005,7 @@ func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
 					Resources: test.resources,
 				},
 			}
-			err := ValidateNodeResourcesFitArgs(nil, &args)
+			err := ValidateNodeResourcesFitArgs(nil, &args, schedfeature.Features{})
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -1164,7 +1206,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 					},
 				},
 			}
-			err := ValidateNodeResourcesFitArgs(nil, &args)
+			err := ValidateNodeResourcesFitArgs(nil, &args, schedfeature.Features{})
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
 			}

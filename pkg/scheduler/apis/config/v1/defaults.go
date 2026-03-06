@@ -234,22 +234,26 @@ func SetDefaults_NodeResourcesFitArgs(obj *configv1.NodeResourcesFitArgs) {
 			Resources: defaultResourceSpec,
 		}
 	}
-	if len(obj.ScoringStrategy.Resources) == 0 {
-		// If no resources specified, use the default set.
-		obj.ScoringStrategy.Resources = append(obj.ScoringStrategy.Resources, defaultResourceSpec...)
-	}
-	for i := range obj.ScoringStrategy.Resources {
-		if obj.ScoringStrategy.Resources[i].Weight == 0 {
-			obj.ScoringStrategy.Resources[i].Weight = 1
+	setDefaults_ScoringStrategy(obj.ScoringStrategy)
+	if feature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		if obj.PlacementScoringStrategy == nil {
+			obj.PlacementScoringStrategy = &configv1.ScoringStrategy{
+				Type:      configv1.ScoringStrategyType(config.MostAllocated),
+				Resources: defaultResourceSpec,
+			}
 		}
+		setDefaults_ScoringStrategy(obj.PlacementScoringStrategy)
 	}
 }
 
-func SetDefaults_PlacementBinPackingArgs(obj *configv1.PlacementBinPackingArgs) {
-	if obj.ScoringStrategy == nil {
-		obj.ScoringStrategy = &configv1.ScoringStrategy{
-			Type:      configv1.ScoringStrategyType(config.LeastAllocated),
-			Resources: defaultResourceSpec,
+func setDefaults_ScoringStrategy(obj *configv1.ScoringStrategy) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, use the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+	for i := range obj.Resources {
+		if obj.Resources[i].Weight == 0 {
+			obj.Resources[i].Weight = 1
 		}
 	}
 }

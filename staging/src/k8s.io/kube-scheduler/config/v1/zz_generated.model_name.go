@@ -77,11 +77,6 @@ func (in NodeResourcesFitArgs) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PlacementBinPackingArgs) OpenAPIModelName() string {
-	return "io.k8s.kube-scheduler.config.v1.PlacementBinPackingArgs"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Plugin) OpenAPIModelName() string {
 	return "io.k8s.kube-scheduler.config.v1.Plugin"
 }

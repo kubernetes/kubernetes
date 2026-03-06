@@ -77,6 +77,9 @@ type NodeResourcesFitArgs struct {
 
 	// ScoringStrategy selects the node resource scoring strategy.
 	ScoringStrategy *ScoringStrategy
+
+	// PlacementScoringStrategy selects the placement scoring strategy for pod group scheduling.
+	PlacementScoringStrategy *ScoringStrategy
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -283,16 +286,6 @@ type DynamicResourcesArgs struct {
 	//     `scheduler_framework_extension_point_duration_seconds`) and driver
 	//     readiness behavior before tightening this timeout.
 	BindingTimeout *metav1.Duration
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.
-type PlacementBinPackingArgs struct {
-	metav1.TypeMeta
-
-	// ScoringStrategy selects the node resource scoring strategy.
-	ScoringStrategy *ScoringStrategy
 }
 
 const DynamicResourcesFilterTimeoutDefault = 10 * time.Second

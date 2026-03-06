@@ -155,9 +155,11 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"InterPodAffinity":                ValidateInterPodAffinityArgs,
 		"NodeAffinity":                    ValidateNodeAffinityArgs,
 		"NodeResourcesBalancedAllocation": ValidateNodeResourcesBalancedAllocationArgs,
-		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
-		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
-		"VolumeBinding":                   ValidateVolumeBindingArgs,
+		"NodeResourcesFitArgs": func(path *field.Path, args *config.NodeResourcesFitArgs) error {
+			return ValidateNodeResourcesFitArgs(path, args, schedfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate))
+		},
+		"PodTopologySpread": ValidatePodTopologySpreadArgs,
+		"VolumeBinding":     ValidateVolumeBindingArgs,
 		"DynamicResources": func(path *field.Path, args *config.DynamicResourcesArgs) error {
 			return ValidateDynamicResourcesArgs(path, args, schedfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate))
 		},

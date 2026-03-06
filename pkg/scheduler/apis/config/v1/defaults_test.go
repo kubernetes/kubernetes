@@ -869,6 +869,55 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
+			name: "NodeResourcesFitArgs placement strategy not set",
+			features: map[featuregate.Feature]bool{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			in: &configv1.NodeResourcesFitArgs{
+				ScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+			want: &configv1.NodeResourcesFitArgs{
+				ScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+				PlacementScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs placement strategy Resources empty",
+			features: map[featuregate.Feature]bool{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			in: &configv1.NodeResourcesFitArgs{
+				ScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+				PlacementScoringStrategy: &configv1.ScoringStrategy{
+					Type: configv1.MostAllocated,
+				},
+			},
+			want: &configv1.NodeResourcesFitArgs{
+				ScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+				PlacementScoringStrategy: &configv1.ScoringStrategy{
+					Type:      configv1.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
 			name: "VolumeBindingArgs empty, StorageCapacityScoring disabled",
 			features: map[featuregate.Feature]bool{
 				features.StorageCapacityScoring: false,

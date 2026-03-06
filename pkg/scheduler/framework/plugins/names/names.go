@@ -38,5 +38,4 @@ const (
 	VolumeBinding                   = "VolumeBinding"
 	VolumeRestrictions              = "VolumeRestrictions"
 	VolumeZone                      = "VolumeZone"
-	PlacementBinPacking             = "PlacementBinPacking"
 )

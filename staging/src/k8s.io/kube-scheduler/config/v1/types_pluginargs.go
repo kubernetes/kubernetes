@@ -78,6 +78,10 @@ type NodeResourcesFitArgs struct {
 	// ScoringStrategy selects the node resource scoring strategy.
 	// The default strategy is LeastAllocated with an equal "cpu" and "memory" weight.
 	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
+
+	// PlacementScoringStrategy selects the placement scoring strategy in pod group scheduling.
+	// The default strategy is MostAllocated with an equal "cpu" and "memory" weight.
+	PlacementScoringStrategy *ScoringStrategy `json:"placementScoringStrategy,omitempty"`
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -226,14 +230,4 @@ type RequestedToCapacityRatioParam struct {
 	// Shape is a list of points defining the scoring function shape.
 	// +listType=atomic
 	Shape []UtilizationShapePoint `json:"shape,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.
-type PlacementBinPackingArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// ScoringStrategy selects the placement resource scoring strategy.
-	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
 }

@@ -292,7 +292,7 @@ func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeB
 	return allErrs.ToAggregate()
 }
 
-func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs) error {
+func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs, fts feature.Features) error {
 	var allErrs field.ErrorList
 	resPath := path.Child("ignoredResources")
 	for i, res := range args.IgnoredResources {
@@ -314,27 +314,13 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 	}
 
 	allErrs = append(allErrs, validateScoringStrategy(args.ScoringStrategy, path.Child("scoringStrategy"))...)
-
-	if len(allErrs) == 0 {
-		return nil
-	}
-	return allErrs.ToAggregate()
-}
-
-func ValidatePlacementBinPackingArgs(path *field.Path, args *config.PlacementBinPackingArgs, fts feature.Features) error {
-	var allErrs field.ErrorList
-
-	scoringStrategyPath := path.Child("scoringStrategy")
 	if fts.EnableTopologyAwareWorkloadScheduling {
-		allErrs = append(allErrs, validateScoringStrategy(args.ScoringStrategy, scoringStrategyPath)...)
-	} else {
-		allErrs = append(allErrs, field.Forbidden(scoringStrategyPath, "TopologyAwareWorkloadScheduling feature gate is disabled"))
+		allErrs = append(allErrs, validateScoringStrategy(args.PlacementScoringStrategy, path.Child("placementScoringStrategy"))...)
 	}
 
 	if len(allErrs) == 0 {
 		return nil
 	}
-
 	return allErrs.ToAggregate()
 }
 
@@ -355,7 +341,7 @@ func validateScoringStrategy(strategy *config.ScoringStrategy, path *field.Path)
 			allErrs = append(allErrs, field.Forbidden(path.Child("requestedToCapacityRatio"), "must be nil when type is not RequestedToCapacityRatio"))
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(path, "ScoringStrategy field is required"))
+		allErrs = append(allErrs, field.Required(path, "field is required"))
 	}
 	return allErrs
 }
