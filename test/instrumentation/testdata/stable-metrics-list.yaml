@@ -98,6 +98,53 @@
   stabilityLevel: BETA
   labels:
   - priority_level
+- name: priority_level_request_utilization
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of number of requests (as a
+    fraction of the relevant limit) waiting or in any stage of execution (but only
+    initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - phase
+  - priority_level
+  buckets:
+  - 0
+  - 0.001
+  - 0.003
+  - 0.01
+  - 0.03
+  - 0.1
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+- name: priority_level_seat_utilization
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
 - name: rejected_requests_total
   subsystem: flowcontrol
   namespace: apiserver
@@ -108,6 +155,52 @@
   - flow_schema
   - priority_level
   - reason
+- name: request_concurrency_in_use
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Concurrency (number of seats) occupied by the currently executing (initial
+    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
+    subsystem
+  type: Gauge
+  deprecatedVersion: 1.31.0
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: request_concurrency_limit
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Nominal number of execution seats configured for each priority level
+  type: Gauge
+  deprecatedVersion: 1.30.0
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+- name: request_execution_seconds
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Duration of initial stage (for a WATCH) or any (for a non-WATCH) stage of
+    request execution in the API Priority and Fairness subsystem
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+  - type
+  buckets:
+  - 0
+  - 0.005
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10
+  - 15
+  - 30
 - name: request_wait_duration_seconds
   subsystem: flowcontrol
   namespace: apiserver
@@ -132,6 +225,25 @@
   - 10
   - 15
   - 30
+- name: work_estimated_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of estimated seats (maximum of initial and final seats) associated
+    with requests in API Priority and Fairness
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 100
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
