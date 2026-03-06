@@ -616,7 +616,7 @@ func kubeletLogQuery(ctx context.Context, cs kubernetes.Interface, wg *waitGroup
 				// output would be worse because then the end marker of a DATA RACE
 				// report could be missed.
 				since = now
-				req := cs.CoreV1().RESTClient().Post().
+				req := cs.CoreV1().RESTClient().Get().
 					Resource("nodes").
 					Name(nodeName).
 					SubResource("proxy").
