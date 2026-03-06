@@ -2648,7 +2648,7 @@ func TestForgetWatcher(t *testing.T) {
 	}
 	w := newCacheWatcher(
 		0,
-		func(_ string, _ labels.Set, _ fields.Set) bool { return true },
+		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
 		nil,
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
