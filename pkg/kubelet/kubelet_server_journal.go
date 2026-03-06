@@ -85,7 +85,7 @@ func (journalServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer gz.Close()
 		out = gz
 	}
-	nlq.Copy(out)
+	nlq.Copy(req.Context(), out)
 }
 
 // nodeLogQuery encapsulates the log query request
@@ -265,9 +265,9 @@ func (n *nodeLogQuery) validate() field.ErrorList {
 
 // Copy streams the contents of the OS specific logging command executed  with the current args to the provided
 // writer. If an error occurs a line is written to the output.
-func (n *nodeLogQuery) Copy(w io.Writer) {
+func (n *nodeLogQuery) Copy(ctx context.Context, w io.Writer) {
 	// set the deadline to the maximum across both runs
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 	defer cancel()
 	boot := 0
 	if n.Boot != nil {
