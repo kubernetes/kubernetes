@@ -312,10 +312,11 @@ func TestRunHTTPHandler(t *testing.T) {
 	}
 
 	tests := []struct {
-		Name     string
-		PodIP    string
-		HTTPGet  *v1.HTTPGetAction
-		Expected expected
+		Name          string
+		PodIP         string
+		HTTPGet       *v1.HTTPGetAction
+		PrePodSetFunc func(pod *v1.Pod)
+		Expected      expected
 	}{
 		{
 			Name:  "missing pod IP",
@@ -529,6 +530,96 @@ func TestRunHTTPHandler(t *testing.T) {
 					"Host":       {"from.header"},
 				},
 			},
+		}, {
+			Name:  "hostNetwork(no Host field use HostIPs): headers",
+			PodIP: "233.252.0.1",
+			PrePodSetFunc: func(pod *v1.Pod) {
+				pod.Spec.HostNetwork = true
+				pod.Status = v1.PodStatus{
+					HostIPs: []v1.HostIP{{IP: "233.252.0.1"}}, // only HostIPs
+				}
+			},
+			HTTPGet: &v1.HTTPGetAction{
+				Path:   "foo",
+				Port:   intstr.FromString("80"),
+				Host:   "", // no Host field
+				Scheme: "http",
+				HTTPHeaders: []v1.HTTPHeader{
+					{
+						Name:  "Foo",
+						Value: "bar",
+					},
+				},
+			},
+			Expected: expected{
+				OldURL:    "http://233.252.0.1:80/foo",
+				OldHeader: http.Header{},
+				NewURL:    "http://233.252.0.1:80/foo",
+				NewHeader: http.Header{
+					"Accept":     {"*/*"},
+					"Foo":        {"bar"},
+					"User-Agent": {"kube-lifecycle/."},
+				},
+			},
+		}, {
+			Name:  "hostNetwork(no Host field use PodIPs): headers",
+			PodIP: "233.252.0.10",
+			PrePodSetFunc: func(pod *v1.Pod) {
+				pod.Spec.HostNetwork = true
+				pod.Status = v1.PodStatus{
+					PodIPs: []v1.PodIP{{IP: "233.252.0.10"}}, // only PodIPs
+				}
+			},
+			HTTPGet: &v1.HTTPGetAction{
+				Path:   "foo",
+				Port:   intstr.FromString("80"),
+				Host:   "", // no Host field
+				Scheme: "http",
+				HTTPHeaders: []v1.HTTPHeader{
+					{
+						Name:  "Foo",
+						Value: "bar",
+					},
+				},
+			},
+			Expected: expected{
+				OldURL:    "http://233.252.0.10:80/foo",
+				OldHeader: http.Header{},
+				NewURL:    "http://233.252.0.10:80/foo",
+				NewHeader: http.Header{
+					"Accept":     {"*/*"},
+					"Foo":        {"bar"},
+					"User-Agent": {"kube-lifecycle/."},
+				},
+			},
+		}, {
+			Name:  "hostNetwork(set Host field use Host): host header",
+			PodIP: "233.252.0.1",
+			PrePodSetFunc: func(pod *v1.Pod) {
+				pod.Spec.HostNetwork = true
+			},
+			HTTPGet: &v1.HTTPGetAction{
+				Host:   "example.test", // set Host field
+				Path:   "foo",
+				Port:   intstr.FromString("80"),
+				Scheme: "http",
+				HTTPHeaders: []v1.HTTPHeader{
+					{
+						Name:  "Host",
+						Value: "from.header",
+					},
+				},
+			},
+			Expected: expected{
+				OldURL:    "http://example.test:80/foo",
+				OldHeader: http.Header{},
+				NewURL:    "http://example.test:80/foo",
+				NewHeader: http.Header{
+					"Accept":     {"*/*"},
+					"User-Agent": {"kube-lifecycle/."},
+					"Host":       {"from.header"},
+				},
+			},
 		},
 	}
 
@@ -560,7 +651,9 @@ func TestRunHTTPHandler(t *testing.T) {
 
 			container.Lifecycle.PostStart.HTTPGet = tt.HTTPGet
 			pod.Spec.Containers = []v1.Container{container}
-
+			if tt.PrePodSetFunc != nil {
+				tt.PrePodSetFunc(&pod)
+			}
 			verify := func(t *testing.T, expectedHeader http.Header, expectedURL string) {
 				fakeHTTPDoer := fakeHTTP{}
 				handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)

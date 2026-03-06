@@ -126,22 +126,11 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 
 func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
 	logger := klog.FromContext(ctx)
-	host := handler.HTTPGet.Host
-	podIP := host
-	if len(host) == 0 {
-		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
-		if err != nil {
-			logger.Error(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
-			return err
-		}
-		if len(status.IPs) == 0 {
-			return fmt.Errorf("failed to find networking container: %v", status)
-		}
-		host = status.IPs[0]
-		podIP = host
+	host, err := hr.resolveHost(ctx, pod, handler.HTTPGet.Host)
+	if err != nil {
+		return err
 	}
-
-	req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle")
+	req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, host, "lifecycle")
 	if err != nil {
 		return err
 	}
@@ -168,6 +157,39 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 		discardHTTPRespBody(resp)
 	}
 	return err
+}
+
+// resolveHost determines the host and podIP for a probe or hook.
+func (hr *handlerRunner) resolveHost(ctx context.Context, pod *v1.Pod, hostOverride string) (string, error) {
+	if len(hostOverride) > 0 {
+		return hostOverride, nil
+	}
+	// For hostNetwork pods, the runtime does not provide a sandbox IP.
+	// Since the kubelet executes the hook from the host's network namespace,
+	// which is the same namespace as the pod's,
+	// we use address from the pod.Status.PodIPs/HostIPs instead.
+	if pod.Spec.HostNetwork {
+		if len(pod.Status.PodIPs) > 0 {
+			return pod.Status.PodIPs[0].IP, nil
+		}
+		if len(pod.Status.HostIPs) > 0 {
+			return pod.Status.HostIPs[0].IP, nil
+		}
+		return "", fmt.Errorf("pod %s/%s uses hostNetwork but has no PodIPs or HostIPs in status: %+v", pod.Namespace, pod.Name, pod.Status)
+	}
+	// For non-hostNetwork pods, fall back to the existing logic of querying
+	// the container runtime for the pod's assigned IP address.
+	podStatus, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "Unable to get pod info, event handlers may be invalid", "pod", klog.KObj(pod))
+		return "", err
+	}
+
+	if len(podStatus.IPs) == 0 {
+		return "", fmt.Errorf("failed to find network status or pod IP for pod: %v", klog.KObj(pod))
+	}
+
+	return podStatus.IPs[0], nil
 }
 
 func discardHTTPRespBody(resp *http.Response) {
