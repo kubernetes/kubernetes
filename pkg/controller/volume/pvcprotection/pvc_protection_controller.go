@@ -256,6 +256,16 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 		return err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && pvc.DeletionTimestamp == nil {
+		isUsed, err := c.isBeingUsed(ctx, pvc, lazyLivePodList)
+		if err != nil {
+			return err
+		}
+		if err := c.updateUnusedSinceStatus(ctx, pvc, isUsed); err != nil {
+			return err
+		}
+	}
+
 	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		// PVC should be deleted. Check if it's used and remove finalizer if
 		// it's not.
@@ -471,6 +481,10 @@ func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 	}
 	logger.V(4).Info("Got event on PVC", "pvc", klog.KObj(pvc))
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) {
+		c.queue.Add(key)
+	}
+
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
 	}
@@ -514,7 +528,8 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 
 func (c *Controller) enqueuePVCs(logger klog.Logger, pod *v1.Pod, deleted bool) {
 	// Filter out pods that can't help us to remove a finalizer on PVC
-	if !deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) &&
+		!deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
 		return
 	}
 
