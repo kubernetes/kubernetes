@@ -1148,6 +1148,7 @@ func TestQuoRound(t *testing.T) {
 	}{
 		{decQuantity(10, 0, DecimalSI), 2, 0, intQuantity(5, 0, DecimalSI)},                                                              // normal division
 		{decQuantity(-10, 0, BinarySI), 2, 0, decQuantity(-5, 0, BinarySI)},                                                              // normal division, negative number
+		{intQuantity(25, 0, DecimalSI), 10, 2, intQuantity(25, -1, DecimalSI)},                                                           // normal division, scale is properly preserved
 		{decQuantity(100, 0, BinarySI), 3, 3, Quantity{d: infDecAmount{inf.NewDec(33333, 3)}}},                                           // arbitrary precision on an infinite decimal
 		{decQuantity(0, 0, DecimalSI), 2, 0, intQuantity(0, 0, DecimalSI)},                                                               // zero
 		{decQuantity(0, 0, DecimalSI), 2, 100, intQuantity(0, 0, DecimalSI)},                                                             // roundVal doesn't affect zero division
