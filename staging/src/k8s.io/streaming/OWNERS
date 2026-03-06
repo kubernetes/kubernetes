@@ -1,13 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - sig-node-approvers
-  - sttts
-  - luxas
-  - mtaufen
+  - aojea
+  - dims
+  - liggitt
+  - seans3
 reviewers:
-  - sig-node-reviewers
-  - luxas
-  - sttts
+  - aojea
+  - dims
+  - liggitt
+  - seans3
 labels:
-  - sig/node
+  - sig/api-machinery
