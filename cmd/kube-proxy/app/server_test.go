@@ -18,8 +18,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -27,9 +29,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	"k8s.io/component-base/configz"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -642,5 +647,65 @@ func TestStatuszRegistryReceivesListedPaths(t *testing.T) {
 	if !wantSet.Equal(gotSet) {
 		t.Errorf("statusz listed paths mismatch.\nwant: %v\ngot:  %v\nbody:\n%s",
 			wantSet.UnsortedList(), gotSet.UnsortedList(), body)
+	}
+}
+
+func TestConfigz(t *testing.T) {
+	configz.Delete(kubeproxyconfig.GroupName)
+	cz, err := configz.New(kubeproxyconfig.GroupName)
+	if err != nil {
+		t.Fatalf("unable to register configz: %v", err)
+	}
+	defer configz.Delete(kubeproxyconfig.GroupName)
+
+	externalConfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	externalConfig.SetGroupVersionKind(kubeproxyconfigv1alpha1.SchemeGroupVersion.WithKind("KubeProxyConfiguration"))
+	if err := cz.Set(externalConfig); err != nil {
+		t.Fatalf("unable to set configz: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	configz.InstallHandler(mux)
+	s := httptest.NewServer(mux)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/configz")
+	if err != nil {
+		t.Fatalf("unable to GET /configz: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("unable to read response body: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want status 200, got %d", resp.StatusCode)
+	}
+
+	var configzResp map[string]unstructured.Unstructured
+	if err := json.Unmarshal(body, &configzResp); err != nil {
+		t.Fatalf("failed to unmarshal configz: %v", err)
+	}
+	cfg, ok := configzResp[kubeproxyconfig.GroupName]
+	if !ok {
+		t.Fatalf("configz missing %q key", kubeproxyconfig.GroupName)
+	}
+	if cfg.GetAPIVersion() != "kubeproxy.config.k8s.io/v1alpha1" {
+		t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+	}
+	if cfg.GetKind() != "KubeProxyConfiguration" {
+		t.Errorf("unexpected Kind: %s", cfg.GetKind())
+	}
+
+	// confirm that they expose public config type
+	var proxyConfig kubeproxyconfigv1alpha1.KubeProxyConfiguration
+	err = json.Unmarshal(body, &struct {
+		ComponentConfig *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"kubeproxy.config.k8s.io"`
+	}{ComponentConfig: &proxyConfig})
+	if err != nil {
+		t.Errorf("failed to deserialize into public config type: %v", err)
 	}
 }

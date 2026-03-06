@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +40,9 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/component-base/configz"
+	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
@@ -572,6 +576,69 @@ func TestStatusz(t *testing.T) {
 	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /healthz /metrics\n$`)
 	if reg.FindStringSubmatch(string(resBody)) == nil {
 		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /healthz /metrics")
+	}
+}
+
+func TestConfigz(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	configz.Delete("kubeletconfig")
+	cz, err := configz.New("kubeletconfig")
+	if err != nil {
+		t.Fatalf("unable to register configz: %v", err)
+	}
+	defer configz.Delete("kubeletconfig")
+	kc := &v1beta1.KubeletConfiguration{}
+	kc.TypeMeta.APIVersion = "kubelet.config.k8s.io/v1beta1"
+	kc.TypeMeta.Kind = "KubeletConfiguration"
+	if err := cz.Set(kc); err != nil {
+		t.Fatalf("unable to set configz: %v", err)
+	}
+
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+"/configz", nil)
+	if err != nil {
+		t.Fatalf("Got error creating request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Got error reading response body: %v", err)
+	}
+
+	var configz map[string]unstructured.Unstructured
+	if err := json.Unmarshal(body, &configz); err != nil {
+		t.Fatalf("failed to unmarshal configz: %v", err)
+	}
+	cfg, ok := configz["kubeletconfig"]
+	if !ok {
+		t.Fatalf("configz missing 'kubeletconfig' key")
+	}
+	if cfg.GetAPIVersion() != "kubelet.config.k8s.io/v1beta1" {
+		t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+	}
+	if cfg.GetKind() != "KubeletConfiguration" {
+		t.Errorf("unexpected Kind: %s", cfg.GetKind())
+	}
+
+	// confirm that they expose public config type
+	var kubeletConfig v1beta1.KubeletConfiguration
+	err = json.Unmarshal(body, &struct {
+		ComponentConfig *v1beta1.KubeletConfiguration `json:"kubeletconfig"`
+	}{ComponentConfig: &kubeletConfig})
+	if err != nil {
+		t.Errorf("failed to deserialize into public config type: %v", err)
 	}
 }
 
