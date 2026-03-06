@@ -1089,7 +1089,7 @@ gopkg.in/yaml.v3
 # k8s.io/cri-client v0.0.0 => ./staging/src/k8s.io/cri-client
 ## explicit; go 1.26.0
 # k8s.io/cri-streaming v0.0.0 => ./staging/src/k8s.io/cri-streaming
-## explicit; go 1.25.0
+## explicit; go 1.26.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 ## explicit; go 1.26.0
 # k8s.io/dynamic-resource-allocation v0.0.0 => ./staging/src/k8s.io/dynamic-resource-allocation
@@ -1176,7 +1176,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit; go 1.26.0
 # k8s.io/streaming v0.0.0 => ./staging/src/k8s.io/streaming
-## explicit; go 1.25.0
+## explicit; go 1.26.0
 # k8s.io/system-validators v1.12.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators

@@ -25,8 +25,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 )
 
@@ -370,12 +368,16 @@ func TestIsWebSocketRequestWithStreamCloseProtocol(t *testing.T) {
 
 	for name, test := range tests {
 		req, err := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		for key, value := range test.headers {
 			req.Header.Add(key, value)
 		}
 		actual := IsWebSocketRequestWithStreamCloseProtocol(req)
-		assert.Equal(t, test.expected, actual, "%s: expected (%t), got (%t)", name, test.expected, actual)
+		if actual != test.expected {
+			t.Errorf("%s: expected (%t), got (%t)", name, test.expected, actual)
+		}
 	}
 }
 
@@ -412,7 +414,8 @@ func TestProtocolSupportsStreamClose(t *testing.T) {
 
 	for name, test := range tests {
 		actual := protocolSupportsStreamClose(test.protocol)
-		assert.Equal(t, test.expected, actual,
-			"%s: expected (%t), got (%t)", name, test.expected, actual)
+		if actual != test.expected {
+			t.Errorf("%s: expected (%t), got (%t)", name, test.expected, actual)
+		}
 	}
 }

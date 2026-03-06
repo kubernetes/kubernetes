@@ -33,8 +33,6 @@ import (
 	"testing"
 
 	"github.com/armon/go-socks5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"k8s.io/streaming/pkg/httpstream"
 )
@@ -592,7 +590,9 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 	t.Setenv("no_proxy", "")
 
 	expectedProxy, err := url.Parse("http://proxy.example:8080")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	delegateCalls := 0
 	delegate := func(*http.Request) (*url.URL, error) {
@@ -603,34 +603,70 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 	proxier := newProxierWithNoProxyCIDR(delegate)
 
 	req, err := http.NewRequest(http.MethodGet, "https://10.1.2.3", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	proxyURL, err := proxier(req)
-	require.NoError(t, err)
-	require.Nil(t, proxyURL)
-	require.Equal(t, 0, delegateCalls)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if proxyURL != nil {
+		t.Fatalf("expected nil proxyURL, got %v", proxyURL)
+	}
+	if delegateCalls != 0 {
+		t.Fatalf("expected delegateCalls=0, got %d", delegateCalls)
+	}
 
 	req, err = http.NewRequest(http.MethodGet, "https://[2001:db8::1]", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	proxyURL, err = proxier(req)
-	require.NoError(t, err)
-	require.Nil(t, proxyURL)
-	require.Equal(t, 0, delegateCalls)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if proxyURL != nil {
+		t.Fatalf("expected nil proxyURL, got %v", proxyURL)
+	}
+	if delegateCalls != 0 {
+		t.Fatalf("expected delegateCalls=0, got %d", delegateCalls)
+	}
 
 	req, err = http.NewRequest(http.MethodGet, "https://192.168.1.10", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	proxyURL, err = proxier(req)
-	require.NoError(t, err)
-	require.NotNil(t, proxyURL)
-	require.Equal(t, expectedProxy.String(), proxyURL.String())
-	require.Equal(t, 1, delegateCalls)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if proxyURL == nil {
+		t.Fatalf("expected non-nil proxyURL")
+	}
+	if proxyURL.String() != expectedProxy.String() {
+		t.Fatalf("expected proxyURL %q, got %q", expectedProxy.String(), proxyURL.String())
+	}
+	if delegateCalls != 1 {
+		t.Fatalf("expected delegateCalls=1, got %d", delegateCalls)
+	}
 
 	req, err = http.NewRequest(http.MethodGet, "https://example.com", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	proxyURL, err = proxier(req)
-	require.NoError(t, err)
-	require.NotNil(t, proxyURL)
-	require.Equal(t, expectedProxy.String(), proxyURL.String())
-	require.Equal(t, 2, delegateCalls)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if proxyURL == nil {
+		t.Fatalf("expected non-nil proxyURL")
+	}
+	if proxyURL.String() != expectedProxy.String() {
+		t.Fatalf("expected proxyURL %q, got %q", expectedProxy.String(), proxyURL.String())
+	}
+	if delegateCalls != 2 {
+		t.Fatalf("expected delegateCalls=2, got %d", delegateCalls)
+	}
 }
 
 type Interceptor struct {
@@ -911,13 +947,17 @@ func TestRoundTripPassesContextToDialer(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			spdyTransport, err := NewRoundTripper(&tls.Config{})
 			if err != nil {
 				t.Fatalf("error creating SpdyRoundTripper: %v", err)
 			}
 			_, err = spdyTransport.Dial(req)
-			assert.EqualError(t, err, "dial tcp 127.0.0.1:1233: operation was canceled")
+			if err == nil || err.Error() != "dial tcp 127.0.0.1:1233: operation was canceled" {
+				t.Errorf("expected error %q, got %v", "dial tcp 127.0.0.1:1233: operation was canceled", err)
+			}
 		})
 	}
 }
