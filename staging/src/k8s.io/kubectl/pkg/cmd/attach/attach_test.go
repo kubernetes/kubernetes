@@ -137,7 +137,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
 			expectedPodName: "foo",
-			expectError:     "container wrong not found in pod foo",
+			expectError:     "container wrong is not valid for pod foo out of: bar, debugger (ephem), initfoo (init)",
 			obj:             attachPod(),
 		},
 		{
@@ -276,7 +276,7 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "foo",
-			expectedErr:  "cannot attach to the container: container foo not found in pod foo",
+			expectedErr:  "cannot attach to the container: container foo is not valid for pod foo out of: bar, debugger (ephem), initfoo (init)",
 		},
 	}
 	for _, test := range tests {
