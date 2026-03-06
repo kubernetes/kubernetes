@@ -1063,6 +1063,67 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	return nil
 }
 
+// prepareContainerPathsForRestore creates the necessary directories and files that restored
+// containers expect to exist. These paths are normally created during container startup,
+// but must be created before calling RestorePod since restored containers are already running.
+// This includes:
+//   - /etc/hosts file (mounted from host)
+//   - Container directories for termination logs
+//
+// The paths created here are passed to the CRI runtime in the PodSandboxConfig.
+func (kl *Kubelet) prepareContainerPathsForRestore(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	podDir := kl.getPodDir(pod.UID)
+
+	klog.V(1).InfoS("Preparing container paths for pod restore", "pod", klog.KObj(pod), "podUID", pod.UID, "podDir", podDir)
+
+	// Create etc-hosts file
+	// This is normally created in makeHostsMount() during container creation
+	podIPs := make([]string, 0, len(podStatus.IPs))
+	for _, ip := range podStatus.IPs {
+		podIPs = append(podIPs, ip)
+	}
+
+	hostsFilePath := getEtcHostsPath(podDir)
+	hostName := pod.Name
+	hostDomainName := ""
+	if pod.Spec.Hostname != "" {
+		hostName = pod.Spec.Hostname
+	}
+	if pod.Spec.Subdomain != "" {
+		hostDomainName = pod.Spec.Subdomain
+	}
+
+	klog.V(1).InfoS("Creating etc-hosts file for pod restore", "pod", klog.KObj(pod), "hostsFilePath", hostsFilePath, "podIPs", podIPs, "hostName", hostName, "hostDomainName", hostDomainName)
+	if err := ensureHostsFile(hostsFilePath, podIPs, hostName, hostDomainName, pod.Spec.HostAliases, pod.Spec.HostNetwork); err != nil {
+		return fmt.Errorf("failed to create etc-hosts file: %w", err)
+	}
+
+	// Create container directories for all containers (init, regular, ephemeral)
+	// These directories hold the termination log file
+	// The directory structure is: /var/lib/kubelet/pods/{pod-uid}/containers/{container-name}/{restart-count}
+	containersDir := filepath.Join(podDir, "containers")
+
+	allContainers := append([]v1.Container{}, pod.Spec.InitContainers...)
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	for i := range pod.Spec.EphemeralContainers {
+		allContainers = append(allContainers, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+
+	klog.V(1).InfoS("Creating container directories for pod restore", "pod", klog.KObj(pod), "containersDir", containersDir, "containerCount", len(allContainers))
+	for _, container := range allContainers {
+		// Create directory for restart count 0 (restored containers start at 0)
+		// Format: /var/lib/kubelet/pods/{pod-uid}/containers/{container-name}/0
+		containerDir := filepath.Join(containersDir, container.Name, "0")
+		klog.V(1).InfoS("Creating container directory for pod restore", "pod", klog.KObj(pod), "containerName", container.Name, "containerDir", containerDir)
+		if err := os.MkdirAll(containerDir, 0750); err != nil && !os.IsExist(err) {
+			return fmt.Errorf("failed to create container directory %s: %w", containerDir, err)
+		}
+	}
+
+	klog.V(1).InfoS("Successfully prepared all container paths for pod restore", "pod", klog.KObj(pod))
+	return nil
+}
+
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
 func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Secret {

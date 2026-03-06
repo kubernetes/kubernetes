@@ -74,6 +74,7 @@ func isSubpath(subpath, path string) bool {
 //	/metrics/*		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=metrics
 //	/logs/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=log
 //	/checkpoint/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=checkpoint
+//	/checkpointpod/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=checkpointpod
 //	/statusz 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=statusz
 //	/pods/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
 //	/runningPods/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
@@ -124,6 +125,8 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(ctx context.Context
 		subresources = append(subresources, "log")
 	case isSubpath(requestPath, checkpointPath):
 		subresources = append(subresources, "checkpoint")
+	case isSubpath(requestPath, checkpointPodPath):
+		subresources = append(subresources, "checkpointpod")
 	case isSubpath(requestPath, statusz.DefaultStatuszPath):
 		subresources = append(subresources, "statusz")
 	case isSubpath(requestPath, flagz.DefaultFlagzPath):

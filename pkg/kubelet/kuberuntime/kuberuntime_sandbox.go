@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"runtime"
 	"sort"
 
@@ -73,6 +74,201 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	}
 
 	return podSandBoxID, "", nil
+}
+
+// restorePodSandbox restores a pod sandbox from a checkpoint and returns (podSandBoxID, message, error).
+//
+// IMPORTANT HARDCODED BEHAVIOR:
+// Currently this function hardcodes pod-level PID namespace sharing (requires infra container).
+// This is a temporary workaround required by CRI-O for pod restore functionality.
+// TODO: The checkpoint archive should include complete pod metadata (ShareProcessNamespace,
+// NamespaceOptions, SecurityContext, etc.) so these settings can be restored from the
+// checkpoint instead of being hardcoded here.
+func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
+	logger := klog.FromContext(ctx)
+
+	if pod.Spec.RestoreFrom == nil || *pod.Spec.RestoreFrom == "" {
+		message := "RestoreFrom is not specified in pod spec"
+		logger.Error(nil, message, "pod", klog.KObj(pod))
+		return "", message, fmt.Errorf(message)
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
+	if err != nil {
+		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
+		return "", message, err
+	}
+
+	// Create pod logs directory
+	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0755)
+	if err != nil {
+		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
+		return "", message, err
+	}
+
+	runtimeHandler := ""
+	if m.runtimeClassManager != nil {
+		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
+			return "", message, err
+		}
+		if runtimeHandler != "" {
+			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+		}
+	}
+
+	logger.V(2).Info("Restoring pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointPath", *pod.Spec.RestoreFrom, "runtimeHandler", runtimeHandler)
+
+	// HARDCODED: Force pod-level PID namespace sharing for restore.
+	// This is required by CRI-O for pod restore as it needs an infra container.
+	// TODO: This should be read from the checkpoint archive metadata instead of being hardcoded.
+	// The checkpoint archive should store the original pod's ShareProcessNamespace setting
+	// and other sandbox configuration that was used during checkpoint creation.
+	shareProcessNamespace := true
+	if podSandboxConfig.Linux == nil {
+		podSandboxConfig.Linux = &runtimeapi.LinuxPodSandboxConfig{}
+	}
+	if podSandboxConfig.Linux.SecurityContext == nil {
+		podSandboxConfig.Linux.SecurityContext = &runtimeapi.LinuxSandboxSecurityContext{}
+	}
+	if podSandboxConfig.Linux.SecurityContext.NamespaceOptions == nil {
+		podSandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtimeapi.NamespaceOption{}
+	}
+	podSandboxConfig.Linux.SecurityContext.NamespaceOptions.Pid = runtimeapi.NamespaceMode_POD
+	logger.V(2).Info("HARDCODED: Forcing pod-level PID namespace for restore", "pod", klog.KObj(pod), "shareProcessNamespace", shareProcessNamespace)
+
+	// Generate container configs with mount information for all containers
+	// This tells the CRI runtime where to mount host paths into the restored containers
+	containerConfigs, err := m.generateContainerConfigsForRestore(ctx, pod, podSandboxConfig)
+	if err != nil {
+		message := fmt.Sprintf("Failed to generate container configs for restore for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to generate container configs for restore", "pod", klog.KObj(pod))
+		return "", message, err
+	}
+
+	logger.V(1).Info("Generated container configs for restore", "pod", klog.KObj(pod), "containerCount", len(containerConfigs))
+
+	// Create the RestorePodRequest
+	// Note: RuntimeHandler is not part of RestorePodRequest; it's stored in the checkpoint
+	restoreRequest := &runtimeapi.RestorePodRequest{
+		Path:         *pod.Spec.RestoreFrom,
+		Config:           podSandboxConfig,
+		ContainerConfigs: containerConfigs,
+	}
+
+	// Call the CRI RestorePod RPC
+	podSandBoxID, err := m.runtimeService.RestorePod(ctx, restoreRequest)
+	if err != nil {
+		message := fmt.Sprintf("Failed to restore pod sandbox from checkpoint %q for pod %q: %v", *pod.Spec.RestoreFrom, format.Pod(pod), err)
+		logger.Error(err, "Failed to restore pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointPath", *pod.Spec.RestoreFrom)
+		return "", message, err
+	}
+
+	if podSandBoxID == "" {
+		message := fmt.Sprintf("RestorePod returned empty pod sandbox ID for pod %q", format.Pod(pod))
+		logger.Error(nil, message, "pod", klog.KObj(pod))
+		return "", message, fmt.Errorf(message)
+	}
+
+	logger.V(2).Info("Successfully restored pod sandbox from checkpoint", "pod", klog.KObj(pod), "podSandboxID", podSandBoxID, "checkpointPath", *pod.Spec.RestoreFrom)
+
+	return podSandBoxID, "", nil
+}
+
+// generateContainerConfigsForRestore generates minimal container configurations for pod restore.
+// These configs contain mount information that tells the CRI runtime where to mount host paths
+// (e.g., /etc/hosts, termination logs, volumes) into the restored containers.
+// The CRI runtime matches these configs with containers from the checkpoint by container name.
+func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig) ([]*runtimeapi.ContainerConfig, error) {
+	logger := klog.FromContext(ctx)
+
+	// Collect all containers (init, regular, ephemeral)
+	allContainers := append([]v1.Container{}, pod.Spec.InitContainers...)
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	for i := range pod.Spec.EphemeralContainers {
+		allContainers = append(allContainers, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+
+	containerConfigs := make([]*runtimeapi.ContainerConfig, 0, len(allContainers))
+
+	// Get pod IPs from the sandbox config for /etc/hosts generation
+	podIP := ""
+	podIPs := []string{}
+	if podSandboxConfig.GetLabels() != nil {
+		if ip, ok := podSandboxConfig.GetLabels()["io.kubernetes.pod.ip"]; ok && ip != "" {
+			podIP = ip
+			podIPs = append(podIPs, ip)
+		}
+	}
+	// Also check pod status for IPs
+	if pod.Status.PodIP != "" {
+		podIP = pod.Status.PodIP
+		podIPs = []string{pod.Status.PodIP}
+	}
+	for _, ip := range pod.Status.PodIPs {
+		if ip.IP != "" && ip.IP != podIP {
+			podIPs = append(podIPs, ip.IP)
+		}
+	}
+
+	logger.V(1).Info("Pod IPs for restore", "pod", klog.KObj(pod), "podIP", podIP, "podIPs", podIPs)
+
+	// Generate container config with mounts for each container
+	for _, container := range allContainers {
+		// Generate run container options which includes all mount information
+		// Pass pod IPs so that /etc/hosts mount can be generated
+		opts, _, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, &container, podIP, podIPs, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate container options for %s: %w", container.Name, err)
+		}
+
+		logger.V(1).Info("Generated RunContainerOptions for restore", "pod", klog.KObj(pod), "containerName", container.Name, "kubeletMountCount", len(opts.Mounts))
+		for i, mount := range opts.Mounts {
+			logger.V(1).Info("Kubelet mount before CRI conversion", "pod", klog.KObj(pod), "containerName", container.Name, "mountIndex", i, "name", mount.Name, "containerPath", mount.ContainerPath, "hostPath", mount.HostPath)
+		}
+
+		// Convert kubelet mounts to CRI mounts
+		mounts := m.makeMounts(opts, &container)
+
+		// Manually add /etc/hosts mount since GenerateRunContainerOptions won't include it
+		// without pod IPs (which aren't available yet during restore)
+		podDir := m.runtimeHelper.GetPodDir(pod.UID)
+		etcHostsPath := filepath.Join(podDir, "etc-hosts")
+		hostsMount := &runtimeapi.Mount{
+			HostPath:       etcHostsPath,
+			ContainerPath:  "/etc/hosts",
+			Readonly:       false,
+			SelinuxRelabel: true,
+		}
+		mounts = append(mounts, hostsMount)
+		logger.V(1).Info("Added /etc/hosts mount for restore", "pod", klog.KObj(pod), "containerName", container.Name, "hostPath", etcHostsPath)
+
+		// Create minimal container config with just the information needed for restore
+		// Include labels and annotations so kubelet can identify the containers
+		labels := newContainerLabels(&container, pod)
+		annotations := newContainerAnnotations(ctx, &container, pod, 0, opts)
+		config := &runtimeapi.ContainerConfig{
+			Metadata: &runtimeapi.ContainerMetadata{
+				Name:    container.Name,
+				Attempt: 0, // Restored containers start at attempt 0
+			},
+			Labels:      labels,
+			Annotations: annotations,
+			Mounts:      mounts,
+		}
+
+		logger.V(1).Info("Generated container config for restore", "pod", klog.KObj(pod), "containerName", container.Name, "mountCount", len(mounts), "labelCount", len(labels), "annotationCount", len(annotations))
+		for i, mount := range mounts {
+			logger.V(1).Info("Container mount for restore", "pod", klog.KObj(pod), "containerName", container.Name, "mountIndex", i, "containerPath", mount.ContainerPath, "hostPath", mount.HostPath, "readonly", mount.Readonly)
+		}
+
+		containerConfigs = append(containerConfigs, config)
+	}
+
+	return containerConfigs, nil
 }
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.

@@ -281,6 +281,13 @@ type PodSpecApplyConfiguration struct {
 	// may be recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
 	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
+	// RestoreFrom specifies a checkpoint image to restore this pod from.
+	// When set, the pod will be restored from a previously checkpointed state
+	// instead of being created from scratch.
+	// The value should be an OCI image reference (e.g., "localhost/checkpoint-pod:latest")
+	// or a path to a checkpoint archive.
+	// This field is immutable and can only be set at pod creation time.
+	RestoreFrom *string `json:"restoreFrom,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -683,5 +690,13 @@ func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecA
 // If called multiple times, the WorkloadRef field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithWorkloadRef(value *WorkloadReferenceApplyConfiguration) *PodSpecApplyConfiguration {
 	b.WorkloadRef = value
+	return b
+}
+
+// WithRestoreFrom sets the RestoreFrom field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestoreFrom field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithRestoreFrom(value string) *PodSpecApplyConfiguration {
+	b.RestoreFrom = &value
 	return b
 }

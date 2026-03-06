@@ -7046,6 +7046,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: restartPolicy
       type:
         scalar: string
+    - name: restoreFrom
+      type:
+        scalar: string
     - name: runtimeClassName
       type:
         scalar: string

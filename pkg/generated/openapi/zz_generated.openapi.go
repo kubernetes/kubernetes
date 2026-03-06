@@ -28792,6 +28792,13 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Ref:         ref(corev1.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
+					"restoreFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RestoreFrom specifies a checkpoint image to restore this pod from. When set, the pod will be restored from a previously checkpointed state instead of being created from scratch. The value should be an OCI image reference (e.g., \"localhost/checkpoint-pod:latest\") or a path to a checkpoint archive. This field is immutable and can only be set at pod creation time.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
