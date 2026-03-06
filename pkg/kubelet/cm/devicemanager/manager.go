@@ -87,6 +87,10 @@ type ManagerImpl struct {
 
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
 	allocatedDevices map[string]sets.Set[string]
+	// pendingAllocations contains in-flight allocation reservations, keyed by resourceName.
+	// Entries are added before plugin Allocate RPC and removed when the reservation either
+	// gets committed to podDevices or allocation fails.
+	pendingAllocations map[string]sets.Set[string]
 
 	// podDevices contains pod to allocated device mapping.
 	podDevices        *podDevices
@@ -125,6 +129,34 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.Set[string]
 
+// regenerateAllocatedDevicesLocked rebuilds allocatedDevices from committed pod allocations
+// and merges currently pending reservations.
+func (m *ManagerImpl) regenerateAllocatedDevicesLocked() {
+	m.allocatedDevices = m.podDevices.devices()
+	for resource, devices := range m.pendingAllocations {
+		if devices == nil || devices.Len() == 0 {
+			continue
+		}
+		if m.allocatedDevices[resource] == nil {
+			m.allocatedDevices[resource] = sets.New[string]()
+		}
+		m.allocatedDevices[resource] = m.allocatedDevices[resource].Union(devices)
+	}
+}
+
+func (m *ManagerImpl) releaseReservedDevicesLocked(resource string, devices sets.Set[string]) {
+	if devices == nil || devices.Len() == 0 {
+		return
+	}
+	if m.pendingAllocations == nil || m.pendingAllocations[resource] == nil {
+		return
+	}
+	m.pendingAllocations[resource] = m.pendingAllocations[resource].Difference(devices)
+	if m.pendingAllocations[resource].Len() == 0 {
+		delete(m.pendingAllocations, resource)
+	}
+}
+
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
@@ -155,6 +187,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		healthyDevices:        make(map[string]sets.Set[string]),
 		unhealthyDevices:      make(map[string]sets.Set[string]),
 		allocatedDevices:      make(map[string]sets.Set[string]),
+		pendingAllocations:    make(map[string]sets.Set[string]),
 		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
@@ -532,7 +565,7 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 	defer m.mutex.Unlock()
 	podDevices, registeredDevs := cp.GetData()
 	m.podDevices.fromCheckpointData(logger, podDevices)
-	m.allocatedDevices = m.podDevices.devices()
+	m.regenerateAllocatedDevicesLocked()
 	for resource := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
 		// will stay zero till the corresponding device plugin re-registers.
@@ -574,7 +607,7 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 	logger.V(3).Info("Pods to be removed", "podUIDs", sets.List(podsToBeRemoved))
 	m.podDevices.delete(sets.List(podsToBeRemoved))
 	// Regenerated allocatedDevices after we update pod allocation information.
-	m.allocatedDevices = m.podDevices.devices()
+	m.regenerateAllocatedDevicesLocked()
 }
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
@@ -658,8 +691,15 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		if m.allocatedDevices[resource] == nil {
 			m.allocatedDevices[resource] = sets.New[string]()
 		}
+		if m.pendingAllocations == nil {
+			m.pendingAllocations = make(map[string]sets.Set[string])
+		}
+		if m.pendingAllocations[resource] == nil {
+			m.pendingAllocations[resource] = sets.New[string]()
+		}
 		for device := range devices.Difference(allocated) {
 			m.allocatedDevices[resource].Insert(device)
+			m.pendingAllocations[resource].Insert(device)
 			allocated.Insert(device)
 			needed--
 			if needed == 0 {
@@ -892,7 +932,8 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		m.mutex.Unlock()
 		if !ok {
 			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
+			m.releaseReservedDevicesLocked(resource, allocDevices)
+			m.regenerateAllocatedDevicesLocked()
 			m.mutex.Unlock()
 			return fmt.Errorf("unknown Device Plugin %s", resource)
 		}
@@ -907,12 +948,17 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 			// In case of allocation failure, we want to restore m.allocatedDevices
 			// to the actual allocated state from m.podDevices.
 			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
+			m.releaseReservedDevicesLocked(resource, allocDevices)
+			m.regenerateAllocatedDevicesLocked()
 			m.mutex.Unlock()
 			return err
 		}
 
 		if len(resp.ContainerResponses) == 0 {
+			m.mutex.Lock()
+			m.releaseReservedDevicesLocked(resource, allocDevices)
+			m.regenerateAllocatedDevicesLocked()
+			m.mutex.Unlock()
 			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
@@ -931,6 +977,9 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		}
 		m.mutex.Unlock()
 		m.podDevices.insert(podUID, contName, resource, allocDevicesWithNUMA, resp.ContainerResponses[0])
+		m.mutex.Lock()
+		m.releaseReservedDevicesLocked(resource, allocDevices)
+		m.mutex.Unlock()
 	}
 
 	if needsUpdateCheckpoint {
