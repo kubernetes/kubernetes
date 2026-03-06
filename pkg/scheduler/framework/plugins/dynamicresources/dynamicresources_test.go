@@ -3021,9 +3021,11 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	registeredHandler := claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
 
 	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	var deviceClassHandlerRegistration cache.ResourceEventHandlerRegistration
 	if features.EnableDRAExtendedResource {
 		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		if _, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+		deviceClassHandlerRegistration, err = tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+		if err != nil {
 			tCtx.Logger().Error(err, "failed to add device class informer event handler")
 		}
 	}
@@ -3072,7 +3074,11 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	// is synced, we need to wait until HasSynced of the handler returns
 	// true, this ensures that the assume cache is in sync with the informer's
 	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitForNamedCacheSyncWithContext(tCtx, registeredHandler.HasSynced, resourceSliceTracker.HasSynced)
+	if deviceClassHandlerRegistration != nil {
+		cache.WaitForNamedCacheSyncWithContext(tCtx, registeredHandler.HasSynced, resourceSliceTracker.HasSynced, deviceClassHandlerRegistration.HasSynced)
+	} else {
+		cache.WaitForNamedCacheSyncWithContext(tCtx, registeredHandler.HasSynced, resourceSliceTracker.HasSynced)
+	}
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
