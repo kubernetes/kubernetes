@@ -68,7 +68,7 @@ var clientCertificateExpirationHistogram = metrics.NewHistogram(
 			15552000, // 6 months
 			31104000, // 1 year
 		},
-		StabilityLevel: metrics.ALPHA,
+		StabilityLevel: metrics.BETA,
 	},
 )
 
