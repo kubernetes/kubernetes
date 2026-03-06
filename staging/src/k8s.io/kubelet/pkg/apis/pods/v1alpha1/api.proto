@@ -31,7 +31,8 @@ enum EventType {
 message WatchPodsEvent {
     // ADDED, MODIFIED, DELETED, INITIAL_SYNC_COMPLETE
     EventType type = 1;
-    // pod is nil for INITIAL_SYNC_COMPLETE
+    // pod is nil for INITIAL_SYNC_COMPLETE.
+    // For DELETED events, only the pod name, namespace, and UID are guaranteed to be set.
     bytes pod = 2;
 }
 

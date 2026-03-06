@@ -99,7 +99,8 @@ type WatchPodsEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// ADDED, MODIFIED, DELETED, INITIAL_SYNC_COMPLETE
 	Type EventType `protobuf:"varint,1,opt,name=type,proto3,enum=v1alpha1.EventType" json:"type,omitempty"`
-	// pod is nil for INITIAL_SYNC_COMPLETE
+	// pod is nil for INITIAL_SYNC_COMPLETE.
+	// For DELETED events, only the pod name, namespace, and UID are guaranteed to be set.
 	Pod           []byte `protobuf:"bytes,2,opt,name=pod,proto3" json:"pod,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

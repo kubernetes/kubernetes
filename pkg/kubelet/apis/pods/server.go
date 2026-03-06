@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
@@ -151,7 +152,14 @@ func (s *PodsServer) OnPodUpdated(pod *v1.Pod, status v1.PodStatus, eventType wa
 
 // OnPodRemoved is called when a pod is removed.
 func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: pod})
+	minimalPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			UID:       pod.UID,
+		},
+	}
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: minimalPod})
 	logger := klog.FromContext(context.Background())
 	logger.Info("Pod removed broadcasted", "podUID", pod.UID)
 }

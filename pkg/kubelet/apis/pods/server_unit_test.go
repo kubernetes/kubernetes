@@ -72,7 +72,11 @@ func TestStartEventLoop(t *testing.T) {
 	event = <-clientChannel
 	assert.Equal(t, watch.Deleted, event.Type)
 	assert.Equal(t, pod1.UID, event.UID)
-	assert.Equal(t, pod1, event.Pod)
+	require.NotNil(t, event.Pod)
+	assert.Equal(t, pod1.Name, event.Pod.Name)
+	assert.Equal(t, pod1.Namespace, event.Pod.Namespace)
+	assert.Equal(t, pod1.UID, event.Pod.UID)
+	assert.Empty(t, event.Pod.Spec.Containers)
 
 	select {
 	case event := <-clientChannel:
@@ -144,6 +148,20 @@ func TestWatchPods(t *testing.T) {
 	err = podOut.Unmarshal(event.Pod)
 	require.NoError(t, err)
 	assert.Equal(t, "pod1", podOut.Name)
+
+	// Trigger a removal
+	server.OnPodRemoved(pod1)
+
+	// Verify DELETED event
+	event = <-mockStream.EventCh
+	assert.Equal(t, podsv1alpha1.EventType_DELETED, event.Type)
+	podOut = &v1.Pod{}
+	err = podOut.Unmarshal(event.Pod)
+	require.NoError(t, err)
+	assert.Equal(t, "pod1", podOut.Name)
+	assert.Equal(t, "ns1", podOut.Namespace)
+	assert.Equal(t, pod1.UID, podOut.UID)
+	assert.Empty(t, podOut.Spec.Containers)
 }
 
 func TestListPods(t *testing.T) {

@@ -1743,7 +1743,6 @@ func (p *podWorkers) requeueLastPodUpdate(podUID types.UID, status *podSyncStatu
 		return
 	}
 	copied := *status.activeUpdate
-	copied.UpdateType = kubetypes.SyncPodSync
 	status.pendingUpdate = &copied
 
 	// notify the pod worker
