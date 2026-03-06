@@ -30,71 +30,72 @@ func TestParse(t *testing.T) {
 		{
 			name:    "empty string",
 			input:   "",
-			wantReq: nil,
+			wantErr: true,
 		},
 		{
 			name:  "single requirement with uid",
-			input: "shardRange(object.metadata.uid,0000000000000000,8000000000000000)",
+			input: "shardRange(object.metadata.uid,0x0000000000000000,0x8000000000000000)",
 			wantReq: []ShardRangeRequirement{
 				{Key: "object.metadata.uid", Start: "0000000000000000", End: "8000000000000000"},
 			},
 		},
 		{
-			name:  "single requirement with empty start",
-			input: "shardRange(object.metadata.uid,,8000000000000000)",
+			name:  "full range with 2^64 end",
+			input: "shardRange(object.metadata.uid,0x0000000000000000,0x10000000000000000)",
 			wantReq: []ShardRangeRequirement{
-				{Key: "object.metadata.uid", Start: "", End: "8000000000000000"},
+				{Key: "object.metadata.uid", Start: "0000000000000000", End: "10000000000000000"},
 			},
 		},
 		{
-			name:  "single requirement with empty end",
-			input: "shardRange(object.metadata.uid,8000000000000000,)",
-			wantReq: []ShardRangeRequirement{
-				{Key: "object.metadata.uid", Start: "8000000000000000", End: ""},
-			},
+			name:    "missing 0x prefix on start",
+			input:   "shardRange(object.metadata.uid,0000000000000000,0x8000000000000000)",
+			wantErr: true,
 		},
 		{
-			name:  "single requirement with both empty",
-			input: "shardRange(object.metadata.uid,,)",
-			wantReq: []ShardRangeRequirement{
-				{Key: "object.metadata.uid", Start: "", End: ""},
-			},
+			name:    "missing 0x prefix on end",
+			input:   "shardRange(object.metadata.uid,0x0000000000000000,8000000000000000)",
+			wantErr: true,
+		},
+		{
+			name:    "empty after 0x prefix",
+			input:   "shardRange(object.metadata.uid,0x,0x8000000000000000)",
+			wantErr: true,
 		},
 		{
 			name:  "namespace field",
-			input: "shardRange(object.metadata.namespace,aa,ff)",
+			input: "shardRange(object.metadata.namespace,0xaa,0xff)",
 			wantReq: []ShardRangeRequirement{
 				{Key: "object.metadata.namespace", Start: "aa", End: "ff"},
 			},
 		},
 		{
 			name:    "name field unsupported",
-			input:   "shardRange(object.metadata.name,00,80)",
+			input:   "shardRange(object.metadata.name,0x00,0x80)",
 			wantErr: true,
 		},
 		{
 			name:    "unsupported field",
-			input:   "shardRange(object.metadata.labels,00,80)",
+			input:   "shardRange(object.metadata.labels,0x00,0x80)",
 			wantErr: true,
 		},
 		{
 			name:    "missing shardRange prefix",
-			input:   "invalidFunc(object.metadata.uid,00,80)",
+			input:   "invalidFunc(object.metadata.uid,0x00,0x80)",
 			wantErr: true,
 		},
 		{
-			name:    "hex too long",
-			input:   "shardRange(object.metadata.uid,00000000000000000,80)",
+			name:    "hex too long (18 chars)",
+			input:   "shardRange(object.metadata.uid,0x000000000000000000,0x80)",
 			wantErr: true,
 		},
 		{
 			name:    "invalid hex char",
-			input:   "shardRange(object.metadata.uid,0g,80)",
+			input:   "shardRange(object.metadata.uid,0x0g,0x80)",
 			wantErr: true,
 		},
 		{
 			name:    "missing closing paren",
-			input:   "shardRange(object.metadata.uid,00,80",
+			input:   "shardRange(object.metadata.uid,0x00,0x80",
 			wantErr: true,
 		},
 	}
@@ -127,11 +128,10 @@ func TestParse(t *testing.T) {
 
 func TestParseRoundTrip(t *testing.T) {
 	inputs := []string{
-		"shardRange(object.metadata.uid,0000000000000000,8000000000000000)",
-		"shardRange(object.metadata.uid,,8000000000000000)",
-		"shardRange(object.metadata.uid,8000000000000000,)",
-		"shardRange(object.metadata.uid,,)",
-		"shardRange(object.metadata.namespace,aa,ff)",
+		"shardRange(object.metadata.uid,0x0000000000000000,0x8000000000000000)",
+		"shardRange(object.metadata.uid,0x8000000000000000,0x10000000000000000)",
+		"shardRange(object.metadata.uid,0x0000000000000000,0x10000000000000000)",
+		"shardRange(object.metadata.namespace,0xaa,0xff)",
 	}
 
 	for _, input := range inputs {

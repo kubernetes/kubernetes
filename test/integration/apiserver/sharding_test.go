@@ -35,41 +35,33 @@ import (
 // calculateShardRange divides the 64-bit hash space evenly across shards and
 // returns the hex-encoded start (inclusive) and end (exclusive) for the given index.
 func calculateShardRange(index, total int) (start, end string) {
-	if total <= 1 {
-		return "", ""
-	}
-	maxVal := new(big.Int).Lsh(big.NewInt(1), 64)
+	maxVal := new(big.Int).Lsh(big.NewInt(1), 64) // 2^64
 	span := new(big.Int).Div(maxVal, big.NewInt(int64(total)))
 
 	startVal := new(big.Int).Mul(span, big.NewInt(int64(index)))
 	endVal := new(big.Int).Mul(span, big.NewInt(int64(index+1)))
-
-	if index == 0 {
-		start = ""
-	} else {
-		start = fmt.Sprintf("%016x", startVal)
-	}
 	if index == total-1 {
-		end = ""
-	} else {
-		end = fmt.Sprintf("%016x", endVal)
+		endVal = maxVal // last shard covers remainder
 	}
+
+	start = fmt.Sprintf("%016x", startVal)
+	end = fmt.Sprintf("%016x", endVal)
 	return start, end
 }
 
 func shardSelectorString(index, total int) string {
 	start, end := calculateShardRange(index, total)
-	return fmt.Sprintf("shardRange(object.metadata.uid,%s,%s)", start, end)
+	return fmt.Sprintf("shardRange(object.metadata.uid,0x%s,0x%s)", start, end)
 }
 
 // objectInShard returns true if the object's UID hash falls within the given shard range.
 func objectInShard(uid string, index, total int) bool {
 	start, end := calculateShardRange(index, total)
 	hash := sharding.HashField(uid)
-	if start != "" && hash < start {
+	if hash < start {
 		return false
 	}
-	if end != "" && hash >= end {
+	if hash >= end {
 		return false
 	}
 	return true
@@ -111,9 +103,11 @@ func TestShardedList(t *testing.T) {
 			t.Fatalf("shard %d: failed to list: %v", shard, err)
 		}
 
-		// The response must be marked as sharded.
-		if !list.Sharded {
-			t.Errorf("shard %d: expected list metadata sharded=true", shard)
+		// The response must include shard info with the selector echoed back.
+		if list.ShardInfo == nil {
+			t.Errorf("shard %d: expected shardInfo to be set", shard)
+		} else if list.ShardInfo.Selector != selector {
+			t.Errorf("shard %d: expected shardInfo.selector=%q, got %q", shard, selector, list.ShardInfo.Selector)
 		}
 
 		for _, cm := range list.Items {
@@ -267,8 +261,8 @@ func TestShardedListFeatureGateDisabled(t *testing.T) {
 		t.Fatalf("list failed: %v", err)
 	}
 
-	if list.Sharded {
-		t.Errorf("expected sharded=false when feature gate is disabled")
+	if list.ShardInfo != nil {
+		t.Errorf("expected shardInfo=nil when feature gate is disabled")
 	}
 	if len(list.Items) != 1 {
 		t.Errorf("expected 1 item (selector ignored), got %d", len(list.Items))
@@ -303,8 +297,8 @@ func TestShardedListComplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}
-	if list.Sharded {
-		t.Errorf("expected sharded=false for unsharded list")
+	if list.ShardInfo != nil {
+		t.Errorf("expected shardInfo=nil for unsharded list")
 	}
 	if len(list.Items) != numObjects {
 		t.Errorf("expected %d items, got %d", numObjects, len(list.Items))

@@ -26,15 +26,23 @@ import (
 //
 //	selector    = requirement ( "," requirement )*
 //	requirement = "shardRange" "(" fieldPath "," hexStart "," hexEnd ")"
-//	fieldPath   = "object.metadata." ( "uid" | "namespace" | "name" )
-//	hexStart    = [0-9a-f]{0,16}
-//	hexEnd      = [0-9a-f]{0,16}
+//	fieldPath   = "object.metadata." ( "uid" | "namespace" )
+//	hexStart    = "0x" [0-9a-f]{1,17}
+//	hexEnd      = "0x" [0-9a-f]{1,17}
 //
-// An empty string returns Everything().
+// Field paths use CEL-style object-rooted syntax ("object.metadata.<field>"),
+// NOT the fieldSelector format ("metadata.<field>").
+//
+// Both hexStart and hexEnd are required 0x-prefixed lowercase hex values
+// representing bounds over the 64-bit FNV-1a hash space. The full range is
+// [0x0000000000000000, 0x10000000000000000), where the exclusive upper bound
+// 0x10000000000000000 equals 2^64.
+//
+// An empty string is an error; omit the parameter entirely for unfiltered lists.
 func Parse(s string) (Selector, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return Everything(), nil
+		return nil, fmt.Errorf("empty shard selector is not allowed; omit the parameter for unfiltered lists")
 	}
 
 	p := &parser{input: s}
@@ -92,8 +100,8 @@ func (p *parser) parseRequirement() (ShardRangeRequirement, error) {
 		return ShardRangeRequirement{}, fmt.Errorf("expected ',' after fieldPath at position %d", p.pos)
 	}
 
-	// Parse hexStart (may be empty)
-	hexStart, err := p.parseHex()
+	// Parse hexStart (required, with 0x prefix)
+	hexStart, err := p.parsePrefixedHex()
 	if err != nil {
 		return ShardRangeRequirement{}, fmt.Errorf("invalid hexStart: %w", err)
 	}
@@ -103,8 +111,8 @@ func (p *parser) parseRequirement() (ShardRangeRequirement, error) {
 		return ShardRangeRequirement{}, fmt.Errorf("expected ',' after hexStart at position %d", p.pos)
 	}
 
-	// Parse hexEnd (may be empty)
-	hexEnd, err := p.parseHex()
+	// Parse hexEnd (required, with 0x prefix)
+	hexEnd, err := p.parsePrefixedHex()
 	if err != nil {
 		return ShardRangeRequirement{}, fmt.Errorf("invalid hexEnd: %w", err)
 	}
@@ -137,14 +145,20 @@ func (p *parser) parseFieldPath() (string, error) {
 	return "", fmt.Errorf("unsupported metadata field at position %d, expected uid or namespace", p.pos)
 }
 
-func (p *parser) parseHex() (string, error) {
+func (p *parser) parsePrefixedHex() (string, error) {
+	if !p.consumePrefix("0x") {
+		return "", fmt.Errorf("expected '0x' prefix at position %d", p.pos)
+	}
 	start := p.pos
 	for p.pos < len(p.input) && isHexChar(p.input[p.pos]) {
 		p.pos++
 	}
 	hex := p.input[start:p.pos]
-	if len(hex) > 16 {
-		return "", fmt.Errorf("hex value too long (%d chars, max 16): %q", len(hex), hex)
+	if hex == "" {
+		return "", fmt.Errorf("hex value is required after '0x' at position %d", p.pos)
+	}
+	if len(hex) > 17 {
+		return "", fmt.Errorf("hex value too long (%d chars, max 17): %q", len(hex), hex)
 	}
 	return hex, nil
 }

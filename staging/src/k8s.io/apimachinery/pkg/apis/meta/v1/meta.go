@@ -97,8 +97,8 @@ type ListInterface interface {
 // ShardedListInterface can be implemented by list types to indicate that they
 // represent a sharded subset of the full collection rather than the complete list.
 type ShardedListInterface interface {
-	GetSharded() bool
-	SetSharded(bool)
+	GetShardInfo() *ShardInfo
+	SetShardInfo(*ShardInfo)
 }
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
@@ -120,8 +120,8 @@ func (meta *ListMeta) GetContinue() string               { return meta.Continue 
 func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
 func (meta *ListMeta) GetRemainingItemCount() *int64     { return meta.RemainingItemCount }
 func (meta *ListMeta) SetRemainingItemCount(c *int64)    { meta.RemainingItemCount = c }
-func (meta *ListMeta) GetSharded() bool                  { return meta.Sharded }
-func (meta *ListMeta) SetSharded(s bool)                 { meta.Sharded = s }
+func (meta *ListMeta) GetShardInfo() *ShardInfo          { return meta.ShardInfo }
+func (meta *ListMeta) SetShardInfo(s *ShardInfo)         { meta.ShardInfo = s }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 

@@ -64,27 +64,11 @@ func TestSelectorMatches(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name: "matching range",
-			selector: NewSelector(ShardRangeRequirement{
-				Key:   "object.metadata.uid",
-				Start: "",
-				End:   "",
-			}),
-			wantMatch: true,
-		},
-		{
-			name: "hash below end",
-			selector: NewSelector(ShardRangeRequirement{
-				Key: "object.metadata.uid",
-				End: "ffffffffffffffff",
-			}),
-			wantMatch: true,
-		},
-		{
-			name: "hash above start with no end",
+			name: "full range matches",
 			selector: NewSelector(ShardRangeRequirement{
 				Key:   "object.metadata.uid",
 				Start: "0000000000000000",
+				End:   "10000000000000000",
 			}),
 			wantMatch: true,
 		},
@@ -102,16 +86,18 @@ func TestSelectorMatches(t *testing.T) {
 			selector: NewSelector(ShardRangeRequirement{
 				Key:   "object.metadata.uid",
 				Start: "ffffffffffffffff",
+				End:   "10000000000000000",
 			}),
 			wantMatch: hash >= "ffffffffffffffff",
 		},
 		{
 			name: "hash at or above end",
 			selector: NewSelector(ShardRangeRequirement{
-				Key: "object.metadata.uid",
-				End: "0000000000000000",
+				Key:   "object.metadata.uid",
+				Start: "0000000000000000",
+				End:   "0000000000000001",
 			}),
-			wantMatch: hash < "0000000000000000",
+			wantMatch: hash < "0000000000000001",
 		},
 	}
 
@@ -136,7 +122,7 @@ func TestSelectorEmpty(t *testing.T) {
 		t.Error("NewSelector() with no args should be empty")
 	}
 
-	sel := NewSelector(ShardRangeRequirement{Key: "object.metadata.uid"})
+	sel := NewSelector(ShardRangeRequirement{Key: "object.metadata.uid", Start: "0000000000000000", End: "8000000000000000"})
 	if sel.Empty() {
 		t.Error("selector with requirement should not be empty")
 	}
@@ -148,7 +134,7 @@ func TestSelectorString(t *testing.T) {
 		Start: "00",
 		End:   "80",
 	})
-	expected := "shardRange(object.metadata.uid,00,80)"
+	expected := "shardRange(object.metadata.uid,0x00,0x80)"
 	if sel.String() != expected {
 		t.Errorf("String() = %q, want %q", sel.String(), expected)
 	}

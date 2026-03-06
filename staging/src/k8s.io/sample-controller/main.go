@@ -58,7 +58,7 @@ func main() {
 			return
 		}
 		start, end := CalculateShardRange(shard, shardTotal)
-		shardSelector = fmt.Sprintf("shardRange(object.metadata.uid,%s,%s)", start, end)
+		shardSelector = fmt.Sprintf("shardRange(object.metadata.uid,0x%s,0x%s)", start, end)
 	}
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
@@ -111,31 +111,20 @@ func init() {
 }
 
 // CalculateShardRange computes the [start, end) 16-char hex prefixes for a given shard
-// in the FNV-1a 64-bit hash space (0x0000000000000000 to 0xffffffffffffffff).
+// in the FNV-1a 64-bit hash space [0x0000000000000000, 0x10000000000000000).
 // index is 0-based (0 to total-1).
 func CalculateShardRange(index, total int) (start, end string) {
-	if total <= 1 {
-		return "", "" // Match everything
-	}
-
 	// FNV-1a 64-bit: full range is [0, 2^64)
 	maxVal := new(big.Int).Lsh(big.NewInt(1), 64) // 2^64
 
 	span := new(big.Int).Div(maxVal, big.NewInt(int64(total)))
 	startVal := new(big.Int).Mul(span, big.NewInt(int64(index)))
 	endVal := new(big.Int).Mul(span, big.NewInt(int64(index+1)))
-
 	if index == total-1 {
-		end = "" // Unbounded upper
-	} else {
-		end = fmt.Sprintf("%016x", endVal)
+		endVal = maxVal // last shard covers remainder
 	}
 
-	if index == 0 {
-		start = "" // Unbounded lower
-	} else {
-		start = fmt.Sprintf("%016x", startVal)
-	}
-
+	start = fmt.Sprintf("%016x", startVal)
+	end = fmt.Sprintf("%016x", endVal)
 	return start, end
 }

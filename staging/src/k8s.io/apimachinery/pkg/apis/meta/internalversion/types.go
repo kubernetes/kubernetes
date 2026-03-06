@@ -92,8 +92,6 @@ type ListOptions struct {
 	SendInitialEvents *bool
 
 	// ShardSelector is the parsed shard selector from the request.
-	// Set from either the new `selector` parameter or converted from the legacy
-	// three-field format.
 	ShardSelector sharding.Selector
 }
 

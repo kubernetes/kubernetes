@@ -834,7 +834,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	if opts.Predicate.ShardSelector != nil && !opts.Predicate.ShardSelector.Empty() {
 		if setter, ok := listObj.(metav1.ShardedListInterface); ok {
-			setter.SetSharded(true)
+			setter.SetShardInfo(&metav1.ShardInfo{Selector: opts.Predicate.ShardSelector.String()})
 		}
 	}
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())

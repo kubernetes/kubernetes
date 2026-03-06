@@ -24,7 +24,13 @@ import (
 )
 
 // ResolveFieldValue extracts a metadata field value from a runtime.Object
-// based on the given field path. Supported field paths:
+// based on the given field path.
+//
+// Field paths use CEL-style object-rooted syntax ("object.metadata.<field>"),
+// which differs from the fieldSelector format ("metadata.<field>"). The
+// "object." prefix anchors the path to the resource being filtered.
+//
+// Supported field paths:
 //   - "object.metadata.uid"
 //   - "object.metadata.namespace"
 func ResolveFieldValue(obj runtime.Object, fieldPath string) (string, error) {

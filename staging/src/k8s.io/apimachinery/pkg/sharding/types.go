@@ -18,11 +18,15 @@ package sharding
 
 // ShardRangeRequirement represents a single shard range requirement.
 // It specifies a field path to hash and a hex range [Start, End) for filtering.
+// The hash space is FNV-1a 64-bit: [0x0000000000000000, 0x10000000000000000).
+// Both Start and End must be specified (no empty/unbounded values).
 type ShardRangeRequirement struct {
 	// Key is the field path, e.g. "object.metadata.uid"
 	Key string
-	// Start is the inclusive lower bound (hex string), "" means unbounded
+	// Start is the inclusive lower bound as a lowercase hex string.
+	// Minimum value is "0000000000000000".
 	Start string
-	// End is the exclusive upper bound (hex string), "" means unbounded
+	// End is the exclusive upper bound as a lowercase hex string.
+	// Maximum value is "10000000000000000" (2^64).
 	End string
 }

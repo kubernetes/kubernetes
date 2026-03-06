@@ -70,14 +70,24 @@ func (s *shardSelector) Matches(obj runtime.Object) (bool, error) {
 		}
 		hash := HashField(value)
 
-		if req.Start != "" && hash < req.Start {
+		if hexLess(hash, req.Start) {
 			return false, nil
 		}
-		if req.End != "" && hash >= req.End {
+		if !hexLess(hash, req.End) {
 			return false, nil
 		}
 	}
 	return true, nil
+}
+
+// hexLess compares two lowercase hex strings numerically.
+// It handles strings of different lengths by treating shorter strings
+// as having smaller magnitude (fewer digits = smaller number).
+func hexLess(a, b string) bool {
+	if len(a) != len(b) {
+		return len(a) < len(b)
+	}
+	return a < b
 }
 
 func (s *shardSelector) Empty() bool {
@@ -87,7 +97,7 @@ func (s *shardSelector) Empty() bool {
 func (s *shardSelector) String() string {
 	parts := make([]string, 0, len(s.requirements))
 	for _, req := range s.requirements {
-		parts = append(parts, fmt.Sprintf("shardRange(%s,%s,%s)", req.Key, req.Start, req.End))
+		parts = append(parts, fmt.Sprintf("shardRange(%s,0x%s,0x%s)", req.Key, req.Start, req.End))
 	}
 	return strings.Join(parts, ",")
 }

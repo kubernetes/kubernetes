@@ -901,7 +901,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}
 	if opts.Predicate.ShardSelector != nil && !opts.Predicate.ShardSelector.Empty() {
 		if setter, ok := listObj.(metav1.ShardedListInterface); ok {
-			setter.SetSharded(true)
+			setter.SetShardInfo(&metav1.ShardInfo{Selector: opts.Predicate.ShardSelector.String()})
 		}
 	}
 	return nil
