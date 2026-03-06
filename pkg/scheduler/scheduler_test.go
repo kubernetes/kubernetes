@@ -1467,26 +1467,29 @@ var _ fwk.PermitPlugin = &fakePermitPlugin{}
 
 func TestNewInformerFactoryTrim(t *testing.T) {
 	cs := fake.NewClientset()
-	informerFactory := NewInformerFactory(cs, 0)
+
 	pd := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
 		Name:      "test",
 		Namespace: "default",
-	}, Spec: v1.PodSpec{}}
-	pd.SetManagedFields([]metav1.ManagedFieldsEntry{
-		{
-			Manager:    "update",
-			Operation:  metav1.ManagedFieldsOperationApply,
-			APIVersion: "apps/v1",
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			{
+				Manager:    "update",
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "apps/v1",
+			},
 		},
-	})
+	}}
+	require.NoError(t, cs.Tracker().Add(pd))
+
+	informerFactory := NewInformerFactory(cs, 0)
 	lister := informerFactory.Core().V1().Pods().Lister()
 
-	informerFactory.Start(nil)
-	informerFactory.WaitForCacheSync(nil)
-	_, err := cs.CoreV1().Pods("default").Create(context.Background(), pd, metav1.CreateOptions{})
-	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 10)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
 	p, err := lister.Pods("default").Get("test")
 	require.NoError(t, err)
-	require.Equal(t, []metav1.ManagedFieldsEntry(nil), p.GetManagedFields())
+	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
 }
