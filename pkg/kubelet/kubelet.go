@@ -692,12 +692,11 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
 		broadcaster := pods.NewBroadcaster()
-		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager)
+		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
 	}
-
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,

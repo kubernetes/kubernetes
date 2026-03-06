@@ -33,6 +33,7 @@ import (
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
+	podstatus "k8s.io/kubernetes/pkg/kubelet/status"
 )
 
 type PodWatchEvent struct {
@@ -121,23 +122,26 @@ func (b *broadcaster) Broadcast(event PodWatchEvent) {
 // PodsServer is the gRPC server that provides pod information.
 type PodsServer struct {
 	podsv1alpha1.UnimplementedPodsServer
-	podManager  pod.Manager
-	broadcaster *broadcaster
+	podManager     pod.Manager
+	statusProvider podstatus.PodStatusProvider
+	broadcaster    *broadcaster
 }
 
 // NewPodsServer creates a new PodServer for production use.
-func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager) *PodsServer {
+func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager, statusProvider podstatus.PodStatusProvider) *PodsServer {
 	return &PodsServer{
-		podManager:  podManager,
-		broadcaster: broadcaster,
+		podManager:     podManager,
+		statusProvider: statusProvider,
+		broadcaster:    broadcaster,
 	}
 }
 
 // NewPodsServerForTest creates a new PodServer with an injectable ticker for testing.
-func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager) *PodsServer {
+func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager, statusProvider podstatus.PodStatusProvider) *PodsServer {
 	return &PodsServer{
-		podManager:  podManager,
-		broadcaster: broadcaster,
+		podManager:     podManager,
+		statusProvider: statusProvider,
+		broadcaster:    broadcaster,
 	}
 }
 
@@ -177,7 +181,13 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 
 	protoPods := make([][]byte, len(podsToReturn))
 	for i, p := range podsToReturn {
-		podBytes, err := p.Marshal()
+		podToMarshal := p
+		if podStatus, ok := s.statusProvider.GetPodStatus(p.UID); ok {
+			podCopy := *p
+			podCopy.Status = podStatus
+			podToMarshal = &podCopy
+		}
+		podBytes, err := podToMarshal.Marshal()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to marshal pod: %v", err)
 		}
@@ -198,7 +208,14 @@ func (s *PodsServer) GetPod(ctx context.Context, req *podsv1alpha1.GetPodRequest
 		return nil, status.Errorf(codes.NotFound, "pod with UID %s not found", req.PodUID)
 	}
 
-	podBytes, err := pod.Marshal()
+	podToMarshal := pod
+	if podStatus, ok := s.statusProvider.GetPodStatus(podUID); ok {
+		podCopy := *pod
+		podCopy.Status = podStatus
+		podToMarshal = &podCopy
+	}
+
+	podBytes, err := podToMarshal.Marshal()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to marshal pod: %v", err)
 	}
@@ -229,7 +246,13 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	})
 
 	for _, p := range initialPods {
-		podBytes, err := p.Marshal()
+		podToMarshal := p
+		if podStatus, ok := s.statusProvider.GetPodStatus(p.UID); ok {
+			podCopy := *p
+			podCopy.Status = podStatus
+			podToMarshal = &podCopy
+		}
+		podBytes, err := podToMarshal.Marshal()
 		if err != nil {
 			logger.Error(err, "Error marshalling initial watch event pod")
 			metrics.PodWatchEventsDroppedTotal.Inc()

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -43,12 +44,14 @@ import (
 	podsapi "k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 )
 
 func TestStartEventLoop(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
 	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 
 	clientChannel := make(chan podsapi.PodWatchEvent, 100)
@@ -107,11 +110,13 @@ func (m *MockWatchPodsServer) Context() context.Context {
 func TestWatchPods(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
 	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 
 	mockManager.On("GetPods").Return([]*v1.Pod{pod1})
 	mockManager.On("GetPodByUID", types.UID("pod1-uid")).Return(pod1, true)
+	mockStatus.On("GetPodStatus", mock.Anything).Return(v1.PodStatus{}, false)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -167,11 +172,13 @@ func TestWatchPods(t *testing.T) {
 func TestListPods(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
 	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Name: "pod2", Namespace: "ns2"}}
 
 	mockManager.On("GetPods").Return([]*v1.Pod{pod1, pod2})
+	mockStatus.On("GetPodStatus", mock.Anything).Return(v1.PodStatus{}, false)
 
 	resp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
 	require.NoError(t, err)
@@ -188,7 +195,8 @@ func TestListPods(t *testing.T) {
 func TestGetPod(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
 	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 	pod1.Spec.EphemeralContainers = []v1.EphemeralContainer{
 		{
@@ -203,7 +211,8 @@ func TestGetPod(t *testing.T) {
 	}
 	pod1.Status = v1.PodStatus{Phase: v1.PodRunning}
 
-	mockManager.On("GetPodByUID", types.UID("pod1-uid")).Return(pod1, true)
+	mockManager.On("GetPodByUID", mock.Anything).Return(pod1, true)
+	mockStatus.On("GetPodStatus", mock.Anything).Return(v1.PodStatus{}, false)
 
 	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 	require.NoError(t, err)
@@ -223,7 +232,8 @@ func TestGetPod(t *testing.T) {
 func TestStaticPod(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
 	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 
 	staticPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -237,6 +247,7 @@ func TestStaticPod(t *testing.T) {
 	}
 
 	mockManager.On("GetPodByUID", types.UID("static-pod-uid")).Return(staticPod, true)
+	mockStatus.On("GetPodStatus", mock.Anything).Return(v1.PodStatus{}, false)
 
 	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "static-pod-uid"})
 	require.NoError(t, err)
@@ -254,8 +265,10 @@ func TestErrorsAndMetrics(t *testing.T) {
 	t.Run("DroppedWatchEventIncrementsMetric", func(t *testing.T) {
 		broadcaster := podsapi.NewBroadcaster()
 		mockManager := new(kubepodtest.MockManager)
-		server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+		mockStatus := new(statustest.MockPodStatusProvider)
+		server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
 		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
+		mockStatus.On("GetPodStatus", mock.Anything).Return(v1.PodStatus{}, false)
 		server.OnPodUpdated(pod1, pod1.Status, watch.Added)
 
 		// Reset the metric before the test
@@ -365,4 +378,55 @@ func TestBroadcaster_SlowClient(t *testing.T) {
 		}
 	})
 	assert.NoError(t, err, "Slow client should have been dropped")
+}
+
+func TestStatusOverlay(t *testing.T) {
+	broadcaster := podsapi.NewBroadcaster()
+	mockManager := new(kubepodtest.MockManager)
+	mockStatus := new(statustest.MockPodStatusProvider)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager, mockStatus)
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
+	pod1.Status.Phase = v1.PodPending
+
+	overlaidStatus := v1.PodStatus{Phase: v1.PodRunning}
+
+	mockManager.On("GetPods").Return([]*v1.Pod{pod1})
+	mockManager.On("GetPodByUID", pod1.UID).Return(pod1, true)
+	mockStatus.On("GetPodStatus", pod1.UID).Return(overlaidStatus, true)
+
+	t.Run("GetPod overlays status", func(t *testing.T) {
+		resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: string(pod1.UID)})
+		require.NoError(t, err)
+		podOut := &v1.Pod{}
+		err = podOut.Unmarshal(resp.Pod)
+		require.NoError(t, err)
+		assert.Equal(t, v1.PodRunning, podOut.Status.Phase)
+	})
+
+	t.Run("ListPods overlays status", func(t *testing.T) {
+		resp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
+		require.NoError(t, err)
+		podOut := &v1.Pod{}
+		err = podOut.Unmarshal(resp.Pods[0])
+		require.NoError(t, err)
+		assert.Equal(t, v1.PodRunning, podOut.Status.Phase)
+	})
+
+	t.Run("WatchPods overlays status in initial sync", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mockStream := &MockWatchPodsServer{
+			Ctx:     ctx,
+			EventCh: make(chan *podsv1alpha1.WatchPodsEvent, 10),
+		}
+		go server.WatchPods(&podsv1alpha1.WatchPodsRequest{}, mockStream)
+
+		event := <-mockStream.EventCh
+		assert.Equal(t, podsv1alpha1.EventType_ADDED, event.Type)
+		podOut := &v1.Pod{}
+		err := podOut.Unmarshal(event.Pod)
+		require.NoError(t, err)
+		assert.Equal(t, v1.PodRunning, podOut.Status.Phase)
+	})
 }

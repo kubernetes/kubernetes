@@ -979,8 +979,6 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
 	}
 	status.working = true
-		}
-	}
 	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
 
 	select {
