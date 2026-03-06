@@ -117,6 +117,8 @@ type Controller struct {
 	pvcProcessingStore *pvcProcessingStore
 }
 
+var unusedSinceNowFunc = metav1.Now
+
 type podUsageCheck func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
@@ -322,7 +324,7 @@ func (c *Controller) updateUnusedSinceStatus(ctx context.Context, pvc *v1.Persis
 	case isUsed && pvc.Status.UnusedSince != nil:
 		return c.updateUnusedSince(ctx, pvc, nil)
 	case !isUsed && pvc.Status.UnusedSince == nil:
-		now := metav1.Now()
+		now := unusedSinceNowFunc()
 		return c.updateUnusedSince(ctx, pvc, &now)
 	default:
 		return nil
