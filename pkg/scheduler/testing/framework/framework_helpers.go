@@ -98,6 +98,14 @@ func RegisterBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) 
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
 }
 
+func RegisterPlacementGeneratePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PlacementGenerate")
+}
+
+func RegisterPlacementScorePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PlacementScore")
+}
+
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
 func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
@@ -150,6 +158,10 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.PreBind
 	case "PostBind":
 		return &plugins.PostBind
+	case "PlacementGenerate":
+		return &plugins.PlacementGenerate
+	case "PlacementScore":
+		return &plugins.PlacementScore
 	default:
 		return nil
 	}
