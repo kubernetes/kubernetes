@@ -24,9 +24,6 @@ set -o pipefail
 # Unset CDPATH, having it set messes up with script import paths
 unset CDPATH
 
-USER_ID=$(id -u)
-GROUP_ID=$(id -g)
-
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
@@ -80,8 +77,8 @@ readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.8.7
-readonly __default_go_runner_version=v2.4.0-go1.25.6-bookworm.0
+readonly __default_distroless_iptables_version=v0.9.0
+readonly __default_go_runner_version=v2.4.0-go1.26.0-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.6
 
 # The default image for all binaries which are dynamically linked.
@@ -94,6 +91,7 @@ readonly __default_dynamic_base_image="$KUBE_BASE_IMAGE_REGISTRY/distroless-ipta
 # It can be overridden to change the image for all such commands.
 # When the per-command env variable is set, that env variable is
 # used without considering KUBE_GORUNNER_IMAGE.
+# TODO: this should be replaced with a plain distroless base image
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
 
 # __default_base_image takes the canonical build target for a Kubernetes command (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
@@ -347,6 +345,9 @@ function kube::build::clean() {
     # We don't need to do this at all for dockerized builds
     if [[ -d "${LOCAL_OUTPUT_ROOT}/local/go/cache" ]]; then
       chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
+    fi
+    if [[ -d "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache" ]]; then
+      chmod -R +w "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache"
     fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi

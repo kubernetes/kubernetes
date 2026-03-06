@@ -582,7 +582,7 @@ func (p *staticPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *
 		}
 		logger.Info("Regenerating TopologyHints for CPUs already allocated")
 		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.CPUSet{}, requested),
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), requested),
 		}
 	}
 
@@ -646,7 +646,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, po
 	if assignedCPUs.Size() == requested {
 		logger.Info("Regenerating TopologyHints for CPUs already allocated")
 		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.CPUSet{}, requested),
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.New(), requested),
 		}
 	}
 

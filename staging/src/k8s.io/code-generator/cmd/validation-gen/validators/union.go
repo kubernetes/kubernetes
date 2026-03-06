@@ -39,10 +39,6 @@ var newUnionMember = types.Name{Package: libValidationPkg, Name: "NewUnionMember
 var newUnionMembership = types.Name{Package: libValidationPkg, Name: "NewUnionMembership"}
 var unionVariablePrefix = "unionMembershipFor"
 
-// unionDefinitions stores all union definitions found by tag validators.
-// Key is the struct path.
-var unionDefinitions = map[string]unions{}
-
 func init() {
 	// Unions are comprised of multiple tags that need to share information.
 	// For field-based unions: tags are on struct fields, validation is on the struct
@@ -52,29 +48,11 @@ func init() {
 	// key examples:
 	//   - struct union: "MyStruct" (validation on the struct type)
 	//   - list union: "Pipeline.Tasks" (validation on the list field)
-	RegisterTypeValidator(unionTypeOrFieldValidator{unionDefinitions})
-	RegisterFieldValidator(unionTypeOrFieldValidator{unionDefinitions})
-	RegisterTagValidator(unionDiscriminatorTagValidator{unionDefinitions})
-	RegisterTagValidator(unionMemberTagValidator{unionDefinitions})
-}
-
-// MarkUnionDeclarative marks the union containing the given member as declarative.
-// parentPath is the path to the struct.
-// member is the field member (for struct unions).
-// fieldName is the field name (for list unions).
-func MarkUnionDeclarative(parentPath string, member *types.Member) {
-	us, ok := unionDefinitions[parentPath]
-	if !ok {
-		return
-	}
-	for _, u := range us {
-		// Check field members
-		for _, m := range u.fieldMembers {
-			if m == member {
-				u.isDeclarative = true
-			}
-		}
-	}
+	shared := map[string]unions{}
+	RegisterTypeValidator(unionTypeOrFieldValidator{shared})
+	RegisterFieldValidator(unionTypeOrFieldValidator{shared})
+	RegisterTagValidator(unionDiscriminatorTagValidator{shared})
+	RegisterTagValidator(unionMemberTagValidator{shared})
 }
 
 type unionTypeOrFieldValidator struct {
@@ -139,7 +117,7 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            udtv.TagName(),
-		StabilityLevel: Beta,
+		StabilityLevel: TagStabilityLevelBeta,
 		Scopes:         udtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field is the discriminator for a union.",
 		Args: []TagArgDoc{{
@@ -178,7 +156,7 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            umtv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         umtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
@@ -221,8 +199,9 @@ type union struct {
 	// "field name" (eg: `field[{"name": "succeeded"}]`), and the value is a
 	// list of selection criteria.
 	itemMembers map[string][]ListSelectorTerm
-	// isDeclarative indicates that the union is declarative.
-	isDeclarative bool
+
+	// stabilityLevel denotes the stability level of the corresponding union validation.
+	stabilityLevel ValidationStabilityLevel
 }
 
 type unionMember struct {
@@ -326,20 +305,14 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
-				if u.isDeclarative {
-					fn.Flags |= DeclarativeNative
-				}
+				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
-				if u.isDeclarative {
-					fn.Flags |= DeclarativeNative
-				}
+				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				result.Functions = append(result.Functions, fn)
 			}
 		}
@@ -418,6 +391,10 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
+
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
 		discriminatorFieldName = jsonAnnotation.Name
@@ -480,6 +457,9 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	return nil
@@ -511,6 +491,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
+
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 
 	if _, found := u.itemMembers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)

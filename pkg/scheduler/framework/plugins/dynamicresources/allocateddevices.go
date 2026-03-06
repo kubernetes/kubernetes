@@ -120,6 +120,13 @@ func (a *allocatedDevices) Get() (sets.Set[structured.DeviceID], int64) {
 	return a.ids.Clone(), a.revision
 }
 
+func (a *allocatedDevices) GetSharedDeviceIDs() (sets.Set[structured.SharedDeviceID], int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return a.shareIDs.Clone(), a.revision
+}
+
 func (a *allocatedDevices) Capacities() (structured.ConsumedCapacityCollection, int64) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()

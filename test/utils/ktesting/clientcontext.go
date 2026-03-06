@@ -27,39 +27,27 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-// Deprecated: use tCtx.WithRESTConfig instead
-func WithRESTConfig(tCtx TContext, cfg *rest.Config) TContext {
-	return tCtx.WithRESTConfig(cfg)
-}
-
 // WithRESTConfig initializes all client-go clients with new clients
 // created for the config. The current test name gets included in the UserAgent.
-func (tc *TC) WithRESTConfig(cfg *rest.Config) TContext {
+func (tCtx TContext) WithRESTConfig(cfg *rest.Config) TContext {
 	cfg = rest.CopyConfig(cfg)
-	cfg.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), tc.Name())
+	cfg.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), tCtx.Name())
 
-	tc = tc.clone()
-	tc.restConfig = cfg
-	tc.client = clientset.NewForConfigOrDie(cfg)
-	tc.dynamic = dynamic.NewForConfigOrDie(cfg)
-	tc.apiextensions = apiextensions.NewForConfigOrDie(cfg)
-	cachedDiscovery := memory.NewMemCacheClient(tc.client.Discovery())
-	tc.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
-	return tc
-}
-
-// Deprecated: use tCtx.WithClients instead
-func WithClients(tCtx TContext, cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
-	return tCtx.WithClients(cfg, mapper, client, dynamic, apiextensions)
+	tCtx.restConfig = cfg
+	tCtx.client = clientset.NewForConfigOrDie(cfg)
+	tCtx.dynamic = dynamic.NewForConfigOrDie(cfg)
+	tCtx.apiextensions = apiextensions.NewForConfigOrDie(cfg)
+	cachedDiscovery := memory.NewMemCacheClient(tCtx.client.Discovery())
+	tCtx.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
+	return tCtx
 }
 
 // WithClients uses an existing config and clients.
-func (tc *TC) WithClients(cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
-	tc = tc.clone()
-	tc.restConfig = cfg
-	tc.restMapper = mapper
-	tc.client = client
-	tc.dynamic = dynamic
-	tc.apiextensions = apiextensions
-	return tc
+func (tCtx TContext) WithClients(cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
+	tCtx.restConfig = cfg
+	tCtx.restMapper = mapper
+	tCtx.client = client
+	tCtx.dynamic = dynamic
+	tCtx.apiextensions = apiextensions
+	return tCtx
 }

@@ -41,9 +41,12 @@ var (
 
 // testDeviceBindingConditions is the entry point for running each integration test that verifies DeviceBindingConditions.
 // Some of these tests use device taints, and they assume that DRADeviceTaints is enabled.
+//
+// In addition, some tests use custom scheduler configuration and therefore
+// can't run in parallel. The ones that use the default scheduler configuration
+// will run in parallel with each other, but not in parallel with
+// non-DeviceBindingConditions tests.
 func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
-	tCtx.Parallel()
-
 	tCtx.Run("BasicFlow", func(tCtx ktesting.TContext) { testDeviceBindingConditionsBasicFlow(tCtx, enabled) })
 	if enabled {
 		tCtx.Run("FailureTaints", func(tCtx ktesting.TContext) { testDeviceBindingFailureConditionsReschedule(tCtx, true) })
@@ -58,9 +61,10 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 // The second pod then uses the device with BindingConditions. The test checks that the scheduler retries
 // after an initial binding failure of the second pod, ensuring successful scheduling after rescheduling.
 func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
-	startScheduler(tCtx)
 
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -117,6 +121,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	_, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create slice without binding conditions")
 
+	startScheduler(tCtx)
 	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
 	start := time.Now()
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
@@ -187,7 +192,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	tCtx.ExpectNoError(err, "add binding failure condition to second claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
-	waitForClaim(tCtx, namespace, claim2.Name, 30*time.Second,
+	waitForClaim(tCtx, namespace, claim2.Name, schedulingTimeout,
 		gomega.HaveField("Status.Devices", gomega.HaveLen(0)),
 		"claim should have cleared device conditions after rescheduling",
 	)
@@ -229,6 +234,8 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 // Device preparation failure is simulated in two ways: by applying DeviceTaints or by removing the device from ResourceSlice.
 // The simulation method is controlled via the `useTaints` argument: when true, DeviceTaints are used; when false, the device is removed from ResourceSlice.
 func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTaints bool) {
+	tCtx.Parallel()
+
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
 	startScheduler(tCtx)
@@ -358,7 +365,7 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	tCtx.ExpectNoError(err, "add binding failure condition to claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
-	waitForClaim(tCtx, namespace, claim1.Name, 30*time.Second,
+	waitForClaim(tCtx, namespace, claim1.Name, schedulingTimeout,
 		gomega.HaveField("Status.Devices", gomega.HaveLen(0)),
 		"claim should have cleared device conditions after rescheduling",
 	)
@@ -381,6 +388,8 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 
 // testBindingConditionsTimeoutReachedd verifies that a short bindingTimeout triggers
 // a PreBind timeout when the required BindingConditions never become true.
+//
+// It runs the scheduler with non-standard settings and thus cannot run in parallel.
 func testDeviceBindingConditionsTimeoutReached(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driver := createTestClass(tCtx, namespace)
@@ -481,6 +490,8 @@ profiles:
 // testDeviceBindingConditionsTimeoutRecovery verifies that when a device with BindingConditions
 // fails to become ready within the timeout (BindingTimeout enforced), and a new device without
 // binding conditions is added, the scheduler reschedules the claim to the new available device.
+//
+// It runs the scheduler with non-standard settings and thus cannot run in parallel.
 func testDeviceBindingConditionsTimeoutRecovery(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)

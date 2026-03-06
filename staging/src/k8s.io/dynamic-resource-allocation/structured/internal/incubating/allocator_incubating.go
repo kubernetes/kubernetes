@@ -87,7 +87,9 @@ type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
 	classLister    DeviceClassLister
-	slices         []*resourceapi.ResourceSlice
+	slicesOnNode   map[string][]*resourceapi.ResourceSlice
+	slicesShared   []*resourceapi.ResourceSlice
+	allSlices      []*resourceapi.ResourceSlice
 	celCache       *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -120,18 +122,30 @@ func NewAllocator(ctx context.Context,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
+	slicesOnNode := make(map[string][]*resourceapi.ResourceSlice)
+	slicesShared := make([]*resourceapi.ResourceSlice, 0)
+	for _, slice := range slices {
+		nodeName := ptr.Deref(slice.Spec.NodeName, "")
+		if nodeName == "" || len(slice.Spec.SharedCounters) > 0 {
+			slicesShared = append(slicesShared, slice)
+		} else {
+			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
+		}
+	}
 	return &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
-		slices:            slices,
+		slicesOnNode:      slicesOnNode,
+		slicesShared:      slicesShared,
+		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[draapi.UniqueString]counterSets),
 	}, nil
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
-	return internal.Experimental
+	return internal.Incubating
 }
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
@@ -148,14 +162,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		result:               make([]internalAllocationResult, len(claims)),
 		allocatingCapacity:   NewConsumedCapacityCollection(),
 	}
-	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlices", len(alloc.slices))
+	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
+	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
 	defer func() {
 		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 	}()
 
-	alloc.logger.V(5).Info("Gathering pools", "slices", alloc.slices)
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
+	pools, err := GatherPools(ctx, slicesForNode, node, a.features, alloc.allSlices)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
@@ -228,12 +242,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				// We can only predict a lower number of devices because it depends on which
 				// subrequest gets chosen.
 				for i, subReq := range request.FirstAvailable {
+					requestKey.subRequestIndex = i
 					reqData, err := alloc.validateDeviceRequest(&deviceSubRequestAccessor{subRequest: &subReq},
 						&exactDeviceRequestAccessor{request: request}, requestKey, pools)
 					if err != nil {
 						return nil, err
 					}
-					requestKey.subRequestIndex = i
 					alloc.requestData[requestKey] = reqData
 					if reqData.numDevices < minDevicesPerRequest {
 						minDevicesPerRequest = reqData.numDevices
@@ -313,7 +327,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
-	alloc.logger.V(6).Info("Gathered information about devices", "allocatedDevices", logAllocatedDevices(alloc.logger, alloc.allocatedState.AllocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
+	alloc.logger.V(6).Info("Gathered information about devices", "numAllocatedDevices", len(alloc.allocatedState.AllocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
 	// expressions. Most likely, there is going to be handful of different
@@ -1033,7 +1047,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 			return false, nil
 		}
 		// No need to propagate the startLocation here since we only try one combination of devices.
-		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest, deviceLocation{})
+		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest, deviceLocation{})
 		if err != nil || !done {
 			// If we get an error or didn't complete, we need to backtrack. Depending
 			// on the situation we might be able to retry, so we make sure we

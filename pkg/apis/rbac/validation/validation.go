@@ -103,7 +103,7 @@ func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole
 func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rule.Verbs) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value").MarkCoveredByDeclarative())
 	}
 
 	if len(rule.NonResourceURLs) > 0 {

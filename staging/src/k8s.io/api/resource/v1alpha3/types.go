@@ -155,8 +155,17 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	//
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
+	// Changing the key and/or value while keeping the effect unchanged
+	// is possible and does not update the time stamp because the eviction
+	// which uses it is either already started (NoExecute) or
+	// not started yet (NoEffect, NoSchedule).
 	//
 	// +optional
 	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
@@ -201,6 +210,7 @@ type DeviceTaintRule struct {
 	// Spec specifies the selector and one taint.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status provides information about what was requested in the spec.

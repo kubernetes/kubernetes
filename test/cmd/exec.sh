@@ -63,6 +63,10 @@ __EOF__
   # These must be pass the validate
   kube::test::if_has_not_string "${output_message}" 'pod or type/name must be specified'
 
+  ### Test execute with invalid container name
+  output_message=$(! kubectl exec test-pod -c nonexistent -- date 2>&1)
+  kube::test::if_has_string "${output_message}" 'container nonexistent is not valid for pod test-pod out of: kubernetes-pause'
+
   # Clean up
   kubectl delete pods test-pod
 

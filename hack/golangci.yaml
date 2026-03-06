@@ -125,6 +125,10 @@ linters:
         text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
 
       - linters:
+          - ginkgolinter
+        text: "Success matcher only support a single error value, or function with Gomega as its first parameter"
+
+      - linters:
           - gocritic
         text: "wrapperFunc: use strings.ReplaceAll|should rewrite switch statement to if statement"
 
@@ -158,7 +162,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(apiserverinternal|apps|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "field .* is missing godoc comment"
         path: "staging/src/k8s.io/api/autoscaling/"
       
@@ -172,7 +176,22 @@ linters:
         path: "staging/src/k8s.io/api/events/(v1|v1beta1)/types.go"
       - text: 'notimestamp: naming convention "notimestamp": field AllocationResult.AllocationTimestamp: prefer use of the term ''time'' over ''timestamp'''
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
-      
+      # optionalfields - Ignore optionalfields issues for existing API group
+      # TODO: For each existing API group, we aim to remove it over time.
+      - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+      - text: "optionalfields: field StorageVersionCondition.ObservedGeneration should be a pointer."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      - text: "optionalfields: field StorageVersion.Spec should be a pointer."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      - text: "optionalfields: field StorageVersion.Status should be a pointer."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      - text: "optionalfields: field StorageVersionCondition.LastTransitionTime should be a pointer."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      - text: "optionalfields: field StorageVersion.Spec should have the omitempty tag."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      - text: "optionalfields: field StorageVersion.Status should have the omitempty tag."
+        path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
       # This is incorrect, but cannot be changed without breaking changes.
@@ -224,8 +243,9 @@ linters:
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
-      - text: "must be marked as optional or required"
-        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|policy|rbac|resource|storage|storagemigration)"
+      # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
+      - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|apps|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|resource|storage)"
       
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -234,6 +254,13 @@ linters:
       # jsontags: 'Port' must be capitalized for backward compatibility
       - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
+      
+      # The PodGroup.Policy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"
 
       - linters:
         - forbidigo
@@ -331,56 +358,13 @@ linters:
             contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/allocation/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/apis/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/checkpointmanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/client/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/cm/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/config/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/configmap/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/container/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/envvars/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/events/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/eviction/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/images/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/kubeletconfig/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/kuberuntime/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/logs/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/metrics/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/network/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/nodeshutdown/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/nodestatus/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pluginmanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/podcertificate/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/prober/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/qos/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/runtimeclass/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/secret/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/stats/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/status/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/token/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/types/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/userns/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/util/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/watchdog/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*
-            
-            # As long as contextual logging is alpha or beta, all WithName, WithValues,
-            # NewContext calls have to go through klog. Once it is GA, we can lift
-            # this restriction. Whether we then do a global search/replace remains
-            # to be decided.
-            with-helpers .*
+            contextual k8s.io/kubernetes/pkg/kubelet/.*
+            # Temporary carve-outs for PR1 split safety: these files still have legacy global klog calls.
+            # TODO: remove each exclusion as follow-up PRs migrate the file to contextual logging.
+            -contextual k8s.io/kubernetes/pkg/kubelet/kubelet_resources.go
+            -contextual k8s.io/kubernetes/pkg/kubelet/kubelet_volumes.go
+            -contextual k8s.io/kubernetes/pkg/kubelet/pod_container_deletor.go
+            -contextual k8s.io/kubernetes/pkg/kubelet/volume_host.go
       sorted:
         # Installed there by hack/verify-golangci-lint.sh.
         path: _output/local/bin/sorted.so
@@ -414,10 +398,11 @@ linters:
               # - "nobools" # Bools do not evolve over time, should use enums instead.
               # - "nofloats" # Ensure floats are not used.
               - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+              - "nonpointerstructs" # Ensure non-pointer structs are correctly tagged as optional or required.
               - "nonullable" # Ensure fields are not marked as nullable.
               # - "nophase" # Ensure field names do not have the word "phase" in them.
               - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
-              # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
+              - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
               - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
@@ -453,7 +438,6 @@ linters:
             # nomaps:
             #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
             # optionalFields:
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
             #  pointers:
             #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
             #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
@@ -464,7 +448,6 @@ linters:
             # optionalOrRequired:
             #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
             #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
             # requiredFields:
             #   pointers:
             #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.
@@ -553,12 +536,6 @@ linters:
         # consistency with existing code
         # and it's just syntactic sugar.
         - any
-        # Replace for-range over b.N with b.Loop.
-        #
-        # Only a hint for new tests because there's
-        # too much existing code that isn't worth
-        # updating.
-        - bloop
         # Replace []byte(fmt.Sprintf) with fmt.Appendf.
         #
         # A useful hint for new code, but
@@ -579,6 +556,12 @@ linters:
         #
         # A useful hint for new code.
         - minmax
+        # simplify code by using go1.26's new(expr)
+        # should only be updated in old code where it really matters.
+        - newexpr
+        # use iterators instead of Len/At-style APIs
+        # should only be updated in old code where it really matters.
+        - stditerators
         # Suggest replacing omitempty with omitzero for struct fields.
         #
         # Disabled because might interfere
@@ -594,17 +577,13 @@ linters:
         - reflecttypefor
         # Replace loops with slices.Contains or slices.ContainsFunc.
         #
-        # A useful hint because it can make  code more obvious
+        # A useful hint because it can make code more obvious
         # and/or avoid helper functions.
         - slicescontains
-        # Replace sort.Slice with slices.Sort for basic types.
+        # Replace strings.Index etc. with strings.Cut
         #
-        # A useful hint because the code becomes shorter.
-        - slicessort
-        # Use iterators instead of Len/At-style APIs.
-        #
-        # A useful hint because the code becomes shorter.
-        - stditerators
+        # A useful hint because it can make code more obvious.
+        - stringscut
         # Replace HasPrefix/TrimPrefix with CutPrefix.
         #
         # A useful hint because the code becomes shorter.

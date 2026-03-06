@@ -1155,7 +1155,7 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 
 	if len(tlsCipherSuites) > 0 {
 		insecureCiphers := cliflag.InsecureTLSCiphers()
-		for i := 0; i < len(tlsCipherSuites); i++ {
+		for i := range tlsCipherSuites {
 			for cipherName, cipherID := range insecureCiphers {
 				if tlsCipherSuites[i] == cipherID {
 					logger.Info("Use of insecure cipher detected.", "cipher", cipherName)
@@ -1176,23 +1176,11 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 	}
 
 	tlsOptions := &server.TLSOptions{
-		Config: &tls.Config{
-			MinVersion:   minTLSVersion,
-			CipherSuites: tlsCipherSuites,
-		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
-	}
-
-	if len(kc.Authentication.X509.ClientCAFile) > 0 {
-		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
-		}
-		// Specify allowed CAs for client certificates
-		tlsOptions.Config.ClientCAs = clientCAs
-		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
-		tlsOptions.Config.ClientAuth = tls.RequestClientCert
+		MinVersion:   minTLSVersion,
+		CipherSuites: tlsCipherSuites,
+		CertFile:     kc.TLSCertFile,
+		KeyFile:      kc.TLSPrivateKeyFile,
+		ClientCAFile: kc.Authentication.X509.ClientCAFile,
 	}
 
 	return tlsOptions, nil
@@ -1282,7 +1270,7 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSConfig, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
@@ -1395,7 +1383,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	)
 	// Retry a couple of times, hoping that any errors are transient.
 	// Fail quickly on known, non transient errors.
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
 			s, ok := status.FromError(err)
@@ -1408,7 +1396,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 			}
 			// CRI implementation doesn't support RuntimeConfig, fallback
 			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
-			kubeletmetrics.CRILosingSupport.WithLabelValues("1.36.0").Inc()
+			kubeletmetrics.CRILosingSupport.WithLabelValues("1.37.0").Inc()
 			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
 			return nil
 		}

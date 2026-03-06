@@ -409,7 +409,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered)...)
+	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered, corevalidation.SizeCovered)...)
 	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"), stored, resource.OpaqueParametersMaxLength)...)
 	return allErrs
 }
@@ -509,7 +509,7 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocationResult, fldPath *field.Path, requestNames requestNames) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
-	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered)...)
+	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered, corevalidation.SizeCovered)...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
@@ -1329,11 +1329,11 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 	}
 
 	if len(networkDeviceData.InterfaceName) > resource.NetworkDeviceDataInterfaceNameMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, resource.NetworkDeviceDataInterfaceNameMaxLength).WithOrigin("maxLength").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, resource.NetworkDeviceDataInterfaceNameMaxLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 
 	if len(networkDeviceData.HardwareAddress) > resource.NetworkDeviceDataHardwareAddressMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength).WithOrigin("maxLength").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
@@ -1428,7 +1428,7 @@ func validateDeviceToleration(toleration resource.DeviceToleration, fldPath *fie
 	case resource.DeviceTolerationOpEqual:
 		allErrs = append(allErrs, validateLabelValue(toleration.Value, fldPath.Child("value"))...)
 	case "":
-		allErrs = append(allErrs, field.Required(fldPath.Child("operator"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("operator"), "").MarkCoveredByDeclarative())
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("operator"), toleration.Operator, validDeviceTolerationOperators).MarkCoveredByDeclarative())
 	}

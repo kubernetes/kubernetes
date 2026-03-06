@@ -2,13 +2,12 @@
 
 module k8s.io/apimachinery
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
@@ -23,15 +22,16 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4
-	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
+	k8s.io/kube-openapi v0.0.0-20260304202019-5b3e3fdb0acf
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.1
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
 	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -41,14 +41,13 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
-	github.com/onsi/ginkgo/v2 v2.27.4 // indirect
-	github.com/onsi/gomega v1.39.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
+	github.com/onsi/gomega v1.39.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

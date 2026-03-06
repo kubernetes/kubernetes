@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -428,6 +429,11 @@ func TestPlugin(t *testing.T) {
 
 	for _, sc := range scenarios {
 		t.Run(fmt.Sprintf("%s/gitRepoPluginDisabled:%v", sc.name, sc.gitRepoPluginDisabled), func(t *testing.T) {
+
+			if !sc.gitRepoPluginDisabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
+
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !sc.gitRepoPluginDisabled)
 			allErrs := doTestPlugin(t, sc)
 			if len(allErrs) == 0 && sc.isExpectedFailure {
@@ -542,7 +548,6 @@ func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
 	var fakeOutputs []fakeexec.FakeAction
 	var fcmd fakeexec.FakeCmd
 	for _, expected := range expecteds {
-		expected := expected
 		if expected.cmd[1] == "clone" {
 			// Calculate the subdirectory clone would create (if any)
 			// git clone -- https://github.com/kubernetes/kubernetes.git target_dir --> target_dir

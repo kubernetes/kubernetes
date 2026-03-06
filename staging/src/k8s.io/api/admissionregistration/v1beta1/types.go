@@ -405,6 +405,7 @@ type ValidatingAdmissionPolicyBinding struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
+	// +required
 	Spec ValidatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -428,7 +429,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
 	// paramRef specifies the parameter resource used to configure the admission control policy.
@@ -487,7 +488,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Required.
 	// +listType=set
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
@@ -1208,6 +1209,7 @@ type MatchCondition struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.34
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicy
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
@@ -1221,6 +1223,7 @@ type MutatingAdmissionPolicy struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.34
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyList
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 type MutatingAdmissionPolicyList struct {
@@ -1471,6 +1474,7 @@ type JSONPatch struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.34
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyBinding
 
 // MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources.
 // MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators
@@ -1494,6 +1498,7 @@ type MutatingAdmissionPolicyBinding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.34
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyBindingList
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingList struct {

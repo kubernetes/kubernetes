@@ -84,7 +84,7 @@ func Validate_CronJobSpec(ctx context.Context, op operation.Operation, fldPath *
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

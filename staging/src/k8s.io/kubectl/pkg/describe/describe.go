@@ -72,6 +72,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
@@ -80,8 +81,7 @@ import (
 	"k8s.io/kubectl/pkg/util/fieldpath"
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
-	"k8s.io/kubectl/pkg/util/slice"
+	kubectlresourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 )
 
@@ -312,7 +312,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -320,7 +320,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -335,7 +335,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -383,7 +383,7 @@ func smartLabelFor(field string) string {
 			continue
 		}
 
-		if slice.Contains(commonAcronyms, strings.ToUpper(part), nil) {
+		if slices.Contains(commonAcronyms, strings.ToUpper(part)) {
 			part = strings.ToUpper(part)
 		} else if strings.ToLower(part) == part {
 			part = cases.Title(language.English).String(part)
@@ -1998,7 +1998,7 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := resourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := kubectlresourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
@@ -2427,6 +2427,11 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.TimeZone != nil {
+			w.Write(LEVEL_0, "Time Zone:\t%s\n", *cronJob.Spec.TimeZone)
+		} else {
+			w.Write(LEVEL_0, "Time Zone:\t<unset>\n")
+		}
 		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
 			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
 		} else {
@@ -3557,7 +3562,6 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, "  Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
 		w.Write(LEVEL_0, "  Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
 		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
-		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
 		// remove when .PodCIDR is deprecated
 		if len(node.Spec.PodCIDR) > 0 {
@@ -3990,7 +3994,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
+		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
+		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
 		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
@@ -4035,9 +4040,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if resourcehelper.IsHugePageResourceName(resource) {
+		if kubectlresourcehelper.IsHugePageResourceName(resource) {
 			hugePageResources = append(hugePageResources, string(resource))
-		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		} else if !kubectlresourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
@@ -4066,7 +4071,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
 	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
+		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
+		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()

@@ -305,22 +305,22 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyPodRestarts(f *framework.Framework, pod *v1.Pod, wantInfo []ResizableContainerInfo) error {
+func verifyPodRestarts(ctx context.Context, f *framework.Framework, pod *v1.Pod, wantInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
 	initCtrStatuses, ctrStatuses := separateContainerStatuses(wantInfo)
 	errs := []error{}
-	if err := verifyContainerRestarts(f, pod, pod.Status.InitContainerStatuses, initCtrStatuses); err != nil {
+	if err := verifyContainerRestarts(ctx, f, pod, pod.Status.InitContainerStatuses, initCtrStatuses); err != nil {
 		errs = append(errs, err)
 	}
-	if err := verifyContainerRestarts(f, pod, pod.Status.ContainerStatuses, ctrStatuses); err != nil {
+	if err := verifyContainerRestarts(ctx, f, pod, pod.Status.ContainerStatuses, ctrStatuses); err != nil {
 		errs = append(errs, err)
 	}
 
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyContainerRestarts(f *framework.Framework, pod *v1.Pod, gotStatuses []v1.ContainerStatus, wantStatuses []v1.ContainerStatus) error {
+func verifyContainerRestarts(ctx context.Context, f *framework.Framework, pod *v1.Pod, gotStatuses []v1.ContainerStatus, wantStatuses []v1.ContainerStatus) error {
 	ginkgo.GinkgoHelper()
 
 	if len(gotStatuses) != len(wantStatuses) {
@@ -333,7 +333,7 @@ func verifyContainerRestarts(f *framework.Framework, pod *v1.Pod, gotStatuses []
 		if gotStatus.RestartCount != wantStatuses[i].RestartCount {
 			errs = append(errs, fmt.Errorf("unexpected number of restarts for container %s: got %d, want %d", gotStatus.Name, gotStatus.RestartCount, wantStatuses[i].RestartCount))
 		} else if gotStatus.RestartCount > 0 {
-			if err := verifyOomScoreAdj(f, pod, gotStatus.Name); err != nil {
+			if err := verifyOomScoreAdj(ctx, f, pod, gotStatus.Name); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -341,7 +341,7 @@ func verifyContainerRestarts(f *framework.Framework, pod *v1.Pod, gotStatuses []
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string) error {
+func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string) error {
 	container := e2epod.FindContainerInPod(pod, containerName)
 	if container == nil {
 		return fmt.Errorf("failed to find container %s in pod %s", containerName, pod.Name)
@@ -356,7 +356,9 @@ func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string
 	oomScoreAdj := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
 	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
 
-	return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj)
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj), nil
+	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
@@ -438,7 +440,7 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
 	}
 
-	if restartErrs := verifyPodRestarts(f, resizedPod, expectedContainers); restartErrs != nil {
+	if restartErrs := verifyPodRestarts(ctx, f, resizedPod, expectedContainers); restartErrs != nil {
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
 	}
 

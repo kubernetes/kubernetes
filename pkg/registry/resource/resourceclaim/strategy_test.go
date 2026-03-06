@@ -25,6 +25,7 @@ import (
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
@@ -619,6 +620,9 @@ func TestStrategyCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
+			if !tc.adminAccess {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:        tc.adminAccess,
 				features.DRADeviceTaints:       tc.deviceTaints,
@@ -950,6 +954,9 @@ func TestStrategyUpdate(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 
+			if !tc.adminAccess {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:        tc.adminAccess,
 				features.DRADeviceTaints:       tc.deviceTaints,
@@ -1557,6 +1564,9 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 			strategy := NewStrategy(mockNSClient)
 
+			if !tc.adminAccess {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:               tc.adminAccess,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatusFeatureGate,

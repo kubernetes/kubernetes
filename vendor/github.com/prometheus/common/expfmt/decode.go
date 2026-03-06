@@ -220,7 +220,7 @@ func extractSamples(f *dto.MetricFamily, o *DecodeOptions) (model.Vector, error)
 		return extractSummary(o, f), nil
 	case dto.MetricType_UNTYPED:
 		return extractUntyped(o, f), nil
-	case dto.MetricType_HISTOGRAM:
+	case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 		return extractHistogram(o, f), nil
 	}
 	return nil, fmt.Errorf("expfmt.extractSamples: unknown metric family type %v", f.GetType())
@@ -403,9 +403,13 @@ func extractHistogram(o *DecodeOptions, f *dto.MetricFamily) model.Vector {
 				infSeen = true
 			}
 
+			v := q.GetCumulativeCountFloat()
+			if v <= 0 {
+				v = float64(q.GetCumulativeCount())
+			}
 			samples = append(samples, &model.Sample{
 				Metric:    model.Metric(lset),
-				Value:     model.SampleValue(q.GetCumulativeCount()),
+				Value:     model.SampleValue(v),
 				Timestamp: timestamp,
 			})
 		}
@@ -428,9 +432,13 @@ func extractHistogram(o *DecodeOptions, f *dto.MetricFamily) model.Vector {
 		}
 		lset[model.MetricNameLabel] = model.LabelValue(f.GetName() + "_count")
 
+		v := m.Histogram.GetSampleCountFloat()
+		if v <= 0 {
+			v = float64(m.Histogram.GetSampleCount())
+		}
 		count := &model.Sample{
 			Metric:    model.Metric(lset),
-			Value:     model.SampleValue(m.Histogram.GetSampleCount()),
+			Value:     model.SampleValue(v),
 			Timestamp: timestamp,
 		}
 		samples = append(samples, count)

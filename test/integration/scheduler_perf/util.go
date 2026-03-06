@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -92,7 +91,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
@@ -136,7 +135,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	scheduler, informerFactory := util.StartScheduler(tCtx, config, outOfTreePluginRegistry)
+	scheduler, informerFactory := util.StartScheduler(tCtx, config, opts.outOfTreePluginRegistry)
 	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
 	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
 	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)

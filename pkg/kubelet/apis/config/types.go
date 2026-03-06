@@ -310,6 +310,7 @@ type KubeletConfiguration struct {
 	// specify CPU limits
 	CPUCFSQuota bool
 	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	// Default: "100ms". Changing this value requires enabling the CustomCPUCFSQuotaPeriod feature gate.
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64

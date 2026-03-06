@@ -27976,6 +27976,103 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				field.NotSupported(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("health"), core.ResourceHealthStatus("invalid-health-value"), []string{"Healthy", "Unhealthy", "Unknown"}),
 			},
 		},
+
+		"don't allow message longer than max length": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(string(make([]byte, v1.ResourceHealthMessageMaxLength+1))),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.TooLong(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("message"), string(make([]byte, v1.ResourceHealthMessageMaxLength+1)), v1.ResourceHealthMessageMaxLength),
+			},
+		},
+
+		"allow message at exactly max length": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(string(make([]byte, v1.ResourceHealthMessageMaxLength))),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+
+		"don't allow empty message": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(""),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("message"), "must be non-empty if specified"),
+			},
+		},
 	}
 	for name, tt := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -29604,6 +29701,44 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				Type:     field.ErrorTypeNotSupported,
 				Field:    "containers[0].restartPolicyRules[0].exitCodes.operator",
 				BadValue: core.ContainerRestartRuleOnExitCodesOperator(""),
+			}},
+		},
+		{
+			Name:          "restart-policy-rules with too many exit codes",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   make([]int32, 256),
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeTooMany,
+				Field:    "containers[0].restartPolicyRules[0].exitCodes.values",
+				BadValue: 256,
+			}},
+		},
+		{
+			Name:          "restart-policy-rules with too many rules",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: func() []core.ContainerRestartRule {
+				rules := make([]core.ContainerRestartRule, 21)
+				for i := range rules {
+					rules[i] = core.ContainerRestartRule{
+						Action: "Restart",
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: "In",
+							Values:   []int32{42},
+						},
+					}
+				}
+				return rules
+			}(),
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeTooMany,
+				Field:    "containers[0].restartPolicyRules",
+				BadValue: 21,
 			}},
 		},
 	}

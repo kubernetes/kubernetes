@@ -66,13 +66,13 @@ func Validate_ReplicationController(ctx context.Context, op operation.Operation,
 			// call field-attached validations
 			func() { // cohort name
 				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
-				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkAlpha()...)
 			}()
 			return
 		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *metav1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
@@ -106,27 +106,26 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 			// call field-attached validations
 			earlyReturn := false
 			// optional fields with default values are effectively required
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
 			return
 		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }), oldObj != nil)...)
 
 	// field corev1.ReplicationControllerSpec.MinReadySeconds
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
-			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
 			return
 		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }), oldObj != nil)...)
 

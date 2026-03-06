@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -58,10 +59,12 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	// Do some initialization to decode the query parameters correctly.
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -70,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -302,9 +306,12 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 }
 
 type fakeAuth struct {
-	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
-	attributesFunc   func(user.Info, *http.Request) []authorizer.Attributes
-	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	authenticateFunc       func(*http.Request) (*authenticator.Response, bool, error)
+	attributesFunc         func(user.Info, *http.Request) []authorizer.Attributes
+	authorizeFunc          func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	currentCABundleContent func() []byte
+	name                   string
+	verifyOptions          func() (x509.VerifyOptions, bool)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -315,6 +322,16 @@ func (f *fakeAuth) GetRequestAttributes(ctx context.Context, u user.Info, req *h
 }
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
+}
+func (f *fakeAuth) AddListener(listener dynamiccertificates.Listener) {}
+func (f *fakeAuth) CurrentCABundleContent() []byte {
+	return f.currentCABundleContent()
+}
+func (f *fakeAuth) Name() string {
+	return f.name
+}
+func (f *fakeAuth) VerifyOptions() (x509.VerifyOptions, bool) {
+	return f.verifyOptions()
 }
 
 type serverTestFramework struct {
@@ -2020,4 +2037,48 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")
 	assert.Contains(t, server2.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "Second server should register /metrics/slis")
+}
+
+// This test verifies that the HTTP request duration metric captures the actual
+// request handling time.
+func TestServeHTTPRequestDurationMetric(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	// Register and reset the metric before the test
+	servermetrics.Register()
+	servermetrics.HTTPRequestsDuration.Reset()
+
+	// Add a delay to the pods handler to simulate request processing time.
+	// We use 50ms which is long enough to be clearly distinguishable from
+	// the ~2 microsecond bug, but short enough to not slow down tests.
+	handlerDelay := 50 * time.Millisecond
+	fw.fakeKubelet.podsFunc = func() []*v1.Pod {
+		time.Sleep(handlerDelay)
+		return []*v1.Pod{}
+	}
+
+	// Make a request to the pods endpoint
+	resp, err := http.Get(fw.testHTTPServer.URL + "/pods/")
+	require.NoError(t, err)
+	defer resp.Body.Close() //nolint:errcheck
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Read the body to ensure the request is fully processed
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	// Get the recorded duration from the metric
+	observerMetric := servermetrics.HTTPRequestsDuration.WithLabelValues("GET", "pods", "readwrite", "false")
+	metricValue, err := testutil.GetHistogramMetricValue(observerMetric)
+	require.NoError(t, err)
+
+	// Use the handler delay as the minimum expected duration. This avoids any
+	// timing-sensitive percentage-based checks.
+	minExpectedDuration := handlerDelay.Seconds()
+	assert.GreaterOrEqual(t, metricValue, minExpectedDuration,
+		"HTTP request duration metric recorded %v seconds, expected at least %v seconds. ",
+		metricValue, minExpectedDuration,
+	)
 }

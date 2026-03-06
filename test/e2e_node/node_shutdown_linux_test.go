@@ -144,7 +144,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			for _, pod := range list.Items {
-				framework.Logf("Pod (%v/%v) status conditions: %q", pod.Namespace, pod.Name, &pod.Status.Conditions)
+				framework.Logf("Pod (%v/%v) status conditions: %#v", pod.Namespace, pod.Name, pod.Status.Conditions)
 			}
 
 			ginkgo.By("Verifying batch pods are running")

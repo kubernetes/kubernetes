@@ -80,22 +80,22 @@ func (m *fakeManager) State() state.Reader {
 
 func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetExclusiveCPUs", "podUID", podUID, "containerName", containerName)
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	m.logger.Info("Get Allocatable CPUs")
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	m.logger.Info("GetAllCPUs")
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 // NewFakeManager creates empty/fake cpu manager

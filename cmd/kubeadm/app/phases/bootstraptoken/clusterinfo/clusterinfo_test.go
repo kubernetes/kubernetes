@@ -99,7 +99,7 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
-				client := clientsetfake.NewClientset()
+				client := clientsetfake.NewSimpleClientset()
 				if tc.createErr != nil {
 					client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
 						return true, nil, tc.createErr
@@ -133,7 +133,7 @@ func TestCreateClusterInfoRBACRules(t *testing.T) {
 		},
 		{
 			name:   "the RBAC rules do not exist",
-			client: clientsetfake.NewClientset(),
+			client: clientsetfake.NewSimpleClientset(),
 		},
 	}
 	for _, tt := range tests {
@@ -146,7 +146,7 @@ func TestCreateClusterInfoRBACRules(t *testing.T) {
 }
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
-	client := clientsetfake.NewClientset()
+	client := clientsetfake.NewSimpleClientset()
 
 	_, err := client.RbacV1().Roles(metav1.NamespacePublic).Create(context.TODO(), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{

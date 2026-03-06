@@ -40,15 +40,6 @@ func TestLoadConfig(t *testing.T) {
 			expectErr: `no kind "Unknown" is registered for version "v1"`,
 		},
 		{
-			name: "valid v1alpha1",
-			input: `
-kind: WebhookAdmission
-apiVersion: apiserver.config.k8s.io/v1alpha1
-kubeConfigFile: /foo
-`,
-			expectKubeconfig: "/foo",
-		},
-		{
 			name: "valid v1",
 			input: `
 kind: WebhookAdmissionConfiguration

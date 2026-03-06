@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
@@ -261,6 +262,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		// Start the informers.
 		stopCh := ctx.Done()
 		controllerContext.InformerFactory.Start(stopCh)
+		defer controllerContext.InformerFactory.Shutdown()
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
@@ -486,7 +488,12 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+	informerName, err := cache.NewInformerName("kube-controller-manager")
+	if err != nil {
+		return ControllerContext{}, fmt.Errorf("failed to create informer name: %w", err)
+	}
+
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithInformerName(informerName))
 
 	metadataConfig, err := rootClientBuilder.Config("metadata-informers")
 	if err != nil {

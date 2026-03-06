@@ -17,13 +17,15 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -61,10 +63,14 @@ func newMockFeatureGate(features map[string]bool) *mockFeatureGate {
 
 func TestNewFramework(t *testing.T) {
 	_, err := New(nil)
-	require.Error(t, err, "NewFramework should return an error with a nil registry")
+	if err == nil {
+		t.Fatalf("NewFramework should return an error with a nil registry")
+	}
 
 	_, err = New([]Feature{})
-	require.NoError(t, err, "NewFramework should not return an error with an empty registry")
+	if err != nil {
+		t.Fatalf("NewFramework should not return an error with an empty registry")
+	}
 }
 
 func TestDiscoverNodeFeatures(t *testing.T) {
@@ -78,9 +84,9 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			maxVersion: featureMaxVersion,
 		},
 		&mockFeature{
-			name: "FeatureBWithStaticConfig",
+			name: "FeatureB",
 			discover: func(cfg *NodeConfiguration) bool {
-				return cfg.FeatureGates.Enabled("feature-b") && cfg.StaticConfig.CPUManagerPolicy == "static"
+				return cfg.FeatureGates.Enabled("feature-b")
 			},
 			maxVersion: featureMaxVersion,
 		},
@@ -108,18 +114,16 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 					string("feature-a"): true,
 					string("feature-b"): true,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "static"},
 			},
-			expected: []string{"FeatureA", "FeatureBWithStaticConfig"}, // Should be sorted
+			expected: []string{"FeatureA", "FeatureB"}, // Should be sorted
 		},
 		{
 			name: "no features enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
 					string("feature-a"): false,
-					string("feature-b"): true,
+					string("feature-b"): false,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "none"},
 			},
 			expected: []string{},
 		},
@@ -146,10 +150,8 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			features := framework.DiscoverNodeFeatures(tc.config)
-			if len(tc.expected) == 0 {
-				assert.Empty(t, features)
-			} else {
-				assert.Equal(t, tc.expected, features)
+			if !slices.Equal(tc.expected, features) {
+				t.Errorf("expected %#v, got %#v", tc.expected, features)
 			}
 		})
 	}
@@ -259,11 +261,17 @@ func TestInferForPodScheduling(t *testing.T) {
 			reqs, err := framework.InferForPodScheduling(&PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errContains)
+				if err == nil {
+					t.Errorf("expected error, got none")
+				} else if !strings.Contains(err.Error(), tc.errContains) {
+					t.Errorf("expected %q to contain %q", err.Error(), tc.errContains)
+				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				} else if !reflect.DeepEqual(tc.expectedReqs, reqs) {
+					t.Errorf("expected %#v, got %#v", tc.expectedReqs, reqs)
+				}
 			}
 		})
 	}
@@ -388,11 +396,17 @@ func TestInferForPodUpdate(t *testing.T) {
 			reqs, err := framework.InferForPodUpdate(&PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}, &PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}, tc.targetVersion)
 
 			if tc.expectErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errContains)
+				if err == nil {
+					t.Errorf("expected error, got none")
+				} else if !strings.Contains(err.Error(), tc.errContains) {
+					t.Errorf("expected %q to contain %q", err.Error(), tc.errContains)
+				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expectedReqs, reqs)
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				} else if !reflect.DeepEqual(tc.expectedReqs, reqs) {
+					t.Errorf("expected %#v, got %#v", tc.expectedReqs, reqs)
+				}
 			}
 		})
 	}
@@ -461,10 +475,18 @@ func TestMatchNode(t *testing.T) {
 						t.Fatalf("unknown match variation: %s", variationName)
 					}
 
-					require.NoError(t, err)
-					assert.Equal(t, tc.expectedMatch, result.IsMatch)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+					if tc.expectedMatch != result.IsMatch {
+						t.Fatalf("expected match=%v, got %v", tc.expectedMatch, result.IsMatch)
+					}
 					if !tc.expectedMatch {
-						assert.ElementsMatch(t, tc.expectedUnsatisfied, result.UnsatisfiedRequirements)
+						want := sets.NewString(tc.expectedUnsatisfied...)
+						got := sets.NewString(result.UnsatisfiedRequirements...)
+						if !want.Equal(got) {
+							t.Fatalf("expected unsatisfied=%v, got=%v", want.List(), got.List())
+						}
 					}
 				})
 			}
@@ -473,5 +495,7 @@ func TestMatchNode(t *testing.T) {
 
 	// Test nil node
 	_, err := MatchNode(NewFeatureSet("feature-a"), nil)
-	require.Error(t, err, "MatchNode should return an error for a nil node")
+	if err == nil {
+		t.Fatalf("MatchNode should return an error for a nil node")
+	}
 }

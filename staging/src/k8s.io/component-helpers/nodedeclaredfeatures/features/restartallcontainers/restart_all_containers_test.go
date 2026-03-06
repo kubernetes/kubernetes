@@ -19,7 +19,6 @@ package restartallcontainers
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
@@ -47,13 +46,14 @@ func TestDiscover(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.EXPECT().Enabled(RestartAllContainersOnContainerExits).Return(tc.featureGateEnabled)
-
+			mockFG.SetEnabled(RestartAllContainersOnContainerExits, tc.featureGateEnabled)
 			config := &nodedeclaredfeatures.NodeConfiguration{
 				FeatureGates: mockFG,
 			}
 			enabled := feature.Discover(config)
-			assert.Equal(t, tc.expected, enabled)
+			if want, got := tc.expected, enabled; want != got {
+				t.Fatalf("want=%v,got=%v", want, got)
+			}
 		})
 	}
 }
@@ -108,7 +108,9 @@ func TestInferForScheduling(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			podInfo := &nodedeclaredfeatures.PodInfo{Spec: tc.pod}
-			assert.Equal(t, tc.expected, feature.InferForScheduling(podInfo))
+			if want, got := tc.expected, feature.InferForScheduling(podInfo); want != got {
+				t.Fatalf("want=%v,got=%v", want, got)
+			}
 		})
 	}
 }
@@ -116,7 +118,9 @@ func TestInferForScheduling(t *testing.T) {
 func TestInferForUpdate(t *testing.T) {
 	feature := &restartAllContainersFeature{}
 	podInfo := &nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}}
-	assert.False(t, feature.InferForUpdate(nil, podInfo), "expect InferForUpdate to be false")
+	if feature.InferForUpdate(nil, podInfo) {
+		t.Fatalf("expect InferForUpdate to be false")
+	}
 }
 
 func containerWithRestartAllContainersAction() v1.Container {

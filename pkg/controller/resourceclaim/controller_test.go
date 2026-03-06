@@ -19,6 +19,7 @@ package resourceclaim
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"testing"
@@ -1522,13 +1523,7 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 			if test.pod.Status.ExtendedResourceClaimStatus != nil {
 				expectedClaimKey = claimKeyPrefix + test.pod.Namespace + "/" + test.pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
 			}
-			found := false
-			for _, k := range keys {
-				if k == expectedClaimKey {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(keys, expectedClaimKey)
 			if test.expectExtendedClaimEnqueued && !found {
 				t.Errorf("expected extended claim key %q to be enqueued, got keys: %v", expectedClaimKey, keys)
 			}

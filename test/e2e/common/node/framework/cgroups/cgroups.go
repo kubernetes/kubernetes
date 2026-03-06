@@ -411,11 +411,11 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
 	oomScoreAdj, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find expected value %s for container app process", expectedOomScoreAdj)
+		return fmt.Errorf("failed to find expected oom_score_adj value %s for container %s in pod %s", expectedOomScoreAdj, cName, pod.Name)
 	}
 	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
 	if oomScoreAdj != expectedOomScoreAdj {
-		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
+		return fmt.Errorf("oom_score_adj value %s not equal to expected %s for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
 	}
 	return nil
 }

@@ -55,7 +55,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"name: empty": {
 					input: mkDeviceClass(tweakName("")),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("metadata", "name"), ""),
+						field.Required(field.NewPath("metadata", "name"), "").MarkFromImperative(),
 					},
 				},
 				"name: valid": {
@@ -64,13 +64,13 @@ func TestDeclarativeValidate(t *testing.T) {
 				"name: invalid (uppercase)": {
 					input: mkDeviceClass(tweakName("Invalid-Name")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "Invalid-Name", "").WithOrigin("format=k8s-long-name"),
+						field.Invalid(field.NewPath("metadata", "name"), "Invalid-Name", "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 					},
 				},
 				"name: invalid (start with dash)": {
 					input: mkDeviceClass(tweakName("-invalid")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "-invalid", "").WithOrigin("format=k8s-long-name"),
+						field.Invalid(field.NewPath("metadata", "name"), "-invalid", "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 					},
 				},
 				"name: max length": {
@@ -79,7 +79,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"name: too long": {
 					input: mkDeviceClass(tweakName(strings.Repeat("a", 254))),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 254), "").WithOrigin("format=k8s-long-name"),
+						field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 254), "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 					},
 				},
 				// spec.selectors.
@@ -89,14 +89,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				"too many selectors": {
 					input: mkDeviceClass(tweakSelectors(33)),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
+						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
 					},
 				},
 				// spec.config
 				"too many configs": {
 					input: mkDeviceClass(tweakConfig(33)),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems"),
+						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
 					},
 				},
 				"valid: at limit configs": {
@@ -110,31 +110,31 @@ func TestDeclarativeValidate(t *testing.T) {
 				"invalid extended resource name": {
 					input: mkDeviceClass(tweakExtendedResourceName("invalid_name")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "invalid_name", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "invalid_name", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name, no slash": {
 					input: mkDeviceClass(tweakExtendedResourceName("noslash")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "noslash", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "noslash", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name, kubernetes.io domain": {
 					input: mkDeviceClass(tweakExtendedResourceName("kubernetes.io/foo")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "kubernetes.io/foo", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "kubernetes.io/foo", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name, requests. prefix": {
 					input: mkDeviceClass(tweakExtendedResourceName("requests.example.com/foo")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "requests.example.com/foo", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "requests.example.com/foo", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name, too long": {
 					input: mkDeviceClass(tweakExtendedResourceName("example.com/" + strings.Repeat("a", 64))),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				// TODO: Add more test cases
@@ -174,7 +174,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakName("test-classx")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable"),
+						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable").MarkFromImperative(),
 					},
 				},
 				"valid update: at limit selectors": {
@@ -185,7 +185,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakSelectors(33)),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
+						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
 					},
 				},
 				"valid update: at limit configs": {
@@ -196,7 +196,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakConfig(33)),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems"),
+						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
 					},
 				},
 
@@ -209,35 +209,35 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceName("invalid_name")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "invalid_name", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "invalid_name", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name update, no slash": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceName("noslash")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "noslash", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "noslash", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name update, kubernetes.io domain": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceName("kubernetes.io/foo")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "kubernetes.io/foo", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "kubernetes.io/foo", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name update, requests. prefix": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceName("requests.example.com/foo")),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "requests.example.com/foo", "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "requests.example.com/foo", "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				"invalid extended resource name update, too long": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakExtendedResourceName("example.com/" + strings.Repeat("a", 64))),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name"),
+						field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com/"+strings.Repeat("a", 64), "").WithOrigin("format=k8s-extended-resource-name").MarkAlpha(),
 					},
 				},
 				// TODO: Add more test cases

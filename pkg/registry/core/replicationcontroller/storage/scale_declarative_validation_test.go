@@ -49,7 +49,7 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 		"spec.replicas: negative replicas": {
 			input: mkScale(setScaleSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 	}

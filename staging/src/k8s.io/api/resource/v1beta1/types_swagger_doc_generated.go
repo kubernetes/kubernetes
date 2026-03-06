@@ -336,7 +336,7 @@ var map_DeviceTaint = map[string]string{
 	"key":       "The taint key to be applied to a device. Must be a label name.",
 	"value":     "The taint value corresponding to the taint key. Must be a label value.",
 	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added or (only in a DeviceTaintRule) the effect was modified. Added automatically during create or update if not set.\n\nIn addition, in a DeviceTaintRule a value provided during an update gets replaced with the current time if the provided value is the same as the old one and the new effect is different. Changing the key and/or value while keeping the effect unchanged is possible and does not update the time stamp because the eviction which uses it is either already started (NoExecute) or not started yet (NoEffect, NoSchedule).",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
@@ -358,9 +358,9 @@ func (DeviceToleration) SwaggerDoc() map[string]string {
 
 var map_NetworkDeviceData = map[string]string{
 	"":                "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
-	"interfaceName":   "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
+	"interfaceName":   "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 bytes.",
 	"ips":             "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.\n\nMust not contain more than 16 entries.",
-	"hardwareAddress": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
+	"hardwareAddress": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 bytes.",
 }
 
 func (NetworkDeviceData) SwaggerDoc() map[string]string {

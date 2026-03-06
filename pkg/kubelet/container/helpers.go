@@ -70,8 +70,8 @@ type RuntimeHelper interface {
 	// UnprepareDynamicResources unprepares resources for a a pod.
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
-	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
-	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+	// RequestPodReinspect flags a pod to be inspected on the next relist.
+	RequestPodReinspect(types.UID)
 
 	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
@@ -277,14 +277,20 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 }
 
 // FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
-func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
+func FilterEventRecorder(recorder record.EventRecorderLogger) record.EventRecorderLogger {
 	return &innerEventRecorder{
 		recorder: recorder,
 	}
 }
 
 type innerEventRecorder struct {
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
+}
+
+func (irecorder *innerEventRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return &innerEventRecorder{
+		recorder: irecorder.recorder.WithLogger(logger),
+	}
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {

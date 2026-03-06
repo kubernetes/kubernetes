@@ -66,7 +66,7 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 			samples := m[kubeletmetrics.KubeletSubsystem+"_"+kubeletmetrics.CRILosingSupportKey]
 
 			gomega.Expect(samples).NotTo(gomega.BeEmpty())
-			gomega.Expect(samples[0].Metric["version"]).To(gomega.BeEquivalentTo("1.36.0"))
+			gomega.Expect(samples[0].Metric["version"]).To(gomega.BeEquivalentTo("1.37.0"))
 		})
 		ginkgo.It("should not emit metric if CRI is new enough", func() {
 			restartKubelet(context.Background(), true)

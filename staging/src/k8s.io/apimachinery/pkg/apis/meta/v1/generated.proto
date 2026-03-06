@@ -369,9 +369,13 @@ message FieldSelectorRequirement {
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
+// +k8s:deepcopy-gen=false
+// +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message FieldsV1 {
   // Raw is the underlying serialization of this object.
+  //
+  // Deprecated: Direct access to this field is deprecated. Use GetRawBytes, GetRawString, SetRawBytes, SetRawString, GetRawReader, NewFieldsV1 instead.
   optional bytes Raw = 1;
 }
 

@@ -321,6 +321,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.12"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: CPUManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false
@@ -413,12 +417,22 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
+- name: DeclarativeValidationBeta
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DeclarativeValidationTakeover
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.36"
 - name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
@@ -459,6 +473,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.36"
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
@@ -473,6 +491,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.36"
 - name: DRAAdminAccess
   versionedSpecs:
   - default: false
@@ -483,12 +505,20 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: DRAConsumableCapacity
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false
@@ -599,6 +629,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: GangScheduling
   versionedSpecs:
   - default: false
@@ -621,6 +655,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.36"
 - name: GracefulNodeShutdown
   versionedSpecs:
   - default: false
@@ -641,20 +679,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
-- name: HonorPVReclaimPolicy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.23"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: HostnameOverride
   versionedSpecs:
   - default: false
@@ -735,16 +759,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
-- name: InPlacePodVerticalScalingAllocatedStatus
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.32"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.33"
 - name: InPlacePodVerticalScalingExclusiveCPUs
   versionedSpecs:
   - default: false
@@ -1089,12 +1103,20 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: MutablePodResourcesForSuspendedJobs
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: MutablePVNodeAffinity
   versionedSpecs:
   - default: false
@@ -1107,6 +1129,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false
@@ -1117,6 +1143,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: NFTablesProxyMode
   versionedSpecs:
   - default: false
@@ -1459,6 +1489,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: ReloadKubeletClientCAFile
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
@@ -1491,6 +1527,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: ResourceHealthStatusMessage
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: RestartAllContainersOnContainerExits
   versionedSpecs:
   - default: false
@@ -1573,6 +1619,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: SELinuxMount
   versionedSpecs:
   - default: false
@@ -1597,6 +1647,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.28"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: SeparateCacheWatchRPC
   versionedSpecs:
   - default: true
@@ -1607,6 +1661,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.36"
 - name: SeparateTaintEvictionController
   versionedSpecs:
   - default: true
@@ -1703,6 +1761,30 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: StaleControllerConsistencyDaemonSet
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: StaleControllerConsistencyJob
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: StaleControllerConsistencyReplicaSet
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: StaleControllerConsistencyStatefulSet
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: StatefulSetSemanticRevisionComparison
   versionedSpecs:
   - default: true
@@ -1777,6 +1859,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: StructuredAuthenticationConfiguration
   versionedSpecs:
   - default: false
@@ -1839,6 +1925,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: TopologyAwareWorkloadScheduling
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: TopologyManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false
@@ -1895,6 +1987,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: UserNamespacesHostNetworkSupport
   versionedSpecs:
   - default: false
@@ -2021,3 +2117,9 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: WorkloadAwarePreemption
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"

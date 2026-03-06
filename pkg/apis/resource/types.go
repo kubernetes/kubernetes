@@ -652,8 +652,12 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
 	//
 	// +optional
 	TimeAdded *metav1.Time
@@ -888,8 +892,7 @@ type ExactDeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional
@@ -1531,8 +1534,7 @@ type DeviceRequestAllocationResult struct {
 	// administrative access. See the corresponding request field
 	// for a definition of mode.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional

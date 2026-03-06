@@ -118,7 +118,7 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 	return nil
 }
 
-func (f *FakeRuntimeHelper) SetPodWatchCondition(_ kubetypes.UID, _ string, _ func(*kubecontainer.PodStatus) bool) {
+func (f *FakeRuntimeHelper) RequestPodReinspect(_ kubetypes.UID) {
 	// Not implemented.
 }
 

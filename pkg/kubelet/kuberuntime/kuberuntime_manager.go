@@ -108,7 +108,7 @@ type podStateProvider interface {
 
 type kubeGenericRuntimeManager struct {
 	runtimeName string
-	recorder    record.EventRecorder
+	recorder    record.EventRecorderLogger
 	osInterface kubecontainer.OSInterface
 
 	// machineInfo contains the machine information.
@@ -203,7 +203,7 @@ type KubeGenericRuntime interface {
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	ctx context.Context,
-	recorder record.EventRecorder,
+	recorder record.EventRecorderLogger,
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
@@ -529,14 +529,6 @@ type containerToKillInfo struct {
 	reason containerKillReason
 }
 
-// containerResources holds the set of resources applicable to the running container
-type containerResources struct {
-	memoryLimit   int64
-	memoryRequest int64
-	cpuLimit      int64
-	cpuRequest    int64
-}
-
 // containerToUpdateInfo contains necessary information to update a container's resources.
 type containerToUpdateInfo struct {
 	// The spec of the container.
@@ -544,9 +536,9 @@ type containerToUpdateInfo struct {
 	// ID of the runtime container that needs resource update
 	kubeContainerID kubecontainer.ContainerID
 	// Desired resources for the running container
-	desiredContainerResources containerResources
+	desiredContainerResources resourceRequirements
 	// Most recently configured resources on the running container
-	currentContainerResources *containerResources
+	currentContainerResources *resourceRequirements
 }
 
 // containerToRemoveInfo contains necessary information to update a container's resources.
@@ -599,8 +591,9 @@ type podActions struct {
 	UpdatePodLevelResources bool
 }
 
-// podLevelResources holds the set of resources applicable to the running pod
-type podLevelResources struct {
+// resourceRequirements summarizes the set of resources applicable to the
+// running pod or container in kuberuntime context.
+type resourceRequirements struct {
 	memoryLimit   int64
 	memoryRequest int64
 	cpuLimit      int64
@@ -634,8 +627,8 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0
 }
 
-func containerResourcesFromRequirements(podRequirements, containerRequirements *v1.ResourceRequirements) containerResources {
-	resources := containerResources{
+func containerResourcesFromRequirements(podRequirements, containerRequirements *v1.ResourceRequirements) resourceRequirements {
+	resources := resourceRequirements{
 		memoryLimit:   containerRequirements.Limits.Memory().Value(),
 		memoryRequest: containerRequirements.Requests.Memory().Value(),
 		cpuLimit:      containerRequirements.Limits.Cpu().MilliValue(),
@@ -652,12 +645,12 @@ func containerResourcesFromRequirements(podRequirements, containerRequirements *
 	return resources
 }
 
-func podResourcesFromRequirements(requirements *v1.ResourceRequirements) podLevelResources {
+func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourceRequirements {
 	if requirements == nil {
-		return podLevelResources{}
+		return resourceRequirements{}
 	}
 
-	return podLevelResources{
+	return resourceRequirements{
 		memoryLimit:   requirements.Limits.Memory().Value(),
 		memoryRequest: requirements.Requests.Memory().Value(),
 		cpuLimit:      requirements.Limits.Cpu().MilliValue(),
@@ -951,7 +944,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	// Always update the pod status once. Even if there was a resize error, the resize may have been
 	// partially actuated.
-	defer m.runtimeHelper.SetPodWatchCondition(pod.UID, "doPodResizeAction", func(*kubecontainer.PodStatus) bool { return true })
+	defer m.runtimeHelper.RequestPodReinspect(pod.UID)
 
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
@@ -1402,7 +1395,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 		}
 		if podContainerChanges.SandboxID != "" {
-			m.recorder.Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
 		} else {
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
 		}
@@ -1534,7 +1527,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 					return
 				}
-				m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+				m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
 				logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
 				return
 			}
@@ -1560,7 +1553,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			if referr != nil {
 				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
-			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
 			return
 		}
 		logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
@@ -1571,7 +1564,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			if referr != nil {
 				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
-			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
 			logger.Error(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
 			result.Fail(err)
 			return
@@ -1840,8 +1833,8 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	key := GetBackoffKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
-			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
-				fmt.Sprintf("Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod)))
+			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
+				"Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod))
 		}
 		backoff := backOff.Get(key)
 		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backoff, container.Name, format.Pod(pod))

@@ -195,9 +195,7 @@ type Config struct {
 	//revive:disable-next-line:var-naming
 	WalDir string `json:"wal-dir"`
 
-	// SnapshotCount is the number of committed transactions that trigger a snapshot to disk.
-	// TODO: remove it in 3.7.
-	// Deprecated: Will be decommissioned in v3.7.
+	// SnapshotCount is the number of committed transactions that trigger a snapshot.
 	SnapshotCount uint64 `json:"snapshot-count"`
 
 	// ExperimentalSnapshotCatchUpEntries is the number of entries for a slow follower
@@ -219,8 +217,8 @@ type Config struct {
 	SnapshotCatchUpEntries uint64 `json:"snapshot-catchup-entries"`
 
 	// MaxSnapFiles is the maximum number of snapshot files.
-	// TODO: remove it in 3.7.
-	// Deprecated: Will be removed in v3.7.
+	// TODO: remove it in 3.8.
+	// Deprecated: Will be removed in v3.8.
 	MaxSnapFiles uint `json:"max-snapshots"`
 	//revive:disable-next-line:var-naming
 	MaxWalFiles uint `json:"max-wals"`
@@ -771,10 +769,10 @@ func (cfg *Config) AddFlags(fs *flag.FlagSet) {
 		"listen-metrics-urls",
 		"List of URLs to listen on for the metrics and health endpoints.",
 	)
-	fs.UintVar(&cfg.MaxSnapFiles, "max-snapshots", cfg.MaxSnapFiles, "Maximum number of snapshot files to retain (0 is unlimited). Deprecated in v3.6 and will be decommissioned in v3.7.")
+	fs.UintVar(&cfg.MaxSnapFiles, "max-snapshots", cfg.MaxSnapFiles, "Maximum number of snapshot files to retain (0 is unlimited). Deprecated in v3.6 and will be decommissioned in v3.8.")
 	fs.UintVar(&cfg.MaxWalFiles, "max-wals", cfg.MaxWalFiles, "Maximum number of wal files to retain (0 is unlimited).")
 	fs.StringVar(&cfg.Name, "name", cfg.Name, "Human-readable name for this member.")
-	fs.Uint64Var(&cfg.SnapshotCount, "snapshot-count", cfg.SnapshotCount, "Number of committed transactions to trigger a snapshot to disk. Deprecated in v3.6 and will be decommissioned in v3.7.")
+	fs.Uint64Var(&cfg.SnapshotCount, "snapshot-count", cfg.SnapshotCount, "Number of committed transactions to trigger a snapshot.")
 	fs.UintVar(&cfg.TickMs, "heartbeat-interval", cfg.TickMs, "Time (in milliseconds) of a heartbeat interval.")
 	fs.UintVar(&cfg.ElectionMs, "election-timeout", cfg.ElectionMs, "Time (in milliseconds) for an election to timeout.")
 	fs.BoolVar(&cfg.InitialElectionTickAdvance, "initial-election-tick-advance", cfg.InitialElectionTickAdvance, "Whether to fast-forward initial election ticks on boot for faster election.")

@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha1"
@@ -2712,12 +2711,12 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 
 		mockFeature := ndftesting.NewMockFeature(t)
-		mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
-		mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+		mockFeature.SetName("FeatureA")
+		mockFeature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
 			return len(podInfo.Spec.Tolerations) > 0 && podInfo.Spec.Tolerations[0].TolerationSeconds != nil &&
 				*podInfo.Spec.Tolerations[0].TolerationSeconds > 0
 		})
-		mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+		mockFeature.SetMaxVersion(nil)
 
 		originalAllFeatures := ndffeatures.AllFeatures
 		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}

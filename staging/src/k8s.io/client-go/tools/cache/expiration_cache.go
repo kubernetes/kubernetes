@@ -137,6 +137,16 @@ func (c *ExpirationCache) List() []interface{} {
 	return list
 }
 
+// LastStoreSyncResourceVersion returns the latest resource version that the cache has seen.
+func (c *ExpirationCache) LastStoreSyncResourceVersion() string {
+	return c.cacheStorage.LastStoreSyncResourceVersion()
+}
+
+// Bookmark observes a new resource version in the cache.
+func (c *ExpirationCache) Bookmark(rv string) {
+	c.cacheStorage.Bookmark(rv)
+}
+
 // ListKeys returns a list of all keys in the expiration cache.
 func (c *ExpirationCache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
@@ -170,7 +180,7 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 	}
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
-	c.cacheStorage.Delete(key)
+	c.cacheStorage.DeleteWithObject(key, obj)
 	return nil
 }
 

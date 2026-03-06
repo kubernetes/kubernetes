@@ -39,7 +39,7 @@ message CronJob {
 
   // Specification of the desired behavior of a cron job, including the schedule.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional CronJobSpec spec = 2;
 
   // Current status of a cron job.
@@ -63,7 +63,7 @@ message CronJobList {
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
   // +required
-  // +k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string schedule = 1;
 
   // The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

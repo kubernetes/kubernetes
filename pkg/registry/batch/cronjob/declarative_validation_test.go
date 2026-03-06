@@ -49,7 +49,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		"schedule: empty": {
 			input: mkCronJob(tweakSchedule("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedule"), ""),
+				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
 			},
 		},
 	}
@@ -85,7 +85,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    mkCronJob(),
 			update: mkCronJob(tweakSchedule("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedule"), ""),
+				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
 			},
 		},
 	}

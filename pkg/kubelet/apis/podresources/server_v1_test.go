@@ -952,11 +952,14 @@ func TestGetPodResourcesV1(t *testing.T) {
 	}
 
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
+	draDriverName := "dra.example.com"
+	poolName := "worker-1-pool"
+	deviceName := "gpu-1"
 	draDevs := []*podresourcesapi.DynamicResource{
 		{
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
-			ClaimResources: []*podresourcesapi.ClaimResource{{CdiDevices: pluginCDIDevices}},
+			ClaimResources: []*podresourcesapi.ClaimResource{{CdiDevices: pluginCDIDevices, DriverName: draDriverName, PoolName: poolName, DeviceName: deviceName}},
 		},
 	}
 

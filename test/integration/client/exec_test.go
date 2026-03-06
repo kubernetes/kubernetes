@@ -35,7 +35,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,6 +51,7 @@ import (
 	"k8s.io/client-go/util/connrotation"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/dump"
 )
 
 // This file tests the client-go credential plugin feature.
@@ -473,8 +473,8 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
 				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
-					{Name: "/only/my/very/secure/binary"},
-					{Name: "other-very-secure-binary"},
+					{Command: "/only/my/very/secure/binary"},
+					{Command: "other-very-secure-binary"},
 				}
 			},
 			wantGetCertificateErrorPrefix: `plugin path "testdata/exec-plugin.sh" is not permitted by the credential plugin allowlist`,
@@ -512,8 +512,8 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
 				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
-					{Name: "testdata/exec-plugin.sh"},
-					{Name: "other-very-secure-binary"},
+					{Command: "testdata/exec-plugin.sh"},
+					{Command: "other-very-secure-binary"},
 				}
 				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
 					{

@@ -263,7 +263,7 @@ message Mount {
     // Mount an image reference (image ID, with or without digest), which is a
     // special use case for image volume mounts. If this field is set, then
     // host_path should be unset. All image mounts are per feature definition
-    // readonly (noexec). The kubelet does an PullImage RPC and evaluates the returned
+    // readonly. The kubelet does an PullImage RPC and evaluates the returned
     // PullImageResponse.image_ref value, which is then set to the
     // ImageSpec.image field. Runtimes are expected to mount the image as
     // required.

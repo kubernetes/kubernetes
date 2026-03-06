@@ -312,6 +312,15 @@ var (
 		AllowExpansion: true,
 	}
 
+	// Definition for snapshot metadata
+	SnapshotMetadata = TestPattern{
+		Name:                   "SnapshotMetadata",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+	}
+
 	// Definitions for snapshot case
 
 	// DynamicSnapshotDelete is TestPattern for "Dynamic snapshot"
@@ -329,6 +338,15 @@ var (
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		VolType:                DynamicPV,
 	}
+
+	// VolumeGroupSnapshotRetain is TestPattern for "VolumeGroupSnapshot"
+	VolumeGroupSnapshotRetain = TestPattern{
+		Name:                   " (retain policy)",
+		SnapshotType:           VolumeGroupSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+
 	// PreprovisionedSnapshotDelete is TestPattern for "Pre-provisioned snapshot"
 	PreprovisionedSnapshotDelete = TestPattern{
 		Name:                   "Pre-provisioned Snapshot (delete policy)",

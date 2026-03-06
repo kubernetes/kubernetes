@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/dump"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/client-go/util/connrotation"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/dump"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
@@ -185,8 +185,8 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 
 	allowlistLookup := sets.New[string]()
 	for _, entry := range config.PluginPolicy.Allowlist {
-		if entry.Name != "" {
-			allowlistLookup.Insert(entry.Name)
+		if entry.Command != "" {
+			allowlistLookup.Insert(entry.Command)
 		}
 	}
 
@@ -641,14 +641,14 @@ func (a *Authenticator) checkAllowlistLocked(cmd *exec.Cmd) error {
 func (a *Authenticator) resolveAllowListEntriesLocked(commandHint string) {
 	hintName := filepath.Base(commandHint)
 	for _, entry := range a.execPluginPolicy.Allowlist {
-		entryBasename := filepath.Base(entry.Name)
+		entryBasename := filepath.Base(entry.Command)
 		if hintName != "" && hintName != entryBasename {
 			// we got a hint, and this allowlist entry does not match it
 			continue
 		}
-		entryResolvedPath, err := exec.LookPath(entry.Name)
+		entryResolvedPath, err := exec.LookPath(entry.Command)
 		if err != nil {
-			klog.V(5).ErrorS(err, "resolving credential plugin allowlist", "name", entry.Name)
+			klog.V(5).ErrorS(err, "resolving credential plugin allowlist", "name", entry.Command)
 			continue
 		}
 		if entryResolvedPath != "" {
@@ -691,10 +691,10 @@ func validateAllowlist(list []api.AllowlistEntry) error {
 			return fmt.Errorf("misconfigured credential plugin allowlist: empty allowlist entry #%d", i+1)
 		}
 
-		if cleaned := filepath.Clean(item.Name); cleaned != item.Name {
-			return fmt.Errorf("non-normalized file path: %q vs %q", item.Name, cleaned)
-		} else if item.Name == "" {
-			return fmt.Errorf("empty file path: %q", item.Name)
+		if cleaned := filepath.Clean(item.Command); cleaned != item.Command {
+			return fmt.Errorf("non-normalized file path: %q vs %q", item.Command, cleaned)
+		} else if item.Command == "" {
+			return fmt.Errorf("empty file path: %q", item.Command)
 		}
 	}
 

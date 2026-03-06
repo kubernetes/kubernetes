@@ -456,7 +456,10 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if !test.csiServiceAccountTokenSecretsEnabled {
+			if !test.csiServiceAccountTokenSecretsEnabled || !test.seLinuxMountReadWriteOncePodEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			if !test.mutableCSINodeAllocatableCountEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{

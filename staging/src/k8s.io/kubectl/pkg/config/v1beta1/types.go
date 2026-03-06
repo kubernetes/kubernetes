@@ -121,7 +121,15 @@ type AllowlistEntry struct {
 	// will be called on both, and the resulting strings must be equal. If
 	// either call to `exec.LookPath` results in an error, the `Name` check
 	// will be considered a failure.
-	Name string `json:"name"`
+	//
+	// Deprecated: use Command instead.
+	Name string `json:"name,omitempty"`
+	// Command matching is performed by first resolving the absolute path of both
+	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
+	// will be called on both, and the resulting strings must be equal. If
+	// either call to `exec.LookPath` results in an error, the `Command` check
+	// will be considered a failure.
+	Command string `json:"command,omitempty"`
 }
 
 // AliasOverride stores the alias definitions.

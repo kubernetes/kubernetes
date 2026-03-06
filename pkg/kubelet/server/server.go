@@ -59,6 +59,8 @@ import (
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
@@ -130,9 +132,11 @@ type Server struct {
 
 // TLSOptions holds the TLS options.
 type TLSOptions struct {
-	Config   *tls.Config
-	CertFile string
-	KeyFile  string
+	MinVersion   uint16
+	CipherSuites []uint16
+	CertFile     string
+	KeyFile      string
+	ClientCAFile string
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -172,7 +176,7 @@ func ListenAndServeKubeletServer(
 	checkers []healthz.HealthChecker,
 	flagz flagz.Reader,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
-	tlsOptions *TLSOptions,
+	tlsConfig *tls.Config,
 	auth AuthInterface,
 	tp oteltrace.TracerProvider) {
 
@@ -192,12 +196,14 @@ func ListenAndServeKubeletServer(
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	if tlsOptions != nil {
-		s.TLSConfig = tlsOptions.Config
-		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
+	if tlsConfig != nil {
+		s.TLSConfig = tlsConfig
+		if err := s.ListenAndServeTLS("", ""); err != nil {
 			logger.Error(err, "Failed to listen and serve")
 			os.Exit(1)
 		}
+
+		// support a hollow node with plain HTTP
 	} else if err := s.ListenAndServe(); err != nil {
 		logger.Error(err, "Failed to listen and serve")
 		os.Exit(1)
@@ -264,6 +270,7 @@ type AuthInterface interface {
 	authenticator.Request
 	NodeRequestAttributesGetter
 	authorizer.Authorizer
+	dynamiccertificates.CAContentProvider
 }
 
 // HostInterface contains all the kubelet methods required by the server.
@@ -312,17 +319,16 @@ func NewServer(
 	server.InstallAuthNotRequiredHandlers(ctx)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		logger.Info("Adding debug handlers to kubelet server")
-		server.InstallAuthRequiredHandlers(ctx)
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler, kubeCfg.EnableSystemLogQuery)
 		server.InstallProfilingHandler(kubeCfg.EnableProfilingHandler, kubeCfg.EnableContentionProfiling)
 		server.InstallDebugFlagsHandler(kubeCfg.EnableDebugFlagsHandler)
+		// must be done last so all paths are included in /statusz
+		server.InstallAuthRequiredHandlers(ctx)
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
-
-	server.installStatusZ()
 
 	return server
 }
@@ -387,7 +393,14 @@ func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelr
 	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", append(opts, otelrestful.WithTracerProvider(tp))...))
 }
 
-func (s *Server) installStatusZ() {
+func (s *Server) InstallZPages() {
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
+	}
+	// must be done last so all paths are included in /statusz
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
 		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
@@ -476,6 +489,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
 			IdType:    cadvisorv2.TypeName,
@@ -483,6 +497,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 			Recursive: true,
 		}
 		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+		servermetrics.SetMetricsProvider(servermetrics.CAdvisorMetricsProvider)
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
@@ -596,13 +611,6 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		if s.flagz != nil {
-			s.addMetricsBucketMatcher("flagz")
-			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
-		}
-	}
-
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
@@ -624,6 +632,9 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
 	}
+
+	// must be done last so all paths are included in /statusz
+	s.InstallZPages()
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message
@@ -1190,8 +1201,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
-	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	// Use ObserveSince to ensure the duration is calculated when the defer executes,
+	// not when it's declared. In Go, arguments to deferred functions are evaluated
+	// immediately at the defer statement, which would cause the metric to record
+	// near-zero values (~2 microseconds) instead of actual request handling time.
+	defer servermetrics.HTTPRequestsDuration.ObserveSince(time.Now(), method, path, serverType, longRunning)()
 
 	handler.ServeHTTP(w, req)
 }

@@ -508,7 +508,6 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -532,7 +531,6 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -540,8 +538,12 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 }
 
 func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}) {
+	if tombstone, ok := obj.(kcache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
 	pod, ok := obj.(*v1.Pod)
-	if pod == nil || !ok {
+	if !ok {
+		runtime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
 		return
 	}
 
@@ -664,7 +666,6 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 		}
 		volumeActionFlag := util.DetermineVolumeAction(
 			pod,
-			adc.desiredStateOfWorld,
 			true /* default volume action */)
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */

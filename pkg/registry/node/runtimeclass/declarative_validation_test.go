@@ -68,7 +68,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						rc.Handler = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("handler"), "must be a valid DNS label"),
+						field.Required(field.NewPath("handler"), "must be a valid DNS label").MarkAlpha(),
 					},
 				},
 				"handler with special characters": {
@@ -77,7 +77,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name"),
+							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
 					},
 				},
 				"handler with uppercase and special characters": {
@@ -86,7 +86,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name"),
+							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
 					},
 				},
 				"handler exceeds length with invalid characters": {
@@ -95,7 +95,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name"),
+							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
 					},
 				},
 			}
@@ -139,7 +139,7 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"), "",
-							"").WithOrigin("immutable"),
+							"").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 			}

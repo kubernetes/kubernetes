@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -3190,13 +3189,13 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	nodeWithMultipleFeatures := st.MakeNode().Name("node-with-multiple-features").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj()
 
 	mockFeature := ndftesting.NewMockFeature(t)
-	mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
-	mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+	mockFeature.SetName("FeatureA")
+	mockFeature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
 		return podInfo.Spec.Containers[0].Name == "container-req-feature-a"
 	})
-	mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
-	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
-	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
+	mockFeature.SetMaxVersion(nil)
+	mockFeature.SetInferForUpdate(func(_, _ *ndf.PodInfo) bool { return false })
+	mockFeature.SetDiscover(func(*ndf.NodeConfiguration) bool { return false })
 
 	tests := []struct {
 		name           string

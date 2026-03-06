@@ -614,7 +614,7 @@ func TestOverlappingRCs(t *testing.T) {
 	defer stopControllers()
 
 	// Create 2 RCs with identical selectors
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		// One RC has 1 replica, and another has 2 replicas
 		rc := newRC(fmt.Sprintf("rc-%d", i+1), ns.Name, i+1)
 		rcs, _ := createRCsPods(t, c, []*v1.ReplicationController{rc}, []*v1.Pod{})
@@ -629,7 +629,7 @@ func TestOverlappingRCs(t *testing.T) {
 	}
 
 	// Expect both RCs have .status.replicas = .spec.replicas
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		newRC, err := c.CoreV1().ReplicationControllers(ns.Name).Get(tCtx, fmt.Sprintf("rc-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rc rc-%d: %v", i+1, err)
@@ -830,7 +830,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	rc := newRC("rc", ns.Name, 2)
 	// Create 3 pods, RC should adopt only 2 of them
 	podList := []*v1.Pod{}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		pod := newMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name)
 		pod.Labels = labelMap()
 		podList = append(podList, pod)

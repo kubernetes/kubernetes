@@ -11,6 +11,43 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 <!-- Released section -->
 <!-- Don't change this section unless doing release -->
 
+## [1.40.0/0.62.0/0.16.0] 2026-02-02
+
+### Added
+
+- Add `AlwaysRecord` sampler in `go.opentelemetry.io/otel/sdk/trace`. (#7724)
+- Add `Enabled` method to all synchronous instrument interfaces (`Float64Counter`, `Float64UpDownCounter`, `Float64Histogram`, `Float64Gauge`, `Int64Counter`, `Int64UpDownCounter`, `Int64Histogram`, `Int64Gauge`,) in `go.opentelemetry.io/otel/metric`.
+  This stabilizes the synchronous instrument enabled feature, allowing users to check if an instrument will process measurements before performing computationally expensive operations. (#7763)
+- Add `go.opentelemetry.io/otel/semconv/v1.39.0` package.
+  The package contains semantic conventions from the `v1.39.0` version of the OpenTelemetry Semantic Conventions.
+  See the [migration documentation](./semconv/v1.39.0/MIGRATION.md) for information on how to upgrade from `go.opentelemetry.io/otel/semconv/v1.38.0.` (#7783, #7789)
+
+### Changed
+
+- Improve the concurrent performance of `HistogramReservoir` in `go.opentelemetry.io/otel/sdk/metric/exemplar` by 4x. (#7443)
+- Improve the concurrent performance of `FixedSizeReservoir` in `go.opentelemetry.io/otel/sdk/metric/exemplar`. (#7447)
+- Improve performance of concurrent histogram measurements in `go.opentelemetry.io/otel/sdk/metric`. (#7474)
+- Improve performance of concurrent synchronous gauge measurements in `go.opentelemetry.io/otel/sdk/metric`. (#7478)
+- Add experimental observability metrics in `go.opentelemetry.io/otel/exporters/stdout/stdoutmetric`. (#7492)
+- `Exporter` in `go.opentelemetry.io/otel/exporters/prometheus` ignores metrics with the scope `go.opentelemetry.io/contrib/bridges/prometheus`.
+  This prevents scrape failures when the Prometheus exporter is misconfigured to get data from the Prometheus bridge. (#7688)
+- Improve performance of concurrent exponential histogram measurements in `go.opentelemetry.io/otel/sdk/metric`. (#7702)
+- The `rpc.grpc.status_code` attribute in the experimental metrics emitted from `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc` is replaced with the `rpc.response.status_code` attribute to align with the semantic conventions. (#7854)
+- The `rpc.grpc.status_code` attribute in the experimental metrics emitted from `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc` is replaced with the `rpc.response.status_code` attribute to align with the semantic conventions. (#7854)
+
+### Fixed
+
+- Fix bad log message when key-value pairs are dropped because of key duplication in `go.opentelemetry.io/otel/sdk/log`. (#7662)
+- Fix `DroppedAttributes` on `Record` in `go.opentelemetry.io/otel/sdk/log` to not count the non-attribute key-value pairs dropped because of key duplication. (#7662)
+- Fix `SetAttributes` on `Record` in `go.opentelemetry.io/otel/sdk/log` to not log that attributes are dropped when they are actually not dropped. (#7662)
+- Fix missing `request.GetBody` in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp` to correctly handle HTTP/2 `GOAWAY` frame. (#7794)
+- `WithHostID` detector in `go.opentelemetry.io/otel/sdk/resource` to use full path for `ioreg` command on Darwin (macOS). (#7818)
+
+### Deprecated
+
+- Deprecate `go.opentelemetry.io/otel/exporters/zipkin`.
+  For more information, see the [OTel blog post deprecating the Zipkin exporter](https://opentelemetry.io/blog/2025/deprecating-zipkin-exporters/). (#7670)
+
 ## [1.39.0/0.61.0/0.15.0/0.0.14] 2025-12-05
 
 ### Added
@@ -3498,7 +3535,8 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.39.0...HEAD
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.40.0...HEAD
+[1.40.0/0.62.0/0.16.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.40.0
 [1.39.0/0.61.0/0.15.0/0.0.14]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.39.0
 [1.38.0/0.60.0/0.14.0/0.0.13]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.38.0
 [0.59.1]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/exporters/prometheus/v0.59.1

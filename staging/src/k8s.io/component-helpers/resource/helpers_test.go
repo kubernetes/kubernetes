@@ -19,10 +19,10 @@ package resource
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/utils/ptr"
 )
 
@@ -884,8 +884,8 @@ func TestPodResourceRequests(t *testing.T) {
 				},
 			}
 			request := PodRequests(p, tc.options)
-			if diff := cmp.Diff(request, tc.expectedRequests); diff != "" {
-				t.Errorf("got=%v, want=%v, diff=%s", request, tc.expectedRequests, diff)
+			if !equality.Semantic.DeepEqual(request, tc.expectedRequests) {
+				t.Errorf("got=%v, want=%v, diff=%s", request, tc.expectedRequests, diff.Diff(request, tc.expectedRequests))
 			}
 		})
 	}
@@ -914,13 +914,13 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 	}
 	requests := PodRequests(p, opts)
 
-	if diff := cmp.Diff(requests, expectedRequests); diff != "" {
-		t.Errorf("got=%v, want=%v, diff=%s", requests, expectedRequests, diff)
+	if !equality.Semantic.DeepEqual(requests, expectedRequests) {
+		t.Errorf("got=%v, want=%v, diff=%s", requests, expectedRequests, diff.Diff(requests, expectedRequests))
 	}
 
 	// should re-use the maps we passed in
-	if diff := cmp.Diff(opts.Reuse, expectedRequests); diff != "" {
-		t.Errorf("got=%v, want=%v, diff=%s", requests, expectedRequests, diff)
+	if !equality.Semantic.DeepEqual(opts.Reuse, expectedRequests) {
+		t.Errorf("got=%v, want=%v, diff=%s", requests, expectedRequests, diff.Diff(opts.Reuse, expectedRequests))
 	}
 }
 
@@ -1486,8 +1486,8 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			}
 			limits := PodLimits(p, tc.options)
-			if diff := cmp.Diff(limits, tc.expectedLimits); diff != "" {
-				t.Errorf("got=%v, want=%v, diff=%s", limits, tc.expectedLimits, diff)
+			if !equality.Semantic.DeepEqual(limits, tc.expectedLimits) {
+				t.Errorf("got=%v, want=%v, diff=%s", limits, tc.expectedLimits, diff.Diff(limits, tc.expectedLimits))
 			}
 		})
 	}
@@ -1969,8 +1969,8 @@ func TestPodLevelResourceRequests(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podReqs := PodRequests(getPodLevelResourcesPod(tc.podResources, tc.overhead, tc.containers, tc.initContainers), tc.opts)
-			if diff := cmp.Diff(podReqs, tc.expectedRequests); diff != "" {
-				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff)
+			if !equality.Semantic.DeepEqual(podReqs, tc.expectedRequests) {
+				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff.Diff(podReqs, tc.expectedRequests))
 			}
 		})
 	}

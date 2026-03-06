@@ -5,6 +5,7 @@ package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -15,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
@@ -83,6 +85,8 @@ func defaultTransportFormatter(_ string, r *http.Request) string {
 // RoundTrip creates a Span and propagates its context via the provided request's headers
 // before handing the request to the configured base RoundTripper. The created span will
 // end when the response body is closed or when a read from the body returns io.EOF.
+// If GetBody returns an error, the error is reported via otel.Handle and the request
+// continues with the original Body.
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	requestStartTime := time.Now()
 	for _, f := range t.filters {
@@ -117,11 +121,22 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	r = r.Clone(ctx) // According to RoundTripper spec, we shouldn't modify the origin request.
 
-	// if request body is nil or NoBody, we don't want to mutate the body as it
+	// GetBody is preferred over direct access to Body if the function is set.
+	// If the resulting body is nil or is NoBody, we don't want to mutate the body as it
 	// will affect the identity of it in an unforeseeable way because we assert
 	// ReadCloser fulfills a certain interface and it is indeed nil or NoBody.
-	bw := request.NewBodyWrapper(r.Body, func(int64) {})
-	if r.Body != nil && r.Body != http.NoBody {
+	body := r.Body
+	if r.GetBody != nil {
+		b, err := r.GetBody()
+		if err != nil {
+			otel.Handle(fmt.Errorf("http.Request GetBody returned an error: %w", err))
+		} else {
+			body = b
+		}
+	}
+
+	bw := request.NewBodyWrapper(body, func(int64) {})
+	if body != nil && body != http.NoBody {
 		r.Body = bw
 	}
 
@@ -161,15 +176,7 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}()
 
 	if err != nil {
-		// set error type attribute if the error is part of the predefined
-		// error types.
-		// otherwise, record it as an exception
-		if errType := t.semconv.ErrorType(err); errType.Valid() {
-			span.SetAttributes(errType)
-		} else {
-			span.RecordError(err)
-		}
-
+		span.SetAttributes(otelsemconv.ErrorType(err))
 		span.SetStatus(codes.Error, err.Error())
 		span.End()
 
@@ -229,7 +236,7 @@ func (wb *wrappedBody) Write(p []byte) (int, error) {
 	// This will not panic given the guard in newWrappedBody.
 	n, err := wb.body.(io.Writer).Write(p)
 	if err != nil {
-		wb.span.RecordError(err)
+		wb.span.SetAttributes(otelsemconv.ErrorType(err))
 		wb.span.SetStatus(codes.Error, err.Error())
 	}
 	return n, err
@@ -247,7 +254,7 @@ func (wb *wrappedBody) Read(b []byte) (int, error) {
 		wb.recordBytesRead()
 		wb.span.End()
 	default:
-		wb.span.RecordError(err)
+		wb.span.SetAttributes(otelsemconv.ErrorType(err))
 		wb.span.SetStatus(codes.Error, err.Error())
 	}
 	return n, err

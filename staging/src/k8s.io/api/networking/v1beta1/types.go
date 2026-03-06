@@ -368,7 +368,7 @@ type IngressClassSpec struct {
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Parameters *IngressClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
 }
 
@@ -392,12 +392,12 @@ type IngressClassParametersReference struct {
 
 	// kind is the type of resource being referenced.
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
@@ -447,7 +447,7 @@ type IPAddress struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec is the desired state of the IPAddress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec IPAddressSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -456,6 +456,8 @@ type IPAddressSpec struct {
 	// ParentRef references the resource that an IPAddress is attached to.
 	// An IPAddress must reference a parent object.
 	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
 }
 
@@ -466,12 +468,14 @@ type ParentReference struct {
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resource is the resource of the object being referenced.
 	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
 	// Namespace is the namespace of the object being referenced.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 	// Name is the name of the object being referenced.
 	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 

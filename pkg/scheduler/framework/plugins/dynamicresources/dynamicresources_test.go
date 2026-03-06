@@ -37,9 +37,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -53,6 +55,8 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
+	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -80,10 +84,12 @@ var (
 	node3Name                    = "worker-3"
 	driver                       = "some-driver"
 	driver2                      = "some-driver-2"
+	sharedDeviceName             = "shared-instance"
 	podName                      = "my-pod"
 	podUID                       = "1234"
 	resourceName                 = "my-resource"
 	resourceName2                = resourceName + "-2"
+	capacityName                 = resourceapi.QualifiedName("my-cap")
 	claimName                    = podName + "-" + resourceName
 	claimName2                   = podName + "-" + resourceName2
 	className                    = "my-resource-class"
@@ -274,6 +280,54 @@ var (
 				Pool:    nodeName,
 				Device:  "instance-1",
 				Request: "req-1",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithSharedDevice = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-123")), // Shared device allocation
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithConsumedCapacity = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-123")), // Shared device allocation
+				ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+					capacityName: apiresource.MustParse("1"),
+				},
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithConsumedCapacity2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-456")), // Shared device allocation
+				ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+					capacityName: apiresource.MustParse("1"),
+				},
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -517,6 +571,15 @@ var (
 	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
 					Allocation(&resourceapi.AllocationResult{NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}, st.NodeSelectorTypeMatchExpressions).Obj()}).
 					Obj()
+	allocatedClaimWithSharedDevice = st.FromResourceClaim(pendingClaim).
+					Allocation(allocationResultWithSharedDevice).
+					Obj()
+	allocatedClaimWithConsumedCapacity = st.FromResourceClaim(pendingClaim).
+						Allocation(allocationResultWithConsumedCapacity).
+						Obj()
+	allocatedClaimWithConsumedCapacity2 = st.FromResourceClaim(pendingClaim).
+						Allocation(allocationResultWithConsumedCapacity2).
+						Obj()
 	otherClaim = st.MakeResourceClaim().
 			Name("not-my-claim").
 			Namespace(namespace).
@@ -525,6 +588,11 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
+	otherAllocatedClaimOtherDevice = func() *resourceapi.ResourceClaim {
+		claim := otherAllocatedClaim.DeepCopy()
+		claim.Status.Allocation.Devices.Results[0].Device += "-other"
+		return claim
+	}()
 	extendedResourceClaim = st.MakeResourceClaim().
 				Name("my-pod-extended-resources-0").
 				GenerateName("my-pod-extended-resources-").
@@ -970,6 +1038,8 @@ type testPluginCase struct {
 	claims  []*resourceapi.ResourceClaim
 	classes []*resourceapi.DeviceClass
 
+	inFlightClaims []*resourceapi.ResourceClaim
+
 	// objs get stored directly in the fake client, without passing
 	// through reactors, in contrast to the types above.
 	objs []apiruntime.Object
@@ -980,8 +1050,8 @@ type testPluginCase struct {
 	// Invoke Filter with a canceled context.
 	cancelFilter bool
 
-	// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
-	enableDRAAdminAccess bool
+	// disableDRAAdminAccess is set to true to test behavior with the DRAAdminAccess feature gate disabled (emulates v1.35).
+	disableDRAAdminAccess bool
 	// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
 	enableDRADeviceBindingConditions bool
 	// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
@@ -1264,7 +1334,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				unreserveBeforePreBind: &result{},
 			},
 		},
-		"exhausted-resources": {
+		"exhausted-resources-in-informer-cache": {
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{pendingClaim, otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
@@ -1277,6 +1347,71 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"exhausted-resources-in-flight-claim": {
+			pod:            podWithClaimName,
+			claims:         []*resourceapi.ResourceClaim{pendingClaim, otherClaim},
+			inFlightClaims: []*resourceapi.ResourceClaim{otherAllocatedClaim},
+			classes:        []*resourceapi.DeviceClass{deviceClass},
+			objs:           []apiruntime.Object{workerNodeSlice},
+			want: want{
+				preenqueue: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+				},
+				prefilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+				},
+				filter: perNodeResult{
+					workerNode.Name: {
+						inFlightClaims: []metav1.Object{otherAllocatedClaim},
+						status:         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaim},
+					status:         fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"other-resources-in-flight-claim": {
+			pod:            podWithClaimName,
+			claims:         []*resourceapi.ResourceClaim{pendingClaim, otherClaim},
+			inFlightClaims: []*resourceapi.ResourceClaim{otherAllocatedClaimOtherDevice},
+			classes:        []*resourceapi.DeviceClass{deviceClass},
+			objs:           []apiruntime.Object{workerNodeSlice},
+			want: want{
+				preenqueue: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+				},
+				prefilter: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+				},
+				filter: perNodeResult{
+					workerNode.Name: {
+						inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim, otherAllocatedClaimOtherDevice},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{otherAllocatedClaimOtherDevice},
+					assumedClaim:   reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim, otherAllocatedClaimOtherDevice},
+					assumedClaim:   reserve(allocatedClaim, podWithClaimName),
 				},
 			},
 		},
@@ -1360,7 +1495,6 @@ func testPlugin(tCtx ktesting.TContext) {
 					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
 				},
 			},
-			enableDRAAdminAccess: true,
 		},
 		"request-admin-access-without-DRAAdminAccess-featuregate": {
 			// When the DRAAdminAccess feature gate is disabled,
@@ -1377,7 +1511,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 			},
-			enableDRAAdminAccess: false,
+			disableDRAAdminAccess: true,
 		},
 
 		"structured-ignore-allocated-admin-access": {
@@ -2473,7 +2607,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				nodes = []*v1.Node{workerNode}
 			}
 			feats := feature.Features{
-				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
+				EnableDRAAdminAccess:               !tc.disableDRAAdminAccess,
 				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
 				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
 				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
@@ -2483,8 +2617,16 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
 
+			if tc.disableDRAAdminAccess {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			testCtx := setup(tCtx, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
+			for _, claim := range tc.inFlightClaims {
+				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
+			}
+
 			initialObjects := testCtx.listAll(tCtx)
 			var registry compbasemetrics.KubeRegistry
 			if tc.metrics != nil {
@@ -2761,7 +2903,6 @@ func (tc *testContext) listAll(tCtx ktesting.TContext) (objects []metav1.Object)
 	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	for _, claim := range claims.Items {
-		claim := claim
 		objects = append(objects, &claim)
 	}
 	sortObjects(objects)
@@ -3284,7 +3425,7 @@ func TestAllocatorSelection(t *testing.T) {
 		// is used.
 		"default": {
 			features:             "",
-			expectImplementation: "stable",
+			expectImplementation: "incubating",
 		},
 
 		// Alpha features need the experimental implementation.
@@ -3737,4 +3878,175 @@ func TestNormalizeScore(t *testing.T) {
 			assert.Equal(t, tc.expectedScores, scores)
 		})
 	}
+}
+
+func TestGatherAllocatedState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testGatherAllocatedState(tCtx)
+}
+func testGatherAllocatedState(tCtx ktesting.TContext) {
+	testcases := map[string]struct {
+		allocatedResourceClaims   []*resourceapi.ResourceClaim
+		inflightResourceClaims    map[types.UID]*resourceapi.ResourceClaim
+		enabledConsumableCapacity bool
+		expectErr                 bool
+		expectedIDAllocated       int
+		expectedSharedIDAllocated int
+		expectedConsumedCapacity  string
+	}{
+		"no-claims": {
+			expectedIDAllocated:       0,
+			expectedSharedIDAllocated: 0,
+		},
+		"single-allocated-claim": {
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 0,
+		},
+		"single-allocated-claim-with-shared-device": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithSharedDevice,
+			},
+			expectedIDAllocated:       0,
+			expectedSharedIDAllocated: 1,
+		},
+		"single-allocated-claim-with-capacity": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithConsumedCapacity,
+			},
+			expectedIDAllocated:       0,
+			expectedSharedIDAllocated: 1,
+			expectedConsumedCapacity:  "1",
+		},
+		"disabled-single-allocated-claim-with-capacity": {
+			enabledConsumableCapacity: false,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithConsumedCapacity,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 0,
+			expectedConsumedCapacity:  "",
+		},
+		"mixed-allocated-claim": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				allocatedClaimWithConsumedCapacity,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 1,
+			expectedConsumedCapacity:  "1",
+		},
+		"add-inflight-allocated-claim-with-capacity": {
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				allocatedClaimWithConsumedCapacity,
+			},
+			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
+				"claim-2-uid": allocatedClaimWithConsumedCapacity2,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 2,
+			expectedConsumedCapacity:  "2",
+		},
+		"disabled-inflight-allocated-claim-with-capacity": {
+			enabledConsumableCapacity: false,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				allocatedClaimWithConsumedCapacity,
+			},
+			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
+				"claim-2-uid": allocatedClaimWithConsumedCapacity2,
+			},
+			expectedIDAllocated:       2,
+			expectedSharedIDAllocated: 0,
+			expectedConsumedCapacity:  "",
+		},
+	}
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.enabledConsumableCapacity)
+
+			tCtx.Helper()
+			logger := klog.FromContext(tCtx)
+			draManager := &DefaultDRAManager{
+				resourceClaimTracker: &claimTracker{
+					inFlightAllocations: &sync.Map{},
+					allocatedDevices:    newAllocatedDevices(logger),
+				},
+			}
+			for _, obj := range tc.allocatedResourceClaims {
+				draManager.resourceClaimTracker.allocatedDevices.handlers().OnAdd(obj, false)
+			}
+			if tc.inflightResourceClaims != nil {
+				for claimUID, obj := range tc.inflightResourceClaims {
+					err := draManager.resourceClaimTracker.SignalClaimPendingAllocation(claimUID, obj)
+					if err != nil {
+						if !tc.expectErr {
+							tCtx.Fatalf("unexpected error: %v", err)
+							return
+						}
+					}
+					if tc.expectErr {
+						tCtx.Fatal("expected error, got none")
+					}
+				}
+			}
+
+			// Start the test from here
+			allocatedState, err := draManager.ResourceClaims().GatherAllocatedState()
+			if err != nil {
+				if !tc.expectErr {
+					tCtx.Fatalf("unexpected error: %v", err)
+					return
+				}
+			}
+			if tc.expectErr {
+				tCtx.Fatal("expected error, got none")
+			}
+			allocatedDeviceIDs := allocatedState.AllocatedDevices
+			allocatedSharedDeviceIDs := allocatedState.AllocatedSharedDeviceIDs
+			aggregatedCapacity := allocatedState.AggregatedCapacity
+
+			// Verify the counts match expectations
+			if allocatedDeviceIDs.Len() != tc.expectedIDAllocated {
+				tCtx.Errorf("expected %d allocated device IDs, got %d", tc.expectedIDAllocated, allocatedDeviceIDs.Len())
+			}
+			if allocatedSharedDeviceIDs.Len() != tc.expectedSharedIDAllocated {
+				tCtx.Errorf("expected %d allocated shared device IDs, got %d", tc.expectedSharedIDAllocated, allocatedSharedDeviceIDs.Len())
+			}
+
+			// Verify aggregated capacity is initialized
+			if aggregatedCapacity == nil {
+				tCtx.Error("aggregatedCapacity should not be nil")
+			}
+			if tc.expectedConsumedCapacity != "" {
+				if len(aggregatedCapacity) == 0 {
+					tCtx.Errorf("expected consumed capacity, got empty")
+				}
+				deviceID := schedulerapi.MakeDeviceID(driver, nodeName, sharedDeviceName)
+				capacity := aggregatedCapacity[deviceID]
+				if capacity == nil {
+					tCtx.Errorf("expected aggregated capacity of %s, got nil", deviceID)
+					return
+				}
+				value := capacity[capacityName]
+				if value == nil {
+					tCtx.Errorf("expected value of %s, got nil", capacityName)
+					return
+				}
+				if value.Cmp(apiresource.MustParse(tc.expectedConsumedCapacity)) != 0 {
+					tCtx.Errorf("expected value of %s to be %s, got %s", capacityName, tc.expectedConsumedCapacity, value)
+				}
+			} else if len(aggregatedCapacity) > 0 {
+				tCtx.Errorf("got unexpected consumed capacity")
+			}
+		})
+	}
+
 }

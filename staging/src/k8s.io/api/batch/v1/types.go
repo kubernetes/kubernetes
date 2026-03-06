@@ -686,7 +686,7 @@ type CronJob struct {
 
 	// Specification of the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of a cron job.
@@ -716,7 +716,7 @@ type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

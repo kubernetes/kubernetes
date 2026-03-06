@@ -214,6 +214,24 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
+	noTypeSchemaPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
+		Validations: []v1.Validation{
+			{
+				Expression: "true",
+			},
+		},
+		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1.RuleWithOperations{
+					Rule: v1.Rule{
+						APIGroups:   []string{"apps"},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"deployments"},
+					},
+				},
+			},
+		}},
+	}}
 
 	deploymentPolicyWithBadMessageExpression := deploymentPolicy.DeepCopy()
 	deploymentPolicyWithBadMessageExpression.Spec.Validations[0].MessageExpression = "object.foo + 114514" // confusion
@@ -396,6 +414,23 @@ func TestTypeCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "params with untyped schema",
+			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
+				ParamKind: &v1.ParamKind{
+					APIVersion: "v1",
+					Kind:       "Config",
+				},
+				Validations: []v1.Validation{
+					{
+						Expression: "params != null",
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			}},
+			schemaToReturn: &spec.Schema{},
+			assertions:     []assertionFunc{toBeEmpty},
+		},
+		{
 			name:   "multiple expressions",
 			policy: multiExpressionPolicy,
 			schemaToReturn: &spec.Schema{
@@ -489,6 +524,12 @@ func TestTypeCheck(t *testing.T) {
 				},
 			},
 			assertions: []assertionFunc{toBeEmpty},
+		},
+		{
+			name:           "schema without type",
+			policy:         noTypeSchemaPolicy,
+			schemaToReturn: &spec.Schema{},
+			assertions:     []assertionFunc{toBeEmpty},
 		},
 		{
 			name: "variables valid",

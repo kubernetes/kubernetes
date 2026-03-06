@@ -10,7 +10,7 @@ spec:
     name: pause
     resources:
       requests:
-        example.com/gpu-{{mod .Index 25}}: 1
+        example.com/gpu-{{Mod .Index 25}}: 1
       limits:
-        example.com/gpu-{{mod .Index 25}}: 1
+        example.com/gpu-{{Mod .Index 25}}: 1
 

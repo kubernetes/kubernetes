@@ -43,7 +43,7 @@ func defaultFillFuncs() map[reflect.Type]FillFunc {
 		obj.(*metav1.TypeMeta).Kind = ""
 	}
 	funcs[reflect.TypeOf(&metav1.FieldsV1{})] = func(s string, i int, obj interface{}) {
-		obj.(*metav1.FieldsV1).Raw = []byte(`{}`)
+		obj.(*metav1.FieldsV1).SetRawString(`{}`)
 	}
 	funcs[reflect.TypeOf(&metav1.Time{})] = func(s string, i int, obj interface{}) {
 		// use the integer as an offset from the year

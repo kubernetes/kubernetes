@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"testing"
@@ -4198,7 +4199,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			for i, pod := range tc.pods {
-				pod := pod
 				pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
 				if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
 					pb.index(fmt.Sprintf("%v", i))
@@ -5904,7 +5904,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			for i, pod := range tc.pods {
-				pod := pod
 				pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
 				if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
 					pb.index(fmt.Sprintf("%v", getCompletionIndex(pod.Annotations)))
@@ -8026,10 +8025,8 @@ func (pb podBuilder) phase(p v1.PodPhase) podBuilder {
 }
 
 func (pb podBuilder) trackingFinalizer() podBuilder {
-	for _, f := range pb.Finalizers {
-		if f == batch.JobTrackingFinalizer {
-			return pb
-		}
+	if slices.Contains(pb.Finalizers, batch.JobTrackingFinalizer) {
+		return pb
 	}
 	pb.Finalizers = append(pb.Finalizers, batch.JobTrackingFinalizer)
 	return pb

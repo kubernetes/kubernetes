@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -596,6 +597,7 @@ func nodeNameOrIP() string {
 }
 
 func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
+	ginkgo.GinkgoHelper()
 	gp := int64(0)
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
@@ -625,4 +627,25 @@ func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS 
 		}
 		return len(containers) == 0
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
+}
+
+func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
+	ginkgo.GinkgoHelper()
+	var wg sync.WaitGroup
+	for _, pod := range podMap {
+		wg.Add(1)
+		go func(podNS, podName string) {
+			defer ginkgo.GinkgoRecover()
+			defer wg.Done()
+			deletePodSyncAndWait(ctx, f, podNS, podName)
+		}(pod.Namespace, pod.Name)
+	}
+	wg.Wait()
+}
+
+func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
+	framework.Logf("deleting pod: %s/%s", podNS, podName)
+	deletePodSyncByName(ctx, f, podName)
+	waitForAllContainerRemoval(ctx, podName, podNS)
+	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }

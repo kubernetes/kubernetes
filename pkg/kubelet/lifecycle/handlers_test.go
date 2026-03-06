@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -847,13 +847,12 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 	}
 	createMockFeature := func(t *testing.T, name string, inferForSched bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
-		m.EXPECT().Name().Return(name).Maybe()
-		m.EXPECT().InferForScheduling(mock.Anything).Return(inferForSched).Maybe()
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return inferForSched })
 		if maxVersionStr != "" {
-			maxVersionStr := version.MustParseSemantic(maxVersionStr)
-			m.EXPECT().MaxVersion().Return(maxVersionStr).Maybe()
+			m.SetMaxVersion(version.MustParseSemantic(maxVersionStr))
 		} else {
-			m.EXPECT().MaxVersion().Return(nil).Maybe()
+			m.SetMaxVersion(nil)
 		}
 		return m
 	}

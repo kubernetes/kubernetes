@@ -23,45 +23,32 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Deprecated: use tCtx.WithCancel instead
-func WithCancel(tCtx TContext) TContext { return tCtx.WithCancel() }
-
 // WithCancel sets up cancellation in a [TContext.Cleanup] callback and
 // constructs a new TContext where [TContext.Cancel] cancels only the new
 // context.
-func (tc *TC) WithCancel() TContext {
-	ctx, cancel := context.WithCancelCause(tc)
+func (tCtx TContext) WithCancel() TContext {
+	ctx, cancel := context.WithCancelCause(tCtx)
 
-	tc = tc.clone()
-	tc.Context = ctx
-	tc.cancel = func(cause string) {
+	tCtx.Context = ctx
+	tCtx.cancel = func(cause string) {
 		var cancelCause error
 		if cause != "" {
 			cancelCause = canceledError(cause)
 		}
 		cancel(cancelCause)
 	}
-	return tc
+	return tCtx
 }
-
-// Deprecated: use tCtx.WithoutCancel instead
-func WithoutCancel(tCtx TContext) TContext { return tCtx.WithoutCancel() }
 
 // WithoutCancel causes the returned context to ignore cancellation of its parent.
 // Calling Cancel will not cancel the parent either.
 // This matches [context.WithoutCancel].
-func (tc *TC) WithoutCancel() TContext {
-	ctx := context.WithoutCancel(tc)
+func (tCtx TContext) WithoutCancel() TContext {
+	ctx := context.WithoutCancel(tCtx)
 
-	tc = tc.clone()
-	tc.Context = ctx
-	tc.cancel = nil
-	return tc
-}
-
-// Deprecated: use tCtx.WithTimeout instead
-func WithTimeout(tCtx TContext, timeout time.Duration, timeoutCause string) TContext {
-	return tCtx.WithTimeout(timeout, timeoutCause)
+	tCtx.Context = ctx
+	tCtx.cancel = nil
+	return tCtx
 }
 
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
@@ -69,25 +56,18 @@ func WithTimeout(tCtx TContext, timeout time.Duration, timeoutCause string) TCon
 // the new context. The cause is used as reason why the context is canceled
 // once the timeout is reached. It may be empty, in which case the usual
 // "context canceled" error is used.
-func (tc *TC) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
-	ctx, cancel := withTimeout(tc, tc.TB(), timeout, timeoutCause)
+func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
+	ctx, cancel := withTimeout(tCtx, tCtx.TB(), timeout, timeoutCause)
 
-	tc = tc.clone()
-	tc.Context = ctx
-	tc.cancel = cancel
-	return tc
-}
-
-// Deprecated: used tCtx.WithLogger instead
-func WithLogger(tCtx TContext, logger klog.Logger) TContext {
-	return tCtx.WithLogger(logger)
+	tCtx.Context = ctx
+	tCtx.cancel = cancel
+	return tCtx
 }
 
 // WithLogger constructs a new context with a different logger.
-func (tc *TC) WithLogger(logger klog.Logger) TContext {
-	ctx := klog.NewContext(tc, logger)
+func (tCtx TContext) WithLogger(logger klog.Logger) TContext {
+	ctx := klog.NewContext(tCtx, logger)
 
-	tc = tc.clone()
-	tc.Context = ctx
-	return tc
+	tCtx.Context = ctx
+	return tCtx
 }

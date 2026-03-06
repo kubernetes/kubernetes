@@ -132,7 +132,6 @@ func TestStrategyCreate(t *testing.T) {
 	}
 
 	for k, tc := range tests {
-		tc := tc
 		t.Run(k, func(t *testing.T) {
 			obj := tc.obj
 			Strategy.PrepareForCreate(tc.ctx, obj)

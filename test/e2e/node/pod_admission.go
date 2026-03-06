@@ -68,6 +68,14 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err)
 
+			// Fetch the pod to verify that the scheduler has set the PodScheduled condition
+			// with observedGeneration.
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(len(pod.Status.Conditions)).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(pod.Status.Conditions[0].Type).To(gomega.BeEquivalentTo(v1.PodScheduled))
+			gomega.Expect(pod.Status.Conditions[0].ObservedGeneration).To(gomega.BeEquivalentTo(1))
+
 			// Fetch the pod to get the latest status which should be last one observed by the scheduler
 			// before it rejected the pod
 			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
@@ -95,6 +103,10 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			// fetch the reject Pod and compare the status
 			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
+
+			// Fetch the rejected Pod and verify the generation and observedGeneration.
+			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))
 
 			// This detects if there are any new fields in Status that were dropped by the pod rejection.
 			// These new fields either should be kept by kubelet's admission or added explicitly in the list of fields that are having a different value or must be cleared.

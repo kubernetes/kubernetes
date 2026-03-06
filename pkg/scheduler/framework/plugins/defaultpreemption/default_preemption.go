@@ -317,6 +317,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 //     Currently we check the node that is nominated for this pod, and as long as there are
 //     terminating pods on this node, we don't attempt to preempt more pods.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+	if pod.Spec.WorkloadRef != nil && pl.fts.EnableTopologyAwareWorkloadScheduling {
+		// When TAS is enabled, the default preemption logic needs to be disabled to avoid performing preemption multiple times for each topology option.
+		// The TAS-compatible preemption logic will be implemented in Delayed Preemption KEP 4671 or Workload-aware preemption KEP 5710 features.
+		return false, "not eligible due to placement-based pod group scheduling limitation."
+	}
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}

@@ -56,7 +56,7 @@ var symbolsForAddressType = sets.New(discoveryv1beta1.AddressTypeFQDN, discovery
 // Validate_AddressType validates an instance of AddressType according
 // to declarative validation rules in the API schema.
 func Validate_AddressType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1beta1.AddressType) (errs field.ErrorList) {
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAddressType, nil)...)
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAddressType, nil).MarkAlpha()...)
 
 	return errs
 }
@@ -73,11 +73,11 @@ func Validate_Endpoint(ctx context.Context, op operation.Operation, fldPath *fie
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -111,11 +111,11 @@ func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -133,6 +133,14 @@ func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Endpoint)...)

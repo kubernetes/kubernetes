@@ -19,11 +19,16 @@ package horizontalpodautoscaler
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var apiVersions = []string{"v1", "v2"}
@@ -41,11 +46,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Resource:   "horizontalpodautoscalers",
 	})
 	testCases := map[string]struct {
-		input        api.HorizontalPodAutoscaler
-		expectedErrs field.ErrorList
+		input             api.HorizontalPodAutoscaler
+		expectedErrs      field.ErrorList
+		enableScaleToZero bool
 	}{
 		"valid: minReplicas = 5": {
 			input: makeValidHPA(tweakMinReplicas(5)),
+		},
+		"valid: minReplicas = 0 (gate enabled)": {
+			input:             makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			enableScaleToZero: true,
 		},
 		"valid: minReplicas not set (nil)": {
 			input: makeValidHPA(), // Default, no minReplicas set
@@ -53,18 +63,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid: maxReplicas = 0 (required)": {
 			input: makeValidHPA(tweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "maxReplicas"), ""),
+				field.Required(field.NewPath("spec", "maxReplicas"), "").MarkAlpha(),
 			},
 		},
 		"invalid: maxReplicas negative": {
 			input: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"invalid: minReplicas = 0 (gate disabled)": {
+			input: makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.enableScaleToZero)
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
@@ -80,9 +97,10 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	testCases := map[string]struct {
-		oldObj       api.HorizontalPodAutoscaler
-		updateObj    api.HorizontalPodAutoscaler
-		expectedErrs field.ErrorList
+		oldObj            api.HorizontalPodAutoscaler
+		updateObj         api.HorizontalPodAutoscaler
+		expectedErrs      field.ErrorList
+		enableScaleToZero bool
 	}{
 		"valid update": {
 			oldObj:    makeValidHPA(),
@@ -92,23 +110,41 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    makeValidHPA(tweakMinReplicas(1)),
 			updateObj: makeValidHPA(tweakMinReplicas(5)),
 		},
+		"valid update: minReplicas 1 -> 0 (gate enabled)": {
+			oldObj:            makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
+			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			enableScaleToZero: true,
+		},
 		"invalid update: maxReplicas = 0 (required)": {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "maxReplicas"), ""),
+				field.Required(field.NewPath("spec", "maxReplicas"), "").MarkAlpha(),
 			},
 		},
 		"invalid update: maxReplicas negative": {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum").MarkAlpha(),
 			},
+		},
+		"invalid update: minReplicas 1 -> 0 (gate disabled)": {
+			oldObj:    makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
+			updateObj: makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"valid update: ratcheting minReplicas=0 when gate disabled": {
+			oldObj:            makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...), tweakMaxReplicas(20)),
+			enableScaleToZero: false,
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.enableScaleToZero)
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "autoscaling",
 				APIVersion:        apiVersion,
@@ -154,4 +190,30 @@ func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 	return func(hpa *api.HorizontalPodAutoscaler) {
 		hpa.Spec.MaxReplicas = replicas
 	}
+}
+
+func tweakMetrics(metrics ...api.MetricSpec) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.Metrics = metrics
+	}
+}
+
+var validScaleToZeroMetrics = []api.MetricSpec{
+	{
+		Type: api.ObjectMetricSourceType,
+		Object: &api.ObjectMetricSource{
+			Metric: api.MetricIdentifier{
+				Name: "requests-per-second",
+			},
+			Target: api.MetricTarget{
+				Type:  api.ValueMetricType,
+				Value: ptr.To(resource.MustParse("10k")),
+			},
+			DescribedObject: api.CrossVersionObjectReference{
+				Kind:       "Ingress",
+				Name:       "main-route",
+				APIVersion: "networking.k8s.io/v1",
+			},
+		},
+	},
 }

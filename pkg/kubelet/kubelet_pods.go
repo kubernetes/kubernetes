@@ -1086,7 +1086,7 @@ func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Se
 	}
 
 	if len(failedPullSecrets) > 0 {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(failedPullSecrets, ", "))
+		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(failedPullSecrets, ", "))
 	}
 
 	return pullSecrets
@@ -1126,20 +1126,29 @@ func (kl *Kubelet) PodIsFinished(pod *v1.Pod) bool {
 func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 	filteredPods := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
-		// if a pod is fully terminated by UID, it should be excluded from the
-		// list of pods
-		if kl.podWorkers.IsPodKnownTerminated(p.UID) {
+		if kl.isPodInactive(p) {
 			continue
 		}
-
-		// terminal pods are considered inactive UNLESS they are actively terminating
-		if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
-			continue
-		}
-
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
+}
+
+// isPodInactive returns true if the pod is in a terminal phase
+// or is known to be fully terminated. This method should only be used
+// when the pod being processed is upstream of the pod worker, i.e.
+// the pods the pod manager is aware of.
+func (kl *Kubelet) isPodInactive(p *v1.Pod) bool {
+	// if a pod is fully terminated by UID, it should be excluded from the
+	// list of pods
+	if kl.podWorkers.IsPodKnownTerminated(p.UID) {
+		return true
+	}
+	// terminal pods are considered inactive UNLESS they are actively terminating
+	if kl.isAdmittedPodTerminal(p) && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
+		return true
+	}
+	return false
 }
 
 // isAdmittedPodTerminal returns true if the provided config source pod is in
@@ -1223,7 +1232,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Stop the workers for terminated pods not in the config source
 	logger.V(3).Info("Clean up pod workers for terminated pods")
-	workingPods := kl.podWorkers.SyncKnownPods(allPods)
+	workingPods := kl.podWorkers.SyncKnownPods(logger, allPods)
 
 	// Reconcile: At this point the pod workers have been pruned to the set of
 	// desired pods. Pods that must be restarted due to UID reuse, or leftover
@@ -1348,7 +1357,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 			logger.V(2).Info("Programmer error, restartable pod was a mirror pod but activePods should never contain a mirror pod", "podUID", desiredPod.UID)
 			continue
 		}
-		kl.podWorkers.UpdatePod(UpdatePodOptions{
+		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			UpdateType: kubetypes.SyncPodCreate,
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -1377,7 +1386,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// next invocation of HandlePodCleanups.
 	for _, pod := range kl.filterTerminalPodsToDelete(allPods, runningRuntimePods, workingPods) {
 		logger.V(3).Info("Handling termination and deletion of the pod to pod workers", "pod", klog.KObj(pod), "podUID", pod.UID)
-		kl.podWorkers.UpdatePod(UpdatePodOptions{
+		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			UpdateType: kubetypes.SyncPodKill,
 			Pod:        pod,
 		})
@@ -1400,7 +1409,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 				PodTerminationGracePeriodSecondsOverride: &one,
 			}
 			logger.V(2).Info("Clean up containers for orphaned pod we had not seen before", "podUID", runningPod.ID, "killPodOptions", killPodOptions)
-			kl.podWorkers.UpdatePod(UpdatePodOptions{
+			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				UpdateType:     kubetypes.SyncPodKill,
 				RunningPod:     runningPod,
 				KillPodOptions: killPodOptions,
@@ -1998,7 +2007,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		} else {
 			if s.HostIP != "" {
 				if utilnet.IPFamilyOfString(s.HostIP) != utilnet.IPFamilyOf(hostIPs[0]) {
-					kl.recorder.Eventf(pod, v1.EventTypeWarning, "HostIPsIPFamilyMismatch",
+					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "HostIPsIPFamilyMismatch",
 						"Kubelet detected an IPv%s node IP (%s), but the cloud provider selected an IPv%s node IP (%s); pass an explicit `--node-ip` to kubelet to fix this.",
 						utilnet.IPFamilyOfString(s.HostIP), s.HostIP, utilnet.IPFamilyOf(hostIPs[0]), hostIPs[0].String())
 				}

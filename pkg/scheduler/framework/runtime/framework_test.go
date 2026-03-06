@@ -247,7 +247,7 @@ func (pl *TestPlugin) PostBind(ctx context.Context, state fwk.CycleState, p *v1.
 }
 
 func (pl *TestPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	return fwk.NewStatus(fwk.Code(pl.inj.PermitStatus), injectReason), time.Duration(0)
+	return fwk.NewStatus(fwk.Code(pl.inj.PermitStatus), injectReason), pl.inj.PermitTimeout
 }
 
 func (pl *TestPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
@@ -1094,7 +1094,6 @@ func TestRunPreScorePlugins(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1731,7 +1730,6 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1826,7 +1824,6 @@ func TestRunPreFilterExtensionRemovePod(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -1914,7 +1911,6 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 			r := make(Registry)
 			enabled := make([]config.Plugin, len(tt.plugins))
 			for i, p := range tt.plugins {
-				p := p
 				enabled[i].Name = p.name
 				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return p, nil
@@ -3064,14 +3060,15 @@ func TestReservePlugins(t *testing.T) {
 
 func TestPermitPlugins(t *testing.T) {
 	tests := []struct {
-		name    string
-		plugins []*TestPlugin
-		want    *fwk.Status
+		name                string
+		plugins             []*TestPlugin
+		wantPluginsWaitTime map[string]time.Duration
+		wantStatus          *fwk.Status
 	}{
 		{
-			name:    "NilPermitPlugin",
-			plugins: []*TestPlugin{},
-			want:    nil,
+			name:       "NilPermitPlugin",
+			plugins:    []*TestPlugin{},
+			wantStatus: nil,
 		},
 		{
 			name: "SuccessPermitPlugin",
@@ -3081,7 +3078,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.Success)},
 				},
 			},
-			want: nil,
+			wantStatus: nil,
 		},
 		{
 			name: "UnschedulablePermitPlugin",
@@ -3091,7 +3088,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.Unschedulable)},
 				},
 			},
-			want: fwk.NewStatus(fwk.Unschedulable, injectReason).WithPlugin("TestPlugin"),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, injectReason).WithPlugin("TestPlugin"),
 		},
 		{
 			name: "ErrorPermitPlugin",
@@ -3101,7 +3098,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.Error)},
 				},
 			},
-			want: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+			wantStatus: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
 		},
 		{
 			name: "UnschedulableAndUnresolvablePermitPlugin",
@@ -3111,7 +3108,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.UnschedulableAndUnresolvable)},
 				},
 			},
-			want: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, injectReason).WithPlugin("TestPlugin"),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, injectReason).WithPlugin("TestPlugin"),
 		},
 		{
 			name: "WaitPermitPlugin",
@@ -3120,8 +3117,16 @@ func TestPermitPlugins(t *testing.T) {
 					name: "TestPlugin",
 					inj:  injectedResult{PermitStatus: int(fwk.Wait)},
 				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PermitStatus: int(fwk.Wait), PermitTimeout: time.Second},
+				},
 			},
-			want: fwk.NewStatus(fwk.Wait, `one or more plugins asked to wait and no plugin rejected pod ""`),
+			wantPluginsWaitTime: map[string]time.Duration{
+				"TestPlugin":  0,
+				"TestPlugin2": time.Second,
+			},
+			wantStatus: fwk.NewStatus(fwk.Wait, "injected status, one or more plugins asked to wait and no plugin rejected pod"),
 		},
 		{
 			name: "SuccessSuccessPermitPlugin",
@@ -3135,7 +3140,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.Success)},
 				},
 			},
-			want: nil,
+			wantStatus: nil,
 		},
 		{
 			name: "ErrorAndErrorPlugins",
@@ -3149,7 +3154,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(fwk.Error)},
 				},
 			},
-			want: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+			wantStatus: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
 		},
 	}
 
@@ -3185,9 +3190,12 @@ func TestPermitPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunPermitPlugins(ctx, state, pod, "")
-			if diff := cmp.Diff(tt.want, status, statusCmpOpts...); diff != "" {
+			pluginsWaitTime, status := f.RunPermitPlugins(ctx, state, pod, "")
+			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantPluginsWaitTime, pluginsWaitTime); diff != "" {
+				t.Errorf("Wrong plugins wait time map (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -3547,8 +3555,16 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			f.RunPermitPlugins(ctx, state, pod, "")
-			f.WaitOnPermit(ctx, pod)
+			pluginsWaitTime, status := f.RunPermitPlugins(ctx, state, pod, "")
+			if status.IsWait() {
+				f.AddWaitingPod(pod, pluginsWaitTime)
+			} else if !status.IsSuccess() {
+				t.Fatalf("Failed to run permit plugins: %v", status)
+			}
+			status = f.WaitOnPermit(ctx, pod)
+			if !status.IsSuccess() && tt.wantRes != "Unschedulable" {
+				t.Fatalf("Failed to wait on permit: %v", status)
+			}
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
@@ -3609,11 +3625,12 @@ func TestWaitOnPermit(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			runPermitPluginsStatus := f.RunPermitPlugins(ctx, state, pod, "")
+			pluginsWaitTime, runPermitPluginsStatus := f.RunPermitPlugins(ctx, state, pod, "")
 			if runPermitPluginsStatus.Code() != fwk.Wait {
 				t.Fatalf("Expected RunPermitPlugins to return status %v, but got %v",
 					fwk.Wait, runPermitPluginsStatus.Code())
 			}
+			f.AddWaitingPod(pod, pluginsWaitTime)
 
 			go tt.action(f)
 
@@ -3749,6 +3766,7 @@ type injectedResult struct {
 	PreBindStatus            int                  `json:"preBindStatus,omitempty"`
 	BindStatus               int                  `json:"bindStatus,omitempty"`
 	PermitStatus             int                  `json:"permitStatus,omitempty"`
+	PermitTimeout            time.Duration        `json:"permitTimeout,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {

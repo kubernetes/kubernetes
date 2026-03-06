@@ -891,7 +891,7 @@ func getFlowSchemaUID(response *http.Response) string {
 // for <loadDuration> time. The number of successfully completed requests is
 // returned.
 func uniformQPSLoadSingle(f *framework.Framework, username string, qps float64, loadDuration time.Duration) int32 {
-	var completed int32
+	var completed atomic.Int32
 	var wg sync.WaitGroup
 	ticker := time.NewTicker(time.Duration(float64(time.Second) / qps))
 	defer ticker.Stop()
@@ -911,11 +911,11 @@ func uniformQPSLoadSingle(f *framework.Framework, username string, qps float64, 
 			go func() {
 				defer wg.Done()
 				makeRequest(f, username)
-				atomic.AddInt32(&completed, 1)
+				completed.Add(1)
 			}()
 		case <-timer.C:
 			// Still in-flight requests should not contribute to the completed count.
-			totalCompleted := atomic.LoadInt32(&completed)
+			totalCompleted := completed.Load()
 			wg.Wait() // do not leak goroutines
 			return totalCompleted
 		}
@@ -927,15 +927,15 @@ func uniformQPSLoadSingle(f *framework.Framework, username string, qps float64, 
 // rate defined by <qps>. The sum of number of successfully completed requests
 // across all concurrent clients is returned.
 func uniformQPSLoadConcurrent(f *framework.Framework, username string, concurrency int32, qps float64, loadDuration time.Duration) int32 {
-	var completed int32
+	var completed atomic.Int32
 	var wg sync.WaitGroup
 	wg.Add(int(concurrency))
-	for i := int32(0); i < concurrency; i++ {
+	for range concurrency {
 		go func() {
 			defer wg.Done()
-			atomic.AddInt32(&completed, uniformQPSLoadSingle(f, username, qps, loadDuration))
+			completed.Add(uniformQPSLoadSingle(f, username, qps, loadDuration))
 		}()
 	}
 	wg.Wait()
-	return completed
+	return completed.Load()
 }

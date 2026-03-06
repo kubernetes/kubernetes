@@ -560,7 +560,7 @@ kubernetesVersion: %s`,
 
 	// fakeClientSetFromFile returns a fake clientset with kubeadm config map
 	var fakeClientSetFromFile = func(_ string) (kubernetes.Interface, error) {
-		client := fakeclientset.NewClientset()
+		client := fakeclientset.NewSimpleClientset()
 		client.PrependReactor("get", "configmaps", func(action clientgotesting.Action) (bool, runtime.Object, error) {
 			getAction := action.(clientgotesting.GetAction)
 			if getAction.GetNamespace() == metav1.NamespaceSystem && getAction.GetName() == kubeadmconstants.KubeadmConfigConfigMap {
@@ -690,7 +690,6 @@ kubernetesVersion: %s`,
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.brokenCertName != "" {
 				// remove the file to simulate a missing certificate

@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -88,6 +89,10 @@ func createSlice(tCtx ktesting.TContext, slice *resourceapi.ResourceSlice) *reso
 
 // createTestClass creates a DeviceClass with a driver name derived from the test namespace
 func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.DeviceClass, string) {
+	return createTestClassWithSpec(tCtx, namespace, nil)
+}
+
+func createTestClassWithSpec(tCtx ktesting.TContext, namespace string, spec *resourceapi.DeviceClassSpec) (*resourceapi.DeviceClass, string) {
 	tCtx.Helper()
 	driverName := namespace + driverNameSuffix
 	class := class.DeepCopy()
@@ -97,7 +102,10 @@ func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.Dev
 			Expression: fmt.Sprintf("device.driver == %q", driverName),
 		},
 	}}
-	_, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+	if spec != nil {
+		class.Spec = *spec
+	}
+	class, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create class")
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 		tCtx.Log("Cleaning up DeviceClass...")
@@ -138,6 +146,19 @@ func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class 
 
 // createPod create a pod in the namespace, referencing the given claim.
 func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, claims ...*resourceapi.ResourceClaim) *v1.Pod {
+	return createPodInternal(tCtx, namespace, suffix, pod, nil, claims...)
+}
+
+// createPodWithExtendedResource creates a pod in the namespace, requesting the given extended resource.
+func createPodWithExtendedResource(tCtx ktesting.TContext, namespace, resourceName, resourceQuantity string, pod *v1.Pod) *v1.Pod {
+	return createPodInternal(tCtx, namespace, "", pod, map[v1.ResourceName]string{
+		v1.ResourceName(resourceName): resourceQuantity,
+	})
+}
+
+// createPodInternal contains the common logic for createPod and createPodWithExtendedResource.
+// It shouldn't be called directly from tests.
+var createPodInternal = func(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, resources map[v1.ResourceName]string, claims ...*resourceapi.ResourceClaim) *v1.Pod {
 	tCtx.Helper()
 	pod = pod.DeepCopy()
 	pod.Name += suffix
@@ -149,6 +170,19 @@ func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.
 			Name:              claim.Name,
 			ResourceClaimName: &claim.Name,
 		})
+	}
+	for res, qty := range resources {
+		for i := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[i]
+			if container.Resources.Requests == nil {
+				container.Resources.Requests = v1.ResourceList{}
+			}
+			if container.Resources.Limits == nil {
+				container.Resources.Limits = v1.ResourceList{}
+			}
+			container.Resources.Requests[res] = resource.MustParse(qty)
+			container.Resources.Limits[res] = resource.MustParse(qty)
+		}
 	}
 	pod.Spec.ResourceClaims = resourceClaims
 	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})

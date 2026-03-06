@@ -1,0 +1,42 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+  name: external-snapshot-metadata-runner
+rules:
+- apiGroups:
+  - cbt.storage.k8s.io
+  resources:
+  - snapshotmetadataservices
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list

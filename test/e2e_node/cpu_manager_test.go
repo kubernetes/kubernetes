@@ -132,6 +132,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	// closure just and only to not carry around awkwardly `f` and `onlineCPUs` only for logging purposes
 	var skipIfAllocatableCPUsLessThan func(node *v1.Node, cpuReq int)
 
+	var createPodSync func(ctx context.Context, pod *v1.Pod) *v1.Pod
+
 	ginkgo.BeforeAll(func(ctx context.Context) {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
@@ -170,6 +172,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
 		podMap = make(map[string]*v1.Pod)
+		createPodSync = func(ctx context.Context, pod *v1.Pod) *v1.Pod {
+			newPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(newPod.UID)] = newPod
+			return newPod
+		}
 	})
 
 	ginkgo.JustBeforeEach(func(ctx context.Context) {
@@ -199,7 +206,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
-				reservedSystemCPUs: cpuset.CPUSet{},
+				reservedSystemCPUs: cpuset.New(),
 			}))
 
 			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
@@ -210,8 +217,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -234,8 +240,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -261,8 +266,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the guaranteed test pod")
-			podGu = e2epod.NewPodClient(f).CreateSync(ctx, podGu)
-			podMap[string(podGu.UID)] = podGu
+			podGu = createPodSync(ctx, podGu)
 
 			podBu := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -272,8 +276,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the burstable test pod")
-			podBu = e2epod.NewPodClient(f).CreateSync(ctx, podBu)
-			podMap[string(podBu.UID)] = podBu
+			podBu = createPodSync(ctx, podBu)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -312,8 +315,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -344,8 +346,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -375,8 +376,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -412,8 +412,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -452,8 +451,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -493,8 +491,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -528,8 +525,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod 1")
-			pod1 = e2epod.NewPodClient(f).CreateSync(ctx, pod1)
-			podMap[string(pod1.UID)] = pod1
+			pod1 = createPodSync(ctx, pod1)
 
 			pod2 := makeCPUManagerPod("gu-pod-2", []ctnAttribute{
 				{
@@ -539,8 +535,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod 2")
-			pod2 = e2epod.NewPodClient(f).CreateSync(ctx, pod2)
-			podMap[string(pod2.UID)] = pod2
+			pod2 = createPodSync(ctx, pod2)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -581,8 +576,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -614,8 +608,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -646,8 +639,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -684,8 +676,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -725,8 +716,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -767,8 +757,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -803,8 +792,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod 1")
-			pod1 = e2epod.NewPodClient(f).CreateSync(ctx, pod1)
-			podMap[string(pod1.UID)] = pod1
+			pod1 = createPodSync(ctx, pod1)
 
 			pod2 := makeCPUManagerPod("gu-pod-2", []ctnAttribute{
 				{
@@ -814,8 +802,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod 2")
-			pod2 = e2epod.NewPodClient(f).CreateSync(ctx, pod2)
-			podMap[string(pod2.UID)] = pod2
+			pod2 = createPodSync(ctx, pod2)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -840,7 +827,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:      cpuset.CPUSet{},
+				reservedSystemCPUs:      cpuset.New(),
 				enableCPUManagerOptions: true,
 				options: map[string]string{
 					cpumanager.StrictCPUReservationOption: "true",
@@ -1859,6 +1846,69 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		})
 	})
 
+	ginkgo.When("using non-default CPU CFS quota period", ginkgo.Label("cfs-period", "cfs-quota"), func() {
+		var cfsPeriod time.Duration
+		var testCFSPeriod string
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			requireCGroupV2()
+			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+			//          this means on more-than-2-way SMT systems this test will prove nothing
+			reservedCPUs = cpuset.New(0)
+
+			// the default QuotaPeriod is in milliseconds
+			cfsPeriod = time.Duration((cm.QuotaPeriod / 2) * time.Microsecond)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedCPUs,
+				customCPUCFSQuotaPeriod: cfsPeriod, // TODO: should we need to do this per-test?
+			}))
+
+			// we reason in microsecond, kernel is going to expose milliseconds
+			testCFSPeriod = strconv.FormatInt(int64(cfsPeriod/1000), 10)
+		})
+
+		ginkgo.It("should enforce for guaranteed pod", func(ctx context.Context) {
+			cpuCount := 1 // overshoot, minimum request is 1
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			ctnName := "gu-container-cfsquota-enabled"
+			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					cpuRequest: "500m",
+					cpuLimit:   "500m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuotaWithPeriod("25000", testCFSPeriod))
+			gomega.Expect(pod).To(HaveContainerQuotaWithPeriod(ctnName, "25000", testCFSPeriod))
+		})
+
+		ginkgo.It("should enforce for burstable pod", func(ctx context.Context) {
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), 0)
+
+			ctnName := "bu-container-cfsquota-enabled"
+			pod := makeCPUManagerPod("bu-pod-cfs-quota-on", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					cpuRequest: "100m",
+					cpuLimit:   "500m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuotaWithPeriod("25000", testCFSPeriod))
+			gomega.Expect(pod).To(HaveContainerQuotaWithPeriod(ctnName, "25000", testCFSPeriod))
+		})
+	})
+
 	f.Context("When checking the sidecar containers", framework.WithNodeConformance(), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
@@ -1984,7 +2034,7 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:      cpuset.CPUSet{},
+				reservedSystemCPUs:      cpuset.New(),
 				enablePodLevelResources: true,
 			}))
 
@@ -2156,10 +2206,8 @@ func HaveContainerCPUsEqualTo(ctnName string, expectedCPUs cpuset.CPUSet) types.
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching the expected value <{{.Data.ExpectedCPUs}}> for container {{.Data.Name}}", md)
 }
 
-func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
-	md := &msgData{
-		ExpectedQuota: expectedQuota,
-	}
+func HaveSandboxQuotaWithPeriod(expectedQuota, cfsPeriod string) types.GomegaMatcher {
+	md := &msgData{}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
 		md.Name = klog.KObj(actual).String()
 		quota, err := getSandboxCFSQuota(actual)
@@ -2168,7 +2216,8 @@ func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
 			framework.Logf("getSandboxCFSQuota() failed: %v", err)
 			return false, err
 		}
-		re, err := regexp.Compile(fmt.Sprintf("^%s %s$", expectedQuota, defaultCFSPeriod))
+		md.ExpectedQuota = fmt.Sprintf("^%s %s$", expectedQuota, cfsPeriod)
+		re, err := regexp.Compile(md.ExpectedQuota)
 		if err != nil {
 			return false, err
 		}
@@ -2176,10 +2225,9 @@ func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has quota <{{.Data.CurrentQuota}}> not matching expected value <{{.Data.ExpectedQuota}}>", md)
 }
 
-func HaveContainerQuota(ctnName, expectedQuota string) types.GomegaMatcher {
+func HaveContainerQuotaWithPeriod(ctnName, expectedQuota, cfsPeriod string) types.GomegaMatcher {
 	md := &msgData{
-		Name:          ctnName,
-		ExpectedQuota: expectedQuota,
+		Name: ctnName,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
 		quota, err := getContainerCFSQuota(actual, ctnName, false)
@@ -2188,12 +2236,21 @@ func HaveContainerQuota(ctnName, expectedQuota string) types.GomegaMatcher {
 			framework.Logf("getContainerCFSQuota(%s) failed: %v", ctnName, err)
 			return false, err
 		}
-		re, err := regexp.Compile(fmt.Sprintf("^%s %s$", expectedQuota, defaultCFSPeriod))
+		md.ExpectedQuota = fmt.Sprintf("^%s %s$", expectedQuota, cfsPeriod)
+		re, err := regexp.Compile(md.ExpectedQuota)
 		if err != nil {
 			return false, err
 		}
 		return re.MatchString(quota), nil
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has quota <{{.Data.CurrentQuota}}> not matching expected value <{{.Data.ExpectedQuota}}> for container {{.Data.Name}}", md)
+}
+
+func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
+	return HaveSandboxQuotaWithPeriod(expectedQuota, defaultCFSPeriod)
+}
+
+func HaveContainerQuota(ctnName, expectedQuota string) types.GomegaMatcher {
+	return HaveContainerQuotaWithPeriod(ctnName, expectedQuota, defaultCFSPeriod)
 }
 
 func HaveContainerCPUsThreadSiblings(ctnName string) types.GomegaMatcher {
@@ -2371,13 +2428,13 @@ func computeNUMADistribution(allocatedCPUs cpuset.CPUSet) map[int]int {
 func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.CPUSet, error) {
 	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit, e2enodeCgroupV2Enabled)
 	if err != nil {
-		return cpuset.CPUSet{}, err
+		return cpuset.New(), err
 	}
 	cgPath = filepath.Join(cgPath, cpusetFileNameFromVersion(e2enodeCgroupV2Enabled))
 	framework.Logf("pod %s/%s cnt %s qos=%s path %q", pod.Namespace, pod.Name, ctnName, pod.Status.QOSClass, cgPath)
 	data, err := os.ReadFile(cgPath)
 	if err != nil {
-		return cpuset.CPUSet{}, err
+		return cpuset.New(), err
 	}
 	cpus := strings.TrimSpace(string(data))
 	framework.Logf("pod %s/%s cnt %s cpuset %q", pod.Namespace, pod.Name, ctnName, cpus)
@@ -2801,6 +2858,7 @@ type cpuManagerKubeletArguments struct {
 	enableCPUManagerOptions          bool
 	disableCPUQuotaWithExclusiveCPUs bool
 	enablePodLevelResources          bool
+	customCPUCFSQuotaPeriod          time.Duration
 	reservedSystemCPUs               cpuset.CPUSet
 	options                          map[string]string
 }
@@ -2815,6 +2873,13 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
+
+	if kubeletArguments.customCPUCFSQuotaPeriod != 0 {
+		newCfg.FeatureGates["CustomCPUCFSQuotaPeriod"] = true
+		newCfg.CPUCFSQuotaPeriod.Duration = kubeletArguments.customCPUCFSQuotaPeriod
+	} else {
+		newCfg.FeatureGates["CustomCPUCFSQuotaPeriod"] = false
+	}
 
 	newCfg.CPUManagerPolicy = kubeletArguments.policyName
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}

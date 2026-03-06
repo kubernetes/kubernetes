@@ -56,12 +56,44 @@ type Error struct {
 	// that should also be caught by declarative validation.
 	CoveredByDeclarative bool
 
-	// DeclarativeNative is true when this error originates from a declarative-native validation.
-	// This field is used to distinguish errors that are exclusively declarative and lack an imperative counterpart.
-	DeclarativeNative bool
+	// FromImperative denotes these errors are originating from  the hand written validations.
+	FromImperative bool
+
+	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
+	ValidationStabilityLevel ValidationStabilityLevel
+}
+
+// ValidationStabilityLevel denotes the stability level of a validation.
+type ValidationStabilityLevel int
+
+const (
+	stabilityLevelUnknown ValidationStabilityLevel = iota
+	stabilityLevelAlpha
+	stabilityLevelBeta
+)
+
+func (v ValidationStabilityLevel) String() string {
+	switch v {
+	case stabilityLevelAlpha:
+		return "alpha"
+	case stabilityLevelBeta:
+		return "beta"
+	default:
+		return "unknown"
+	}
 }
 
 var _ error = &Error{}
+
+// IsAlpha returns true if the error is an alpha validation error.
+func (e *Error) IsAlpha() bool {
+	return e.ValidationStabilityLevel == stabilityLevelAlpha
+}
+
+// IsBeta returns true if the error is a beta validation error.
+func (e *Error) IsBeta() bool {
+	return e.ValidationStabilityLevel == stabilityLevelBeta
+}
 
 // Error implements the error interface.
 func (e *Error) Error() string {
@@ -117,6 +149,7 @@ func (e *Error) ErrorBody() string {
 	if len(e.Detail) != 0 {
 		s += fmt.Sprintf(": %s", e.Detail)
 	}
+
 	return s
 }
 
@@ -313,6 +346,29 @@ func TooLong(field *Path, _ interface{}, maxLength int) *Error {
 	}
 }
 
+// TooLongCharacters returns a *Error indicating "too long".  This is used to report that
+// the given value is too long in characters (including multi-byte characters).
+// This is similar to Invalid, but the returned  error will not include the too-long value.
+// If maxLength is negative, it will be included in the message. The value argument is not used.
+func TooLongCharacters[T ~string](field *Path, _ T, maxLength int) *Error {
+	var msg string
+	if maxLength >= 0 {
+		bs := "chars"
+		if maxLength == 1 {
+			bs = "char"
+		}
+		msg = fmt.Sprintf("may not be more than %d %s", maxLength, bs)
+	} else {
+		msg = "value is too long"
+	}
+	return &Error{
+		Type:     ErrorTypeTooLong,
+		Field:    field.String(),
+		BadValue: "<value omitted>",
+		Detail:   msg,
+	}
+}
+
 // TooLongMaxLength returns a *Error indicating "too long".
 // Deprecated: Use TooLong instead.
 func TooLongMaxLength(field *Path, value interface{}, maxLength int) *Error {
@@ -450,16 +506,42 @@ func (list ErrorList) ExtractCoveredByDeclarative() ErrorList {
 	return newList
 }
 
-// MarkDeclarativeNative marks the error as originating from a declarative-native validation.
-func (e *Error) MarkDeclarativeNative() *Error {
-	e.DeclarativeNative = true
+// MarkAlpha marks the error as an alpha validation error.
+func (e *Error) MarkAlpha() *Error {
+	e.ValidationStabilityLevel = stabilityLevelAlpha
 	return e
 }
 
-// MarkDeclarativeNative marks all errors in the list as originating from declarative-native validations.
-func (list ErrorList) MarkDeclarativeNative() ErrorList {
+// MarkAlpha marks the errors as alpha validation errors.
+func (list ErrorList) MarkAlpha() ErrorList {
 	for _, err := range list {
-		err.DeclarativeNative = true
+		err.ValidationStabilityLevel = stabilityLevelAlpha
+	}
+	return list
+}
+
+// MarkBeta marks the error as a beta validation error.
+func (e *Error) MarkBeta() *Error {
+	e.ValidationStabilityLevel = stabilityLevelBeta
+	return e
+}
+
+// MarkBeta marks the errors as beta validation errors.
+func (list ErrorList) MarkBeta() ErrorList {
+	for _, err := range list {
+		err.ValidationStabilityLevel = stabilityLevelBeta
+	}
+	return list
+}
+
+func (e *Error) MarkFromImperative() *Error {
+	e.FromImperative = true
+	return e
+}
+
+func (list ErrorList) MarkFromImperative() ErrorList {
+	for _, err := range list {
+		err.FromImperative = true
 	}
 	return list
 }

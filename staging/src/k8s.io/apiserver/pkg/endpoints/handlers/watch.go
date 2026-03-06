@@ -242,7 +242,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(req.Context(), err, "Unable to start watch")
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
@@ -251,7 +251,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.MediaType)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(req.Context(), err, "No stream framing support available")
 		s.Scope.err(errors.NewBadRequest(err.Error()), w, req)
 		return
 	}
@@ -298,10 +298,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
+			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
 			if err := watchEncoder.Encode(event); err != nil {
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
@@ -314,7 +314,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
 				if !ok {
-					utilruntime.HandleError(fmt.Errorf("unable to measure watchlist latency because no received ts found in the ctx, gvr: %s", s.Scope.Resource))
+					utilruntime.HandleErrorWithContext(req.Context(), nil, "Unable to measure watchlist latency, no received timestamp found in the context", "gvr", s.Scope.Resource)
 				} else {
 					initLatency := time.Since(receivedTimestamp)
 					metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope, initLatency)
@@ -329,6 +329,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 // HandleWS serves a series of encoded events over a websocket connection.
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
+	ctx := ws.Request().Context()
+	logger := klog.FromContext(ctx)
+
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -342,10 +345,10 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer cleanup()
 
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithLogger(logger)
 		// This blocks until the connection is closed.
 		// Client should not send anything.
-		wsstream.IgnoreReceives(ws, 0)
+		wsstream.IgnoreReceivesWithLogger(logger, ws, 0)
 		// Once the client closes, we should also close
 		close(done)
 	}()
@@ -353,7 +356,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	framer := newWebsocketFramer(ws, s.UseTextFraming)
 
 	gvr := s.Scope.Resource
-	watchEncoder := newWatchEncoder(context.TODO(), gvr, s.EmbeddedEncoder, s.Encoder, framer)
+	watchEncoder := newWatchEncoder(ctx, gvr, s.EmbeddedEncoder, s.Encoder, framer)
 	ch := s.Watching.ResultChan()
 
 	for {
@@ -369,7 +372,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 
 			if err := watchEncoder.Encode(event); err != nil {
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithLogger(logger, err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
@@ -406,7 +409,7 @@ func (w *websocketFramer) Write(p []byte) (int, error) {
 
 var _ io.Writer = &websocketFramer{}
 
-func shouldRecordWatchListLatency(event watch.Event) bool {
+func shouldRecordWatchListLatency(ctx context.Context, event watch.Event) bool {
 	if event.Type != watch.Bookmark || !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		return false
 	}
@@ -416,7 +419,7 @@ func shouldRecordWatchListLatency(event watch.Event) bool {
 	// for more please read https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list
 	hasAnnotation, err := storage.HasInitialEventsEndBookmarkAnnotation(event.Object)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to determine if the obj has the required annotation for measuring watchlist latency, obj %T: %v", event.Object, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to determine if the object has the required annotation for measuring watchlist latency", "object", fmt.Sprintf("%T", event.Object))
 		return false
 	}
 	return hasAnnotation

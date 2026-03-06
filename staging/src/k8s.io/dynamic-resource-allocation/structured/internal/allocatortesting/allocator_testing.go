@@ -3836,6 +3836,198 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
 			)},
 		},
+		"prioritized-list-allocation-mode-all-with-selectors": {
+			// When using allocationMode:All, at least one device must be allocated, otherwise
+			// DRA will attempt the next subRequest.
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v6"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+						subRequest(subReq1, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v5"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+			)},
+		},
+		"prioritized-list-allocation-mode-all-with-selectors-multiple-pools": {
+			// All devices selected by the DeviceClass will be allocated, even if they
+			// are spread across different resource pools.
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v6"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+						subRequest(subReq1, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v5"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+					deviceAllocationResult(req0SubReq1, driverA, pool2, device1, false),
+				),
+			},
+		},
+		"prioritized-list-allocation-mode-all-with-selectors-multiple-pools-across-nodes": {
+			// All devices selected by the DeviceClass will be allocated, even if they
+			// are spread across different resource pools, as long as they are available
+			// on the node.
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v6"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+						subRequest(subReq1, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v5"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+					}),
+				),
+				sliceWithDevices(slice2, node2, pool2, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+					}),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v6")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+				),
+			},
+		},
+		"prioritized-list-allocation-mode-all-with-selectors-deviceclass-subset": {
+			// Only devices selected by the deviceclass will be considered
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v6"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+						subRequest(subReq1, classA, 0, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].generation == "v5"`, driverA),
+							},
+						}).withAllocationMode(resourceapi.DeviceAllocationModeAll),
+					),
+				),
+			),
+			classes: objects(
+				&resourceapi.DeviceClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: classA,
+					},
+					Spec: resourceapi.DeviceClassSpec{
+						Selectors: []resourceapi.DeviceSelector{
+							{
+								CEL: &resourceapi.CELDeviceSelector{
+									Expression: fmt.Sprintf(`device.driver == "%s" && device.attributes["%s"].selected`, driverA, driverA),
+								},
+							},
+						},
+					},
+				},
+			),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v6")},
+						"selected":   {BoolValue: ptr.To(false)},
+					}),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+						"selected":   {BoolValue: ptr.To(false)},
+					}),
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"generation": {StringValue: ptr.To("v5")},
+						"selected":   {BoolValue: ptr.To(true)},
+					}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0SubReq1, driverA, pool1, device3, false),
+				),
+			},
+		},
 		"max-number-devices": {
 			claimsToAllocate: objects(
 				claimWithRequests(
@@ -6038,7 +6230,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 65,
+				internal.Stable: 65,
 			},
 		},
 		"check-combinations-within-single-request-single-pool-multiple-slices": {
@@ -6060,7 +6252,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 65,
+				internal.Stable: 65,
 			},
 		},
 		"check-combinations-within-single-request-multiple-pools-multiple-slices": {
@@ -6084,7 +6276,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 65,
+				internal.Stable: 65,
 			},
 		},
 		"check-combinations-within-single-request-many-pools": {
@@ -6110,7 +6302,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 65,
+				internal.Stable: 65,
 			},
 		},
 		"check-combinations-with-backtracking": {
@@ -6154,7 +6346,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 12,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 14,
+				internal.Stable: 14,
 			},
 		},
 		"check-combinations-with-backtracking-across-slices-and-pools": {
@@ -6209,7 +6401,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 12,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 14,
+				internal.Stable: 14,
 			},
 		},
 		"check-combinations-with-prioritized-list": {
@@ -6266,7 +6458,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 26,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Incubating: 32,
+				internal.Stable: 32,
 			},
 		},
 	}
@@ -6307,7 +6499,9 @@ func TestAllocator(t *testing.T,
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
 				t.Skipf("%T does not support the AllocatorStats interface", allocator)
 			}
-
+			if tc.node == nil {
+				tc.node = node(node1, region1)
+			}
 			results, err := allocator.Allocate(ctx, tc.node, unwrap(claimsToAllocate...))
 			matchError := tc.expectError
 			if matchError == nil {

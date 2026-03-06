@@ -107,7 +107,7 @@ func getOrphanOptions() metav1.DeleteOptions {
 
 var (
 	zero       = int64(0)
-	lablecount = int64(0)
+	lablecount atomic.Int64
 )
 
 const (
@@ -312,7 +312,7 @@ func newCronJob(name, schedule string) *batchv1.CronJob {
 
 // getUniqLabel returns a UniqLabel based on labeLkey and labelvalue.
 func getUniqLabel(labelkey, labelvalue string) map[string]string {
-	count := atomic.AddInt64(&lablecount, 1)
+	count := lablecount.Add(1)
 	uniqlabelkey := fmt.Sprintf("%s-%05d", labelkey, count)
 	uniqlabelvalue := fmt.Sprintf("%s-%05d", labelvalue, count)
 	return map[string]string{uniqlabelkey: uniqlabelvalue}

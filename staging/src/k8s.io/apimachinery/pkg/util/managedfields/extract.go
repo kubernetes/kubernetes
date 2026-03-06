@@ -17,7 +17,6 @@ limitations under the License.
 package managedfields
 
 import (
-	"bytes"
 	"fmt"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
@@ -65,7 +64,7 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 		return nil
 	}
 	fieldset := &fieldpath.Set{}
-	err = fieldset.FromJSON(bytes.NewReader(fieldsEntry.FieldsV1.Raw))
+	err = fieldset.FromJSON(fieldsEntry.FieldsV1.GetRawReader())
 	if err != nil {
 		return fmt.Errorf("error marshalling FieldsV1 to JSON: %w", err)
 	}

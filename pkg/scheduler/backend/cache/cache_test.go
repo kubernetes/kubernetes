@@ -1162,20 +1162,17 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		updatedPods = append(updatedPods, updatedPod)
 	}
 
-	// Add a couple of pods with affinity, on the first and seconds nodes.
+	// Add a few of pods with affinity
 	var podsWithAffinity []*v1.Pod
-	for i := 0; i < 2; i++ {
+	for i := range 20 {
 		pod := st.MakePod().Name(fmt.Sprintf("p-affinity-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-affinity-%v", i)).
 			PodAffinityExists("foo", "", st.PodAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i)).Obj()
 		podsWithAffinity = append(podsWithAffinity, pod)
 	}
 
-	// Add a few of pods with PVC
-	var podsWithPVC []*v1.Pod
-	for i := 0; i < 8; i++ {
-		pod := st.MakePod().Name(fmt.Sprintf("p-pvc-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-pvc-%v", i)).
-			PVC(fmt.Sprintf("test-pvc%v", i%4)).Node(fmt.Sprintf("test-node%v", i%2)).Obj()
-		podsWithPVC = append(podsWithPVC, pod)
+	makePodWithPVC := func(podID int, node int, pvcID int) *v1.Pod {
+		return st.MakePod().Name(fmt.Sprintf("p-pvc-%v", podID)).Namespace("test-ns").UID(fmt.Sprintf("puid-pvc-%v", podID)).
+			PVC(fmt.Sprintf("test-pvc%v", pvcID)).Node(fmt.Sprintf("test-node%v", node)).Obj()
 	}
 
 	var cache *cacheImpl
@@ -1213,9 +1210,10 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
-	addPodWithPVC := func(i int) operation {
+	addPodWithPVC := func(podID int, node int, pvcID int) operation {
 		return func(t *testing.T) {
-			if err := cache.AddPod(logger, podsWithPVC[i]); err != nil {
+			pod := makePodWithPVC(podID, node, pvcID)
+			if err := cache.AddPod(logger, pod); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1234,9 +1232,10 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
-	removePodWithPVC := func(i int) operation {
+	removePodWithPVC := func(podID int, node int, pvcID int) operation {
 		return func(t *testing.T) {
-			if err := cache.RemovePod(logger, podsWithPVC[i]); err != nil {
+			pod := makePodWithPVC(podID, node, pvcID)
+			if err := cache.RemovePod(logger, pod); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1244,6 +1243,97 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	updatePod := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.UpdatePod(logger, pods[i], updatedPods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePod := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AssumePod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodWithAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AssumePod(logger, podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodWithPVC := func(podID int, node int, pvcID int) operation {
+		return func(t *testing.T) {
+			pod := makePodWithPVC(podID, node, pvcID)
+			if err := cache.AssumePod(logger, pod); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			podInfo, _ := framework.NewPodInfo(pods[i])
+			if err := snapshot.AssumePod(podInfo); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodWithAffinityInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			podInfo, _ := framework.NewPodInfo(podsWithAffinity[i])
+			if err := snapshot.AssumePod(podInfo); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodWithPVCInSnapshot := func(podID int, node int, pvcID int) operation {
+		return func(t *testing.T) {
+			pod := makePodWithPVC(podID, node, pvcID)
+			podInfo, _ := framework.NewPodInfo(pod)
+			if err := snapshot.AssumePod(podInfo); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPod := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.ForgetPod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodWithAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.ForgetPod(logger, podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodWithPVC := func(podID int, node int, pvcID int) operation {
+		return func(t *testing.T) {
+			pod := makePodWithPVC(podID, node, pvcID)
+			if err := cache.ForgetPod(logger, pod); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			if err := snapshot.ForgetPod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodWithAffinityInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			if err := snapshot.ForgetPod(logger, podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodWithPVCInSnapshot := func(podID int, node int, pvcID int) operation {
+		return func(t *testing.T) {
+			pod := makePodWithPVC(podID, node, pvcID)
+			if err := snapshot.ForgetPod(logger, pod); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1401,7 +1491,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add Pods with PVC",
 			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1),
+				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), addNode(1),
 			},
 			expected:           []*v1.Node{nodes[1], nodes[0]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc0"),
@@ -1418,7 +1508,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add multiple nodes with pods with PVC",
 			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1), addPodWithPVC(1), updateSnapshot(),
+				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), addNode(1), addPodWithPVC(1, 1, 1), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[1], nodes[0]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc0", "test-ns/test-pvc1"),
@@ -1435,7 +1525,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add then Remove pod with PVC",
 			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), removePodWithPVC(0), addPodWithPVC(2), updateSnapshot(),
+				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), removePodWithPVC(0, 0, 0), addPodWithPVC(2, 0, 2), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[0]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc2"),
@@ -1443,7 +1533,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add then Remove pod with PVC and add same pod again",
 			operations: []operation{
-				addNode(0), addPodWithPVC(0), updateSnapshot(), removePodWithPVC(0), addPodWithPVC(0), updateSnapshot(),
+				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), removePodWithPVC(0, 0, 0), addPodWithPVC(0, 0, 0), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[0]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc0"),
@@ -1451,8 +1541,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add and Remove multiple pods with PVC with same ref count length different content",
 			operations: []operation{
-				addNode(0), addNode(1), addPodWithPVC(0), addPodWithPVC(1), updateSnapshot(),
-				removePodWithPVC(0), removePodWithPVC(1), addPodWithPVC(2), addPodWithPVC(3), updateSnapshot(),
+				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), updateSnapshot(),
+				removePodWithPVC(0, 0, 0), removePodWithPVC(1, 1, 1), addPodWithPVC(2, 0, 2), addPodWithPVC(3, 1, 3), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[1], nodes[0]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc2", "test-ns/test-pvc3"),
@@ -1460,13 +1550,44 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		{
 			name: "Add and Remove multiple pods with PVC",
 			operations: []operation{
-				addNode(0), addNode(1), addPodWithPVC(0), addPodWithPVC(1), addPodWithPVC(2), updateSnapshot(),
-				removePodWithPVC(0), removePodWithPVC(1), updateSnapshot(), addPodWithPVC(0), updateSnapshot(),
-				addPodWithPVC(3), addPodWithPVC(4), addPodWithPVC(5), updateSnapshot(),
-				removePodWithPVC(0), removePodWithPVC(3), removePodWithPVC(4), updateSnapshot(),
+				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), addPodWithPVC(2, 0, 2), updateSnapshot(),
+				removePodWithPVC(0, 0, 0), removePodWithPVC(1, 1, 1), updateSnapshot(), addPodWithPVC(0, 0, 0), updateSnapshot(),
+				addPodWithPVC(3, 1, 3), addPodWithPVC(4, 0, 0), addPodWithPVC(5, 1, 1), updateSnapshot(),
+				removePodWithPVC(0, 0, 0), removePodWithPVC(3, 1, 3), removePodWithPVC(4, 0, 0), updateSnapshot(),
 			},
 			expected:           []*v1.Node{nodes[0], nodes[1]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc1", "test-ns/test-pvc2"),
+		},
+		{
+			name: "Assume and forget in cache, and in snapshot",
+			operations: []operation{
+				addNode(0), addNode(2), addNode(4), addNode(8), updateSnapshot(),
+				assumePod(8), assumePodInSnapshot(4), assumePod(0), forgetPod(0),
+				assumePodInSnapshot(2), forgetPodInSnapshot(4), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedUsedPVCSet: sets.New[string](),
+		},
+		{
+			name: "Assume and forget in cache, and in snapshot, with affinity",
+			operations: []operation{
+				addNode(0), addNode(2), addNode(4), addNode(8), updateSnapshot(),
+				assumePodWithAffinity(8), assumePodWithAffinityInSnapshot(4), assumePodWithAffinity(0), forgetPodWithAffinity(0),
+				assumePodWithAffinityInSnapshot(2), forgetPodWithAffinityInSnapshot(4), updateSnapshot(),
+			},
+			expected:                     []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedHavePodsWithAffinity: 1,
+			expectedUsedPVCSet:           sets.New[string](),
+		},
+		{
+			name: "Assume and forget in cache, and in snapshot, with PVC",
+			operations: []operation{
+				addNode(0), addNode(2), addNode(4), addNode(8), updateSnapshot(),
+				assumePodWithPVC(8, 8, 8), assumePodWithPVCInSnapshot(4, 4, 4), assumePodWithPVC(0, 0, 0), forgetPodWithPVC(0, 0, 0),
+				assumePodWithPVCInSnapshot(2, 2, 2), forgetPodWithPVCInSnapshot(4, 4, 4), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedUsedPVCSet: sets.New("test-ns/test-pvc8"),
 		},
 	}
 

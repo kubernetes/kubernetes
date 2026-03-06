@@ -2912,11 +2912,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -2926,11 +2926,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -2984,11 +2984,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
@@ -2998,11 +2998,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
@@ -3060,11 +3060,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem600M.Value(),
 									cpuLimit:    cpu600m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem300M.Value(),
 									cpuLimit:    cpu300m.MilliValue(),
 								},
@@ -3074,11 +3074,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem600M.Value(),
 									cpuLimit:    cpu600m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem300M.Value(),
 									cpuLimit:    cpu300m.MilliValue(),
 								},
@@ -3172,11 +3172,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -3186,11 +3186,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -3225,11 +3225,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -3264,11 +3264,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[2],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
@@ -3404,11 +3404,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
@@ -3444,11 +3444,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[2],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu200m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit: mem100M.Value(),
 									cpuLimit:    cpu100m.MilliValue(),
 								},
@@ -3530,13 +3530,13 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							{
 								container:       &pod.Spec.Containers[2],
 								kubeContainerID: kcs.ID,
-								desiredContainerResources: containerResources{
+								desiredContainerResources: resourceRequirements{
 									memoryLimit:   mem200M.Value(),
 									memoryRequest: mem100M.Value(),
 									cpuLimit:      cpu200m.MilliValue(),
 									cpuRequest:    cpu100m.MilliValue(),
 								},
-								currentContainerResources: &containerResources{
+								currentContainerResources: &resourceRequirements{
 									memoryLimit:   mem200M.Value(),
 									memoryRequest: mem200M.Value(),
 									cpuLimit:      cpu200m.MilliValue(),
@@ -3664,13 +3664,13 @@ func TestUpdatePodContainerResources(t *testing.T) {
 				return containerToUpdateInfo{
 					container:       container,
 					kubeContainerID: kubecontainer.ContainerID{},
-					desiredContainerResources: containerResources{
+					desiredContainerResources: resourceRequirements{
 						memoryLimit:   tc.apiSpecResources[idx].Limits.Memory().Value(),
 						memoryRequest: tc.apiSpecResources[idx].Requests.Memory().Value(),
 						cpuLimit:      tc.apiSpecResources[idx].Limits.Cpu().MilliValue(),
 						cpuRequest:    tc.apiSpecResources[idx].Requests.Cpu().MilliValue(),
 					},
-					currentContainerResources: &containerResources{
+					currentContainerResources: &resourceRequirements{
 						memoryLimit:   tc.apiStatusResources[idx].Limits.Memory().Value(),
 						memoryRequest: tc.apiStatusResources[idx].Requests.Memory().Value(),
 						cpuLimit:      tc.apiStatusResources[idx].Limits.Cpu().MilliValue(),
@@ -3864,8 +3864,8 @@ func TestDoPodResizeAction(t *testing.T) {
 
 	for i, tc := range []struct {
 		testName                  string
-		currentResources          containerResources
-		desiredResources          containerResources
+		currentResources          resourceRequirements
+		desiredResources          resourceRequirements
 		updatedResources          []v1.ResourceName
 		otherContainersHaveLimits bool
 		runtimeErrors             map[string][]error
@@ -3875,11 +3875,11 @@ func TestDoPodResizeAction(t *testing.T) {
 	}{
 		{
 			testName: "Increase cpu and memory requests and limits, with computed pod limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 200, cpuLimit: 200,
 				memoryRequest: 200, memoryLimit: 200,
 			},
@@ -3889,11 +3889,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Increase cpu and memory requests and limits, with computed pod limits and set a runtime error",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 200, cpuLimit: 200,
 				memoryRequest: 200, memoryLimit: 200,
 			},
@@ -3906,11 +3906,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Increase cpu and memory requests and limits, without computed pod limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 200, cpuLimit: 200,
 				memoryRequest: 200, memoryLimit: 200,
 			},
@@ -3921,11 +3921,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Increase cpu and memory requests only",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 200,
 				memoryRequest: 100, memoryLimit: 200,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 150, cpuLimit: 200,
 				memoryRequest: 150, memoryLimit: 200,
 			},
@@ -3934,11 +3934,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Resize memory request no limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 200,
 			},
@@ -3947,11 +3947,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Resize cpu request no limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest:    200,
 				memoryRequest: 100,
 			},
@@ -3960,11 +3960,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
 				memoryRequest: 100, memoryLimit: 100,
 			},
@@ -3973,11 +3973,11 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add limits and pod limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
 				memoryRequest: 100, memoryLimit: 100,
 			},
@@ -4103,18 +4103,18 @@ func TestValidatePodResizeAction(t *testing.T) {
 
 	for _, tc := range []struct {
 		testName                               string
-		currentResources, desiredResources     containerResources
+		currentResources, desiredResources     resourceRequirements
 		currentPodMemLimit, desiredPodMemLimit *int64
 		containerMemoryUsage, podMemoryUsage   *uint64
 		expectedError                          bool
 	}{
 		{
 			testName: "Resize memory request no limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				cpuRequest:    100,
 				memoryRequest: 200,
 			},
@@ -4122,10 +4122,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add container limits, low usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](10),
@@ -4134,10 +4134,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add container limits, high usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](200),
@@ -4146,10 +4146,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add container limits, missing container usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			podMemoryUsage: ptr.To[uint64](10),
@@ -4157,10 +4157,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add container limits, missing pod usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](10),
@@ -4168,20 +4168,20 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Increase container limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 200,
 			},
 			expectedError: false,
 		},
 		{
 			testName: "Decrease container limits, low usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 200,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](20),
@@ -4190,10 +4190,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Decrease container limits, high usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 200,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](150),
@@ -4202,10 +4202,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add pod limit, low usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			desiredPodMemLimit:   ptr.To[int64](100),
@@ -4215,10 +4215,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Add pod limit, high usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			desiredPodMemLimit:   ptr.To[int64](100),
@@ -4228,10 +4228,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Increase pod limits",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			currentPodMemLimit:   ptr.To[int64](100),
@@ -4242,10 +4242,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Decrease pod limits, low usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			currentPodMemLimit:   ptr.To[int64](200),
@@ -4256,10 +4256,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Decrease pod limits, high usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			currentPodMemLimit:   ptr.To[int64](200),
@@ -4270,10 +4270,10 @@ func TestValidatePodResizeAction(t *testing.T) {
 		},
 		{
 			testName: "Decrease pod limits, missing usage",
-			currentResources: containerResources{
+			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			desiredResources: containerResources{
+			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			currentPodMemLimit:   ptr.To[int64](200),

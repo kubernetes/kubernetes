@@ -92,6 +92,8 @@ var (
 
 const (
 	defaultPodAttachTimeout = 60 * time.Second
+
+	defaultDetachSequence = "ctrl-p,ctrl-q"
 )
 
 var metadataAccessor = meta.NewAccessor()
@@ -117,6 +119,7 @@ type RunOptions struct {
 
 	ArgsLenAtDash  int
 	Attach         bool
+	DetachKeys     string
 	Expose         bool
 	Image          string
 	Interactive    bool
@@ -190,6 +193,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, create a ClusterIP service associated with the pod.  Requires `--port`.")
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
+	cmd.Flags().StringVar(&opt.DetachKeys, "detach-keys", defaultDetachSequence, "Override the key sequence for detaching a container.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 	opt.AddOverrideFlags(cmd)
 }
@@ -340,6 +344,8 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			CommandName:   cmd.Parent().CommandPath() + " attach",
 
 			Attach: &attach.DefaultRemoteAttach{},
+
+			DetachKeys: o.DetachKeys,
 		}
 		config, err := f.ToRESTConfig()
 		if err != nil {

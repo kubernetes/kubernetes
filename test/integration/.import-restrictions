@@ -12,6 +12,9 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes/test/e2e/framework/(pod|daemonset)
     allowedPrefixes:
       - ""
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e/dra/utils
+    allowedPrefixes:
+      - ""
   - selectorRegexp: k8s[.]io/kubernetes/test/e2e
     forbiddenPrefixes:
       - ""

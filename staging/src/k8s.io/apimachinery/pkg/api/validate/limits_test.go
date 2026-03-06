@@ -42,7 +42,7 @@ func TestMaxLength(t *testing.T) {
 		value: "0",
 		max:   0,
 		wantErrs: field.ErrorList{
-			field.TooLong(field.NewPath("fldpath"), nil, 0).WithOrigin("maxLength"),
+			field.TooLongCharacters(field.NewPath("fldpath"), "", 0).WithOrigin("maxLength"),
 		},
 	}, {
 		name:     "one character",
@@ -54,14 +54,55 @@ func TestMaxLength(t *testing.T) {
 		value: "01",
 		max:   1,
 		wantErrs: field.ErrorList{
-			field.TooLong(field.NewPath("fldpath"), nil, 1).WithOrigin("maxLength"),
+			field.TooLongCharacters(field.NewPath("fldpath"), "", 1).WithOrigin("maxLength"),
 		},
 	}, {
 		value: "",
 		max:   -1,
 		wantErrs: field.ErrorList{
-			field.TooLong(field.NewPath("fldpath"), nil, -1).WithOrigin("maxLength"),
+			field.TooLongCharacters(field.NewPath("fldpath"), "", -1).WithOrigin("maxLength"),
 		},
+	}, {
+		name:     "ascii-only characters, less characters than max (n-1)",
+		value:    "abcdefghi",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "multi-byte characters, less characters than max (n-1)",
+		value:    "©®©®©®©®©",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "ascii-only characters, more characters than max (n+1)",
+		value: "abcdefghijkl",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLongCharacters(field.NewPath("fldpath"), "", 10).WithOrigin("maxLength"),
+		},
+	}, {
+		name:  "multi-byte characters, more characters than max (n+1)",
+		value: "©®©®©®©®©®©",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLongCharacters(field.NewPath("fldpath"), "", 10).WithOrigin("maxLength"),
+		},
+	}, {
+		name:  "mixture of characters, minimum possible size of input is less than max, rune count exceed maximum",
+		value: "©abc®defghi",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLongCharacters(field.NewPath("fldpath"), "", 10).WithOrigin("maxLength"),
+		},
+	}, {
+		name:     "multi-byte characters, exact characters as max (n)",
+		value:    "©®©®©®©®©®",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "ascii-only characters, exact characters as max (n)",
+		value:    "abcdefghij",
+		max:      10,
+		wantErrs: nil,
 	}}
 
 	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
@@ -211,5 +252,89 @@ func doTestMinimum[T constraints.Integer](t *testing.T, cases []minimumTestCase[
 				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
 			}
 		}
+	}
+}
+
+func TestMaxBytes(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    string
+		max      int
+		wantErrs field.ErrorList // regex
+	}{{
+		name:     "empty string",
+		value:    "",
+		max:      0,
+		wantErrs: nil,
+	}, {
+		name:  "zero length",
+		value: "0",
+		max:   0,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 0).WithOrigin("maxBytes"),
+		},
+	}, {
+		name:     "one character",
+		value:    "0",
+		max:      1,
+		wantErrs: nil,
+	}, {
+		name:  "two characters",
+		value: "01",
+		max:   1,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 1).WithOrigin("maxBytes"),
+		},
+	}, {
+		value: "",
+		max:   -1,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", -1).WithOrigin("maxBytes"),
+		},
+	}, {
+		name:     "ascii-only characters, less bytes than max",
+		value:    "abcdefghi",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "multi-byte characters, less bytes than max",
+		value:    "©®©®",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "ascii-only characters, more bytes than max",
+		value: "abcdefghijkl",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}, {
+		name:  "multi-byte characters, more bytes than max",
+		value: "©®©®©©",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}, {
+		name:     "mixture of characters, less bytes than max",
+		value:    "©abc®®",
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "mixture of characters, more bytes than max",
+		value: "©abc®®abc",
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := tc.value
+			gotErrs := MaxBytes(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
 	}
 }

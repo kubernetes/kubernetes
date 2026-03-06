@@ -218,7 +218,7 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 	case currentReadyCondition != nil && currentReadyCondition.Status == metav1.ConditionFalse:
 		if !c.reportedNotReadyCondition {
 			klog.InfoS("Default ServiceCIDR condition Ready is False, but controller configuration matches. Please validate your cluster's network configuration.", "serviceCIDR", klog.KObj(serviceCIDR), "status", currentReadyCondition.Status, "reason", currentReadyCondition.Reason, "message", currentReadyCondition.Message)
-			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, currentReadyCondition.Reason, "Configuration matches, but "+currentReadyCondition.Message)
+			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, currentReadyCondition.Reason, "Configuration matches, but %s", currentReadyCondition.Message)
 			c.reportedNotReadyCondition = true
 		}
 

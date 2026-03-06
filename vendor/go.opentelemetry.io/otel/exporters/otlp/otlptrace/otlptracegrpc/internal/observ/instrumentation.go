@@ -18,8 +18,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/x"
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
-	"go.opentelemetry.io/otel/semconv/v1.37.0/otelconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/semconv/v1.39.0/otelconv"
 )
 
 const (
@@ -116,7 +116,9 @@ func NewInstrumentation(id int64, target string) (*Instrumentation, error) {
 		// Do not modify attrs (NewSet sorts in-place), make a new slice.
 		recOpt: metric.WithAttributeSet(attribute.NewSet(append(
 			// Default to OK status code.
-			[]attribute.KeyValue{semconv.RPCGRPCStatusCodeOk},
+			[]attribute.KeyValue{
+				semconv.RPCResponseStatusCode(codes.OK.String()),
+			},
 			attrs...,
 		)...)),
 	}
@@ -291,8 +293,7 @@ func (i *Instrumentation) recordOption(err error, code codes.Code) metric.Record
 	defer put(measureAttrsPool, attrs)
 	*attrs = append(*attrs, i.attrs...)
 
-	c := int64(code) // uint32 -> int64.
-	*attrs = append(*attrs, semconv.RPCGRPCStatusCodeKey.Int64(c))
+	*attrs = append(*attrs, semconv.RPCResponseStatusCode(code.String()))
 	if err != nil {
 		*attrs = append(*attrs, semconv.ErrorType(err))
 	}

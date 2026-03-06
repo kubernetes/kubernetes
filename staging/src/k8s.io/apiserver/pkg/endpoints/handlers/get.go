@@ -171,142 +171,153 @@ func getRequestOptions(req *http.Request, scope *RequestScope, into runtime.Obje
 func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		// For performance tracking purposes.
-		ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
-		req = req.WithContext(ctx)
-
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-
-		// Watches for single objects are routed to this function.
-		// Treat a name parameter the same as a field selector entry.
-		hasName := true
-		_, name, err := scope.Namer.Name(req)
-		if err != nil {
-			hasName = false
-		}
 		ctx = request.WithNamespace(ctx, namespace)
-
-		opts := metainternalversion.ListOptions{}
-		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
-			err = errors.NewBadRequest(err.Error())
-			scope.err(err, w, req)
-			return
-		}
-
-		metainternalversion.SetListOptionsDefaults(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList))
-		if errs := metainternalversionvalidation.ValidateListOptions(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList)); len(errs) > 0 {
-			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
-			scope.err(err, w, req)
-			return
-		}
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-
-		// transform fields
-		// TODO: DecodeParametersInto should do this.
-		if opts.FieldSelector != nil {
-			fn := func(label, value string) (newLabel, newValue string, err error) {
-				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
-			}
-			if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
-				// TODO: allow bad request to set field causes based on query parameters
-				err = errors.NewBadRequest(err.Error())
-				scope.err(err, w, req)
-				return
-			}
-		}
-
-		if hasName {
-			// metadata.name is the canonical internal name.
-			// SelectionPredicate will notice that this is a request for
-			// a single object and optimize the storage query accordingly.
-			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
-
-			// Note that fieldSelector setting explicitly the "metadata.name"
-			// will result in reaching this branch (as the value of that field
-			// is propagated to requestInfo as the name parameter.
-			// That said, the allowed field selectors in this branch are:
-			// nil, fields.Everything and field selector matching metadata.name
-			// for our name.
-			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
-				selectedName, ok := opts.FieldSelector.RequiresExactMatch("metadata.name")
-				if !ok || name != selectedName {
-					scope.err(errors.NewBadRequest("fieldSelector metadata.name doesn't match requested name"), w, req)
-					return
-				}
-			} else {
-				opts.FieldSelector = nameSelector
-			}
-		}
-
-		if opts.Watch || forceWatch {
-			if rw == nil {
-				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
-				return
-			}
-			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
-			timeout := time.Duration(0)
-			if opts.TimeoutSeconds != nil {
-				timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-			}
-			if timeout == 0 && minRequestTimeout > 0 {
-				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
-			}
-
-			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "sendInitialEvents", opts.SendInitialEvents, "timeout", timeout, "audit-ID", audit.GetAuditIDTruncated(ctx))
-			ctx, cancel := context.WithTimeout(ctx, timeout)
-			defer func() { cancel() }()
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			// Invalidate cancel() to defer until serve() is complete.
-			deferredCancel := cancel
-			cancel = func() {}
-
-			serve := func() {
-				defer deferredCancel()
-				requestInfo, _ := request.RequestInfoFrom(ctx)
-				metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-					defer watcher.Stop()
-					handler.ServeHTTP(w, req)
-				})
-			}
-
-			// Run watch serving in a separate goroutine to allow freeing current stack memory
-			t := routine.TaskFrom(req.Context())
-			if t != nil {
-				t.Func = serve
-			} else {
-				serve()
-			}
-			return
-		}
-
-		// Log only long List requests (ignore Watch).
-		defer span.End(500 * time.Millisecond)
-		span.AddEvent("About to List from storage")
-		result, err := r.List(ctx, &opts)
+		opts, err := listOpts(req, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		span.AddEvent("Listing from storage done")
-		defer span.AddEvent("Writing http response done", attribute.Int("count", meta.LenList(result)))
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+
+		switch {
+		case opts.Watch || forceWatch:
+			err = handleWatch(ctx, rw, scope, req, w, opts, outputMediaType, minRequestTimeout)
+		default:
+			err = handleList(ctx, r, scope, req, w, opts, outputMediaType)
+		}
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
 	}
+}
+
+func listOpts(req *http.Request, scope *RequestScope) (metainternalversion.ListOptions, error) {
+	// Watches for single objects are routed to this function.
+	// Treat a name parameter the same as a field selector entry.
+	hasName := true
+	_, name, err := scope.Namer.Name(req)
+	if err != nil {
+		hasName = false
+	}
+
+	opts := metainternalversion.ListOptions{}
+	if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
+		return opts, errors.NewBadRequest(err.Error())
+	}
+
+	metainternalversion.SetListOptionsDefaults(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList))
+	if errs := metainternalversionvalidation.ValidateListOptions(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList)); len(errs) > 0 {
+		err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
+		return opts, err
+	}
+
+	// transform fields
+	// TODO: DecodeParametersInto should do this.
+	if opts.FieldSelector != nil {
+		fn := func(label, value string) (newLabel, newValue string, err error) {
+			return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
+		}
+		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
+			// TODO: allow bad request to set field causes based on query parameters
+			return opts, errors.NewBadRequest(err.Error())
+		}
+	}
+
+	if hasName {
+		// metadata.name is the canonical internal name.
+		// SelectionPredicate will notice that this is a request for
+		// a single object and optimize the storage query accordingly.
+		nameSelector := fields.OneTermEqualSelector("metadata.name", name)
+
+		// Note that fieldSelector setting explicitly the "metadata.name"
+		// will result in reaching this branch (as the value of that field
+		// is propagated to requestInfo as the name parameter.
+		// That said, the allowed field selectors in this branch are:
+		// nil, fields.Everything and field selector matching metadata.name
+		// for our name.
+		if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
+			selectedName, ok := opts.FieldSelector.RequiresExactMatch("metadata.name")
+			if !ok || name != selectedName {
+				return opts, errors.NewBadRequest("fieldSelector metadata.name doesn't match requested name")
+			}
+		} else {
+			opts.FieldSelector = nameSelector
+		}
+	}
+	return opts, nil
+}
+
+func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req *http.Request, w http.ResponseWriter, opts metainternalversion.ListOptions, outputMediaType negotiation.MediaTypeOptions, minRequestTimeout time.Duration) error {
+	if rw == nil {
+		return errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch")
+	}
+	// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
+	timeout := time.Duration(0)
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 && minRequestTimeout > 0 {
+		timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+	}
+
+	klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "sendInitialEvents", opts.SendInitialEvents, "timeout", timeout, "audit-ID", audit.GetAuditIDTruncated(ctx))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer func() { cancel() }()
+	watcher, err := rw.Watch(ctx, &opts)
+	if err != nil {
+		return err
+	}
+	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+	if err != nil {
+		return err
+	}
+	// Invalidate cancel() to defer until serve() is complete.
+	deferredCancel := cancel
+	cancel = func() {}
+
+	serve := func() {
+		defer deferredCancel()
+		requestInfo, _ := request.RequestInfoFrom(ctx)
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
+			defer watcher.Stop()
+			handler.ServeHTTP(w, req)
+		})
+	}
+
+	// Run watch serving in a separate goroutine to allow freeing current stack memory
+	t := routine.TaskFrom(req.Context())
+	if t != nil {
+		t.Func = serve
+	} else {
+		serve()
+	}
+	return nil
+}
+
+func handleList(ctx context.Context, r rest.Lister, scope *RequestScope, req *http.Request, w http.ResponseWriter, opts metainternalversion.ListOptions, outputMediaType negotiation.MediaTypeOptions) error {
+	// For performance tracking purposes.
+	ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
+	defer span.End(500 * time.Millisecond)
+	req = req.WithContext(ctx)
+
+	span.AddEvent("About to List from storage")
+	result, err := r.List(ctx, &opts)
+	if err != nil {
+		return err
+	}
+	span.AddEvent("Listing from storage done")
+	defer span.AddEvent("Writing http response done", attribute.Int("count", meta.LenList(result)))
+	transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+	return nil
 }

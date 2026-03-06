@@ -3694,7 +3694,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 	}
 
 	if len(rules) > 20 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("restartPolicyRules"), rules, 20))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("restartPolicyRules"), len(rules), 20))
 	}
 	for i, rule := range rules {
 		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
@@ -3713,7 +3713,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 			}
 
 			if len(rule.ExitCodes.Values) > 255 {
-				allErrs = append(allErrs, field.TooLong(exitCodesFld.Child("values"), rule.ExitCodes.Values, 255))
+				allErrs = append(allErrs, field.TooMany(exitCodesFld.Child("values"), len(rule.ExitCodes.Values), 255))
 			}
 		} else {
 			allErrs = append(allErrs, field.Required(policyRulesFld.Child("exitCodes"), "must be specified"))
@@ -9522,6 +9522,14 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 
 				if !supportedResourceHealthValues.Has(r.Health) {
 					allErrors = append(allErrors, field.NotSupported(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("health"), r.Health, sets.List(supportedResourceHealthValues)))
+				}
+
+				if r.Message != nil {
+					if len(*r.Message) == 0 {
+						allErrors = append(allErrors, field.Required(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("message"), "must be non-empty if specified"))
+					} else if len(*r.Message) > v1.ResourceHealthMessageMaxLength {
+						allErrors = append(allErrors, field.TooLong(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("message"), *r.Message, v1.ResourceHealthMessageMaxLength))
+					}
 				}
 
 				if uniqueResources.Has(r.ResourceID) {

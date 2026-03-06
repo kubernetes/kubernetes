@@ -1502,10 +1502,10 @@ func TestDescribeResources(t *testing.T) {
 			describeResources(testCase.resources, writer, LEVEL_1)
 			output := out.String()
 			gotElements := make(map[string]int)
-			for key, val := range testCase.expectedElements {
+			for key := range testCase.expectedElements {
 				count := strings.Count(output, key)
 				if count == 0 {
-					t.Errorf("expected to find %q in output: %q", val, output)
+					t.Errorf("expected to find %q in output: %q", key, output)
 					continue
 				}
 				gotElements[key] = count
@@ -6597,6 +6597,98 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeNodeWithPodLevelResources(t *testing.T) {
+	holderIdentity := "holder"
+	nodeCapacity := getResourceList("8", "24Gi")
+	nodeAllocatable := getResourceList("4", "12Gi")
+
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: false,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-pod-level-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				// Pod-level resources
+				Resources: &corev1.ResourceRequirements{
+					Requests: getResourceList("2", "4Gi"),
+					Limits:   getResourceList("4", "8Gi"),
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "container-1",
+						Image: "image:latest",
+					},
+					{
+						Name:  "container-2",
+						Image: "image:latest",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify that describeNodeResource works correctly with pod-level resources
+	// Pod-level resources: requests cpu=2, memory=4Gi; limits cpu=4, memory=8Gi
+	// Node allocatable: cpu=4, memory=12Gi
+	// Expected: cpu requests 2 (50%), cpu limits 4 (100%), memory requests 4Gi (33%), memory limits 8Gi (66%)
+	expectedOut := []string{
+		"pod-with-pod-level-resources",
+		// Verify per-pod row shows correct computed values for pod-level resources
+		"pod-with-pod-level-resources    2 (50%)       4 (100%)    4Gi (33%)        8Gi (66%)",
+		// Verify the allocated resources totals correctly account for pod-level resources
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests   Limits
+  --------           --------   ------
+  cpu                2 (50%)    4 (100%)
+  memory             4Gi (33%)  8Gi (66%)
+  ephemeral-storage  0 (0%)     0 (0%)`,
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
@@ -7274,6 +7366,7 @@ func TestDescribeCronJob(t *testing.T) {
 					Schedule:                   "*/5 * * * *",
 					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 					Suspend:                    ptr.To(false),
+					TimeZone:                   ptr.To("America/New_York"),
 					SuccessfulJobsHistoryLimit: ptr.To[int32](3),
 					FailedJobsHistoryLimit:     ptr.To[int32](1),
 					StartingDeadlineSeconds:    ptr.To[int64](200),
@@ -7296,6 +7389,7 @@ func TestDescribeCronJob(t *testing.T) {
 				"Schedule:                      */5 * * * *",
 				"Concurrency Policy:            Forbid",
 				"Suspend:                       False",
+				"Time Zone:                     America/New_York",
 				"Starting Deadline Seconds:     200",
 				"Successful Job History Limit:  3",
 				"Failed Job History Limit:      1",

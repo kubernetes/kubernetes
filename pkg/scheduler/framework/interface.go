@@ -21,6 +21,7 @@ package framework
 import (
 	"context"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -233,10 +234,15 @@ type Framework interface {
 	// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
 	// running the remaining plugins and returns an error. Otherwise, if any of the
-	// plugins returns "Wait", then this function will create and add waiting pod
-	// to a map of currently waiting pods and return status with "Wait" code.
+	// plugins returns "Wait", then this function will construct the pluginsWaitTime and return status with "Wait" code.
+	// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
+	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status)
+
+	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
+	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
-	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+	// This method should only be called when RunPermitPlugins returns a Wait status and WaitOnPermit is expected to execute soon.
+	AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]time.Duration)
 
 	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
 	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
@@ -277,11 +283,20 @@ type Framework interface {
 	Close() error
 }
 
-func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
+// NewPostFilterResult creates PostFilterResult with a provided nominated node
+// and a list of victims (if any) that need to be preempted to make the pod schedulable.
+func NewPostFilterResult(nodeName string, victims []*v1.Pod) *fwk.PostFilterResult {
 	return &fwk.PostFilterResult{
 		NominatingInfo: &fwk.NominatingInfo{
-			NominatedNodeName: name,
+			NominatedNodeName: nodeName,
 			NominatingMode:    fwk.ModeOverride,
 		},
+		Victims: victims,
 	}
+}
+
+// Deprecated: use NewPostFilterResult instead, even if no victims were identified.
+// Deprecated in Kubernetes 1.36 and will be removed in 1.38.
+func NewPostFilterResultWithNominatedNode(nodeName string) *fwk.PostFilterResult {
+	return NewPostFilterResult(nodeName, nil)
 }

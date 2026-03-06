@@ -2,9 +2,9 @@
 
 module k8s.io/kubectl
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
@@ -20,8 +20,8 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/moby/term v0.5.0
-	github.com/onsi/ginkgo/v2 v2.27.4
-	github.com/onsi/gomega v1.39.0
+	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/onsi/gomega v1.39.1
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/spf13/cobra v1.10.0
 	github.com/spf13/pflag v1.0.9
@@ -37,14 +37,14 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4
+	k8s.io/kube-openapi v0.0.0-20260304202019-5b3e3fdb0acf
 	k8s.io/metrics v0.0.0
-	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
-	sigs.k8s.io/kustomize/kustomize/v5 v5.7.1
-	sigs.k8s.io/kustomize/kyaml v0.20.1
+	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
+	sigs.k8s.io/kustomize/kyaml v0.21.1
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.1
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -61,7 +61,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -86,11 +86,11 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	golang.org/x/tools v0.41.0 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/kustomize/api v0.20.1 // indirect
+	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 )
 
 replace (

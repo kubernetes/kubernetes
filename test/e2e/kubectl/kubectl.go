@@ -1504,7 +1504,6 @@ metadata:
 				{"OS Image:"},
 				{"Container Runtime Version:"},
 				{"Kubelet Version:"},
-				{"Kube-Proxy Version:"},
 				{"Pods:"}}
 			checkOutput(output, requiredStrings)
 

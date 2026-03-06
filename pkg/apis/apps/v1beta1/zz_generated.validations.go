@@ -77,13 +77,12 @@ func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *fi
 	// field appsv1beta1.ScaleSpec.Replicas
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
-			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
 			return
 		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *appsv1beta1.ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
 

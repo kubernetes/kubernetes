@@ -63,7 +63,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 
 	ns := framework.CreateNamespaceOrDie(client1, "test-enable-disable-service-cidr", t)
 	// make 2 services , there will be 3 services counting the kubernetes.default
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if _, err := client1.CoreV1().Services(ns.Name).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}

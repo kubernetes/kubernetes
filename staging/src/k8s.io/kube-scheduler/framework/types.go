@@ -636,3 +636,16 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 		*protocol = string(v1.ProtocolTCP)
 	}
 }
+
+// Placement determines the resources to be considered when scheduling a pod group.
+// Pod group scheduling cycle can check multiple placements and select the one that results
+// in the best pod assignments.
+type Placement struct {
+	// Name uniquely identifies the placement.
+	// This is used for diagnostics and debugability.
+	// The choice of the name is up to the PlacementGeneratePlugin.
+	Name string
+	// Nodes specifies the nodes that are valid for this placement.
+	// Scheduler will try to schedule the pod group using only those nodes.
+	Nodes []NodeInfo
+}

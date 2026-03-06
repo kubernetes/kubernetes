@@ -140,6 +140,10 @@ linters:
         text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
 
       - linters:
+          - ginkgolinter
+        text: "Success matcher only support a single error value, or function with Gomega as its first parameter"
+
+      - linters:
           - gocritic
         text: "wrapperFunc: use strings.ReplaceAll|should rewrite switch statement to if statement"
 
@@ -287,12 +291,6 @@ linters:
         # and it's just syntactic sugar.
         - any
         {{- if .Base }}
-        # Replace for-range over b.N with b.Loop.
-        #
-        # Only a hint for new tests because there's
-        # too much existing code that isn't worth
-        # updating.
-        - bloop
         # Replace []byte(fmt.Sprintf) with fmt.Appendf.
         #
         # A useful hint for new code, but
@@ -313,6 +311,12 @@ linters:
         #
         # A useful hint for new code.
         - minmax
+        # simplify code by using go1.26's new(expr)
+        # should only be updated in old code where it really matters.
+        - newexpr
+        # use iterators instead of Len/At-style APIs
+        # should only be updated in old code where it really matters.
+        - stditerators
         {{- end }}
         # Suggest replacing omitempty with omitzero for struct fields.
         #
@@ -330,17 +334,13 @@ linters:
         - reflecttypefor
         # Replace loops with slices.Contains or slices.ContainsFunc.
         #
-        # A useful hint because it can make  code more obvious
+        # A useful hint because it can make code more obvious
         # and/or avoid helper functions.
         - slicescontains
-        # Replace sort.Slice with slices.Sort for basic types.
+        # Replace strings.Index etc. with strings.Cut
         #
-        # A useful hint because the code becomes shorter.
-        - slicessort
-        # Use iterators instead of Len/At-style APIs.
-        #
-        # A useful hint because the code becomes shorter.
-        - stditerators
+        # A useful hint because it can make code more obvious.
+        - stringscut
         # Replace HasPrefix/TrimPrefix with CutPrefix.
         #
         # A useful hint because the code becomes shorter.

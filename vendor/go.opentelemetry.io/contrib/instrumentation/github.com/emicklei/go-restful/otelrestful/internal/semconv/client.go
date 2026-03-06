@@ -12,7 +12,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,8 +19,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv/v1.37.0"
-	"go.opentelemetry.io/otel/semconv/v1.37.0/httpconv"
+	"go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/semconv/v1.39.0/httpconv"
 )
 
 type HTTPClient struct{
@@ -163,23 +162,6 @@ func (n HTTPClient) ResponseTraceAttrs(resp *http.Response) []attribute.KeyValue
 		attrs = append(attrs, semconv.ErrorTypeKey.String(errorType))
 	}
 	return attrs
-}
-
-func (n HTTPClient) ErrorType(err error) attribute.KeyValue {
-	t := reflect.TypeOf(err)
-	var value string
-	if t.PkgPath() == "" && t.Name() == "" {
-		// Likely a builtin type.
-		value = t.String()
-	} else {
-		value = fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
-	}
-
-	if value == "" {
-		return semconv.ErrorTypeOther
-	}
-
-	return semconv.ErrorTypeKey.String(value)
 }
 
 func (n HTTPClient) method(method string) (attribute.KeyValue, attribute.KeyValue) {

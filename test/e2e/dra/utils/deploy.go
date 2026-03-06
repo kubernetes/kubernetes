@@ -75,6 +75,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -283,7 +284,7 @@ type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) *Driver {
-	d := NewDriverInstance(nil)
+	d := NewDriverInstance(ktesting.TContext{} /* no namespace yet, will be set later */)
 
 	ginkgo.BeforeEach(func() {
 		tCtx := f.TContext(context.Background())
@@ -299,6 +300,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator dr
 
 // NewDriverInstance is a variant of NewDriver where the driver is inactive and must
 // be started explicitly with Run. May be used inside ginkgo.It or a Go unit test.
+// The context is used to determine the test's and thus the driver's namespace.
 func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 	d := &Driver{
 		fail:       map[MethodInstance]bool{},
@@ -310,11 +312,10 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
+		WithRealNodes:              true,
 		ExpectResourceSliceRemoval: true,
 	}
-	if tCtx != nil {
-		d.initName(tCtx)
-	}
+	d.initName(tCtx)
 	return d
 }
 
@@ -383,6 +384,9 @@ type Driver struct {
 
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
+
+	// Run driver pods. If false, only set up slices and class.
+	WithRealNodes bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -455,10 +459,11 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 	}
 
-	manifests := []string{
-		// The code below matches the content of this manifest (ports,
-		// container names, etc.).
-		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
+	if !d.WithRealNodes {
+		// Slices have been created as usual.
+		// We don't actually have nodes, so
+		// running pods wouldn't work and can be skipped.
+		return
 	}
 
 	// Create service account and corresponding RBAC rules.
@@ -468,16 +473,52 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 
+	// Figure out which hostpathplugin to use: basically the latest one
+	// from the test/e2e/testing-manifests/storage-csi manifests. That is
+	// where SIG Storage maintains the versions of the hostpath image which
+	// are part of Kubernetes E2E testing. test/utils/image parses those files.
+	//
+	// We piggy-back on that instead of controlling the version ourselves
+	// because it reduces effort, at the risk of unexpected
+	// breakage. Another benefit is that -list-images and registry patching
+	// via test/utils/image + KUBE_TEST_REPO_LIST work.
+	hostPathImage := "registry.k8s.io/sig-storage/hostpathplugin"
+	hostPathVersion := ""
+	for _, config := range image.GetOriginalImageConfigs() {
+		parts := strings.SplitN(config.GetE2EImage(), ":", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		image, version := parts[0], parts[1]
+		if image != hostPathImage {
+			continue
+		}
+		// "Dumb" string comparison is good enough for e.g. v1.16.1 < v1.17.0.
+		// It seems unlikely that any major/patch will need more than one digit
+		// or that version grow beyond 99.
+		if hostPathVersion == "" || hostPathVersion < version {
+			hostPathVersion = version
+		}
+	}
+	origImageURL := hostPathImage + ":" + hostPathVersion
+	patchedImageURL, err := image.ReplaceRegistryInImageURL(origImageURL)
+	tCtx.ExpectNoError(err, "look up E2E image")
+
 	// Using a ReplicaSet instead of a DaemonSet has the advantage that we can control
 	// the lifecycle explicitly, in particular run two pods per node long enough to
 	// run checks.
+	manifests := []string{
+		// The code below matches the content of this manifest (ports,
+		// container names, etc.).
+		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
+	}
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	numNodes := int32(len(nodes.NodeNames))
 	pluginDataDirectoryPath := path.Join(kubeletRootDir, "plugins", d.Name)
 	registrarDirectoryPath := path.Join(kubeletRootDir, "plugins_registry")
 	instanceName := d.Name + d.InstanceSuffix
-	err := utils.CreateFromManifestsTCtx(tCtx, func(item interface{}) error {
+	err = utils.CreateFromManifestsTCtx(tCtx, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix + d.InstanceSuffix
@@ -485,6 +526,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 			item.Spec.Replicas = &numNodes
 			item.Spec.Selector.MatchLabels[instanceKey] = instanceName
 			item.Spec.Template.Labels[instanceKey] = instanceName
+			item.Spec.Template.Spec.Containers[0].Image = patchedImageURL
 			item.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
 			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = instanceName
 			item.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
@@ -608,7 +650,8 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 		// All listeners running in this pod use a new unique local port number
 		// by atomically incrementing this variable.
-		listenerPort := int32(9000)
+		var listenerPort atomic.Int32
+		listenerPort.Store(9000)
 		rollingUpdateUID := pod.UID
 		serialize := true
 		if !d.RollingUpdate {
@@ -619,6 +662,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
+			app.Options{EnableHealthService: true},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)
@@ -643,20 +687,23 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		d.cleanup = append(d.cleanup, func(tCtx ktesting.TContext) {
 			// Depends on cancel being called first.
 			plugin.Stop()
-
-			// Also explicitly stop all pods.
-			tCtx.Log("scaling down driver proxy pods for", d.Name)
-			rs, err := tCtx.Client().AppsV1().ReplicaSets(tCtx.Namespace()).Get(tCtx, rsName, metav1.GetOptions{})
-			tCtx.ExpectNoError(err, "get ReplicaSet for driver "+d.Name)
-			rs.Spec.Replicas = ptr.To(int32(0))
-			rs, err = tCtx.Client().AppsV1().ReplicaSets(tCtx.Namespace()).Update(tCtx, rs, metav1.UpdateOptions{})
-			tCtx.ExpectNoError(err, "scale down ReplicaSet for driver "+d.Name)
-			if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(tCtx, tCtx.Client(), rs, 0); err != nil {
-				tCtx.ExpectNoError(err, "all kubelet plugin proxies stopped")
-			}
 		})
 		d.Nodes[nodename] = KubeletPlugin{ExamplePlugin: plugin, ClientSet: driverClient}
 	}
+
+	// Scale down the proxy ReplicaSet after all per-node plugins have
+	// been stopped.
+	d.cleanup = append(d.cleanup, func(tCtx ktesting.TContext) {
+		tCtx.Log("scaling down driver proxy pods for", d.Name)
+		rs, err := tCtx.Client().AppsV1().ReplicaSets(tCtx.Namespace()).Get(tCtx, rsName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get ReplicaSet for driver "+d.Name)
+		rs.Spec.Replicas = ptr.To(int32(0))
+		rs, err = tCtx.Client().AppsV1().ReplicaSets(tCtx.Namespace()).Update(tCtx, rs, metav1.UpdateOptions{})
+		tCtx.ExpectNoError(err, "scale down ReplicaSet for driver "+d.Name)
+		if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(tCtx, tCtx.Client(), rs, 0); err != nil {
+			tCtx.ExpectNoError(err, "all kubelet plugin proxies stopped")
+		}
+	})
 
 	if !d.WithKubelet {
 		return
@@ -781,7 +828,7 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
+func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *atomic.Int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
 	return func(ctx context.Context, endpoint string) (l net.Listener, e error) {
 		// No need create sockets, the kubelet is not expected to use them.
 		if !d.WithKubelet {
@@ -799,7 +846,7 @@ func (d *Driver) listen(tCtx ktesting.TContext, pod *v1.Pod, port *int32) func(c
 		}
 
 		// "Allocate" a new port by by bumping the per-pod counter by one.
-		port := atomic.AddInt32(port, 1)
+		port := port.Add(1)
 
 		logger := klog.FromContext(ctx)
 		logger = klog.LoggerWithName(logger, "socket-listener")
@@ -994,6 +1041,7 @@ func (d *Driver) TearDown(tCtx ktesting.TContext) {
 //
 // Only use this in tests where kubelet support for DRA is guaranteed.
 func (d *Driver) IsGone(tCtx ktesting.TContext) {
+	tCtx.Helper()
 	tCtx.Logf("Waiting for ResourceSlices of driver %s to be removed...", d.Name)
 	tCtx.Eventually(d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 }

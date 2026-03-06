@@ -246,7 +246,7 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
@@ -785,7 +785,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 
@@ -799,7 +799,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
@@ -808,7 +808,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
@@ -828,7 +828,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 	return allErrs
 }
 

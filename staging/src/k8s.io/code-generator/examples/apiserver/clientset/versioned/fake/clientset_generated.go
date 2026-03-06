@@ -40,10 +40,6 @@ import (
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-//
-// Deprecated: NewClientset replaces this with support for field management, which significantly improves
-// server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
-// via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -89,7 +85,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-// IsWatchListSemanticsSupported informs the reflector that this client
+// IsWatchListSemanticsUnSupported informs the reflector that this client
 // doesn't support WatchList semantics.
 //
 // This is a synthetic method whose sole purpose is to satisfy the optional
