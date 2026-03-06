@@ -1361,15 +1361,11 @@ message Container {
     // MUST be identical to that of the corresponding ContainerConfig used to
     // instantiate this Container.
     map<string, string> annotations = 9;
-    // Reference to the unique identifier of the image, on the node, as
-    // returned in the image service apis.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
     //
-    // Note: The image_ref above has been historically used by container
-    // runtimes to reference images by digest. The image_ref has been also used
-    // in the kubelet image garbage collection, which does not work with
-    // digests at all. To separate and avoid possible misusage, we now
-    // introduce the image_id field, which should always refer to a unique
-    // image identifier on the node.
+    // This value MUST always match `PullImageResponse.image_id` when referring
+    // to the same image.
     string image_id = 10;
 }
 
@@ -1424,13 +1420,11 @@ message ContainerStatus {
     string log_path = 15;
     // Resource limits configuration of the container.
     ContainerResources resources = 16;
-    // Reference to the unique identifier of the image, on the node, as
-    // returned in the image service apis.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
     //
-    // Note: The image_ref above has been historically used by container
-    // runtimes to reference images by digest. To separate and avoid possible
-    // misusage, we now introduce the image_id field, which should always refer
-    // to a unique image identifier on the node.
+    // This value MUST always match `PullImageResponse.image_id` when referring
+    // to the same image.
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
@@ -1584,7 +1578,11 @@ message ListImagesRequest {
 
 // Basic information about a container image.
 message Image {
-    // ID of the image.
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
+    //
+    // This value MUST always match `PullImageResponse.image_id` when referring
+    // to the same image.
     string id = 1;
     // Other names by which this image is known.
     repeated string repo_tags = 2;
@@ -1655,6 +1653,27 @@ message PullImageResponse {
     // Reference to the image in use. For most runtimes, this should be an
     // image ID or digest.
     string image_ref = 1;
+
+    // Reference to the unique identifier of the image on the node, as
+    // returned in the image and runtime service apis.
+    //
+    // When referring to the same image, the container runtime MUST always return
+    // the same value for:
+    //     - Image.id
+    //     - Container.image_id
+    //     - ContainerStatus.image_id
+    //     - PullImageResponse.image_id
+    //
+    // Note: The image_ref above has been historically used by container
+    // runtimes to reference images by digest OR an image ID. This type
+    // ambiguity lead to some runtimes returning the digest, others returning the
+    // ID. To separate and avoid possible misusage, we introduce the image_id field,
+    // which should always refer to a unique image identifier on the node for pulled
+    // and imported images.
+    //
+    // It would be a breaking change to the CRI Integration if the image ID value
+    // for an image changes on a node.
+    string image_id = 2;
 }
 
 message RemoveImageRequest {
