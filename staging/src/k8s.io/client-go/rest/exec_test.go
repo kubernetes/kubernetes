@@ -256,6 +256,7 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		func(r *func(*http.Request) (*url.URL, error), f randfill.Continue) {
 			*r = fakeProxyFunc
 		},
+		func(r *<-chan struct{}, f randfill.Continue) {},
 		func(r *runtime.Object, f randfill.Continue) {
 			unknown := &runtime.Unknown{}
 			f.Fill(unknown)
@@ -295,6 +296,7 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		expected.WarningHandlerWithContext = nil
 		expected.Timeout = 0
 		expected.Dial = nil
+		expected.DialerStopCh = nil
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Host != "" {

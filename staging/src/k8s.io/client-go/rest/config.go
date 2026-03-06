@@ -159,6 +159,10 @@ type Config struct {
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
 
+	// DialerStopCh is an optional stop channel for the cert-reloading dialer goroutine.
+	// If nil, the dialer goroutine will run for the lifetime of the process.
+	DialerStopCh <-chan struct{}
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
@@ -653,6 +657,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+		DialerStopCh:              config.DialerStopCh,
 	}
 }
 
@@ -698,6 +703,7 @@ func CopyConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+		DialerStopCh:              config.DialerStopCh,
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
