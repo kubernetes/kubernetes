@@ -1414,6 +1414,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1.NodeAffinityArgs{}.OpenAPIModelName():                                                                  schema_k8sio_kube_scheduler_config_v1_NodeAffinityArgs(ref),
 		configv1.NodeResourcesBalancedAllocationArgs{}.OpenAPIModelName():                                               schema_k8sio_kube_scheduler_config_v1_NodeResourcesBalancedAllocationArgs(ref),
 		configv1.NodeResourcesFitArgs{}.OpenAPIModelName():                                                              schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref),
+		configv1.PlacementBinPackingArgs{}.OpenAPIModelName():                                                           schema_k8sio_kube_scheduler_config_v1_PlacementBinPackingArgs(ref),
 		configv1.Plugin{}.OpenAPIModelName():                                                                            schema_k8sio_kube_scheduler_config_v1_Plugin(ref),
 		configv1.PluginConfig{}.OpenAPIModelName():                                                                      schema_k8sio_kube_scheduler_config_v1_PluginConfig(ref),
 		configv1.PluginSet{}.OpenAPIModelName():                                                                         schema_k8sio_kube_scheduler_config_v1_PluginSet(ref),
@@ -68619,11 +68620,46 @@ func schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref common.Refer
 	}
 }
 
+func schema_k8sio_kube_scheduler_config_v1_PlacementBinPackingArgs(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"scoringStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScoringStrategy selects the placement resource scoring strategy.",
+							Ref:         ref(configv1.ScoringStrategy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			configv1.ScoringStrategy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_kube_scheduler_config_v1_Plugin(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.",
+				Description: "Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score and PlacementScore plugins.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -68636,7 +68672,7 @@ func schema_k8sio_kube_scheduler_config_v1_Plugin(ref common.ReferenceCallback) 
 					},
 					"weight": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Weight defines the weight of plugin, only used for Score plugins.",
+							Description: "Weight defines the weight of plugin, only used for Score and PlacementScore plugins.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -68835,6 +68871,13 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 					"placementGenerate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PlacementGenerate is a list of plugins that should be invoked during pod group scheduling cycle when determining placements for a pod group.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
+					"placementScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
 						},

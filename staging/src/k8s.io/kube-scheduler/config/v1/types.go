@@ -235,6 +235,9 @@ type Plugins struct {
 
 	// PlacementGenerate is a list of plugins that should be invoked during pod group scheduling cycle when determining placements for a pod group.
 	PlacementGenerate PluginSet `json:"placementGenerate,omitempty"`
+
+	// PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.
+	PlacementScore PluginSet `json:"placementScore,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -253,11 +256,11 @@ type PluginSet struct {
 	Disabled []Plugin `json:"disabled,omitempty"`
 }
 
-// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.
+// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score and PlacementScore plugins.
 type Plugin struct {
 	// Name defines the name of plugin
 	Name string `json:"name"`
-	// Weight defines the weight of plugin, only used for Score plugins.
+	// Weight defines the weight of plugin, only used for Score and PlacementScore plugins.
 	Weight *int32 `json:"weight,omitempty"`
 }
 

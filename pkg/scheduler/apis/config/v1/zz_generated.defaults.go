@@ -40,6 +40,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*configv1.NodeResourcesBalancedAllocationArgs))
 	})
 	scheme.AddTypeDefaultingFunc(&configv1.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*configv1.NodeResourcesFitArgs)) })
+	scheme.AddTypeDefaultingFunc(&configv1.PlacementBinPackingArgs{}, func(obj interface{}) {
+		SetObjectDefaults_PlacementBinPackingArgs(obj.(*configv1.PlacementBinPackingArgs))
+	})
 	scheme.AddTypeDefaultingFunc(&configv1.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*configv1.PodTopologySpreadArgs)) })
 	scheme.AddTypeDefaultingFunc(&configv1.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*configv1.VolumeBindingArgs)) })
 	return nil
@@ -67,6 +70,10 @@ func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *configv1.NodeReso
 
 func SetObjectDefaults_NodeResourcesFitArgs(in *configv1.NodeResourcesFitArgs) {
 	SetDefaults_NodeResourcesFitArgs(in)
+}
+
+func SetObjectDefaults_PlacementBinPackingArgs(in *configv1.PlacementBinPackingArgs) {
+	SetDefaults_PlacementBinPackingArgs(in)
 }
 
 func SetObjectDefaults_PodTopologySpreadArgs(in *configv1.PodTopologySpreadArgs) {

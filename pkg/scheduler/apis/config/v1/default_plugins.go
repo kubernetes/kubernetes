@@ -69,6 +69,17 @@ func applyFeatureGates(config *v1.Plugins) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{
+			Name:   names.PlacementBinPacking,
+			Weight: ptr.To[int32](1),
+		})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{
+			Name:   names.PlacementBinPacking,
+			Weight: ptr.To[int32](1),
+		})
 	}
 }
 
@@ -114,6 +125,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.Bind = mergePluginSet(logger, defaultPlugins.Bind, customPlugins.Bind)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
 	defaultPlugins.PlacementGenerate = mergePluginSet(logger, defaultPlugins.PlacementGenerate, customPlugins.PlacementGenerate)
+	defaultPlugins.PlacementScore = mergePluginSet(logger, defaultPlugins.PlacementScore, customPlugins.PlacementScore)
 	return defaultPlugins
 }
 
