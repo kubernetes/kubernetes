@@ -5,7 +5,8 @@
     "selfLink": "selfLinkValue",
     "resourceVersion": "resourceVersionValue",
     "continue": "continueValue",
-    "remainingItemCount": 4
+    "remainingItemCount": 4,
+    "sharded": true
   },
   "status": "statusValue",
   "message": "messageValue",

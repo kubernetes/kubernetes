@@ -61299,6 +61299,13 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 							Format:      "int64",
 						},
 					},
+					"sharded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sharded indicates this list is a filtered subset of the full list, as selected by a shard selector on the request. Clients should not cache sharded list responses as a full representation of the collection.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -61393,6 +61400,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 						SchemaProps: spec.SchemaProps{
 							Description: "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "selector is a shard selector that restricts the list of returned objects using a functional grammar. The format is a comma-separated list of requirements, where each requirement is: shardRange(fieldPath,hexStart,hexEnd). The fieldPath specifies which metadata field to hash (e.g. object.metadata.uid). hexStart/hexEnd define the inclusive lower and exclusive upper bounds of the FNV-1a hash range. Empty bounds mean unbounded. Example: shardRange(object.metadata.uid,0000000000000000,8000000000000000) Requires the ShardedListandWatch feature gate to be enabled.",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},

@@ -77,6 +77,7 @@ response:
       remainingItemCount: 4
       resourceVersion: resourceVersionValue
       selfLink: selfLinkValue
+      sharded: true
     reason: reasonValue
     status: statusValue
   uid: uidValue

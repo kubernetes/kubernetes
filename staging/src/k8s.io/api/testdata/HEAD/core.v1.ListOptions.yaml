@@ -7,6 +7,7 @@ labelSelector: labelSelectorValue
 limit: 7
 resourceVersion: resourceVersionValue
 resourceVersionMatch: resourceVersionMatchValue
+selector: selectorValue
 sendInitialEvents: true
 timeoutSeconds: 5
 watch: true

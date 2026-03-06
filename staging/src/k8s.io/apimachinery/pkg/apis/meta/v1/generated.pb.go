@@ -1100,6 +1100,14 @@ func (m *ListMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i--
+	if m.Sharded {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x28
 	if m.RemainingItemCount != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.RemainingItemCount))
 		i--
@@ -1143,6 +1151,11 @@ func (m *ListOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.Selector)
+	copy(dAtA[i:], m.Selector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Selector)))
+	i--
+	dAtA[i] = 0x7a
 	if m.SendInitialEvents != nil {
 		i--
 		if *m.SendInitialEvents {
@@ -2542,6 +2555,7 @@ func (m *ListMeta) Size() (n int) {
 	if m.RemainingItemCount != nil {
 		n += 1 + sovGenerated(uint64(*m.RemainingItemCount))
 	}
+	n += 2
 	return n
 }
 
@@ -2570,6 +2584,8 @@ func (m *ListOptions) Size() (n int) {
 	if m.SendInitialEvents != nil {
 		n += 2
 	}
+	l = len(m.Selector)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -3174,6 +3190,7 @@ func (this *ListMeta) String() string {
 		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
 		`Continue:` + fmt.Sprintf("%v", this.Continue) + `,`,
 		`RemainingItemCount:` + valueToStringGenerated(this.RemainingItemCount) + `,`,
+		`Sharded:` + fmt.Sprintf("%v", this.Sharded) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3193,6 +3210,7 @@ func (this *ListOptions) String() string {
 		`AllowWatchBookmarks:` + fmt.Sprintf("%v", this.AllowWatchBookmarks) + `,`,
 		`ResourceVersionMatch:` + fmt.Sprintf("%v", this.ResourceVersionMatch) + `,`,
 		`SendInitialEvents:` + valueToStringGenerated(this.SendInitialEvents) + `,`,
+		`Selector:` + fmt.Sprintf("%v", this.Selector) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6720,6 +6738,26 @@ func (m *ListMeta) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.RemainingItemCount = &v
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Sharded", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Sharded = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -7030,6 +7068,38 @@ func (m *ListOptions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SendInitialEvents = &b
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Selector = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
