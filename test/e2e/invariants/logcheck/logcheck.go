@@ -129,13 +129,15 @@ type logCheck struct {
 
 	// dataRaces enables checking for "DATA RACE" reports.
 	dataRaces bool
+	// panics enabled checking for go panics
+	panics bool
 	// More checks may get added in the future.
 }
 
 // any returns true if any log output check is enabled.
 func (c logCheck) any() bool {
 	// Needs to be extended when adding new checks.
-	return c.dataRaces
+	return c.dataRaces || c.panics
 }
 
 // regexpValue implements flag.Value for a regular expression.
@@ -161,6 +163,7 @@ func (r *regexpValue) Set(expr string) error {
 // RegisterFlags adds command line flags for configuring the package to the given flag set.
 // They have "logcheck" as prefix.
 func RegisterFlags(fs *flag.FlagSet) {
+	fs.BoolVar(&enabledLogChecks.panics, "logcheck-panics", false, "enables checking logs for panics")
 	fs.BoolVar(&enabledLogChecks.dataRaces, "logcheck-data-races", false, "enables checking logs for DATA RACE warnings")
 	fs.Var(&enabledLogChecks.namespaces, "logcheck-namespaces-regexp", "all namespaces matching this regular expressions get checked")
 	fs.Var(&enabledLogChecks.nodes, "logcheck-nodes-regexp", "all kubelets on nodes matching this regular expressions get checked")
@@ -256,6 +259,7 @@ func newLogChecker(ctx context.Context, client kubernetes.Interface, check logCh
 		logDir:    logDir,
 		logFile:   logFile,
 		dataRaces: make(map[string][][]string),
+		panics:    make(map[string][][]string),
 	}, nil
 }
 
@@ -280,6 +284,15 @@ type logChecker struct {
 	// Only entities for which at least some output was received get added here,
 	// therefore also the "<entity>: okay" part of the report only appears for those.
 	dataRaces map[string][][]string
+
+	// All panics detected so far, indexed by "<namespace>/<pod name>/<container name>"
+	// or "kubelet/<node name>".
+	//
+	// The last entry is initially empty while waiting for the next panic.
+	//
+	// Only entities for which at least some output was received get added here,
+	// therefore also the "<entity>: okay" part of the report only appears for those.
+	panics map[string][][]string
 }
 
 // stop cancels pod monitoring, waits until that is shut down, and then produces text for a failure message (ideally empty) and stdout.
@@ -321,15 +334,17 @@ func (l *logChecker) stop(logger klog.Logger) (failure, stdout string) {
 	slices.Sort(keys)
 	for _, k := range keys {
 		races := l.dataRaces[k]
+		panics := l.panics[k]
 		buffer := &failureBuffer
-		if len(races) == 0 {
+		noIssues := len(races) == 0 && len(panics) == 0
+		if noIssues {
 			buffer = &stdoutBuffer
 		}
 		if buffer.Len() > 0 {
 			buffer.WriteString("\n")
 		}
 		buffer.WriteString("#### " + k + "\n")
-		if len(races) == 0 {
+		if noIssues {
 			buffer.WriteString("\nOkay.\n")
 			continue
 		}
@@ -380,6 +395,12 @@ func (l *logChecker) stop(logger klog.Logger) (failure, stdout string) {
 				backtrace = append(backtrace, line)
 			}
 			dumpBacktrace()
+		}
+		for _, panic := range panics {
+			buffer.WriteString("\n")
+			for _, line := range panic {
+				buffer.WriteString(line)
+			}
 		}
 	}
 
@@ -471,7 +492,7 @@ const journaldHeader = `... .. ..:..:......... \S+ kubelet\[\d+\]: `
 var logQueryLineHeaderRE = regexp.MustCompile(`^(?:` + journaldHeader + `)`)
 
 func (l *logChecker) logOpen(logger klog.Logger, names ...string) io.Writer {
-	if !l.check.dataRaces {
+	if !l.check.any() {
 		return nil
 	}
 
@@ -480,7 +501,7 @@ func (l *logChecker) logOpen(logger klog.Logger, names ...string) io.Writer {
 	}
 
 	k := strings.Join(names, "/")
-	logger.Info("Starting to check for data races", "container", k)
+	logger.Info("Starting to check logs", "container", k)
 	return &logOutputChecker{logger: logger, k: k, l: l}
 }
 
@@ -510,7 +531,17 @@ type logOutputChecker struct {
 	k          string
 	l          *logChecker
 	inDataRace bool
+	panicState panicMatchState
 }
+
+type panicMatchState uint8
+
+const (
+	notInPanic  panicMatchState = 0
+	inPanic     panicMatchState = 1
+	firstBlank  panicMatchState = 2
+	restOfPanic panicMatchState = 3
+)
 
 var (
 	_ io.Writer = &logOutputChecker{}
@@ -526,7 +557,25 @@ func (p *logOutputChecker) Write(l []byte) (int, error) {
 	defer p.l.mutex.Unlock()
 
 	races := p.l.dataRaces[p.k]
+	panics := p.l.panics[p.k]
+
 	switch {
+	// panic state machine
+	case p.panicState == notInPanic && strings.HasPrefix(line, "panic: "):
+		p.panicState = inPanic
+		panics = append(panics, nil)
+		p.logger.Info("Started new panic", "containerd", p.k, "count", len(panics))
+	case p.panicState == inPanic: // consume first blank line after a panic
+		p.panicState = firstBlank
+		panics[len(panics)-1] = append(panics[len(panics)-1], line)
+	case p.panicState == firstBlank: // there will be at least one goroutine log line after the first blank
+		p.panicState = restOfPanic
+		panics[len(panics)-1] = append(panics[len(panics)-1], line)
+	case p.panicState == restOfPanic && line == "\n": // panic ends with blank line
+		p.panicState = notInPanic
+		p.logger.Info("Completed panic", "container", p.k, "count", len(panics), "panic", strings.Join(panics[len(panics)-1], ""))
+
+	// data race state machine
 	case p.inDataRace && line != dataRaceEnd:
 		races[len(races)-1] = append(races[len(races)-1], line)
 	case p.inDataRace && line == dataRaceEnd:
@@ -538,17 +587,20 @@ func (p *logOutputChecker) Write(l []byte) (int, error) {
 		p.inDataRace = true
 		races = append(races, nil)
 		p.logger.Info("Started new data race", "container", p.k, "count", len(races))
+
 	default:
 		// Some other log output.
 	}
+
 	p.l.dataRaces[p.k] = races
+	p.l.panics[p.k] = panics
 
 	return len(l), nil
 }
 
 // Close gets called once all output is processed.
 func (p *logOutputChecker) Close() error {
-	p.logger.Info("Done checking for data races", "container", p.k)
+	p.logger.Info("Done checking logs", "container", p.k)
 	p.l.wg.done()
 	return nil
 }

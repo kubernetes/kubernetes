@@ -84,14 +84,14 @@ DATA RACE:
       scheduleHandler()
 `,
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "Starting to check for data races" container="kube-system/pod/container"
+<log header>] "Starting to check logs" container="kube-system/pod/container"
 <log header>] "Started new data race" container="kube-system/pod/container" count=1
 <log header>] "Completed data race" container="kube-system/pod/container" count=1 dataRace=<
 	Write at ...
 	Goroutine created at:
 	  scheduleHandler()
  >
-<log header>] "Done checking for data races" container="kube-system/pod/container"
+<log header>] "Done checking logs" container="kube-system/pod/container"
 `,
 		},
 		"disabled-data-race": {
@@ -182,7 +182,7 @@ Goroutine created at:
         otherScheduleHandler()
 `,
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "Starting to check for data races" container="kube-system/pod/container"
+<log header>] "Starting to check logs" container="kube-system/pod/container"
 <log header>] "Started new data race" container="kube-system/pod/container" count=1
 <log header>] "Completed data race" container="kube-system/pod/container" count=1 dataRace=<
 	Write at ...
@@ -195,7 +195,7 @@ Goroutine created at:
 	Goroutine created at:
 	  otherScheduleHandler()
  >
-<log header>] "Done checking for data races" container="kube-system/pod/container"
+<log header>] "Done checking logs" container="kube-system/pod/container"
 `,
 		},
 		"both": {
@@ -216,14 +216,14 @@ DATA RACE:
       scheduleHandler()
 `,
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "Starting to check for data races" container="kube-system/pod/container"
+<log header>] "Starting to check logs" container="kube-system/pod/container"
 <log header>] "Started new data race" container="kube-system/pod/container" count=1
 <log header>] "Completed data race" container="kube-system/pod/container" count=1 dataRace=<
 	Write at ...
 	Goroutine created at:
 	  scheduleHandler()
  >
-<log header>] "Done checking for data races" container="kube-system/pod/container"
+<log header>] "Done checking logs" container="kube-system/pod/container"
 `,
 		},
 		"two-containers": {
@@ -239,16 +239,16 @@ Goroutine created at:
 			},
 			check: logCheck{dataRaces: true},
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "Starting to check for data races" container="kube-system/pod/container1"
-<log header>] "Done checking for data races" container="kube-system/pod/container1"
-<log header>] "Starting to check for data races" container="kube-system/pod/container2"
+<log header>] "Starting to check logs" container="kube-system/pod/container1"
+<log header>] "Done checking logs" container="kube-system/pod/container1"
+<log header>] "Starting to check logs" container="kube-system/pod/container2"
 <log header>] "Started new data race" container="kube-system/pod/container2" count=1
 <log header>] "Completed data race" container="kube-system/pod/container2" count=1 dataRace=<
 	Write at ...
 	Goroutine created at:
 	  scheduleHandler()
  >
-<log header>] "Done checking for data races" container="kube-system/pod/container2"
+<log header>] "Done checking logs" container="kube-system/pod/container2"
 
 #### kube-system/pod/container1
 
@@ -276,16 +276,16 @@ Goroutine created at:
 			},
 			check: logCheck{dataRaces: true},
 			expectStdout: `<log header>] "Watching" namespace="kube-system"
-<log header>] "Starting to check for data races" container="kube-system/pod1/container"
-<log header>] "Done checking for data races" container="kube-system/pod1/container"
-<log header>] "Starting to check for data races" container="kube-system/pod2/container"
+<log header>] "Starting to check logs" container="kube-system/pod1/container"
+<log header>] "Done checking logs" container="kube-system/pod1/container"
+<log header>] "Starting to check logs" container="kube-system/pod2/container"
 <log header>] "Started new data race" container="kube-system/pod2/container" count=1
 <log header>] "Completed data race" container="kube-system/pod2/container" count=1 dataRace=<
 	Write at ...
 	Goroutine created at:
 	  scheduleHandler()
  >
-<log header>] "Done checking for data races" container="kube-system/pod2/container"
+<log header>] "Done checking logs" container="kube-system/pod2/container"
 
 #### kube-system/pod1/container
 
