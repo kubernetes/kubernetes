@@ -56,10 +56,6 @@ var (
 	lazyCompiler      *compiler
 	lazyFeatures      Features
 
-	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
-	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
-	attributeType = withMaxElements(apiservercel.AnyType, resourceapi.DeviceAttributeMaxValueLength)
-
 	// Other strings also have a known maximum size.
 	domainType = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxDomainLength)
 	idType     = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxIDLength)
@@ -70,10 +66,6 @@ var (
 	// actual cost in compile_test.go).
 	multiAllocType = withMaxElements(apiservercel.BoolType, 1)
 
-	// Each map is bound by the maximum number of different attributes.
-	innerAttributesMapType = apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-	outerAttributesMapType = apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-
 	// Same for capacity.
 	innerCapacityMapType = apiservercel.NewMapType(idType, apiservercel.QuantityDeclType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
 	outerCapacityMapType = apiservercel.NewMapType(domainType, innerCapacityMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
@@ -82,6 +74,7 @@ var (
 // Features contains feature gates supported by the package.
 type Features struct {
 	EnableConsumableCapacity bool
+	EnableListTypeAttributes bool
 }
 
 func GetCompiler(features Features) *compiler {
@@ -110,6 +103,8 @@ type CompilationResult struct {
 	MaxCost uint64
 
 	emptyMapVal ref.Val
+
+	features Features
 }
 
 // Device defines the input values for a CEL selector expression.
@@ -131,6 +126,13 @@ type compiler struct {
 	// cost estimates version-dependent.
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet
+
+	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
+	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
+	// If DRAListTypeAttributes is enabled, this also applies to list attributes, so that the cost estimator can take into account the size of the list.
+	attributeType *apiservercel.DeclType
+
+	features Features
 }
 
 // Options contains several additional parameters
@@ -160,6 +162,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 			},
 			Expression: expression,
 			MaxCost:    math.MaxUint64,
+			features:   c.features,
 		}
 	}
 
@@ -173,9 +176,16 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 	expectedReturnType := cel.BoolType
-	if ast.OutputType() != expectedReturnType &&
-		ast.OutputType() != cel.AnyType {
-		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
+	if c.features.EnableListTypeAttributes {
+		if ast.OutputType() != expectedReturnType &&
+			ast.OutputType() != cel.DynType {
+			return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
+		}
+	} else {
+		if ast.OutputType() != expectedReturnType &&
+			ast.OutputType() != cel.AnyType {
+			return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
+		}
 	}
 	_, err = cel.AstToCheckedExpr(ast)
 	if err != nil {
@@ -200,6 +210,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 		MaxCost:     math.MaxUint64,
+		features:    c.features,
 	}
 
 	if !options.DisableCostEstimation {
@@ -217,14 +228,15 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	return compilationResult
 }
 
-func (c *compiler) newCostEstimator() *library.CostEstimator {
-	return &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
+func (c *compiler) newCostEstimator() checker.CostEstimator {
+	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
+	return &draCostEstimator{base: base}
 }
 
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+func getAttributeValue(attr resourceapi.DeviceAttribute, features Features) (any, error) {
 	switch {
 	case attr.IntValue != nil:
 		return *attr.IntValue, nil
@@ -238,6 +250,31 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 			return nil, fmt.Errorf("parse semantic version: %w", err)
 		}
 		return apiservercel.Semver{Version: v}, nil
+	case attr.ListValue != nil:
+		if !features.EnableListTypeAttributes {
+			return nil, errors.New("unsupported attribute value")
+		}
+		listValue := *attr.ListValue
+		switch {
+		case listValue.IntValue != nil:
+			return listValue.IntValue, nil
+		case listValue.BoolValue != nil:
+			return listValue.BoolValue, nil
+		case listValue.StringValue != nil:
+			return listValue.StringValue, nil
+		case listValue.VersionValue != nil:
+			semVers := make([]apiservercel.Semver, len(listValue.VersionValue))
+			for i, versionStr := range listValue.VersionValue {
+				v, err := semver.Parse(versionStr)
+				if err != nil {
+					return nil, fmt.Errorf("parse semantic version: %w", err)
+				}
+				semVers[i] = apiservercel.Semver{Version: v}
+			}
+			return semVers, nil
+		default:
+			return nil, errors.New("unsupported list attribute value")
+		}
 	default:
 		return nil, errors.New("unsupported attribute value")
 	}
@@ -250,7 +287,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
-		value, err := getAttributeValue(attr)
+		value, err := getAttributeValue(attr, c.features)
 		if err != nil {
 			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
@@ -312,6 +349,20 @@ func newCompiler(features Features) *compiler {
 		return result
 	}
 
+	attributeType := withMaxElements(apiservercel.AnyType, resourceapi.DeviceAttributeMaxValueLength)
+	if features.EnableListTypeAttributes {
+		attributeType = withMaxElements(
+			// use DynType instead of AnyType so that iterate functions can work(e.g., exists, all, etc.)
+			apiservercel.DynType,
+			// if list attributes are enabled, the maximum size of the attribute could be larger.
+			// We have to admit this value for maxElements because we can have no knowledge the attribute is scalar or list.
+			max(resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice, resourceapi.DeviceAttributeMaxValueLength),
+		)
+	}
+	// Each map is bound by the maximum number of different attributes.
+	innerAttributesMapType := apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+	outerAttributesMapType := apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+
 	fieldsV131 := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapType, true),
@@ -363,13 +414,46 @@ func newCompiler(features Features) *compiler {
 				deviceTypeV134ConsumableCapacity,
 			},
 		},
+		{
+			IntroducedVersion: version.MajorMinor(1, 36),
+			FeatureEnabled: func() bool {
+				return features.EnableListTypeAttributes
+			},
+			EnvOptions: []cel.EnvOption{
+				cel.Function("include",
+					cel.MemberOverload("dra_include_dyn_dyn",
+						[]*cel.Type{cel.DynType, cel.DynType},
+						cel.BoolType,
+						cel.BinaryBinding(includeFunc),
+					),
+				),
+			},
+		},
 	}
 	envset, err := envset.Extend(versioned...)
 	if err != nil {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
 	// return with newest deviceType
-	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity}
+	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity, features: features, attributeType: attributeType}
+}
+
+func includeFunc(target, arg ref.Val) ref.Val {
+	if list, ok := target.(traits.Lister); ok {
+		it := list.Iterator()
+		for it.HasNext() == types.True {
+			item := it.Next()
+			if item.Equal(arg) == types.True {
+				return types.True
+			}
+		}
+		return types.False
+	}
+
+	if target.Equal(arg) == types.True {
+		return types.True
+	}
+	return types.False
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {
@@ -414,7 +498,30 @@ func (m mapper) Find(key ref.Val) (ref.Val, bool) {
 	return m.defaultValue, true
 }
 
-// sizeEstimator tells the cost estimator the maximum size of maps or strings accessible through the `device` variable.
+// draCostEstimator is a wrapper around the base CEL CostEstimator to provide custom cost estimates for DRA-specific functions and types.
+type draCostEstimator struct {
+	base *library.CostEstimator
+}
+
+func (e *draCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
+	return e.base.EstimateSize(element)
+}
+
+func (e *draCostEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if function == "include" && overloadID == "dra_include_dyn_dyn" {
+		// "<target>.include(<arg>)" is equivalent with "<arg> in <target>"
+		// whose complexity is linear with the size of the target.
+		if target != nil {
+			if sz := e.EstimateSize(*target); sz != nil {
+				return &checker.CallEstimate{CostEstimate: sz.MultiplyByCost(checker.CostEstimate{Min: 1, Max: 1})}
+			}
+		}
+	}
+
+	return e.base.EstimateCallCost(function, overloadID, target, args)
+}
+
+// sizeEstimator tells the cost estimator the maximum size of maps, strings, or lists accessible through the `device` variable.
 // Without this, the maximum string size of e.g. `device.attributes["dra.example.com"].services` would be unknown.
 //
 // sizeEstimator is derived from the sizeEstimator in k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel.
@@ -459,8 +566,8 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 				// If this is an attribute map, then we know that all elements
 				// have the same maximum size as set in attributeType, regardless
 				// of their name.
-				if currentNode.ElemType == attributeType {
-					currentNode = attributeType
+				if currentNode.ElemType == s.compiler.attributeType {
+					currentNode = s.compiler.attributeType
 					continue
 				}
 				return nil

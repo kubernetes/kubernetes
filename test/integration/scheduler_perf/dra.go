@@ -315,7 +315,10 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}
 
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
 
 	// Also wait for the assume cache to catch up.
 	// Without this we cannot reliably store the result of

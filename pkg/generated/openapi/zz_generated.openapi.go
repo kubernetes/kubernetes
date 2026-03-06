@@ -1000,6 +1000,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1_DeviceAllocationConfiguration(ref),
 		resourcev1.DeviceAllocationResult{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_DeviceAllocationResult(ref),
 		resourcev1.DeviceAttribute{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1_DeviceAttribute(ref),
+		resourcev1.DeviceAttributeListType{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_DeviceAttributeListType(ref),
 		resourcev1.DeviceCapacity{}.OpenAPIModelName():                                                                  schema_k8sio_api_resource_v1_DeviceCapacity(ref),
 		resourcev1.DeviceClaim{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1_DeviceClaim(ref),
 		resourcev1.DeviceClaimConfiguration{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1_DeviceClaimConfiguration(ref),
@@ -1052,6 +1053,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		resourcev1beta1.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
 		resourcev1beta1.DeviceAttribute{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref),
+		resourcev1beta1.DeviceAttributeListType{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_DeviceAttributeListType(ref),
 		resourcev1beta1.DeviceCapacity{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref),
 		resourcev1beta1.DeviceClaim{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceClaim(ref),
 		resourcev1beta1.DeviceClaimConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta1_DeviceClaimConfiguration(ref),
@@ -1094,6 +1096,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref),
 		resourcev1beta2.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref),
 		resourcev1beta2.DeviceAttribute{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref),
+		resourcev1beta2.DeviceAttributeListType{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_DeviceAttributeListType(ref),
 		resourcev1beta2.DeviceCapacity{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta2_DeviceCapacity(ref),
 		resourcev1beta2.DeviceClaim{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta2_DeviceClaim(ref),
 		resourcev1beta2.DeviceClaimConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta2_DeviceClaimConfiguration(ref),
@@ -47326,6 +47329,107 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"list": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ListValue is a typed-list of attribute values. The list must be homogeneous, meaning that all entries must have the same type of value (int, bool, string or version).",
+							Ref:         ref(resourcev1.DeviceAttributeListType{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.DeviceAttributeListType{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_DeviceAttributeListType(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValue is a list of numbers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValue is a list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValue is a list of strings. Each string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -49834,6 +49938,107 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"list": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ListValue is a typed-list of attribute values. The list must be homogeneous, meaning that all entries must have the same type of value (int, bool, string or version).",
+							Ref:         ref(resourcev1beta1.DeviceAttributeListType{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.DeviceAttributeListType{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceAttributeListType(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValue is a list of numbers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValue is a list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValue is a list of strings. Each string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -52004,6 +52209,107 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"list": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ListValue is a typed-list of attribute values. The list must be homogeneous, meaning that all entries must have the same type of value (int, bool, string or version).",
+							Ref:         ref(resourcev1beta2.DeviceAttributeListType{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.DeviceAttributeListType{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_DeviceAttributeListType(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValue is a list of numbers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValue is a list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValue is a list of strings. Each string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},

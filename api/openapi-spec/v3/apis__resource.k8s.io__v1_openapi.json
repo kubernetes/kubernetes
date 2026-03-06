@@ -494,6 +494,14 @@
             "format": "int64",
             "type": "integer"
           },
+          "list": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceAttributeListType"
+              }
+            ],
+            "description": "ListValue is a typed-list of attribute values. The list must be homogeneous, meaning that all entries must have the same type of value (int, bool, string or version)."
+          },
           "string": {
             "description": "StringValue is a string. Must not be longer than 64 characters.",
             "type": "string"
@@ -501,6 +509,49 @@
           "version": {
             "description": "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1.DeviceAttributeListType": {
+        "description": "DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.",
+        "properties": {
+          "bools": {
+            "description": "BoolValue is a list of true/false values.",
+            "items": {
+              "default": false,
+              "type": "boolean"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "ints": {
+            "description": "IntValue is a list of numbers.",
+            "items": {
+              "default": 0,
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "strings": {
+            "description": "StringValue is a list of strings. Each string must not be longer than 64 characters.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "versions": {
+            "description": "VersionValue is a list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           }
         },
         "type": "object"

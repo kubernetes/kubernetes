@@ -546,6 +546,8 @@ type CapacityRequestPolicyRange struct {
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
+// If DRAListTypeAttributes feature gate is enabled, the limit applies
+// to the sum of the number of entries in scalar attributes, capacity and items in list attributes.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
@@ -605,6 +607,47 @@ type DeviceAttribute struct {
 	// +optional
 	// +oneOf=ValueType
 	VersionValue *string
+
+	// ListValue is a typed-list of attribute values. The list must be homogeneous,
+	// meaning that all entries must have the same type of value (int, bool, string or version).
+	//
+	// +optional
+	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +featureGate=DRAListDeviceAttributes
+	ListValue *DeviceAttributeListType
+}
+
+// DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.
+type DeviceAttributeListType struct {
+	// The Go field names below have a Value suffix to avoid a conflict between the
+	// field "String" and the corresponding method. That method is required.
+	// The Kubernetes API is defined without that suffix to keep it more natural.
+
+	// IntValue is a list of numbers.
+	//
+	// +optional
+	// +oneOf=ValueType
+	IntValue []int64
+
+	// BoolValue is a list of true/false values.
+	//
+	// +optional
+	// +oneOf=ValueType
+	BoolValue []bool
+
+	// StringValue is a list of strings.
+	// Each string must not be longer than 64 characters.
+	//
+	// +optional
+	// +oneOf=ValueType
+	StringValue []string
+
+	// VersionValue is a list of semantic versions according to semver.org spec 2.0.0.
+	// Each version string must not be longer than 64 characters.
+	//
+	// +optional
+	// +oneOf=ValueType
+	VersionValue []string
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.

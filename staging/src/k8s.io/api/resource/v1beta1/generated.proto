@@ -565,6 +565,54 @@ message DeviceAttribute {
   // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:unionMember
   optional string version = 5;
+
+  // ListValue is a typed-list of attribute values. The list must be homogeneous,
+  // meaning that all entries must have the same type of value (int, bool, string or version).
+  //
+  // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +featureGate=DRAListTypeAttributes
+  optional DeviceAttributeListType list = 6;
+}
+
+// DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.
+message DeviceAttributeListType {
+  // IntValue is a list of numbers.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  repeated int64 ints = 2;
+
+  // BoolValue is a list of true/false values.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  repeated bool bools = 3;
+
+  // StringValue is a list of strings.
+  // Each string must not be longer than 64 characters.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
+  repeated string strings = 4;
+
+  // VersionValue is a list of semantic versions according to semver.org spec 2.0.0.
+  // Each version string must not be longer than 64 characters.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
+  repeated string versions = 5;
 }
 
 // DeviceCapacity describes a quantity associated with a device.

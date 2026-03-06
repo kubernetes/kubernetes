@@ -42,6 +42,15 @@ spec:
         attributesKey:
           bool: true
           int: 2
+          list:
+            bools:
+            - true
+            ints:
+            - 2
+            strings:
+            - stringsValue
+            versions:
+            - versionsValue
           string: stringValue
           version: versionValue
       bindingConditions:

@@ -196,6 +196,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -323,4 +324,36 @@ func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.Resour
 			}
 		}
 	}
+}
+
+func dropDisableDRAListTypeAttributesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes) ||
+		draListTypeAttributesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		for k, deviceAttribute := range newSlice.Spec.Devices[i].Attributes {
+			if deviceAttribute.ListValue != nil {
+				deviceAttribute.ListValue = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+		}
+	}
+}
+
+func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		for _, deviceAttribute := range device.Attributes {
+			if deviceAttribute.ListValue != nil {
+				return true
+			}
+		}
+	}
+
+	return false
 }
