@@ -74,7 +74,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "dek_cache_fill_percent",
 			Help:           "Percent of the cache slots currently occupied by cached DEKs.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -85,7 +85,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "dek_cache_inter_arrival_time_seconds",
 			Help:           "Time (in seconds) of inter arrival of transformation requests.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 			Buckets:        metrics.ExponentialBuckets(60, 2, 10),
 		},
 		[]string{"transformation_type"},
