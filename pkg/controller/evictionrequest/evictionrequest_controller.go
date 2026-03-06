@@ -350,14 +350,18 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 		// Non-pod targets are not supported yet, so cancel the eviction request
 		statusApply := coordinationapply.EvictionRequestStatus().
 			WithObservedGeneration(evictionRequest.Generation).
-			WithConditions(newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
-				metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed),
-				"Unsupported target type"))
+			WithConditions(
+				setCondition(evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionCanceled,
+					metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed),
+					"Unsupported target type"),
+				setCondition(evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionEvicted,
+					metav1.ConditionFalse, "AwaitingProcessing", ""),
+			)
 		return c.applyStatus(ctx, evictionRequest, statusApply)
 	}
 
 	target := newTargetInfo(evictionRequest.Spec.Target, targetPod)
-	logger.V(4).Info("Syncing EvictionRequest", "evictionRequest", klog.KObj(evictionRequest), "target", target.name())
+	logger.V(4).Info("Syncing EvictionRequest", "evictionRequest", klog.KObj(evictionRequest), "target", klog.KObj(targetPod))
 
 	statusApply, resyncAfter := c.computeStatus(ctx, evictionRequest, target)
 
@@ -428,7 +432,7 @@ func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) 
 	return nil
 }
 
-// computeStatus first computes the desired status for an EvictionRequest and then builds the status apply configuration
+// computeStatus computes the desired status for an EvictionRequest and builds the status apply configuration.
 // It returns the status apply configuration and an optional resync duration.
 func (c *EvictionRequestController) computeStatus(
 	ctx context.Context,
@@ -440,21 +444,17 @@ func (c *EvictionRequestController) computeStatus(
 	statusApply := coordinationapply.EvictionRequestStatus().
 		WithObservedGeneration(evictionRequest.Generation)
 
-	if condition := computePreconditionFailure(evictionRequest, target); condition != nil {
-		logger.V(4).Info("Setting precondition failure condition", "evictionRequest", klog.KObj(evictionRequest),
-			"type", *condition.Type, "reason", *condition.Reason)
-		return statusApply.WithConditions(condition), 0
+	completionResync := shouldDeferCompletion(evictionRequest, target, c.clock)
+	canceled, evicted := computeConditions(evictionRequest, target, completionResync > 0)
+	statusApply.WithConditions(canceled, evicted)
+
+	isTerminal := *canceled.Status == metav1.ConditionTrue || *evicted.Status == metav1.ConditionTrue
+	if isTerminal {
+		logger.V(4).Info("Terminal condition reached", "evictionRequest", klog.KObj(evictionRequest))
 	}
 
 	targetInterceptors := computeTargetInterceptors(evictionRequest, target)
-
-	completionResync := shouldDeferCompletion(evictionRequest, target, c.clock)
-	var completionCondition *metav1ac.ConditionApplyConfiguration
-	if completionResync == 0 {
-		completionCondition = computeCompletionCondition(evictionRequest, target)
-	}
-
-	active, processed, progressionResync := computeInterceptorProgression(evictionRequest, targetInterceptors, completionCondition != nil, c.clock)
+	active, processed, progressionResync := computeInterceptorProgression(evictionRequest, targetInterceptors, isTerminal, c.clock)
 
 	// Report metrics per KEP-4563
 	targetType := target.targetType()
@@ -480,15 +480,6 @@ func (c *EvictionRequestController) computeStatus(
 
 	statusApply.WithActiveInterceptors(active...)
 	statusApply.WithProcessedInterceptors(processed...)
-
-	if completionCondition != nil {
-		logger.V(4).Info("Setting completion condition", "evictionRequest", klog.KObj(evictionRequest),
-			"type", *completionCondition.Type, "reason", *completionCondition.Reason)
-		statusApply.WithConditions(completionCondition)
-	} else if completionResync > 0 {
-		logger.V(4).Info("Deferring completion to allow active interceptor to report",
-			"evictionRequest", klog.KObj(evictionRequest), "resyncAfter", completionResync)
-	}
 
 	// Include interceptor entries for all target interceptors so SSA doesn't
 	// remove them. Only set Name and StartTime — other fields (HeartbeatTime,
@@ -528,44 +519,47 @@ func (c *EvictionRequestController) applyStatus(
 	return err
 }
 
-// computePreconditionFailure checks for precondition failures that prevent processing from starting.
-// Returns a Canceled condition if validation fails before we've ever observed this request.
-// Returns nil if preconditions pass and we can proceed with processing.
-func computePreconditionFailure(
+// computeConditions returns the full pair of Canceled and Evicted conditions.
+// Both are always set — defaulting to False until flipped to True.
+// Precondition checks run only on first sync (ObservedGeneration == 0).
+// Completion checks are skipped when deferCompletion is true.
+func computeConditions(
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
 	target targetInfo,
-) *metav1ac.ConditionApplyConfiguration {
-	if evictionRequest.Status.ObservedGeneration > 0 {
-		return nil
+	deferCompletion bool,
+) (canceled, evicted *metav1ac.ConditionApplyConfiguration) {
+	existing := evictionRequest.Status.Conditions
+	canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
+		metav1.ConditionFalse, "AwaitingProcessing", "")
+	evicted = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
+		metav1.ConditionFalse, "AwaitingProcessing", "")
+
+	// Precondition failure
+	if evictionRequest.Status.ObservedGeneration == 0 {
+		if valid, message := target.isValidTarget(); !valid {
+			canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
+				metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), message)
+			return canceled, evicted
+		}
 	}
 
-	if valid, message := target.isValidTarget(); !valid {
-		return newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
-			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), message)
+	if deferCompletion {
+		return canceled, evicted
 	}
 
-	return nil
-}
-
-// computeCompletionCondition checks for eviction completion after processing has started.
-// Returns a condition if the eviction has reached a terminal state or nil if eviction is still in progress.
-func computeCompletionCondition(evictionRequest *coordinationv1alpha1.EvictionRequest, target targetInfo) *metav1ac.ConditionApplyConfiguration {
+	// Completion checks
 	if target.isGone() {
-		return newCondition(coordinationv1alpha1.EvictionRequestConditionEvicted,
+		evicted = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted), "Target pod has been deleted")
-	}
-
-	if target.isTerminal() {
-		return newCondition(coordinationv1alpha1.EvictionRequestConditionEvicted,
+	} else if target.isTerminal() {
+		evicted = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal), "Pod has reached terminal state")
-	}
-
-	if len(evictionRequest.Spec.Requesters) == 0 {
-		return newCondition(coordinationv1alpha1.EvictionRequestConditionCanceled,
+	} else if len(evictionRequest.Spec.Requesters) == 0 {
+		canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
 			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters), "Requesters list is empty")
 	}
 
-	return nil
+	return canceled, evicted
 }
 
 // shouldDeferCompletion returns how long to wait before setting the completion
@@ -586,12 +580,12 @@ func shouldDeferCompletion(
 		return 0
 	}
 
-	deletionTimestamp := target.deletionTimestamp()
-	if deletionTimestamp.IsZero() {
+	meta := target.GetObjectMeta()
+	if meta == nil || meta.GetDeletionTimestamp() == nil {
 		return 0
 	}
 
-	if remaining := GracefulCompletionDelay - clock.Since(deletionTimestamp); remaining > 0 {
+	if remaining := GracefulCompletionDelay - clock.Since(meta.GetDeletionTimestamp().Time); remaining > 0 {
 		return remaining
 	}
 	return 0
