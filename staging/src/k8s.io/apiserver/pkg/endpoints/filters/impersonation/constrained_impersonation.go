@@ -51,12 +51,17 @@ func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer,
 		recordAuthorizationCall: metrics.RecordImpersonationAuthorizationCall,
 	}
 
+	recordAttempt := func(ctx context.Context, mode, decision string, duration time.Duration) {
+		metrics.RecordImpersonationAttempt(mode, decision, duration)
+		request.TrackImpersonationLatency(ctx, duration)
+	}
+
 	return &constrainedImpersonationHandler{
 		handler: handler,
 		tracker: newImpersonationModesTracker(ma),
 		s:       s,
 
-		recordAttempt:     metrics.RecordImpersonationAttempt,
+		recordAttempt:     recordAttempt,
 		metricsAuthorizer: ma,
 	}
 }
@@ -67,7 +72,7 @@ type constrainedImpersonationHandler struct {
 	s       runtime.NegotiatedSerializer
 
 	// to allow unit tests to override metrics recording
-	recordAttempt     func(mode, decision string, duration time.Duration)
+	recordAttempt     func(ctx context.Context, mode, decision string, duration time.Duration)
 	metricsAuthorizer *metricsAuthorizer
 }
 
@@ -98,12 +103,12 @@ func (c *constrainedImpersonationHandler) ServeHTTP(w http.ResponseWriter, req *
 	impersonatedUser, err := c.tracker.getImpersonatedUser(ctx, wantedUser, attributes)
 	duration := time.Since(start)
 	if err != nil {
-		c.recordAttempt("", "denied", duration)
+		c.recordAttempt(ctx, "", "denied", duration)
 		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "err", err)
 		responsewriters.RespondWithError(w, req, err, c.s)
 		return
 	}
-	c.recordAttempt(modeFromConstraint(impersonatedUser.constraint), "allowed", duration)
+	c.recordAttempt(ctx, modeFromConstraint(impersonatedUser.constraint), "allowed", duration)
 
 	req = req.WithContext(request.WithUser(ctx, impersonatedUser.user))
 	httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(requestor), userString(impersonatedUser.user))

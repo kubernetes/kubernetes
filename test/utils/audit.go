@@ -34,20 +34,23 @@ import (
 
 // AuditEvent is a simplified representation of an audit event for testing purposes
 type AuditEvent struct {
-	ID                 types.UID
-	Level              auditinternal.Level
-	Stage              auditinternal.Stage
-	RequestURI         string
-	Verb               string
-	Code               int32
-	User               string
-	ImpersonatedUser   string
-	ImpersonatedGroups string
-	Resource           string
-	Namespace          string
-	RequestObject      bool
-	ResponseObject     bool
-	AuthorizeDecision  string
+	ID                      types.UID
+	Level                   auditinternal.Level
+	Stage                   auditinternal.Stage
+	RequestURI              string
+	Verb                    string
+	Code                    int32
+	StatusMessage           string
+	User                    string
+	ImpersonatedUser        string
+	ImpersonatedUID         string
+	ImpersonatedGroups      string
+	ImpersonationConstraint *string
+	Resource                string
+	Namespace               string
+	RequestObject           bool
+	ResponseObject          bool
+	AuthorizeDecision       string
 
 	// The Check functions in this package takes ownerships of these maps. You should
 	// not reference these maps after calling the Check functions.
@@ -147,6 +150,7 @@ func testEventFromInternalFiltered(e *auditinternal.Event, customAnnotationsFilt
 	}
 	if e.ResponseStatus != nil {
 		event.Code = e.ResponseStatus.Code
+		event.StatusMessage = e.ResponseStatus.Message
 	}
 	if e.ResponseObject != nil {
 		event.ResponseObject = true
@@ -156,8 +160,12 @@ func testEventFromInternalFiltered(e *auditinternal.Event, customAnnotationsFilt
 	}
 	if e.ImpersonatedUser != nil {
 		event.ImpersonatedUser = e.ImpersonatedUser.Username
+		event.ImpersonatedUID = e.ImpersonatedUser.UID
 		sort.Strings(e.ImpersonatedUser.Groups)
 		event.ImpersonatedGroups = strings.Join(e.ImpersonatedUser.Groups, ",")
+	}
+	if e.AuthenticationMetadata != nil {
+		event.ImpersonationConstraint = &e.AuthenticationMetadata.ImpersonationConstraint
 	}
 	event.AuthorizeDecision = e.Annotations["authorization.k8s.io/decision"]
 	for k, v := range e.Annotations {
