@@ -236,6 +236,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
 	register(newSELinuxWarningControllerDescriptor())
+	register(newPodCheckpointControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {

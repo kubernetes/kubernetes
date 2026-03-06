@@ -553,6 +553,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcheckpoint-controller"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+			rbacv1helpers.NewRule("update", "patch").Groups(checkpointGroup).Resources("podcheckpoints/status").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "create").Groups(legacyGroup).Resources("nodes/proxy").RuleOrDie(),
+			rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("nodes/checkpointpod").RuleOrDie(),
+		},
+	})
+
 	return controllerRoles, controllerRoleBindings
 }
 

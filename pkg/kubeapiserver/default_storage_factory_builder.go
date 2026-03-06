@@ -29,6 +29,7 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/checkpoint"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -144,6 +145,13 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(api.Resource("replicationcontrollers"), extensions.Resource("replicationcontrollers")) // to make scale subresources equivalent
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
 	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
+
+	// PodCheckpoint types don't have protobuf bindings, so force JSON storage.
+	storageFactory.SetSerializer(
+		checkpoint.Resource("podcheckpoints"),
+		runtime.ContentTypeJSON,
+		c.Serializer,
+	)
 
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
