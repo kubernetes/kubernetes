@@ -31,10 +31,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	oidctest "k8s.io/kubernetes/test/integration/apiserver/oidc"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
+	"k8s.io/kubernetes/test/utils/oidc"
 )
 
 func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath string) {
@@ -120,7 +119,7 @@ func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath s
 
 	proxyAddr := listener.Addr().String()
 
-	server := &http.Server{Handler: oidctest.NewHTTPConnectProxyHandler(t, called)}
+	server := &http.Server{Handler: oidc.NewHTTPConnectProxyHandler(t, called)}
 
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
@@ -185,9 +184,9 @@ func TestTLSServerName(t *testing.T) {
 			require.NoError(t, err, "Failed to start TLS egress proxy")
 			t.Logf("TLS egress proxy ready at %s (cert issued for: %s)", proxyAddr, proxyHostname)
 
-			caCertContent, _, caFilePath, caKeyFilePath := oidctest.GenerateCert(t)
-			_, publicKey := oidctest.RSAGenerateKey(t)
-			oidcServer := utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
+			caCertContent, _, caFilePath, caKeyFilePath := oidc.GenerateCert(t)
+			_, publicKey := oidc.RSAGenerateKey(t)
+			oidcServer := oidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
 			egressConfig := fmt.Sprintf(`
 apiVersion: apiserver.k8s.io/v1beta1
@@ -220,11 +219,11 @@ jwt:
   claimMappings:
     username:
       expression: "'test-' + claims.sub"
-`, oidcServer.URL(), oidctest.IndentCertificateAuthority(string(caCertContent)))
+`, oidcServer.URL(), oidc.IndentCertificateAuthority(string(caCertContent)))
 
 			customFlags := []string{
-				fmt.Sprintf("--egress-selector-config-file=%s", oidctest.WriteTempFile(t, egressConfig)),
-				fmt.Sprintf("--authentication-config=%s", oidctest.WriteTempFile(t, authenticationConfig)),
+				fmt.Sprintf("--egress-selector-config-file=%s", oidc.WriteTempFile(t, egressConfig)),
+				fmt.Sprintf("--authentication-config=%s", oidc.WriteTempFile(t, authenticationConfig)),
 				"--authorization-mode=RBAC",
 			}
 
@@ -236,7 +235,7 @@ jwt:
 			)
 			t.Cleanup(server.TearDownFn)
 
-			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(oidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
 			if sni, _ := observedSNI.Load().(string); sni != tc.expectedSNI {
 				t.Errorf("expected SNI=%q, got=%q", tc.expectedSNI, sni)

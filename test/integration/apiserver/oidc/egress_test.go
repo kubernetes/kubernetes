@@ -28,6 +28,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 )
 
 func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
@@ -40,7 +41,7 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 	}
 
 	var called atomic.Bool
-	server := http.Server{Handler: NewHTTPConnectProxyHandler(t, &called)}
+	server := http.Server{Handler: utilsoidc.NewHTTPConnectProxyHandler(t, &called)}
 
 	t.Cleanup(func() {
 		if !called.Load() {
