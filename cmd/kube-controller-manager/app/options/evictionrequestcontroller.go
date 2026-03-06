@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
@@ -53,6 +55,9 @@ func (o *EvictionRequestControllerOptions) Validate() []error {
 		return nil
 	}
 
-	errs := []error{}
+	var errs []error
+	if o.ConcurrentEvictionRequestSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("concurrent-eviction-request-syncs must be greater than 0, got %d", o.ConcurrentEvictionRequestSyncs))
+	}
 	return errs
 }

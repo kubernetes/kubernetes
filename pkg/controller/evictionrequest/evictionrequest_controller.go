@@ -420,7 +420,7 @@ func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) 
 		EvictionRequests(namespace).
 		Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: c.controllerName, Force: true})
 	if err != nil {
-		logger.Error(err, "Failed to patch EvictionRequest labels", "evictionRequest", klog.KObj(evictionRequest), "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to update EvictionRequest labels", "evictionRequest", klog.KObj(evictionRequest), "pod", klog.KObj(pod))
 		return err
 	}
 
@@ -457,12 +457,17 @@ func (c *EvictionRequestController) computeStatus(
 	active, processed, progressionResync := computeInterceptorProgression(evictionRequest, targetInterceptors, completionCondition != nil, c.clock)
 
 	// Report metrics per KEP-4563
+	targetType := target.targetType()
 	if len(active) > 0 {
-		metrics.ActiveInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, active[0]).Set(1)
+		metrics.ActiveInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetType, active[0]).Set(1)
 	}
-	metrics.ProcessedInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(processed)))
-	metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(evictionRequest.Spec.Requesters)))
-	metrics.PodInterceptors.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name).Set(float64(len(targetInterceptors)))
+	for _, p := range processed {
+		metrics.ProcessedInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetType, p).Set(1)
+	}
+	for _, r := range evictionRequest.Spec.Requesters {
+		metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetType, r.Name).Set(1)
+	}
+	metrics.PodInterceptors.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetType).Set(float64(len(targetInterceptors)))
 
 	resyncAfter := progressionResync
 	if completionResync > 0 {
