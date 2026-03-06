@@ -20,7 +20,6 @@ import (
 	"context"
 	"sort"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -44,10 +43,14 @@ func (a containerStatusbyCreatedList) Less(i, j int) bool {
 	return a[i].CreatedAt.After(a[j].CreatedAt)
 }
 
+// newPodContainerDeletor binds pod container deletions to the kubelet
+// lifecycle. When ctx is canceled during kubelet shutdown, the deletor worker
+// stops and an in-flight DeleteContainer call may be interrupted before the
+// runtime finishes removing the container.
 func newPodContainerDeletor(ctx context.Context, runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
 	logger := klog.FromContext(ctx)
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
-	go wait.Until(func() {
+	go func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -58,7 +61,7 @@ func newPodContainerDeletor(ctx context.Context, runtime kubecontainer.Runtime, 
 				}
 			}
 		}
-	}, 0, ctx.Done())
+	}()
 
 	return &podContainerDeletor{
 		worker:           buffer,
