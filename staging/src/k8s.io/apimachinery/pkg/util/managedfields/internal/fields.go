@@ -17,8 +17,6 @@ limitations under the License.
 package internal
 
 import (
-	"bytes"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
@@ -36,12 +34,13 @@ var EmptyFields = func() metav1.FieldsV1 {
 
 // FieldsToSet creates a set paths from an input trie of fields
 func FieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
-	err = s.FromJSON(bytes.NewReader(f.Raw))
+	err = s.FromJSON(f.GetRawReader())
 	return s, err
 }
 
 // SetToFields creates a trie of fields from an input set of paths
 func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
-	f.Raw, err = s.ToJSON()
+	raw, err := s.ToJSON()
+	f.SetRawBytes(raw)
 	return f, err
 }
