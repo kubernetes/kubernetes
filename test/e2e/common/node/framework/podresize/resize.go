@@ -480,7 +480,7 @@ func ExpectPodResizePending(ctx context.Context, f *framework.Framework, resizeP
 	if resourceErrs := VerifyPodStatusResources(resizePendingPod, expectedContainers); resourceErrs != nil {
 		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
 	}
-	if restartErrs := verifyPodRestarts(f, resizePendingPod, expectedContainers); restartErrs != nil {
+	if restartErrs := verifyPodRestarts(ctx, f, resizePendingPod, expectedContainers); restartErrs != nil {
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
 	}
 

@@ -36,6 +36,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -592,6 +593,11 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	}
 
 	if reason != "" {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+			if reason == topologymanager.ErrorTopologyAffinity {
+				reason = v1.PodReasonInfeasible
+			}
+		}
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {

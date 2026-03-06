@@ -4298,7 +4298,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
 					}
 				},
-				ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards decrease (gu-container-1) CPU request/limit, within available capacity",
+				ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards fail to decrease (gu-container-1) CPU request/limit, within available capacity because of TopologyAffinityError",
 					// Initial
 					[]podresize.ResizableContainerInfo{
 						{
@@ -4347,17 +4347,18 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 					[]podresize.ResizableContainerInfo{
 						{
 							Name:      "gu-container-1",
-							Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+							Resources: &cgroups.ContainerResources{CPUReq: "10000m", CPULim: "10000m", MemReq: "200Mi", MemLim: "200Mi"},
 						},
 					},
 					// Expected cpuCount after second patch
 					[]containerCPUInfo{
 						{
 							Name:     "gu-container-1",
-							cpuCount: 2,
+							cpuCount: 10,
 						},
 					},
-					"",
+					// Want error after first patch
+					"Infeasible.*",
 				),
 			)
 		})
@@ -4594,6 +4595,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							cpuCount: 2,
 						},
 					},
+					// Want error after first patch
 					"",
 				),
 				ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards restore (gu-container-1) CPU request/limit and increase (gu-container-2) CPU request/limit, within available capacity",

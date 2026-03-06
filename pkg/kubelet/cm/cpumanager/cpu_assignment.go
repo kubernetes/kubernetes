@@ -451,7 +451,31 @@ type cpuAccumulator struct {
 	availableCPUSorter availableCPUSorter
 }
 
-func newCPUAccumulator(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) *cpuAccumulator {
+func newCPUAccumulator(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy) *cpuAccumulator {
+	acc := &cpuAccumulator{
+		logger:        logger,
+		topo:          topo,
+		details:       topo.CPUDetails.KeepOnly(availableCPUs),
+		numCPUsNeeded: numCPUs,
+		result:        cpuset.New(),
+	}
+
+	if topo.NumSockets >= topo.NumNUMANodes {
+		acc.numaOrSocketsFirst = &numaFirst{acc}
+	} else {
+		acc.numaOrSocketsFirst = &socketsFirst{acc}
+	}
+
+	if cpuSortingStrategy == CPUSortingStrategyPacked {
+		acc.availableCPUSorter = &sortCPUsPacked{acc}
+	} else {
+		acc.availableCPUSorter = &sortCPUsSpread{acc}
+	}
+
+	return acc
+}
+
+func newCPUAccumulatorForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) *cpuAccumulator {
 	acc := &cpuAccumulator{
 		logger:        logger,
 		topo:          topo,
@@ -1128,17 +1152,8 @@ func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopC
 // the least amount of free CPUs to the one with the highest amount of free CPUs (i.e. in ascending
 // order of free CPUs). For any NUMA node, the cores are selected from the ones in the socket with
 // the least amount of free CPUs to the one with the highest amount of free CPUs.
-func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
-
-	// If the number of CPUs requested to be retained is not a subset
-	// of reusableCPUs, then we fail early
-	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
-		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
-			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
-		}
-	}
-
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, reusableCPUsForResize, mustKeepCPUsForResize)
+func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool) (cpuset.CPUSet, error) {
+	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -1151,15 +1166,7 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
 	//    Nodes map to 1 or more sockets, pull from NUMA nodes first.
 	//    Otherwise pull from sockets first.
-	acc.numaOrSocketsFirst.takeFullFirstLevelForResize()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
 	acc.numaOrSocketsFirst.takeFullFirstLevel()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
-	acc.numaOrSocketsFirst.takeFullSecondLevelForResize()
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -1182,10 +1189,6 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 	//    a core's-worth of CPUs.
 	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
 	if cpuSortingStrategy != CPUSortingStrategySpread {
-		acc.takeRemainCpusForFullCores()
-		if acc.isSatisfied() {
-			return acc.result, nil
-		}
 		acc.takeFullCores()
 		if acc.isSatisfied() {
 			return acc.result, nil
@@ -1195,10 +1198,6 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 	// 4. Acquire single threads, preferring to fill partially-allocated cores
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
-	acc.takeRemainingCPUsForResize()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
 	acc.takeRemainingCPUs()
 	if acc.isSatisfied() {
 		return acc.result, nil
@@ -1270,14 +1269,246 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
 	// PreferAlignByUncoreCache feature not implemented here yet and set to false.
 	// Support for PreferAlignByUncoreCache to be done at beta release.
 	if (numCPUs % cpuGroupSize) != 0 {
-		return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForResize)
+		return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+	}
+
+	// Otherwise build an accumulator to start allocating CPUs from.
+	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	if acc.isFailed() {
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+	}
+
+	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
+	numas := acc.sortAvailableNUMANodes()
+
+	// Calculate the minimum and maximum possible number of NUMA nodes that
+	// could satisfy this request. This is used to optimize how many iterations
+	// of the loop we need to go through below.
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize)
+
+	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
+	// where we can evenly distribute CPUs across them. To optimize things, we
+	// don't always start at 1 and end at len(numas). Instead, we use the
+	// values of 'minNUMAs' and 'maxNUMAs' calculated above.
+	for k := minNUMAs; k <= maxNUMAs; k++ {
+		// Iterate through the various n-choose-k NUMA node combinations,
+		// looking for the combination of NUMA nodes that can best have CPUs
+		// distributed across them.
+		var bestBalance float64 = math.MaxFloat64
+		var bestRemainder []int = nil
+		var bestCombo []int = nil
+		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
+			// If we've already found a combo with a balance of 0 in a
+			// different iteration, then don't bother checking any others.
+			if bestBalance == 0 {
+				return Break
+			}
+
+			// Check that this combination of NUMA nodes has enough CPUs to
+			// satisfy the allocation overall.
+			cpus := acc.details.CPUsInNUMANodes(combo...)
+			if cpus.Size() < numCPUs {
+				return Continue
+			}
+
+			// Check that CPUs can be handed out in groups of size
+			// 'cpuGroupSize' across the NUMA nodes in this combo.
+			numCPUGroups := 0
+			for _, numa := range combo {
+				numCPUGroups += (acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize)
+			}
+			if (numCPUGroups * cpuGroupSize) < numCPUs {
+				return Continue
+			}
+
+			// Check that each NUMA node in this combination can allocate an
+			// even distribution of CPUs in groups of size 'cpuGroupSize',
+			// modulo some remainder.
+			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
+			for _, numa := range combo {
+				cpus := acc.details.CPUsInNUMANodes(numa)
+				if cpus.Size() < distribution {
+					return Continue
+				}
+			}
+
+			// Calculate how many CPUs will be available on each NUMA node in
+			// the system after allocating an even distribution of CPU groups
+			// of size 'cpuGroupSize' from each NUMA node in 'combo'. This will
+			// be used in the "balance score" calculation to help decide if
+			// this combo should ultimately be chosen.
+			availableAfterAllocation := make(mapIntInt, len(numas))
+			for _, numa := range numas {
+				availableAfterAllocation[numa] = acc.details.CPUsInNUMANodes(numa).Size()
+			}
+			for _, numa := range combo {
+				availableAfterAllocation[numa] -= distribution
+			}
+
+			// Check if there are any remaining CPUs to distribute across the
+			// NUMA nodes once CPUs have been evenly distributed in groups of
+			// size 'cpuGroupSize'.
+			remainder := numCPUs - (distribution * len(combo))
+
+			// Get a list of NUMA nodes to consider pulling the remainder CPUs
+			// from. This list excludes NUMA nodes that don't have at least
+			// 'cpuGroupSize' CPUs available after being allocated
+			// 'distribution' number of CPUs.
+			var remainderCombo []int
+			for _, numa := range combo {
+				if availableAfterAllocation[numa] >= cpuGroupSize {
+					remainderCombo = append(remainderCombo, numa)
+				}
+			}
+
+			// Declare a set of local variables to help track the "balance
+			// scores" calculated when using different subsets of
+			// 'remainderCombo' to allocate remainder CPUs from.
+			var bestLocalBalance float64 = math.MaxFloat64
+			var bestLocalRemainder []int = nil
+
+			// If there aren't any remainder CPUs to allocate, then calculate
+			// the "balance score" of this combo as the standard deviation of
+			// the values contained in 'availableAfterAllocation'.
+			if remainder == 0 {
+				bestLocalBalance = standardDeviation(availableAfterAllocation.Values())
+				bestLocalRemainder = nil
+			}
+
+			// Otherwise, find the best "balance score" when allocating the
+			// remainder CPUs across different subsets of NUMA nodes in 'remainderCombo'.
+			// These remainder CPUs are handed out in groups of size 'cpuGroupSize'.
+			// We start from k=len(remainderCombo) and walk down to k=1 so that
+			// we continue to distribute CPUs as much as possible across
+			// multiple NUMA nodes.
+			for k := len(remainderCombo); remainder > 0 && k >= 1; k-- {
+				acc.iterateCombinations(remainderCombo, k, func(subset []int) LoopControl {
+					// Make a local copy of 'remainder'.
+					remainder := remainder
+
+					// Make a local copy of 'availableAfterAllocation'.
+					availableAfterAllocation := availableAfterAllocation.Clone()
+
+					// If this subset is not capable of allocating all
+					// remainder CPUs, continue to the next one.
+					if sum(availableAfterAllocation.Values(subset...)) < remainder {
+						return Continue
+					}
+
+					// For all NUMA nodes in 'subset', walk through them,
+					// removing 'cpuGroupSize' number of CPUs from each
+					// until all remainder CPUs have been accounted for.
+					for remainder > 0 {
+						for _, numa := range subset {
+							if remainder == 0 {
+								break
+							}
+							if availableAfterAllocation[numa] < cpuGroupSize {
+								continue
+							}
+							availableAfterAllocation[numa] -= cpuGroupSize
+							remainder -= cpuGroupSize
+						}
+					}
+
+					// Calculate the "balance score" as the standard deviation
+					// of the number of CPUs available on all NUMA nodes in the
+					// system after the remainder CPUs have been allocated
+					// across 'subset' in groups of size 'cpuGroupSize'.
+					balance := standardDeviation(availableAfterAllocation.Values())
+					if balance < bestLocalBalance {
+						bestLocalBalance = balance
+						bestLocalRemainder = subset
+					}
+
+					return Continue
+				})
+			}
+
+			// If the best "balance score" for this combo is less than the
+			// lowest "balance score" of all previous combos, then update this
+			// combo (and remainder set) to be the best one found so far.
+			if bestLocalBalance < bestBalance {
+				bestBalance = bestLocalBalance
+				bestRemainder = bestLocalRemainder
+				bestCombo = combo
+			}
+
+			return Continue
+		})
+
+		// If we made it through all of the iterations above without finding a
+		// combination of NUMA nodes that can properly balance CPU allocations,
+		// then move on to the next larger set of NUMA node combinations.
+		if bestCombo == nil {
+			continue
+		}
+
+		// Otherwise, start allocating CPUs from the NUMA node combination
+		// chosen. First allocate an even distribution of CPUs in groups of
+		// size 'cpuGroupSize' from 'bestCombo'.
+		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
+		for _, numa := range bestCombo {
+			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false)
+			acc.take(cpus)
+		}
+
+		// Then allocate any remaining CPUs in groups of size 'cpuGroupSize'
+		// from each NUMA node in the remainder set.
+		remainder := numCPUs - (distribution * len(bestCombo))
+		for remainder > 0 {
+			for _, numa := range bestRemainder {
+				if remainder == 0 {
+					break
+				}
+				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
+					continue
+				}
+				cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false)
+				acc.take(cpus)
+				remainder -= cpuGroupSize
+			}
+		}
+
+		// If we haven't allocated all of our CPUs at this point, then something
+		// went wrong in our accounting and we should error out.
+		if acc.numCPUsNeeded > 0 {
+			return cpuset.New(), fmt.Errorf("accounting error, not enough CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+		}
+
+		// Likewise, if we have allocated too many CPUs at this point, then something
+		// went wrong in our accounting and we should error out.
+		if acc.numCPUsNeeded < 0 {
+			return cpuset.New(), fmt.Errorf("accounting error, too many CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+		}
+
+		// Otherwise, return the result
+		return acc.result, nil
+	}
+
+	// If we never found a combination of NUMA nodes that we could properly
+	// distribute CPUs across, fall back to the packing algorithm.
+	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+}
+
+func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
+	// If the number of CPUs requested cannot be handed out in chunks of
+	// 'cpuGroupSize', then we just call out the packing algorithm since we
+	// can't distribute CPUs in this chunk size.
+	// PreferAlignByUncoreCache feature not implemented here yet and set to false.
+	// Support for PreferAlignByUncoreCache to be done at beta release.
+	if (numCPUs % cpuGroupSize) != 0 {
+		return takeByTopologyNUMAPackedForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForResize)
 	}
 
 	// If the number of CPUs requested to be retained is not a subset
@@ -1289,7 +1520,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 	}
 
 	// Otherwise build an accumulator to start allocating CPUs from.
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, nil, mustKeepCPUsForResize)
+	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, nil, mustKeepCPUsForResize)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -1490,7 +1721,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
 		for _, numa := range bestCombo {
 			reusableCPUsPerNumaForResize := reusableCPUsForResizeDetail.CPUsInNUMANodes(numa)
-			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false, &reusableCPUsPerNumaForResize, mustKeepCPUsForResize)
+			cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false, &reusableCPUsPerNumaForResize, mustKeepCPUsForResize)
 			acc.take(cpus)
 		}
 
@@ -1505,7 +1736,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
 					continue
 				}
-				cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false, nil, mustKeepCPUsForResize)
+				cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false, nil, mustKeepCPUsForResize)
 				acc.take(cpus)
 				remainder -= cpuGroupSize
 			}
@@ -1529,5 +1760,84 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 
 	// If we never found a combination of NUMA nodes that we could properly
 	// distribute CPUs across, fall back to the packing algorithm.
-	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForResize)
+	return takeByTopologyNUMAPackedForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForResize)
+}
+
+func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
+
+	// If the number of CPUs requested to be retained is not a subset
+	// of reusableCPUs, then we fail early
+	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
+		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
+		}
+	}
+
+	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, reusableCPUsForResize, mustKeepCPUsForResize)
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	if acc.isFailed() {
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+	}
+
+	// Algorithm: topology-aware best-fit
+	// 1. Acquire whole NUMA nodes and sockets, if available and the container
+	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
+	//    Nodes map to 1 or more sockets, pull from NUMA nodes first.
+	//    Otherwise pull from sockets first.
+	acc.numaOrSocketsFirst.takeFullFirstLevelForResize()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	acc.numaOrSocketsFirst.takeFullFirstLevel()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	acc.numaOrSocketsFirst.takeFullSecondLevelForResize()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	acc.numaOrSocketsFirst.takeFullSecondLevel()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+
+	// 2. If PreferAlignByUncoreCache is enabled, acquire whole UncoreCaches
+	//    if available and the container requires at least a UncoreCache's-worth
+	//    of CPUs. Otherwise, acquire CPUs from the least amount of UncoreCaches.
+	if preferAlignByUncoreCache {
+		acc.takeUncoreCache()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+	}
+
+	// 3. Acquire whole cores, if available and the container requires at least
+	//    a core's-worth of CPUs.
+	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
+	if cpuSortingStrategy != CPUSortingStrategySpread {
+		acc.takeRemainCpusForFullCores()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+		acc.takeFullCores()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+	}
+
+	// 4. Acquire single threads, preferring to fill partially-allocated cores
+	//    on the same sockets as the whole cores we have already taken in this
+	//    allocation.
+	acc.takeRemainingCPUsForResize()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	acc.takeRemainingCPUs()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+
+	return cpuset.New(), fmt.Errorf("failed to allocate cpus")
 }
