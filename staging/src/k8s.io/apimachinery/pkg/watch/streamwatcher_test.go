@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	. "k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 type fakeDecoder struct {
@@ -43,6 +45,25 @@ func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err erro
 	return item.Type, item.Object, nil
 }
 
+func (f fakeDecoder) ConcurrentDecode() <-chan *EventData {
+	resultChan := make(chan *EventData)
+	go func() {
+		for {
+			eventType, object, err := f.Decode()
+			resultChan <- &EventData{
+				Action: eventType,
+				Object: object,
+				Err:    err,
+			}
+			if err != nil {
+				close(resultChan)
+				return
+			}
+		}
+	}()
+	return resultChan
+}
+
 func (f fakeDecoder) Close() {
 	if f.items != nil {
 		close(f.items)
@@ -59,66 +80,121 @@ func (f *fakeReporter) AsObject(err error) runtime.Object {
 }
 
 func TestStreamWatcher(t *testing.T) {
-	table := []Event{
-		{Type: Added, Object: testType("foo")},
+	tests := []struct {
+		name                              string
+		clientConcurrentWatchObjectDecode bool
+	}{
+		{
+			name:                              "disable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: false,
+		},
+		{
+			name:                              "enable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: true,
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientConcurrentWatchObjectDecode, test.clientConcurrentWatchObjectDecode)
+			table := []Event{
+				{Type: Added, Object: testType("foo")},
+			}
 
-	fd := fakeDecoder{items: make(chan Event, 5)}
-	//nolint:logcheck // Intentionally uses the old API.
-	sw := NewStreamWatcher(fd, nil)
+			fd := fakeDecoder{items: make(chan Event, 5)}
+			//nolint:logcheck // Intentionally uses the old API.
+			sw := NewStreamWatcher(fd, nil)
 
-	for _, item := range table {
-		fd.items <- item
-		got, open := <-sw.ResultChan()
-		if !open {
-			t.Errorf("unexpected early close")
-		}
-		if e, a := item, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-	}
+			for _, item := range table {
+				fd.items <- item
+				got, open := <-sw.ResultChan()
+				if !open {
+					t.Errorf("unexpected early close")
+				}
+				if e, a := item, got; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+			}
 
-	sw.Stop()
-	_, open := <-sw.ResultChan()
-	if open {
-		t.Errorf("Unexpected failure to close")
+			sw.Stop()
+			_, open := <-sw.ResultChan()
+			if open {
+				t.Errorf("Unexpected failure to close")
+			}
+		})
 	}
 }
 
 func TestStreamWatcherError(t *testing.T) {
-	fd := fakeDecoder{err: fmt.Errorf("test error")}
-	fr := &fakeReporter{}
-	//nolint:logcheck // Intentionally uses the old API.
-	sw := NewStreamWatcher(fd, fr)
-	evt, ok := <-sw.ResultChan()
-	if !ok {
-		t.Fatalf("unexpected close")
+	tests := []struct {
+		name                              string
+		clientConcurrentWatchObjectDecode bool
+	}{
+		{
+			name:                              "disable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: false,
+		},
+		{
+			name:                              "enable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: true,
+		},
 	}
-	if evt.Type != Error || evt.Object != runtime.Unstructured(nil) {
-		t.Fatalf("unexpected object: %#v", evt)
-	}
-	_, ok = <-sw.ResultChan()
-	if ok {
-		t.Fatalf("unexpected open channel")
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientConcurrentWatchObjectDecode, test.clientConcurrentWatchObjectDecode)
 
-	sw.Stop()
-	_, ok = <-sw.ResultChan()
-	if ok {
-		t.Fatalf("unexpected open channel")
+			fd := fakeDecoder{err: fmt.Errorf("test error")}
+			fr := &fakeReporter{}
+			//nolint:logcheck // Intentionally uses the old API.
+			sw := NewStreamWatcher(fd, fr)
+			evt, ok := <-sw.ResultChan()
+			if !ok {
+				t.Fatalf("unexpected close")
+			}
+			if evt.Type != Error || evt.Object != runtime.Unstructured(nil) {
+				t.Fatalf("unexpected object: %#v", evt)
+			}
+			_, ok = <-sw.ResultChan()
+			if ok {
+				t.Fatalf("unexpected open channel")
+			}
+
+			sw.Stop()
+			_, ok = <-sw.ResultChan()
+			if ok {
+				t.Fatalf("unexpected open channel")
+			}
+		})
 	}
 }
 
 func TestStreamWatcherRace(t *testing.T) {
-	fd := fakeDecoder{err: fmt.Errorf("test error")}
-	fr := &fakeReporter{}
-	//nolint:logcheck // Intentionally uses the old API.
-	sw := NewStreamWatcher(fd, fr)
-	time.Sleep(10 * time.Millisecond)
-	sw.Stop()
-	time.Sleep(10 * time.Millisecond)
-	_, ok := <-sw.ResultChan()
-	if ok {
-		t.Fatalf("unexpected pending send")
+	tests := []struct {
+		name                              string
+		clientConcurrentWatchObjectDecode bool
+	}{
+		{
+			name:                              "disable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: false,
+		},
+		{
+			name:                              "enable clientConcurrentWatchObjectDecode",
+			clientConcurrentWatchObjectDecode: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientConcurrentWatchObjectDecode, test.clientConcurrentWatchObjectDecode)
+			fd := fakeDecoder{err: fmt.Errorf("test error")}
+			fr := &fakeReporter{}
+			//nolint:logcheck // Intentionally uses the old API.
+			sw := NewStreamWatcher(fd, fr)
+			time.Sleep(10 * time.Millisecond)
+			sw.Stop()
+			time.Sleep(10 * time.Millisecond)
+			_, ok := <-sw.ResultChan()
+			if ok {
+				t.Fatalf("unexpected pending send")
+			}
+		})
 	}
 }

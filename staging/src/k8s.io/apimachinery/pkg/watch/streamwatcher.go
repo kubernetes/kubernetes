@@ -21,6 +21,7 @@ import (
 	"io"
 	"sync"
 
+	"k8s.io/client-go/features"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,12 +29,21 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+type EventData struct {
+	Action EventType
+	Object runtime.Object
+	Err    error
+}
+
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
 type Decoder interface {
 	// Decode should return the type of event, the decoded object, or an error.
 	// An error will cause StreamWatcher to call Close(). Decode should block until
 	// it has data or an error occurs.
 	Decode() (action EventType, object runtime.Object, err error)
+
+	// ConcurrentDecode returns a channel of *EventData, which contains the decoded object and the event type.
+	ConcurrentDecode() <-chan *EventData
 
 	// Close should close the underlying io.Reader, signalling to the source of
 	// the stream that it is no longer being watched. Close() must cause any
@@ -110,8 +120,26 @@ func (sw *StreamWatcher) receive() {
 	defer utilruntime.HandleCrashWithLogger(sw.logger)
 	defer close(sw.result)
 	defer sw.Stop()
-	for {
+
+	getEvent := func() (EventType, runtime.Object, error) {
 		action, obj, err := sw.source.Decode()
+		return action, obj, err
+	}
+
+	if features.FeatureGates().Enabled(features.ClientConcurrentWatchObjectDecode) {
+		eventChan := sw.source.ConcurrentDecode()
+		getEvent = func() (EventType, runtime.Object, error) {
+			event, ok := <-eventChan
+			if !ok {
+				// should not happen. eventChan is closed after error, when got an error, getEvent loop will exit.
+				return "", nil, io.EOF
+			}
+			return event.Action, event.Object, event.Err
+		}
+	}
+
+	for {
+		action, obj, err := getEvent()
 		if err != nil {
 			switch err {
 			case io.EOF:

@@ -87,6 +87,12 @@ const (
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
 	WatchListClient Feature = "WatchListClient"
+
+	// owner: @chenk008
+	// beta: v1.36
+	//
+	// Enables concurrent decoding of watched objects to accelerate the delivery of watch events.
+	ClientConcurrentWatchObjectDecode = "ClientConcurrentWatchObjectDecode"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -121,5 +127,8 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
+	ClientConcurrentWatchObjectDecode: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Alpha},
 	},
 }
