@@ -3627,12 +3627,12 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 var supportedResizeResources = sets.New(core.ResourceCPU, core.ResourceMemory)
 var supportedResizePolicies = sets.New(core.NotRequired, core.RestartContainer)
 
-func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path, podRestartPolicy *core.RestartPolicy) field.ErrorList {
+func validateResizePolicy(ctr *core.Container, fldPath *field.Path, podRestartPolicy *core.RestartPolicy, isInitCtr bool) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	// validate that resource name is not repeated, supported resource names and policy values are specified
 	resources := make(map[core.ResourceName]bool)
-	for i, p := range policyList {
+	for i, p := range ctr.ResizePolicy {
 		if _, found := resources[p.ResourceName]; found {
 			allErrors = append(allErrors, field.Duplicate(fldPath.Index(i), p.ResourceName))
 		}
@@ -3653,9 +3653,20 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 		}
 
 		if *podRestartPolicy == core.RestartPolicyNever && p.RestartPolicy != core.NotRequired {
-			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when `restartPolicy` is 'Never'"))
+			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when pod `restartPolicy` is 'Never'"))
+		}
+		if isInitCtr {
+			isSidecar := false
+			if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+				isSidecar = ctr.RestartPolicy != nil && *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
+			}
+			resizeRestartPolicy := p.RestartPolicy
+			if !isSidecar && resizeRestartPolicy == core.RestartContainer {
+				allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must not be set to 'RestartContainer' for non-sidecar initContainers"))
+			}
 		}
 	}
+
 	return allErrors
 }
 
@@ -3745,7 +3756,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers, false)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
@@ -3818,7 +3829,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		idxPath := fldPath.Index(i)
 
 		// Apply the validation common to all container types
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers, true)...)
 
 		restartAlways := false
 		// Apply the validation specific to init containers
@@ -3873,7 +3884,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers, isInitCtr bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	namePath := path.Child("name")
@@ -3911,7 +3922,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
-	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
+	allErrs = append(allErrs, validateResizePolicy(ctr, path.Child("resizePolicy"), podRestartPolicy, isInitCtr)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers)...)
 	return allErrs
 }
@@ -4034,7 +4045,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 		path := fldPath.Index(i)
 
 		// Apply validation common to all containers
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers, false)...)
 
 		// Container names must be unique within the list of regular containers.
 		// Collisions with init or ephemeral container names will be detected by the init or ephemeral
