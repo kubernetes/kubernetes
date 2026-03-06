@@ -24,10 +24,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -249,6 +252,181 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			framework.ExpectNoError(err)
 
 			gomega.Expect(imagePullDuration).To(gomega.BeNumerically(">=", delayTime), "PullImages should take more than 10 seconds")
+		})
+	})
+
+	// CRI streaming API tests
+	framework.Context("CRI streaming list operations", feature.CriProxy, framework.WithFeatureGate(features.CRIListStreaming), func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
+		})
+
+		ginkgo.It("should use streaming RPCs for listing pods and containers", func(ctx context.Context) {
+			// Track which streaming APIs were called
+			apiCalled := make(map[string]bool)
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				apiCalled[apiName] = true
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Wait for kubelet to make list calls (which should use streaming when enabled)
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(apiCalled[criproxy.StreamContainers]).To(gomega.BeTrueBecause("StreamContainers should be called"))
+				g.Expect(apiCalled[criproxy.StreamPodSandboxes]).To(gomega.BeTrueBecause("StreamPodSandboxes should be called"))
+				g.Expect(apiCalled[criproxy.StreamImages]).To(gomega.BeTrueBecause("StreamImages should be called"))
+				g.Expect(apiCalled[criproxy.ListContainers]).To(gomega.BeFalseBecause("ListContainers should not be called"))
+				g.Expect(apiCalled[criproxy.ListPodSandbox]).To(gomega.BeFalseBecause("ListPodSandbox should not be called"))
+				g.Expect(apiCalled[criproxy.ListImages]).To(gomega.BeFalseBecause("ListImages should not be called"))
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should fall back to unary RPC when streaming returns Unimplemented", func(ctx context.Context) {
+			// Track API calls to verify fallback behavior
+			streamCallCount := 0
+			listCallCount := 0
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers:
+					streamCallCount++
+					// Return Unimplemented error to trigger fallback
+					return status.Error(codes.Unimplemented, "streaming not supported")
+				case criproxy.ListContainers:
+					listCallCount++
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Verify that after the streaming RPC returned Unimplemented,
+			// the fallback to unary RPC was used
+			gomega.Eventually(func() bool {
+				return listCallCount > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected fallback to ListContainers after StreamContainers returned Unimplemented"))
+
+			// Verify streaming was attempted at least once
+			gomega.Expect(streamCallCount).To(gomega.BeNumerically(">=", 1),
+				"Expected StreamContainers to be attempted at least once before falling back")
+		})
+
+		ginkgo.It("should handle mid-stream errors", func(ctx context.Context) {
+			// Track per-call send count so we can fail after the first item
+			// is successfully sent, simulating a mid-stream failure.
+			var perCallSendCount atomic.Int32
+			var midStreamErrors atomic.Int32
+			var listFallbackCalls atomic.Int32
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers:
+					// Reset per-call counter at the start of each streaming call
+					perCallSendCount.Store(0)
+				case criproxy.StreamContainersSend:
+					if perCallSendCount.Add(1) > 1 {
+						midStreamErrors.Add(1)
+						return status.Error(codes.Internal, "injected mid-stream error")
+					}
+				case criproxy.ListContainers:
+					listFallbackCalls.Add(1)
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Wait for the mid-stream error to be triggered at least once
+			gomega.Eventually(func() bool {
+				return midStreamErrors.Load() > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected mid-stream error to be triggered during StreamContainers"))
+
+			// Verify no fallback to unary RPC (Internal errors should NOT trigger fallback)
+			gomega.Expect(listFallbackCalls.Load()).To(gomega.Equal(int32(0)),
+				"Non-Unimplemented errors should not trigger fallback to ListContainers")
+		})
+
+		ginkgo.It("should handle streaming timeout", func(ctx context.Context) {
+			// blockCh is used to block the streaming send loop, simulating a
+			// slow runtime that causes the client's context to time out.
+			blockCh := make(chan struct{})
+			ginkgo.DeferCleanup(func() { close(blockCh) })
+
+			var perCallSendCount atomic.Int32
+			var timeoutTriggers atomic.Int32
+			var listFallbackCalls atomic.Int32
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers:
+					// Reset per-call counter at the start of each streaming call
+					perCallSendCount.Store(0)
+				case criproxy.StreamContainersSend:
+					if perCallSendCount.Add(1) > 1 {
+						timeoutTriggers.Add(1)
+						// Block until the test completes; the client's context
+						// timeout will fire and the Recv() will return
+						// DeadlineExceeded.
+						<-blockCh
+					}
+				case criproxy.ListContainers:
+					listFallbackCalls.Add(1)
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Wait for the timeout to be triggered at least once
+			gomega.Eventually(func() bool {
+				return timeoutTriggers.Load() > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected streaming send to be blocked at least once"))
+
+			// Wait for the kubelet to log the streaming recv failure caused by the timeout
+			gomega.Eventually(func() error {
+				return verifyErrorInKubeletLogs("StreamContainers recv failed")
+			}).WithPolling(5*time.Second).WithTimeout(3*time.Minute).Should(gomega.Succeed(),
+				"Expected kubelet to log a StreamContainers recv failure due to timeout")
+
+			// Verify no fallback to unary RPC (timeout errors should NOT trigger fallback)
+			gomega.Expect(listFallbackCalls.Load()).To(gomega.Equal(int32(0)),
+				"Timeout errors should not trigger fallback to ListContainers")
+		})
+
+		ginkgo.It("should fall back to unary RPC for images when streaming returns Unimplemented", func(ctx context.Context) {
+			// Track API calls to verify fallback behavior for image service
+			streamCallCount := 0
+			listCallCount := 0
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamImages:
+					streamCallCount++
+					// Return Unimplemented error to trigger fallback
+					return status.Error(codes.Unimplemented, "streaming not supported")
+				case criproxy.ListImages:
+					listCallCount++
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			//
+			// Verify that after the streaming RPC returned Unimplemented,
+			// the fallback to unary RPC was used
+			gomega.Eventually(func() bool {
+				return listCallCount > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected fallback to ListImages after StreamImages returned Unimplemented"))
+
+			// Verify streaming was attempted at least once
+			gomega.Expect(streamCallCount).To(gomega.BeNumerically(">=", 1),
+				"Expected StreamImages to be attempted at least once before falling back")
 		})
 	})
 })
