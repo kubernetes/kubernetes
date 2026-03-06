@@ -54,14 +54,23 @@ func shardSelectorString(index, total int) string {
 	return fmt.Sprintf("shardRange(object.metadata.uid,0x%s,0x%s)", start, end)
 }
 
+// hexLess compares two lowercase hex strings numerically, matching the
+// server-side sharding comparison logic.
+func hexLess(a, b string) bool {
+	if len(a) != len(b) {
+		return len(a) < len(b)
+	}
+	return a < b
+}
+
 // objectInShard returns true if the object's UID hash falls within the given shard range.
 func objectInShard(uid string, index, total int) bool {
 	start, end := calculateShardRange(index, total)
 	hash := sharding.HashField(uid)
-	if hash < start {
+	if hexLess(hash, start) {
 		return false
 	}
-	if hash >= end {
+	if !hexLess(hash, end) {
 		return false
 	}
 	return true
