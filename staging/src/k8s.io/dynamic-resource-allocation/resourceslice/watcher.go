@@ -61,7 +61,11 @@ func (w *wrapWatcher) receive(ctx context.Context) {
 				return
 			}
 			if w.match == nil || w.match(event) {
-				w.result <- event
+				select {
+				case <-ctx.Done():
+					return
+				case w.result <- event:
+				}
 			}
 		}
 	}
