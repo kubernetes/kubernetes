@@ -83,6 +83,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -4825,6 +4826,65 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantNodeList, gotNodeNames, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected nodes (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMaybeSetNominationTimestamp(t *testing.T) {
+	existingTimestamp := time.Now().Add(-time.Minute)
+	fakeNow := time.Now()
+
+	tests := []struct {
+		name              string
+		existingTimestamp *time.Time
+		nominatingInfo    *fwk.NominatingInfo
+		expectedTimestamp *time.Time
+	}{
+		{
+			name:           "nil nominatingInfo does not set timestamp",
+			nominatingInfo: nil,
+		},
+		{
+			name:           "ModeNoop does not set timestamp",
+			nominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop},
+		},
+		{
+			name: "ModeOverride with empty NominatedNodeName does not set timestamp",
+			nominatingInfo: &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
+				NominatedNodeName: "",
+			},
+		},
+		{
+			name: "ModeOverride with non-empty NominatedNodeName sets timestamp",
+			nominatingInfo: &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
+				NominatedNodeName: "node1",
+			},
+			expectedTimestamp: &fakeNow,
+		},
+		{
+			name:              "existing timestamp is not overwritten on re-nomination",
+			existingTimestamp: &existingTimestamp,
+			nominatingInfo: &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
+				NominatedNodeName: "node1",
+			},
+			expectedTimestamp: &existingTimestamp,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podInfo := &framework.QueuedPodInfo{
+				PodInfo:             mustNewPodInfo(t, st.MakePod().Name("p").Namespace("ns").UID("p").Obj()),
+				NominationTimestamp: tt.existingTimestamp,
+			}
+
+			maybeSetNominationTimestamp(podInfo, tt.nominatingInfo, testingclock.NewFakeClock(fakeNow))
+			if diff := cmp.Diff(tt.expectedTimestamp, podInfo.NominationTimestamp, cmpopts.EquateApproxTime(0)); diff != "" {
+				t.Errorf("unexpected NominationTimestamp (-want +got):\n%s", diff)
 			}
 		})
 	}
