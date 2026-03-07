@@ -150,6 +150,10 @@ const (
 	splitREString = "^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$"
 )
 
+const (
+	zeroDivErrMsg = "division by zero error"
+)
+
 var (
 	// Errors that could happen while parsing a string.
 	ErrFormatWrong = errors.New("quantities must match the regular expression '" + splitREString + "'")
@@ -634,6 +638,36 @@ func (q *Quantity) Mul(y int64) bool {
 		return true
 	}
 	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
+}
+
+// QuoRound divides the current value by y and rounds the division result by roundVal digits.
+// the function panics on y=0 or roundVal < 0
+func (q *Quantity) QuoRound(y int64, roundVal int64) bool {
+	if y == 0 {
+		panic(zeroDivErrMsg)
+	}
+	if roundVal < 0 {
+		panic("negative rounding values are not allowed")
+	}
+
+	q.s = ""
+	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, inf.Scale(0)), inf.Scale(roundVal), inf.RoundDown).UnscaledBig().IsInt64()
+}
+
+// QuoIntegerDivision integer divides the current value by y and rounds towards zero (round down).
+// the function panics on y=0
+func (q *Quantity) QuoIntegerDivision(y int64) bool {
+	if y == 0 {
+		panic(zeroDivErrMsg)
+	}
+
+	q.s = ""
+	if q.d.Dec == nil && q.i.scale == 0 {
+		q.i.value /= y
+		return true
+	}
+
+	return q.ToDec().d.Dec.QuoRound(q.d.Dec, inf.NewDec(y, 0), 0, inf.RoundDown).UnscaledBig().IsInt64()
 }
 
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the

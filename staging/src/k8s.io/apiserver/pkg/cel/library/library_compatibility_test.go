@@ -60,6 +60,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes <1.33>:
 		"semver", "isSemver", "major", "minor", "patch",
 		// Kubernetes <1.??>:
+		"mul", "div", "divInt",
+		// Kubernetes <1.36>
 	)
 
 	// TODO: test celgo function lists
