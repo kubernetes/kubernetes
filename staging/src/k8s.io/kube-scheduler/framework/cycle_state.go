@@ -62,14 +62,14 @@ type CycleState interface {
 	// GetSkipPreBindPlugins returns plugins that will be skipped in the PreBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	GetSkipPreBindPlugins() sets.Set[string]
-	// SetSkipPreBindPlugins sets plugins that should be skipped in the PerBind extension point.
+	// SetSkipPreBindPlugins sets plugins that should be skipped in the PreBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetSkipPreBindPlugins(plugins sets.Set[string])
 	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
 	// in the PreBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	GetParallelPreBindPlugins() sets.Set[string]
-	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
+	// SetParallelPreBindPlugins sets plugins that can be run in parallel with other plugins
 	// in the PreBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetParallelPreBindPlugins(plugins sets.Set[string])
@@ -89,4 +89,33 @@ type CycleState interface {
 	// Clone creates a copy of CycleState and returns its pointer. Clone returns
 	// nil if the context being cloned is nil.
 	Clone() CycleState
+	// IsPodGroupScheduling returns true if this cycle is a pod group scheduling cycle.
+	// When true, Permit plugin reads PodGroupState from the immutable snapshot instead of the live cache.
+	IsPodGroupScheduling() bool
+	// SetPodGroupScheduling sets whether this cycle is a pod group scheduling cycle or not.
+	SetPodGroupScheduling(bool)
+}
+
+// PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.
+// StateData stored by one plugin can be read, altered, or deleted by another plugin that operates on a pod group.
+// PodGroupCycleState does not provide any data protection, as all plugins are assumed to be
+// trusted.
+type PodGroupCycleState interface {
+	// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordPluginMetrics() bool
+	// Read retrieves data with the given "key" from PodGroupCycleState. If the key is not
+	// present, ErrNotFound is returned.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Read(key StateKey) (StateData, error)
+	// Write stores the given "val" in PodGroupCycleState with the given "key".
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Write(key StateKey, val StateData)
+	// Delete deletes data with the given key from PodGroupCycleState.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Delete(key StateKey)
 }

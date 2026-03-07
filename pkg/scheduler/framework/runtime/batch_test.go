@@ -82,6 +82,10 @@ func (s sharedLister) StorageInfos() fwk.StorageInfoLister {
 	return &storageInfoListerContract{}
 }
 
+func (s sharedLister) PodGroupStates() fwk.PodGroupStateLister {
+	return nil
+}
+
 var batchRegistry = func() Registry {
 	r := make(Registry)
 	err := r.Register("batchTest", newBatchTestPlugin)

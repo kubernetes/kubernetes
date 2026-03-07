@@ -67,6 +67,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		applyGangScheduling(config)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		applyTopologyAwareWorkloadScheduling(config)
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -91,6 +94,10 @@ func applyGangScheduling(config *v1.Plugins) {
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.GangScheduling})
 }
 
+func applyTopologyAwareWorkloadScheduling(config *v1.Plugins) {
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupCount})
+}
+
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
 func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins) *v1.Plugins {
 	if customPlugins == nil {
@@ -110,6 +117,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.PreBind = mergePluginSet(logger, defaultPlugins.PreBind, customPlugins.PreBind)
 	defaultPlugins.Bind = mergePluginSet(logger, defaultPlugins.Bind, customPlugins.Bind)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
+	defaultPlugins.PlacementScore = mergePluginSet(logger, defaultPlugins.PlacementScore, customPlugins.PlacementScore)
 	return defaultPlugins
 }
 

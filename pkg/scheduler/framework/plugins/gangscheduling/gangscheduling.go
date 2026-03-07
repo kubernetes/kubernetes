@@ -25,7 +25,6 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -49,7 +48,6 @@ type GangScheduling struct {
 
 var _ fwk.EnqueueExtensions = &GangScheduling{}
 var _ fwk.PreEnqueuePlugin = &GangScheduling{}
-var _ fwk.ReservePlugin = &GangScheduling{}
 var _ fwk.PermitPlugin = &GangScheduling{}
 
 // New initializes a new plugin and returns it.
@@ -140,7 +138,7 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return nil
 	}
 
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.handle.PodGroupManager().PodGroupStates().Get(namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -151,35 +149,6 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	// The quorum is met, allow the pod to enter the scheduling queue.
 	return nil
-}
-
-// Reserve is called after a node has been selected for the pod. For gang pods,
-// this stage marks the pod as "assumed" in the WorkloadManager,
-// contributing to the count of pods ready to be co-scheduled at the Permit stage.
-func (pl *GangScheduling) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	if pod.Spec.WorkloadRef == nil {
-		return nil
-	}
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
-	if err != nil {
-		return fwk.AsStatus(err)
-	}
-	podGroupState.AssumePod(pod.UID)
-	return nil
-}
-
-// Unreserve removes the gang pod from the "assumed" state in the WorkloadManager,
-// ensuring it doesn't count towards the Permit quorum.
-func (pl *GangScheduling) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
-	if pod.Spec.WorkloadRef == nil {
-		return
-	}
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
-	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef)
-		return
-	}
-	podGroupState.ForgetPod(pod.UID)
 }
 
 // Permit forces all pods in a gang to wait at this stage. Once the number of waiting (assumed) pods
@@ -209,7 +178,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return nil, 0
 	}
 
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.getPodGroupState(state, namespace, workloadRef)
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
@@ -234,4 +203,14 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	}
 
 	return nil, 0
+}
+
+// getPodGroupState returns the pod group state appropriate for the current scheduling mode.
+// In pod group scheduling mode, it reads from the snapshot.
+// Otherwise, it reads runtime state from the cache.
+func (pl *GangScheduling) getPodGroupState(state fwk.CycleState, namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+	if state != nil && state.IsPodGroupScheduling() {
+		return pl.handle.SnapshotSharedLister().PodGroupStates().Get(namespace, workloadRef)
+	}
+	return pl.handle.PodGroupManager().PodGroupStates().Get(namespace, workloadRef)
 }

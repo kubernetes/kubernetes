@@ -22,8 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -53,16 +55,18 @@ type Snapshot struct {
 	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
-	generation int64
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
-	assumedPods map[string]*v1.Pod
-
+	assumedPods    map[string]*v1.Pod
+	podGroupStates map[PodGroupKey]*podGroupStateSnapshot
+	generation     int64
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
 	// This field should be cleared once the pod group has been checked for the placement.
 	placementNodes *placementNodes
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
+	genericWorkloadEnabled bool
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -70,9 +74,11 @@ var _ fwk.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap: make(map[string]*framework.NodeInfo),
-		usedPVCSet:  sets.New[string](),
-		assumedPods: make(map[string]*v1.Pod),
+		nodeInfoMap:            make(map[string]*framework.NodeInfo),
+		usedPVCSet:             sets.New[string](),
+		assumedPods:            make(map[string]*v1.Pod),
+		podGroupStates:         make(map[PodGroupKey]*podGroupStateSnapshot),
+		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
 }
 
@@ -188,6 +194,27 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
+// PodGroupStates returns a PodGroupStateLister backed by this snapshot's pod group states.
+func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
+	return &snapshotPodGroupStateLister{podGroupStates: s.podGroupStates}
+}
+
+var _ fwk.PodGroupStateLister = &snapshotPodGroupStateLister{}
+
+type snapshotPodGroupStateLister struct {
+	podGroupStates map[PodGroupKey]*podGroupStateSnapshot
+}
+
+// Get returns the pod group state from the snapshot for the given pod group.
+func (l *snapshotPodGroupStateLister) Get(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+	key := NewPodGroupKey(namespace, workloadRef)
+	state, ok := l.podGroupStates[key]
+	if !ok {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	return state, nil
+}
+
 // NumNodesInPlacement returns the number of nodes in the snapshot for the current placement.
 // If no placement is set, it returns the number of nodes in the snapshot.
 // This function is not thread safe so it should be executed when no other routines can write to the snapshot.
@@ -195,6 +222,11 @@ func (s *Snapshot) NumNodesInPlacement() int {
 	if s.placementNodes != nil {
 		return len(s.placementNodes.nodeInfoList)
 	}
+	return len(s.nodeInfoList)
+}
+
+// NumNodes returns the number of nodes in the snapshot.
+func (s *Snapshot) NumNodes() int {
 	return len(s.nodeInfoList)
 }
 
@@ -247,6 +279,14 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if !s.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
+		return nil
+	}
+	pgKey := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	if pgs, ok := s.podGroupStates[pgKey]; ok {
+		pgs.assumePod(pod.UID)
+	}
 	return nil
 }
 
@@ -262,6 +302,13 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		return fmt.Errorf("assumed pod %q not found in the snapshot", key)
 	}
 	delete(s.assumedPods, key)
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if s.genericWorkloadEnabled && assumedPod.Spec.WorkloadRef != nil {
+		pgKey := NewPodGroupKey(assumedPod.Namespace, assumedPod.Spec.WorkloadRef)
+		if pgs, ok := s.podGroupStates[pgKey]; ok {
+			pgs.forgetPod(assumedPod.UID)
+		}
+	}
 	nodeName := assumedPod.Spec.NodeName
 	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
 		// Calling RemovePod increases the Generation number of the nodeInfo.
