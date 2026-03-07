@@ -361,6 +361,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				return nil, fmt.Errorf("invalid resource pools were encountered%w", internal.ErrFailedAllocationOnNode)
 			}
 		}
+		// If a CEL selector mismatch was recorded, surface it as a
+		// per-node failure reason so users know why no device matched.
+		if alloc.noMatchReason != "" {
+			return nil, fmt.Errorf("%s%w", alloc.noMatchReason, internal.ErrFailedAllocationOnNode)
+		}
 		return nil, nil
 	}
 
@@ -632,6 +637,11 @@ type allocator struct {
 	// requested by all allocations targeting that device.
 	allocatingCapacity ConsumedCapacityCollection
 	result             []internalAllocationResult
+	// noMatchReason records the first CEL selector expression that did not
+	// match any device, together with the claim or class name. It is only
+	// set once (the first mismatch wins) and is surfaced as the failure
+	// reason when Allocate() finds no solution.
+	noMatchReason string
 }
 
 // counterSets is a map with the name of counter sets to the counters in
@@ -1282,6 +1292,14 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 			return false, fmt.Errorf("claim %s: selector #%d: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, err)
 		}
 		if !matches {
+			// Record the first mismatch reason so it can be surfaced if no
+			// device ever matches. We only record claim-level (user-written)
+			// selectors, not class selectors — class selectors filtering out
+			// devices from other drivers is expected infrastructure behavior.
+			if class == nil && alloc.noMatchReason == "" {
+				alloc.noMatchReason = fmt.Sprintf("claim %s, selector #%d: expression %q did not match",
+					klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, selector.CEL.Expression)
+			}
 			return false, nil
 		}
 	}
