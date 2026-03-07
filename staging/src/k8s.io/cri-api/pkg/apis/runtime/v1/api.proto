@@ -558,7 +558,7 @@ message PodSandboxStatusRequest {
 }
 
 // PodIP represents an ip of a Pod
-message PodIP{
+message PodIP {
     // an ip is a string representation of an IPv4 or an IPv6
     string ip = 1;
 }
