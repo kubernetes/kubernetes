@@ -103,6 +103,9 @@ func TestControllerSyncPool(t *testing.T) {
 		nodeUID types.UID
 		// noOwner completely disables setting an owner.
 		noOwner bool
+		// reconcileOnlyPoolName limits reconciliation to a single pool (issue #137011).
+		// When set, NodeName is not set on slices even for Node owner.
+		reconcileOnlyPoolName string
 		// initialObjects is a list of initial resource slices to be used in the test.
 		initialObjects         []runtime.Object
 		initialOtherObjects    []runtime.Object
@@ -835,6 +838,67 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"reconcile-only-pool-name-create-slice-no-node-name": {
+			nodeUID:               nodeUID,
+			reconcileOnlyPoolName: poolName,
+			initialObjects:        []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{Devices: []resourceapi.Device{}}},
+					},
+				},
+			},
+			expectedStats: Stats{NumCreates: 1},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					AllNodes(true).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"reconcile-only-pool-name-with-node-selector": {
+			nodeUID:               nodeUID,
+			reconcileOnlyPoolName: poolName,
+			initialObjects:        []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						NodeSelector: nodeSelector,
+						Slices:       []Slice{{Devices: []resourceapi.Device{newDevice(deviceName)}}},
+					},
+				},
+			},
+			expectedStats: Stats{NumCreates: 1},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					NodeSelector(nodeSelector).
+					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"reconcile-only-pool-name-with-perdevice-node-selector": {
+			nodeUID:               nodeUID,
+			reconcileOnlyPoolName: poolName,
+			initialObjects:        []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{Devices: []resourceapi.Device{newDevice(deviceName, nodeSelector)}, PerDeviceNodeSelection: ptr.To(true)}},
+					},
+				},
+			},
+			expectedStats: Stats{NumCreates: 1},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).
+					PerDeviceNodeSelection(true).
+					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName, nodeSelector)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
 		"update-node-selector": {
 			initialObjects: []runtime.Object{
 				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
@@ -1222,7 +1286,7 @@ func TestControllerSyncPool(t *testing.T) {
 				owner = nil
 			}
 			var controllerErrors []error
-			ctrl, err := newController(ctx, Options{
+			opts := Options{
 				DriverName: driverName,
 				KubeClient: kubeClient,
 				Owner:      owner,
@@ -1232,7 +1296,11 @@ func TestControllerSyncPool(t *testing.T) {
 				ErrorHandler: func(ctx context.Context, err error, msg string) {
 					controllerErrors = append(controllerErrors, fmt.Errorf("%s: %w", msg, err))
 				},
-			})
+			}
+			if test.reconcileOnlyPoolName != "" {
+				opts.ReconcileOnlyPoolName = test.reconcileOnlyPoolName
+			}
+			ctrl, err := newController(ctx, opts)
 			defer ctrl.Stop()
 			require.NoError(t, err, "unexpected controller creation error")
 
@@ -1301,6 +1369,69 @@ func TestControllerSyncPool(t *testing.T) {
 					t.Errorf("expected errors:\n  %s\ngot:\n  %s", joinErrors(test.expectedErrors), joinErrors(formatErrors(dedupedControllerErrors)))
 				}
 			}
+		})
+	}
+}
+
+// TestControllerUpdateReconcileOnlyPoolNameValidation verifies that Update rejects
+// invalid pool sets when ReconcileOnlyPoolName is set
+func TestControllerUpdateReconcileOnlyPoolNameValidation(t *testing.T) {
+	const poolName = "pool"
+
+	testcases := map[string]struct {
+		resources      *DriverResources
+		expectedErrors []string
+	}{
+		"multiple pools returns error": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedErrors: []string{"found 2 pools; expected exactly one pool with this name"},
+		},
+
+		"wrong pool only returns error": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+			expectedErrors: []string{"found 1 pools; expected exactly one pool with this name"},
+		},
+
+		"empty pools succeeds": {
+			resources: &DriverResources{Pools: map[string]Pool{}},
+		},
+
+		"single matching pool succeeds": {
+			resources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+				},
+			},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			ctrl := &Controller{
+				reconcileOnlyPoolName: poolName,
+				queue:                 ptr.To(workqueue.Mock[string]{}),
+				errorHandler: func(_ context.Context, err error, _ string) {
+					if len(tc.expectedErrors) > 0 {
+						require.Error(t, err)
+						for _, expectedError := range tc.expectedErrors {
+							assert.Contains(t, err.Error(), expectedError)
+						}
+						return
+					}
+
+					require.NoError(t, err)
+				},
+			}
+			ctrl.Update(tc.resources)
 		})
 	}
 }
@@ -1587,6 +1718,8 @@ func newDevice(name string, fields ...any) resourceapi.Device {
 			device.NodeName = ptr.To(string(f))
 		case allowMultipleAllocationsField:
 			device.AllowMultipleAllocations = ptr.To(bool(f))
+		case *v1.NodeSelector:
+			device.NodeSelector = f
 		default:
 			panic(fmt.Sprintf("unsupported resourceapi.Device field type %T", field))
 		}

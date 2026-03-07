@@ -473,6 +473,27 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// ReconcileOnlyPoolName limits reconciliation to slices with Spec.Pool.Name
+// equal to name.
+//
+// If set, the controller enqueues only ResourceSlices with a matching
+// Spec.Pool.Name and does not set Spec.NodeName (even for Node owners).
+// This enables node-owned slices that remain cluster-visible via
+// NodeSelector or AllNodes.
+//
+// Beware that this has a performance impact on the cluster
+// because all nodes have to receive all ResourceSlices of
+// the driver. Without this option, each node only receives
+// its own ResourceSlices.
+//
+// Empty means the default behavior.
+func ReconcileOnlyPoolName(name string) Option {
+	return func(o *options) error {
+		o.reconcileOnlyPoolName = name
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -494,6 +515,7 @@ type options struct {
 	registrationService        bool
 	draService                 bool
 	healthService              *bool
+	reconcileOnlyPoolName      string
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -502,19 +524,20 @@ type Helper struct {
 	// backgroundCtx is for activities that are started later.
 	backgroundCtx context.Context
 	// cancel cancels the backgroundCtx.
-	cancel           func(cause error)
-	wg               sync.WaitGroup
-	registrar        *nodeRegistrar
-	pluginServer     *grpcServer
-	plugin           DRAPlugin
-	driverName       string
-	nodeName         string
-	nodeUID          types.UID
-	kubeClient       kubernetes.Interface
-	resourceClient   cgoresource.ResourceV1Interface
-	serialize        bool
-	grpcMutex        sync.Mutex
-	grpcLockFilePath string
+	cancel                func(cause error)
+	wg                    sync.WaitGroup
+	registrar             *nodeRegistrar
+	pluginServer          *grpcServer
+	plugin                DRAPlugin
+	driverName            string
+	nodeName              string
+	nodeUID               types.UID
+	kubeClient            kubernetes.Interface
+	resourceClient        cgoresource.ResourceV1Interface
+	serialize             bool
+	grpcMutex             sync.Mutex
+	grpcLockFilePath      string
+	reconcileOnlyPoolName string
 
 	// Information about resource publishing changes concurrently and thus
 	// must be protected by the mutex. The controller gets started only
@@ -578,13 +601,14 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 
 	d := &Helper{
-		driverName:     o.driverName,
-		nodeName:       o.nodeName,
-		nodeUID:        o.nodeUID,
-		kubeClient:     o.kubeClient,
-		resourceClient: draclient.New(o.kubeClient),
-		serialize:      o.serialize,
-		plugin:         plugin,
+		driverName:            o.driverName,
+		nodeName:              o.nodeName,
+		nodeUID:               o.nodeUID,
+		kubeClient:            o.kubeClient,
+		resourceClient:        draclient.New(o.kubeClient),
+		serialize:             o.serialize,
+		plugin:                plugin,
+		reconcileOnlyPoolName: o.reconcileOnlyPoolName,
 	}
 	if o.rollingUpdateUID != "" {
 		dir := o.pluginDataDirectoryPath
@@ -788,6 +812,7 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 					// -> all errors are recoverable.
 					d.plugin.HandleError(ctx, recoverableError{error: err}, msg)
 				},
+				ReconcileOnlyPoolName: d.reconcileOnlyPoolName,
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}
