@@ -129,9 +129,9 @@ type ContainerManager interface {
 	// These checkers are integrated into the systemd watchdog to monitor the service's health.
 	GetHealthCheckers() []healthz.HealthChecker
 
-	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
-	// due to node recreation.
-	ShouldResetExtendedResourceCapacity() bool
+	// ShouldResetExtendedResourceCapacity returns whether the extended resource
+	// should be zeroed or not, depending on whether the resource has an active provider.
+	ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool
 
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
 	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler

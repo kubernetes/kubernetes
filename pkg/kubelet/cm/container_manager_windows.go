@@ -314,8 +314,8 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity(extendedResource)
 }
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {

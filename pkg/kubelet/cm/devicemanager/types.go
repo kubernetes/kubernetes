@@ -76,10 +76,9 @@ type Manager interface {
 	// GetAllocatableDevices returns information about all the devices known to the manager
 	GetAllocatableDevices() ResourceDeviceInstances
 
-	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
-	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
-	// the node has been recreated.
-	ShouldResetExtendedResourceCapacity() bool
+	// ShouldResetExtendedResourceCapacity returns whether the extended resource
+	// should be zeroed or not, depending on whether the resource has an active provider.
+	ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments

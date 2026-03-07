@@ -145,7 +145,7 @@ func (cm *containerManagerStub) GetAllocatableDevices() []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
+func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity(_ v1.ResourceName) bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
