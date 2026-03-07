@@ -447,15 +447,15 @@ func TestGarbageCollection(t *testing.T) {
 // The input must be a pointer to an object.
 func mustGarbageCollect(t *testing.T, i interface{}) {
 	t.Helper()
-	var collected int32 = 0
+	var collected atomic.Int32
 	runtime.SetFinalizer(i, func(x interface{}) {
-		atomic.StoreInt32(&collected, 1)
+		collected.Store(1)
 	})
 	t.Cleanup(func() {
 		if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
 			// Trigger GC explicitly, otherwise we may need to wait a long time for it to run
 			runtime.GC()
-			return atomic.LoadInt32(&collected) == 1, nil
+			return collected.Load() == 1, nil
 		}); err != nil {
 			t.Errorf("object was not garbage collected")
 		}

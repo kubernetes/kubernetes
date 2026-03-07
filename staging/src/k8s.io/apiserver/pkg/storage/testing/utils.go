@@ -322,6 +322,7 @@ func (p *PrefixTransformer) TransformFromStorage(ctx context.Context, data []byt
 	}
 	return bytes.TrimPrefix(data, p.prefix), p.stale, p.err
 }
+
 func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	if dataCtx == nil {
 		panic("no context provided")
@@ -345,7 +346,7 @@ type reproducingTransformer struct {
 	wrapped value.Transformer
 	store   storage.Interface
 
-	index      uint32
+	index      atomic.Uint32
 	nextObject func(uint32) (string, *example.Pod)
 }
 
@@ -361,7 +362,7 @@ func (rt *reproducingTransformer) TransformToStorage(ctx context.Context, data [
 }
 
 func (rt *reproducingTransformer) createObject(ctx context.Context) error {
-	key, obj := rt.nextObject(atomic.AddUint32(&rt.index, 1))
+	key, obj := rt.nextObject(rt.index.Add(1))
 	out := &example.Pod{}
 	return rt.store.Create(ctx, key, obj, out, 0)
 }

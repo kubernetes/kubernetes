@@ -23,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -79,7 +80,7 @@ func BenchmarkAdmit(b *testing.B) {
 			ns := "webhook-test"
 			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
 
-			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(atomic.Int32))))
 			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)
@@ -138,7 +139,7 @@ func TestAdmit(t *testing.T) {
 			ns := "webhook-test"
 			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
 
-			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(atomic.Int32))))
 			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)
@@ -240,7 +241,7 @@ func TestAdmitCachedClient(t *testing.T) {
 		client, informer := webhooktesting.NewFakeMutatingDataSource(ns, webhooktesting.ConvertToMutatingWebhooks(tt.Webhooks), stopCh)
 
 		// override the webhook source. The client cache will stay the same.
-		cacheMisses := new(int32)
+		cacheMisses := new(atomic.Int32)
 		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(cacheMisses)))
 		wh.SetExternalKubeClientSet(client)
 		wh.SetExternalKubeInformerFactory(informer)
@@ -258,12 +259,12 @@ func TestAdmitCachedClient(t *testing.T) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
 
-		if tt.ExpectCacheMiss && *cacheMisses == 0 {
+		if tt.ExpectCacheMiss && cacheMisses.Load() == 0 {
 			t.Errorf("%s: expected cache miss, but got no AuthenticationInfoResolver call", tt.Name)
 		}
 
-		if !tt.ExpectCacheMiss && *cacheMisses > 0 {
-			t.Errorf("%s: expected client to be cached, but got %d AuthenticationInfoResolver calls", tt.Name, *cacheMisses)
+		if !tt.ExpectCacheMiss && cacheMisses.Load() > 0 {
+			t.Errorf("%s: expected client to be cached, but got %d AuthenticationInfoResolver calls", tt.Name, cacheMisses.Load())
 		}
 	}
 }
@@ -299,7 +300,7 @@ func TestWebhookDuration(ts *testing.T) {
 			ns := "webhook-test"
 			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, webhooktesting.ConvertToMutatingWebhooks(test.Webhooks), stopCh)
 
-			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(atomic.Int32))))
 			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
 			wh.SetExternalKubeClientSet(client)
 			wh.SetExternalKubeInformerFactory(informer)

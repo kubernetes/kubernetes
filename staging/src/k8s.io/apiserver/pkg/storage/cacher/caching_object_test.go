@@ -35,7 +35,7 @@ type mockEncoder struct {
 	expectedResult string
 	expectedError  error
 
-	callsNumber int32
+	callsNumber atomic.Int32
 }
 
 func newMockEncoder(id, result string, err error) *mockEncoder {
@@ -47,7 +47,7 @@ func newMockEncoder(id, result string, err error) *mockEncoder {
 }
 
 func (e *mockEncoder) encode(_ runtime.Object, w io.Writer) error {
-	atomic.AddInt32(&e.callsNumber, 1)
+	e.callsNumber.Add(1)
 	if e.expectedError != nil {
 		return e.expectedError
 	}
@@ -78,8 +78,8 @@ func TestCachingObject(t *testing.T) {
 		}
 	}
 	for _, encoder := range encoders {
-		if encoder.callsNumber != 1 {
-			t.Errorf("%s: unexpected number of encode() calls: %d", encoder.identifier, encoder.callsNumber)
+		if encoder.callsNumber.Load() != 1 {
+			t.Errorf("%s: unexpected number of encode() calls: %d", encoder.identifier, encoder.callsNumber.Load())
 		}
 	}
 }
@@ -147,7 +147,7 @@ func TestCachingObjectRaces(t *testing.T) {
 				if err := object.CacheEncode(encoder.identifier, encoder.encode, buffer); err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				if callsNumber := atomic.LoadInt32(&encoder.callsNumber); callsNumber != 1 {
+				if callsNumber := encoder.callsNumber.Load(); callsNumber != 1 {
 					t.Errorf("unexpected number of serializations: %d", callsNumber)
 				}
 			}
