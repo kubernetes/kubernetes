@@ -1098,6 +1098,7 @@ func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIR
 }
 
 func TestConflictingData(t *testing.T) {
+	pod1v1beta1ns1 := makeID("v1beta1", "Pod", "ns1", "podname1", "poduid1")
 	pod1ns1 := makeID("v1", "Pod", "ns1", "podname1", "poduid1")
 	pod2ns1 := makeID("v1", "Pod", "ns1", "podname2", "poduid2")
 	pod2ns2 := makeID("v1", "Pod", "ns2", "podname2", "poduid2")
@@ -2448,6 +2449,129 @@ func TestConflictingData(t *testing.T) {
 					absentOwnerCache: []objectReference{pod1ns1, role1v1},
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+			},
+		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/102641
+			name: "deletion works after apiVersion bumps",
+			steps: []step{
+				// setup
+				createObjectInClient("rbac.authorization.k8s.io", "v1beta1", "roles", "ns1", makeMetadataObj(role1v1beta1)),
+				createObjectInClient("", "v1beta1", "pods", "ns1", makeMetadataObj(pod1v1beta1ns1, role1v1beta1)),
+				// 2,3: observe v1beta1 owner
+				processEvent(makeAddEvent(role1v1beta1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1beta1)},
+				}),
+				// 4,5: observe v1beta1 child
+				processEvent(makeAddEvent(pod1v1beta1ns1, role1v1beta1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1beta1), makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 6,7: observe owner with new v1 apiVersion
+				processEvent(makeAddEvent(role1v1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1), makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 8,9: observe child with new v1 apiVersion
+				processEvent(makeAddEvent(pod1ns1, role1v1beta1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1), makeNode(pod1ns1, withOwners(role1v1beta1))},
+				}),
+				// 10,11: observe child with ownerRef new v1 apiVersion
+				processEvent(makeAddEvent(pod1ns1, role1v1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1), makeNode(pod1ns1, withOwners(role1v1))},
+				}),
+				// 12,13,14,15: unserve v1beta1
+				deleteObjectFromClient("rbac.authorization.k8s.io", "v1beta1", "roles", "ns1", role1v1beta1.Name),
+				createObjectInClient("rbac.authorization.k8s.io", "v1", "roles", "ns1", makeMetadataObj(role1v1)),
+				deleteObjectFromClient("", "v1beta1", "pods", "ns1", pod1v1beta1ns1.Name),
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1, role1v1)),
+				// 16,17: observe owner delete
+				processEvent(makeDeleteEvent(role1v1)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(role1v1))}, // only child remains
+					absentOwnerCache:       []objectReference{role1v1},                      // cached absence of parent via v1
+					pendingAttemptToDelete: []*node{makeNode(pod1ns1, withOwners(role1v1))},
+				}),
+				// 18,19: handle queued attempted delete of child
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname1",    // lookup of Pod pre-delete
+						"delete /v1, Resource=pods ns=ns1 name=podname1", // delete Pod
+					},
+					graphNodes:       []*node{makeNode(pod1ns1, withOwners(role1v1))}, // only child remains
+					absentOwnerCache: []objectReference{role1v1},                      // cached absence of parent via v1
+				}),
+			},
+		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/102641
+			name: "deletion works after apiVersion bumps even if delete triggered on old apiVersion",
+			steps: []step{
+				// setup
+				createObjectInClient("rbac.authorization.k8s.io", "v1beta1", "roles", "ns1", makeMetadataObj(role1v1beta1)),
+				createObjectInClient("", "v1beta1", "pods", "ns1", makeMetadataObj(pod1v1beta1ns1, role1v1beta1)),
+				// 2,3: observe v1beta1 owner
+				processEvent(makeAddEvent(role1v1beta1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1beta1)},
+				}),
+				// 4,5: observe v1beta1 child
+				processEvent(makeAddEvent(pod1v1beta1ns1, role1v1beta1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1beta1), makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 6,7,8,9: unserve v1beta1
+				deleteObjectFromClient("rbac.authorization.k8s.io", "v1beta1", "roles", "ns1", role1v1beta1.Name),
+				createObjectInClient("rbac.authorization.k8s.io", "v1", "roles", "ns1", makeMetadataObj(role1v1)),
+				deleteObjectFromClient("", "v1beta1", "pods", "ns1", pod1v1beta1ns1.Name),
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1, role1v1)),
+				// 10,11: observe owner with new v1 apiVersion
+				processEvent(makeAddEvent(role1v1)),
+				assertState(state{
+					graphNodes: []*node{makeNode(role1v1), makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 12,13: observe owner delete
+				processEvent(makeDeleteEvent(role1v1)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))}, // only child remains
+					absentOwnerCache:       []objectReference{role1v1},                                  // cached absence of parent via v1
+					pendingAttemptToDelete: []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 15,15: handle queued attempted delete of child: fails because ownerRef still points to v1beta1
+				processAttemptToDelete(1),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))}, // only child remains
+					absentOwnerCache:       []objectReference{role1v1},                                  // cached absence of parent via v1
+					pendingAttemptToDelete: []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 16,17: observe child with new v1 apiVersion
+				processEvent(makeAddEvent(pod1ns1, role1v1beta1)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(role1v1beta1))}, // only child remains
+					absentOwnerCache:       []objectReference{role1v1},                           // cached absence of parent via v1
+					pendingAttemptToDelete: []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 18,19: observe child with ownerRef with new v1 apiVersion
+				processEvent(makeAddEvent(pod1ns1, role1v1)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(role1v1))},
+					absentOwnerCache:       []objectReference{role1v1}, // cached absence of parent via v1
+					pendingAttemptToDelete: []*node{makeNode(pod1v1beta1ns1, withOwners(role1v1beta1))},
+				}),
+				// 20,21: handle queued attempted delete of child
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname1",    // lookup of Pod pre-delete
+						"delete /v1, Resource=pods ns=ns1 name=podname1", // delete Pod
+					},
+					graphNodes:       []*node{makeNode(pod1ns1, withOwners(role1v1))}, // only child remains
+					absentOwnerCache: []objectReference{role1v1},                      // cached absence of parent via v1
 				}),
 			},
 		},
