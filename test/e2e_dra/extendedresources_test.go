@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -36,6 +37,10 @@ const (
 	resourceTypeExplicit = "explicit"
 	resourceTypeImplicit = "implicit"
 )
+
+func extendedResourcesDriverResources(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {
+	return drautils.DriverResourcesNow(nodes, 8)
+}
 
 // extendedResourceUpgradeDowngrade tests the DRAExtendedResources feature during upgrade/downgrade scenarios
 // for a specific resource type (explicit or implicit).
