@@ -35,7 +35,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -2718,11 +2717,8 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		})
 		mockFeature.SetMaxVersion(nil)
 
-		originalAllFeatures := ndffeatures.AllFeatures
-		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
-		defer func() {
-			ndffeatures.AllFeatures = originalAllFeatures
-		}()
+		ndfFramework := ndf.New([]ndf.Feature{mockFeature})
+		ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 	}
 	if tt.EnableGangScheduling {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{

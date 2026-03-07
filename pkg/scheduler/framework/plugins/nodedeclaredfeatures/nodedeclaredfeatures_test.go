@@ -51,6 +51,14 @@ func createMockFeature(t *testing.T, name string, infer bool, maxVersionStr stri
 }
 
 func TestPreFilter(t *testing.T) {
+	const (
+		feature1 = "TestFeature1"
+		feature2 = "TestFeature2"
+	)
+	mapper := ndf.NewFeatureMapper([]string{feature1, feature2})
+	newFS := func(features ...string) ndf.FeatureSet {
+		return mapper.MustMapSorted(features)
+	}
 	_, ctx := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name              string
@@ -67,7 +75,8 @@ func TestPreFilter(t *testing.T) {
 			pod:               st.MakePod().Name("test-pod").Obj(),
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
-				createMockFeature(t, "TestFeature", true, ""),
+				createMockFeature(t, feature1, true, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,
@@ -78,10 +87,11 @@ func TestPreFilter(t *testing.T) {
 			pod:               st.MakePod().Name("test-pod").Obj(),
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
-				createMockFeature(t, "TestFeature", true, ""),
+				createMockFeature(t, feature1, true, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success),
-			expectedState:  &preFilterState{reqs: ndf.NewFeatureSet("TestFeature")},
+			expectedState:  &preFilterState{reqs: newFS(feature1)},
 		},
 		{
 			name:              "Pod with multiple feature requirements",
@@ -89,11 +99,11 @@ func TestPreFilter(t *testing.T) {
 			pod:               st.MakePod().Name("test-pod").Obj(),
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
-				createMockFeature(t, "TestFeature1", true, "1.38.0"),
-				createMockFeature(t, "TestFeature2", true, "1.38.0"),
+				createMockFeature(t, feature1, true, "1.38.0"),
+				createMockFeature(t, feature2, true, "1.38.0"),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success),
-			expectedState:  &preFilterState{reqs: ndf.NewFeatureSet("TestFeature1", "TestFeature2")},
+			expectedState:  &preFilterState{reqs: newFS(feature1, feature2)},
 		},
 		{
 			name:              "Pod with no requirements",
@@ -101,7 +111,8 @@ func TestPreFilter(t *testing.T) {
 			pod:               st.MakePod().Name("test-pod").Obj(),
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
-				createMockFeature(t, "TestFeature", false, ""),
+				createMockFeature(t, feature1, false, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,
@@ -112,7 +123,8 @@ func TestPreFilter(t *testing.T) {
 			pod:               st.MakePod().Name("test-pod").Obj(),
 			componenetVersion: "1.34.0",
 			nodeFeatures: []ndf.Feature{
-				createMockFeature(t, "TestFeature", true, "1.33.0"),
+				createMockFeature(t, feature1, true, "1.33.0"),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,
@@ -121,10 +133,7 @@ func TestPreFilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ndfFramework, err := ndf.New(tc.nodeFeatures)
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New(tc.nodeFeatures)
 
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
@@ -162,6 +171,16 @@ func TestPreFilter(t *testing.T) {
 
 func TestFilter(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	const (
+		featureA = "FeatureA"
+		featureB = "FeatureB"
+		featureC = "FeatureC"
+	)
+	f, _ := ndftesting.NewMockFramework(t, featureA, featureB, featureC)
+	ndftesting.SetFrameworkDuringTest(t, f)
+	newFS := func(features ...string) ndf.FeatureSet {
+		return f.MustMapSorted(features)
+	}
 
 	testCases := []struct {
 		name           string
@@ -175,7 +194,7 @@ func TestFilter(t *testing.T) {
 			name:           "plugin disabled",
 			pluginEnabled:  false,
 			pod:            st.MakePod().Name("test-pod").Obj(),
-			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj(),
+			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureA, featureB}).Obj(),
 			preFilterReqs:  nil,
 			expectedStatus: nil,
 		},
@@ -183,23 +202,23 @@ func TestFilter(t *testing.T) {
 			name:           "Node matches requirements",
 			pluginEnabled:  true,
 			pod:            st.MakePod().Name("test-pod").Obj(),
-			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj(),
-			preFilterReqs:  []string{"FeatureA"},
+			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureA, featureB}).Obj(),
+			preFilterReqs:  []string{featureA},
 			expectedStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
 			name:           "Node does not match requirements",
 			pluginEnabled:  true,
 			pod:            st.MakePod().Name("test-pod").Obj(),
-			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{"FeatureB"}).Obj(),
-			preFilterReqs:  []string{"FeatureA"},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureA"),
+			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureB}).Obj(),
+			preFilterReqs:  []string{featureA},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Node with multiple features, pod requires subset",
 			pod:            st.MakePod().Name("test-pod").Obj(),
-			node:           st.MakeNode().Name("node-multi").DeclaredFeatures([]string{"FeatureA", "FeatureB", "FeatureC"}).Obj(),
-			preFilterReqs:  []string{"FeatureA", "FeatureC"},
+			node:           st.MakeNode().Name("node-multi").DeclaredFeatures([]string{featureA, featureB, featureC}).Obj(),
+			preFilterReqs:  []string{featureA, featureC},
 			expectedStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
@@ -207,16 +226,16 @@ func TestFilter(t *testing.T) {
 			pluginEnabled:  true,
 			pod:            st.MakePod().Name("test-pod").Obj(),
 			node:           st.MakeNode().Name("node-1").Obj(),
-			preFilterReqs:  []string{"FeatureA"},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureA"),
+			preFilterReqs:  []string{featureA},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Node with some but not all required features",
 			pluginEnabled:  true,
 			pod:            st.MakePod().Name("test-pod").Obj(),
-			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{"FeatureA"}).Obj(),
-			preFilterReqs:  []string{"FeatureA", "FeatureB"},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node declared features check failed - unsatisfied requirements: FeatureB"),
+			node:           st.MakeNode().Name("node-1").DeclaredFeatures([]string{featureA}).Obj(),
+			preFilterReqs:  []string{featureA, featureB},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements),
 		},
 		{
 			name:           "Error getting pre-filter state",
@@ -235,18 +254,14 @@ func TestFilter(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
 
-			ndfFramework, err := ndf.New([]ndf.Feature{})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
 			plugin := &NodeDeclaredFeatures{
-				ndfFramework: ndfFramework,
+				ndfFramework: ndf.DefaultFramework,
 				version:      version.MustParseSemantic("1.35.0"),
 				enabled:      tc.pluginEnabled,
 			}
 			cycleState := framework.NewCycleState()
 			if tc.preFilterReqs != nil {
-				cycleState.Write(preFilterStateKey, &preFilterState{reqs: ndf.NewFeatureSet(tc.preFilterReqs...)})
+				cycleState.Write(preFilterStateKey, &preFilterState{reqs: newFS(tc.preFilterReqs...)})
 			}
 
 			status := plugin.Filter(ctx, cycleState, tc.pod, nodeInfo)
@@ -297,10 +312,7 @@ func TestEnqueueExtensionsNodeUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ndfFramework, err := ndf.New([]ndf.Feature{})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New([]ndf.Feature{})
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
 				version:      version.MustParseSemantic("1.35.0"),
@@ -427,10 +439,7 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			mockF := ndftesting.NewMockFeature(t)
 			tc.setupMock(mockF)
 
-			ndfFramework, err := ndf.New([]ndf.Feature{mockF})
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
+			ndfFramework := ndf.New([]ndf.Feature{mockF})
 			plugin := &NodeDeclaredFeatures{
 				ndfFramework: ndfFramework,
 				version:      tc.componenetVersion,
