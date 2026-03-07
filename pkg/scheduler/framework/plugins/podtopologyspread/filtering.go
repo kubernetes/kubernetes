@@ -228,9 +228,10 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 }
 
 type topologyCount struct {
-	topologyValue string
-	constraintID  int
-	count         int
+	topologyValue        string
+	constraintID         int
+	count                int
+	countWithTerminating int
 }
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
@@ -281,28 +282,43 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 
 			value := node.Labels[c.TopologyKey]
 			count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace)
+			countWithTerminating := countPodsMatchSelectorWithTerminating(nodeInfo.GetPods(), c.Selector, pod.Namespace)
 			tpCounts = append(tpCounts, topologyCount{
-				topologyValue: value,
-				constraintID:  i,
-				count:         count,
+				topologyValue:        value,
+				constraintID:         i,
+				count:                count,
+				countWithTerminating: countWithTerminating,
 			})
 		}
 		tpCountsByNode[n] = tpCounts
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
+	// tpValueToMatchNumIncl tracks per-zone counts including terminating pods.
+	// It is used only to compute criticalPaths (the global minimum), so that a
+	// terminating pod in one zone is not excluded from the minimum calculation
+	// and does not artificially inflate the skew of other zones (#116629).
+	tpValueToMatchNumIncl := make([]map[string]int, len(constraints))
+	for i := 0; i < len(constraints); i++ {
+		tpValueToMatchNumIncl[i] = make(map[string]int, sizeHeuristic(len(allNodes), constraints[i]))
+	}
+
 	for _, tpCounts := range tpCountsByNode {
 		// tpCounts might not hold all the constraints, so index can't be used here as constraintID.
 		for _, tpCount := range tpCounts {
 			s.TpValueToMatchNum[tpCount.constraintID][tpCount.topologyValue] += tpCount.count
+			tpValueToMatchNumIncl[tpCount.constraintID][tpCount.topologyValue] += tpCount.countWithTerminating
 		}
 	}
 
-	// calculate min match for each constraint and topology value
+	// calculate min match for each constraint and topology value.
+	// CriticalPaths are derived from counts that include terminating pods so
+	// that a terminating pod in one zone cannot lower minMatchNum and cause
+	// skew inflation for zones that are reachable by the incoming pod (#116629).
 	for i := 0; i < len(constraints); i++ {
 		s.CriticalPaths[i] = newCriticalPaths()
 
-		for value, num := range s.TpValueToMatchNum[i] {
+		for value, num := range tpValueToMatchNumIncl[i] {
 			s.CriticalPaths[i].update(value, num)
 		}
 	}

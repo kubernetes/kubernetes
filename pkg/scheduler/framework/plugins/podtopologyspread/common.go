@@ -159,6 +159,27 @@ func countPodsMatchSelector(podInfos []fwk.PodInfo, selector labels.Selector, ns
 	return count
 }
 
+// countPodsMatchSelectorWithTerminating is like countPodsMatchSelector but
+// includes terminating pods (DeletionTimestamp != nil). It is used when
+// computing the global minimum domain count (criticalPaths / minMatchNum) so
+// that a terminating pod in one zone does not artificially deflate minMatchNum
+// and inflate the apparent skew of other zones (see #116629).
+func countPodsMatchSelectorWithTerminating(podInfos []fwk.PodInfo, selector labels.Selector, ns string) int {
+	if selector.Empty() {
+		return 0
+	}
+	count := 0
+	for _, p := range podInfos {
+		if p.GetPod().Namespace != ns {
+			continue
+		}
+		if selector.Matches(labels.Set(p.GetPod().Labels)) {
+			count++
+		}
+	}
+	return count
+}
+
 // podLabelsMatchSpreadConstraints returns whether tha labels matches with the selector in any of topologySpreadConstraint
 func podLabelsMatchSpreadConstraints(constraints []topologySpreadConstraint, labels labels.Set) bool {
 	for _, c := range constraints {
