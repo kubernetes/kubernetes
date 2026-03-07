@@ -23,7 +23,7 @@ package v1
 //
 // specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpecApplyConfiguration struct {
-	// reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
+	// scaleTargetRef is the reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
 	// and will set the desired number of pods by using its Scale subresource.
 	ScaleTargetRef *CrossVersionObjectReferenceApplyConfiguration `json:"scaleTargetRef,omitempty"`
 	// minReplicas is the lower limit for the number of replicas to which the autoscaler

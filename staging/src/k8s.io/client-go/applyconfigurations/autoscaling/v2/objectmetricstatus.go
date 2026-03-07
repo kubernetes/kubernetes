@@ -28,7 +28,7 @@ type ObjectMetricStatusApplyConfiguration struct {
 	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
 	// current contains the current value for the given metric
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
-	// DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
+	// describedObject specifies the descriptions of a object,such as kind,name apiVersion
 	DescribedObject *CrossVersionObjectReferenceApplyConfiguration `json:"describedObject,omitempty"`
 }
 
