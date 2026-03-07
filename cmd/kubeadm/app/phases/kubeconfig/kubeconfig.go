@@ -345,7 +345,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 			Organizations: organizations,
 		},
 		ClientCertNotAfter:  notAfter,
-		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -375,7 +375,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 			Token: token,
 		},
 		ClientCertNotAfter:  notAfter,
-		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -486,7 +486,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.SuperAdminKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -495,7 +495,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -504,21 +504,21 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.NodesGroup},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			APIServer:           localAPIEndpoint,
 			ClientName:          kubeadmconstants.ControllerManagerUser,
 			ClientCertAuth:      &clientCertAuth{},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
 			APIServer:           localAPIEndpoint,
 			ClientName:          kubeadmconstants.SchedulerUser,
 			ClientCertAuth:      &clientCertAuth{},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 	}, nil
 }
