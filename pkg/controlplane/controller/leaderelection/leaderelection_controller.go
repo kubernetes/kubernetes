@@ -318,7 +318,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 
 	var ackedCandidates []*v1beta1.LeaseCandidate
 	for _, candidate := range candidates {
-		if candidate.Spec.RenewTime.Add(electionDuration).After(now) {
+		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).After(now) {
 			ackedCandidates = append(ackedCandidates, candidate)
 		}
 	}
