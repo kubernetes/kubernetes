@@ -19,9 +19,11 @@ limitations under the License.
 package qos
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -30,6 +32,32 @@ var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), stri
 
 func isSupportedQoSComputeResource(name core.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))
+}
+
+// isPodLevelResourcesSet checks if the pod has any supported QoS compute resources configured
+// at the pod level.
+func isPodLevelResourcesSet(pod *core.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+
+	if (len(pod.Spec.Resources.Requests) + len(pod.Spec.Resources.Limits)) == 0 {
+		return false
+	}
+
+	for name := range pod.Spec.Resources.Requests {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	for name := range pod.Spec.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetPodQOS returns the QoS class of a pod persisted in the PodStatus.QOSClass field.
@@ -92,7 +120,7 @@ func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	isGuaranteed := true
 	// When pod-level resources are specified, we use them to determine QoS class.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		pod.Spec.Resources != nil {
+		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || isPodLevelResourcesSet(pod))) {
 		if len(pod.Spec.Resources.Requests) > 0 {
 			// process requests
 			processResourceList(requests, pod.Spec.Resources.Requests)
