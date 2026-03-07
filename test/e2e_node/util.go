@@ -263,6 +263,16 @@ func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bo
 	return node, ready && schedulable
 }
 
+// getReadyLocalTestNode is a wrapper around getLocalTestNode that requires the
+// node to be ready or returns an error.
+func getReadyLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, error) {
+	node, ready := getLocalTestNode(ctx, f)
+	if !ready {
+		return nil, fmt.Errorf("expected node to be ready=%t", ready)
+	}
+	return node, nil
+}
+
 func getLocalNodeCPUDetails(ctx context.Context, f *framework.Framework) (cpuCapVal int64, cpuAllocVal int64, cpuResVal int64) {
 	localNodeCap := getLocalNode(ctx, f).Status.Capacity
 	cpuCap := localNodeCap[v1.ResourceCPU]
