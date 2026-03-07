@@ -64,6 +64,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/flagz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -91,6 +92,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
@@ -302,6 +304,7 @@ type Bootstrap interface {
 	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsConfig *tls.Config, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
+	ListenAndServePods(ctx context.Context)
 	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
 }
 
@@ -690,6 +693,10 @@ func NewMainKubelet(ctx context.Context,
 	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		broadcaster := pods.NewBroadcaster()
+		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
+	}
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,
@@ -1566,6 +1573,9 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podsServer is the server that provides the pods gRPC service.
+	podsServer *pods.PodsServer
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2075,7 +2085,17 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		metrics.PodStartDuration.Observe(metrics.SinceInSeconds(firstSeenTime))
 	}
 
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		eventType := watch.Modified
+		// If the status manager doesn't yet have a status for this pod (ok == false),
+		// it indicates this is the first time the pod is being synced and should
+		// be broadcast as an Added event.
+		if !ok {
+			eventType = watch.Added
+		}
+		kl.podsServer.OnPodUpdated(pod, finalStatus, eventType)
+	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
@@ -2282,7 +2302,10 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
 	}
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 
 	if gracePeriod != nil {
 		logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
@@ -2368,7 +2391,10 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// information about the container end states (including exit codes) - when
 	// SyncTerminatedPod is called the containers may already be removed.
 	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, true)
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed = kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
 	logger.V(4).Info("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -2488,6 +2514,9 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// mark the final pod status
 	kl.statusManager.TerminatePod(logger, pod)
+	if kl.podsServer != nil {
+		kl.podsServer.OnPodRemoved(pod)
+	}
 	logger.V(4).Info("Pod is terminated and will need no more status updates", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	return nil
@@ -2558,11 +2587,15 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
 	logger := klog.FromContext(ctx)
 	kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "%s", message)
-	kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+	status := v1.PodStatus{
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
 		Reason:   reason,
-		Message:  "Pod was rejected: " + message})
+		Message:  "Pod was rejected: " + message}
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, status)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 }
 
 func recordAdmissionRejection(reason string) {
@@ -3298,23 +3331,41 @@ func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bo
 	return pod, true
 }
 
-// ListenAndServePodResources runs the kubelet podresources grpc service
+// ListenAndServePodResources runs the kubelet podresources grpc service.
 func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
-	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
-	if err != nil {
-		klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
-		return
-	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+		endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
+		if err != nil {
+			klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
+			return
+		}
 
-	providers := podresources.PodResourcesProviders{
-		Pods:             &kubeletPodsProvider{kl: kl},
-		Devices:          kl.containerManager,
-		Cpus:             kl.containerManager,
-		Memory:           kl.containerManager,
-		DynamicResources: kl.containerManager,
-	}
+		providers := podresources.PodResourcesProviders{
+			Pods:             &kubeletPodsProvider{kl: kl},
+			Devices:          kl.containerManager,
+			Cpus:             kl.containerManager,
+			Memory:           kl.containerManager,
+			DynamicResources: kl.containerManager,
+		}
 
-	server.ListenAndServePodResources(ctx, endpoint, providers)
+		server.ListenAndServePodResources(ctx, endpoint, providers)
+	}
+}
+
+// ListenAndServePod initializes an HTTP server to serve the Pod API.
+func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get local endpoint for pod api")
+			return
+		}
+		server.ListenAndServePodsServer(
+			ctx,
+			endpoint,
+			kl.podsServer,
+		)
+	}
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.

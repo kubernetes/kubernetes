@@ -777,7 +777,6 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	updateLogger := logger.WithValues("pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-
 	// decide what to do with this pod - we are either setting it up, tearing it down, or ignoring it
 	var firstTime bool
 	now := p.clock.Now()
@@ -981,7 +980,8 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
 	}
 	status.working = true
-	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
+	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
+
 	select {
 	case podUpdates <- struct{}{}:
 	default:
