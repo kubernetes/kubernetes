@@ -31,6 +31,7 @@ type Features struct {
 	EnableDRAConsumableCapacity                   bool
 	EnableDRADeviceTaints                         bool
 	EnableDRADeviceBindingConditions              bool
+	EnableDRANativeResources                      bool
 	EnableDRAPartitionableDevices                 bool
 	EnableDRAResourceClaimDeviceStatus            bool
 	EnableDRASchedulerFilterTimeout               bool
@@ -80,5 +81,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
 		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		EnableDRANativeResources:                      featureGate.Enabled(features.DRANativeResources),
 	}
 }

@@ -47,6 +47,26 @@ var objWithExtendedResourceName = &resource.DeviceClass{
 	},
 }
 
+var objWithManagesNativeResourcesTrue = &resource.DeviceClass{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-class",
+		Generation: 1,
+	},
+	Spec: resource.DeviceClassSpec{
+		ManagesNativeResources: ptr.To(true),
+	},
+}
+
+var objWithManagesNativeResourcesFalse = &resource.DeviceClass{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-class",
+		Generation: 1,
+	},
+	Spec: resource.DeviceClassSpec{
+		ManagesNativeResources: ptr.To(false),
+	},
+}
+
 func TestStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceClass must not be namespace scoped")
@@ -62,6 +82,7 @@ func TestStrategyCreate(t *testing.T) {
 	testcases := map[string]struct {
 		obj                   *resource.DeviceClass
 		draExtendedResource   bool
+		draNativeResources    bool
 		expectValidationError bool
 		expectObj             *resource.DeviceClass
 	}{
@@ -87,6 +108,26 @@ func TestStrategyCreate(t *testing.T) {
 			draExtendedResource: true,
 			expectObj:           objWithExtendedResourceName,
 		},
+		"drop-manages-native-resources": {
+			obj:                objWithManagesNativeResourcesTrue,
+			draNativeResources: false,
+			expectObj:          obj,
+		},
+		"keep-manages-native-resources-true": {
+			obj:                objWithManagesNativeResourcesTrue,
+			draNativeResources: true,
+			expectObj:          objWithManagesNativeResourcesTrue,
+		},
+		"keep-manages-native-resources-false": {
+			obj:                objWithManagesNativeResourcesFalse,
+			draNativeResources: true,
+			expectObj:          objWithManagesNativeResourcesFalse,
+		},
+		"keep-manages-native-resources-nil": {
+			obj:                obj,
+			draNativeResources: true,
+			expectObj:          obj,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -94,6 +135,7 @@ func TestStrategyCreate(t *testing.T) {
 			obj := tc.obj.DeepCopy()
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, tc.draNativeResources)
 
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
@@ -120,6 +162,7 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                *resource.DeviceClass
 		newObj                *resource.DeviceClass
 		draExtendedResource   bool
+		draNativeResources    bool
 		expectValidationError bool
 		expectObj             *resource.DeviceClass
 	}{
@@ -165,6 +208,70 @@ func TestStrategyUpdate(t *testing.T) {
 			draExtendedResource: false,
 			expectObj:           objWithExtendedResourceName,
 		},
+		"drop-manages-native-resources-on-update": {
+			oldObj:             obj,
+			newObj:             objWithManagesNativeResourcesTrue,
+			draNativeResources: false,
+			expectObj:          obj,
+		},
+		"drop-manages-native-resources-on-update-to-false": {
+			oldObj:             obj,
+			newObj:             objWithManagesNativeResourcesFalse,
+			draNativeResources: false,
+			expectObj:          obj,
+		},
+		"keep-manages-native-resources-on-update": {
+			oldObj:             obj,
+			newObj:             objWithManagesNativeResourcesTrue,
+			draNativeResources: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithManagesNativeResourcesTrue.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"update-manages-native-resources-true-to-false": {
+			oldObj:             objWithManagesNativeResourcesTrue,
+			newObj:             objWithManagesNativeResourcesFalse,
+			draNativeResources: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithManagesNativeResourcesFalse.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"update-manages-native-resources-true-to-nil": {
+			oldObj:             objWithManagesNativeResourcesTrue,
+			newObj:             obj,
+			draNativeResources: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := obj.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"keep-existing-manages-native-resources-true-disabled-feature": {
+			oldObj:             objWithManagesNativeResourcesTrue,
+			newObj:             objWithManagesNativeResourcesTrue,
+			draNativeResources: false,
+			expectObj:          objWithManagesNativeResourcesTrue,
+		},
+		"update-existing-manages-native-resources-true-to-false-disabled-feature": {
+			oldObj:             objWithManagesNativeResourcesTrue,
+			newObj:             objWithManagesNativeResourcesFalse,
+			draNativeResources: false,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithManagesNativeResourcesFalse.DeepCopy()
+				obj.Generation += 1
+				return obj
+			}(),
+		},
+		"keep-existing-manages-native-resources-false-disabled-feature": {
+			oldObj:             objWithManagesNativeResourcesFalse,
+			newObj:             objWithManagesNativeResourcesFalse,
+			draNativeResources: false,
+			expectObj:          objWithManagesNativeResourcesFalse,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -174,6 +281,7 @@ func TestStrategyUpdate(t *testing.T) {
 			newObj.ResourceVersion = "4"
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, tc.draNativeResources)
 
 			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {

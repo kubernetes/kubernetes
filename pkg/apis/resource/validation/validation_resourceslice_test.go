@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -77,9 +78,9 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 			},
 		},
 	}
-	for i := 0; i < numDevices; i++ {
+	for d := range numDevices {
 		device := resourceapi.Device{
-			Name:       fmt.Sprintf("device-%d", i),
+			Name:       fmt.Sprintf("device-%d", d),
 			Attributes: testAttributes(),
 			Capacity:   testCapacity(),
 		}
@@ -110,6 +111,47 @@ func testResourceSliceWithBindingConditions(name, nodeName, driverName string, n
 	return slice
 }
 
+func testNativeResourceCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	return map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		"dra.example.com/cpu":    {Value: resource.MustParse("100")},
+		"dra.example.com/memory": {Value: resource.MustParse("100Gi")},
+	}
+}
+
+func testResourceSliceWithNativeResources(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
+		},
+	}
+	for d := range numDevices {
+		device := resourceapi.Device{
+			Name:       fmt.Sprintf("device-%d", d),
+			Attributes: testAttributes(),
+			Capacity:   testNativeResourceCapacity(),
+			NativeResourceMappings: map[v1.ResourceName]resourceapi.NativeResourceMapping{
+				v1.ResourceCPU: {
+					PerAllocatedUnitQuantity: ptr.To(resource.MustParse("1")),
+					CapacityKey:              ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+				},
+				"memory": {
+					CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+				},
+			},
+		}
+		slice.Spec.Devices = append(slice.Spec.Devices, device)
+	}
+	return slice
+}
+
 func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
@@ -118,9 +160,10 @@ func TestValidateResourceSlice(t *testing.T) {
 	badValue := "spaces not allowed"
 
 	scenarios := map[string]struct {
-		slice                         *resourceapi.ResourceSlice
-		wantFailures                  field.ErrorList
-		consumableCapacityFeatureGate bool
+		slice                               *resourceapi.ResourceSlice
+		wantFailures                        field.ErrorList
+		consumableCapacityFeatureGate       bool
+		enableDRANativeResourcesFeatureGate bool
 	}{
 		"good": {
 			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices),
@@ -993,11 +1036,73 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(0), "condition1", "bindingFailureConditions must not overlap with bindingConditions")},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition1", "condition3"}),
 		},
+		"correct-native-resource-mappings": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNativeResources(goodName, goodName, driverName, 1)
+				return slice
+			}(),
+			enableDRANativeResourcesFeatureGate: true,
+		},
+		"native-resource-mappings-both-quantityfrom": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNativeResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resourceapi.NativeResourceMapping{
+					v1.ResourceCPU: {
+						CapacityKey:              ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						PerAllocatedUnitQuantity: ptr.To(resource.MustParse("1")),
+					},
+				}
+				return slice
+			}(),
+			enableDRANativeResourcesFeatureGate: true,
+		},
+		"bad-native-resource-mappings-no-quantityfrom": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nativeResourceMappings").Key(string(v1.ResourceCPU)), "", "at least one of PerAllocatedUnitQuantity or CapacityKey must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNativeResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resourceapi.NativeResourceMapping{
+					v1.ResourceCPU: {},
+				}
+				return slice
+			}(),
+			enableDRANativeResourcesFeatureGate: true,
+		},
+		"bad-native-resource-mappings-capacity-key-not-found": {
+			wantFailures: field.ErrorList{
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nativeResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNativeResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resourceapi.NativeResourceMapping{
+					v1.ResourceCPU: {
+						CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+					},
+				}
+				return slice
+			}(),
+			enableDRANativeResourcesFeatureGate: true,
+		},
+		"bad-native-resource-mappings-invalid-per-instance-quantity": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nativeResourceMappings").Key(string(v1.ResourceCPU)).Child("perAllocatedUnitQuantity"), "-1", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NativeResourceMappings = map[v1.ResourceName]resourceapi.NativeResourceMapping{
+					v1.ResourceCPU: {PerAllocatedUnitQuantity: ptr.To(resource.MustParse("-1"))},
+				}
+				return slice
+			}(),
+			enableDRANativeResourcesFeatureGate: true,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, true)
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

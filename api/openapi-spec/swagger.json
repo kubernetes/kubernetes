@@ -8798,6 +8798,24 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.NativeResourceAllocation": {
+      "description": "NativeResourceAllocation describes the allocation of a native resource.",
+      "properties": {
+        "quantity": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "Quantity is the amount of native resource allocated through this claim for this resource."
+        },
+        "resourceName": {
+          "description": "ResourceName is the native resource name (e.g., \"cpu\", \"memory\").",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resourceName",
+        "quantity"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.Node": {
       "description": "Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).",
       "properties": {
@@ -10167,6 +10185,36 @@
         }
       ]
     },
+    "io.k8s.api.core.v1.PodNativeResourceClaimStatus": {
+      "description": "PodNativeResourceClaimStatus describes the status of native resources allocated via DRA.",
+      "properties": {
+        "claimInfo": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference",
+          "description": "ClaimInfo holds a reference to the ResourceClaim that resulted in this allocation."
+        },
+        "containers": {
+          "description": "Containers lists the names of all containers in this pod that reference the claim.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "resources": {
+          "description": "Resources lists the native resources and quantities allocated by this claim.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.NativeResourceAllocation"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "claimInfo",
+        "resources"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.PodOS": {
       "description": "PodOS defines the OS parameters of a pod.",
       "properties": {
@@ -10659,6 +10707,14 @@
         "message": {
           "description": "A human readable message indicating details about why the pod is in this condition.",
           "type": "string"
+        },
+        "nativeResourceClaimStatus": {
+          "description": "NativeResourceClaimStatus contains the status of native resources (like cpu, memory) that were allocated for this pod through DRA claims.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.PodNativeResourceClaimStatus"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "nominatedNodeName": {
           "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
@@ -15778,6 +15834,13 @@
           "description": "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
           "type": "string"
         },
+        "nativeResourceMappings": {
+          "additionalProperties": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1.NativeResourceMapping"
+          },
+          "description": "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+          "type": "object"
+        },
         "nodeName": {
           "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
           "type": "string"
@@ -16026,6 +16089,10 @@
         "extendedResourceName": {
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
+        },
+        "managesNativeResources": {
+          "description": "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+          "type": "boolean"
         },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
@@ -16327,6 +16394,20 @@
       "required": [
         "deviceClassName"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1.NativeResourceMapping": {
+      "description": "NativeResourceMapping associates a native resource name with its mapping.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+          "type": "string"
+        },
+        "perAllocatedUnitQuantity": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1."
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.resource.v1.NetworkDeviceData": {
@@ -17008,6 +17089,13 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "nativeResourceMappings": {
+          "additionalProperties": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.NativeResourceMapping"
+          },
+          "description": "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+          "type": "object"
+        },
         "nodeName": {
           "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
           "type": "string"
@@ -17374,6 +17462,10 @@
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
         },
+        "managesNativeResources": {
+          "description": "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+          "type": "boolean"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -17659,6 +17751,20 @@
         "value": {
           "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value must be empty, otherwise just a regular string. Must be a label value.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta1.NativeResourceMapping": {
+      "description": "NativeResourceMapping associates a native resource name with its mapping.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+          "type": "string"
+        },
+        "perAllocatedUnitQuantity": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1."
         }
       },
       "type": "object"
@@ -18298,6 +18404,13 @@
           "description": "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
           "type": "string"
         },
+        "nativeResourceMappings": {
+          "additionalProperties": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta2.NativeResourceMapping"
+          },
+          "description": "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+          "type": "object"
+        },
         "nodeName": {
           "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
           "type": "string"
@@ -18546,6 +18659,10 @@
         "extendedResourceName": {
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
+        },
+        "managesNativeResources": {
+          "description": "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+          "type": "boolean"
         },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
@@ -18847,6 +18964,20 @@
       "required": [
         "deviceClassName"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.NativeResourceMapping": {
+      "description": "NativeResourceMapping associates a native resource name with its mapping.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+          "type": "string"
+        },
+        "perAllocatedUnitQuantity": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1."
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.resource.v1beta2.NetworkDeviceData": {

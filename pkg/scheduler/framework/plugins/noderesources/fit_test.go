@@ -2292,3 +2292,101 @@ func testFitSignPod(tCtx ktesting.TContext) {
 		})
 	}
 }
+
+func TestComputePodResourceRequestWithNativeDRA(t *testing.T) {
+	testComputePodResourceRequestWithNativeDRA(ktesting.Init(t))
+}
+func testComputePodResourceRequestWithNativeDRA(tCtx ktesting.TContext) {
+	tests := []struct {
+		name                     string
+		pod                      *v1.Pod
+		expected                 *preFilterState
+		enableDRANativeResources bool
+	}{
+		{
+			name:                     "Pod with DRA claim and EnableDRANativeResources enabled",
+			enableDRANativeResources: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 150, // NativeResourceClaimStatus + standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+		{
+			name:                     "Pod with DRA claim and EnableDRANativeResources disabled",
+			enableDRANativeResources: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 100, // only standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
+			opts := ResourceRequestsOptions{
+				EnableDRANativeResources: tc.enableDRANativeResources,
+			}
+			result := computePodResourceRequest(tc.pod, opts)
+
+			if diff := cmp.Diff(tc.expected.Resource, result.Resource); diff != "" {
+				tCtx.Errorf("computePodResourceRequest() returned diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

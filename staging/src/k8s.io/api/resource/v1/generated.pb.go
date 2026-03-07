@@ -25,6 +25,7 @@ import (
 	io "io"
 	"sort"
 
+	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,6 +95,8 @@ func (m *DeviceTaint) Reset() { *m = DeviceTaint{} }
 func (m *DeviceToleration) Reset() { *m = DeviceToleration{} }
 
 func (m *ExactDeviceRequest) Reset() { *m = ExactDeviceRequest{} }
+
+func (m *NativeResourceMapping) Reset() { *m = NativeResourceMapping{} }
 
 func (m *NetworkDeviceData) Reset() { *m = NetworkDeviceData{} }
 
@@ -573,6 +576,35 @@ func (m *Device) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.NativeResourceMappings) > 0 {
+		keysForNativeResourceMappings := make([]string, 0, len(m.NativeResourceMappings))
+		for k := range m.NativeResourceMappings {
+			keysForNativeResourceMappings = append(keysForNativeResourceMappings, string(k))
+		}
+		sort.Strings(keysForNativeResourceMappings)
+		for iNdEx := len(keysForNativeResourceMappings) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.NativeResourceMappings[k8s_io_api_core_v1.ResourceName(keysForNativeResourceMappings[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForNativeResourceMappings[iNdEx])
+			copy(dAtA[i:], keysForNativeResourceMappings[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForNativeResourceMappings[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x6a
+		}
+	}
 	if m.AllowMultipleAllocations != nil {
 		i--
 		if *m.AllowMultipleAllocations {
@@ -1179,6 +1211,16 @@ func (m *DeviceClassSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ManagesNativeResources != nil {
+		i--
+		if *m.ManagesNativeResources {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.ExtendedResourceName != nil {
 		i -= len(*m.ExtendedResourceName)
 		copy(dAtA[i:], *m.ExtendedResourceName)
@@ -1827,6 +1869,48 @@ func (m *ExactDeviceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.DeviceClassName)))
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *NativeResourceMapping) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NativeResourceMapping) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NativeResourceMapping) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PerAllocatedUnitQuantity != nil {
+		{
+			size, err := m.PerAllocatedUnitQuantity.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.CapacityKey != nil {
+		i -= len(*m.CapacityKey)
+		copy(dAtA[i:], *m.CapacityKey)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.CapacityKey)))
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -2745,6 +2829,15 @@ func (m *Device) Size() (n int) {
 	if m.AllowMultipleAllocations != nil {
 		n += 2
 	}
+	if len(m.NativeResourceMappings) > 0 {
+		for k, v := range m.NativeResourceMappings {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
 	return n
 }
 
@@ -2932,6 +3025,9 @@ func (m *DeviceClassSpec) Size() (n int) {
 	if m.ExtendedResourceName != nil {
 		l = len(*m.ExtendedResourceName)
 		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.ManagesNativeResources != nil {
+		n += 2
 	}
 	return n
 }
@@ -3176,6 +3272,23 @@ func (m *ExactDeviceRequest) Size() (n int) {
 	}
 	if m.Capacity != nil {
 		l = m.Capacity.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NativeResourceMapping) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.CapacityKey != nil {
+		l = len(*m.CapacityKey)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.PerAllocatedUnitQuantity != nil {
+		l = m.PerAllocatedUnitQuantity.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -3586,6 +3699,16 @@ func (this *Device) String() string {
 		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
 	}
 	mapStringForCapacity += "}"
+	keysForNativeResourceMappings := make([]string, 0, len(this.NativeResourceMappings))
+	for k := range this.NativeResourceMappings {
+		keysForNativeResourceMappings = append(keysForNativeResourceMappings, string(k))
+	}
+	sort.Strings(keysForNativeResourceMappings)
+	mapStringForNativeResourceMappings := "map[k8s_io_api_core_v1.ResourceName]NativeResourceMapping{"
+	for _, k := range keysForNativeResourceMappings {
+		mapStringForNativeResourceMappings += fmt.Sprintf("%v: %v,", k, this.NativeResourceMappings[k8s_io_api_core_v1.ResourceName(k)])
+	}
+	mapStringForNativeResourceMappings += "}"
 	s := strings.Join([]string{`&Device{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Attributes:` + mapStringForAttributes + `,`,
@@ -3599,6 +3722,7 @@ func (this *Device) String() string {
 		`BindingConditions:` + fmt.Sprintf("%v", this.BindingConditions) + `,`,
 		`BindingFailureConditions:` + fmt.Sprintf("%v", this.BindingFailureConditions) + `,`,
 		`AllowMultipleAllocations:` + valueToStringGenerated(this.AllowMultipleAllocations) + `,`,
+		`NativeResourceMappings:` + mapStringForNativeResourceMappings + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3753,6 +3877,7 @@ func (this *DeviceClassSpec) String() string {
 		`Selectors:` + repeatedStringForSelectors + `,`,
 		`Config:` + repeatedStringForConfig + `,`,
 		`ExtendedResourceName:` + valueToStringGenerated(this.ExtendedResourceName) + `,`,
+		`ManagesNativeResources:` + valueToStringGenerated(this.ManagesNativeResources) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3923,6 +4048,17 @@ func (this *ExactDeviceRequest) String() string {
 		`AdminAccess:` + valueToStringGenerated(this.AdminAccess) + `,`,
 		`Tolerations:` + repeatedStringForTolerations + `,`,
 		`Capacity:` + strings.Replace(this.Capacity.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NativeResourceMapping) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NativeResourceMapping{`,
+		`CapacityKey:` + valueToStringGenerated(this.CapacityKey) + `,`,
+		`PerAllocatedUnitQuantity:` + strings.Replace(fmt.Sprintf("%v", this.PerAllocatedUnitQuantity), "Quantity", "resource.Quantity", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6027,6 +6163,135 @@ func (m *Device) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.AllowMultipleAllocations = &b
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NativeResourceMappings", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.NativeResourceMappings == nil {
+				m.NativeResourceMappings = make(map[k8s_io_api_core_v1.ResourceName]NativeResourceMapping)
+			}
+			var mapkey k8s_io_api_core_v1.ResourceName
+			mapvalue := &NativeResourceMapping{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = k8s_io_api_core_v1.ResourceName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &NativeResourceMapping{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.NativeResourceMappings[k8s_io_api_core_v1.ResourceName(mapkey)] = *mapvalue
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -7302,6 +7567,27 @@ func (m *DeviceClassSpec) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.ExtendedResourceName = &s
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ManagesNativeResources", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.ManagesNativeResources = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -9348,6 +9634,125 @@ func (m *ExactDeviceRequest) Unmarshal(dAtA []byte) error {
 				m.Capacity = &CapacityRequirements{}
 			}
 			if err := m.Capacity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NativeResourceMapping) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NativeResourceMapping: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NativeResourceMapping: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CapacityKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := QualifiedName(dAtA[iNdEx:postIndex])
+			m.CapacityKey = &s
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerAllocatedUnitQuantity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PerAllocatedUnitQuantity == nil {
+				m.PerAllocatedUnitQuantity = &resource.Quantity{}
+			}
+			if err := m.PerAllocatedUnitQuantity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

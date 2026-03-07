@@ -2017,6 +2017,339 @@ func TestIsSupportedPodLevelResource(t *testing.T) {
 	}
 }
 
+var hugePageResource1Gi = v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi")
+
+func TestPodResourceRequestsWithDRANativeClaims(t *testing.T) {
+	testCases := []struct {
+		description      string
+		pod              *v1.Pod
+		options          PodResourcesOptions
+		expectedRequests v1.ResourceList
+	}{
+		{
+			description: "No claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			description: "Single claim on one container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:      resource.MustParse("100m"),
+									v1.ResourceMemory:   resource.MustParse("1Gi"),
+									hugePageResource1Gi: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+								{ResourceName: hugePageResource1Gi, Quantity: resource.MustParse("1")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:      resource.MustParse("150m"), // 100m + 50m
+				v1.ResourceMemory:   resource.MustParse("1Gi"),
+				hugePageResource1Gi: resource.MustParse("3"), // 2 + 1
+			},
+		},
+		{
+			description: "Multiple claims on one container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+							},
+						},
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim2-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("25m")},
+								{ResourceName: v1.ResourceMemory, Quantity: resource.MustParse("512Mi")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("175m"),  // 100m + 50m + 25m
+				v1.ResourceMemory: resource.MustParse("1.5Gi"), // 1Gi + 512Mi
+			},
+		},
+		{
+			description: "Same claim on multiple containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1", "c2"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("350m"), // 100m + 200m + 50m (claim counted once)
+			},
+		},
+		{
+			description: "Different claims on multiple containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:      resource.MustParse("100m"),
+									hugePageResource1Gi: resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:      resource.MustParse("200m"),
+									v1.ResourceMemory:   resource.MustParse("1Gi"),
+									hugePageResource1Gi: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{
+									ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m"),
+								},
+								{
+									ResourceName: hugePageResource1Gi, Quantity: resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim2-uid"},
+							Containers: []string{"c2"},
+							Resources: []v1.NativeResourceAllocation{
+								{
+									ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("25m"),
+								},
+								{
+									ResourceName: v1.ResourceMemory, Quantity: resource.MustParse("512Mi"),
+								},
+								{
+									ResourceName: hugePageResource1Gi, Quantity: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:      resource.MustParse("375m"),  // 100m + 200m + 50m + 25m
+				v1.ResourceMemory:   resource.MustParse("1.5Gi"), // 1Gi + 1Gi + 1Gi + 512Mi
+				hugePageResource1Gi: resource.MustParse("6"),     // 1 + 2 + 1 + 2
+			},
+		},
+		{
+			description: "Claim on init container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"ic1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("25m")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("125m"), // max(100m, 50m) + 25m
+			},
+		},
+		{
+			description: "UseDRANativeResourceClaimStatus flag disabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("50m")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: false},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+		},
+		{
+			description: "Pod Level Resources overrides the claim request",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NativeResourceClaimStatus: []v1.PodNativeResourceClaimStatus{
+						{
+							ClaimInfo:  v1.ObjectReference{UID: "claim1-uid"},
+							Containers: []string{"c1"},
+							Resources: []v1.NativeResourceAllocation{
+								{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("3")},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANativeResourceClaimStatus: true, SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),   // Pod level resource should not be overridden by claim request (3)
+				v1.ResourceMemory: resource.MustParse("1Gi"), // Container level resource should be included
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			request := PodRequests(tc.pod, tc.options)
+			if diff := diff.Diff(tc.expectedRequests, request); diff != "" {
+				t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	cases := []struct {

@@ -28208,10 +28208,11 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		test string
-		old  *core.Pod
-		new  *core.Pod
-		err  string
+		test                     string
+		old                      *core.Pod
+		new                      *core.Pod
+		err                      string
+		enableDRANativeResources bool
 	}{
 		{
 			test: "pod-level resources resize with nil resources in old pod",
@@ -28803,6 +28804,33 @@ func TestValidatePodResize(t *testing.T) {
 			)),
 			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
+		{
+			test: "Resize pod with NativeResourceClaimStatus",
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+				)
+				p.Status.NativeResourceClaimStatus = []core.PodNativeResourceClaimStatus{{ClaimInfo: core.ObjectReference{UID: "test-uid"}}}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("200m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NativeResourceClaimStatus = []core.PodNativeResourceClaimStatus{{ClaimInfo: core.ObjectReference{UID: "test-uid"}}}
+				return p
+			}(),
+			enableDRANativeResources: true,
+			err:                      "spec: Forbidden: pods with native resource claims cannot be resized",
+		},
 	}
 
 	for _, test := range tests {
@@ -28832,7 +28860,7 @@ func TestValidatePodResize(t *testing.T) {
 				test.old.Spec.RestartPolicy = "Always"
 			}
 
-			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true, InPlacePodLevelResourcesVerticalScalingEnabled: true, PodLevelResourcesEnabled: true})
+			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true, InPlacePodLevelResourcesVerticalScalingEnabled: true, PodLevelResourcesEnabled: true, DRANativeResourcesEnabled: test.enableDRANativeResources})
 
 			if test.err == "" {
 				if len(errs) != 0 {

@@ -568,6 +568,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.NamespaceList{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NamespaceList(ref),
 		corev1.NamespaceSpec{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NamespaceSpec(ref),
 		corev1.NamespaceStatus{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_NamespaceStatus(ref),
+		corev1.NativeResourceAllocation{}.OpenAPIModelName():                                                            schema_k8sio_api_core_v1_NativeResourceAllocation(ref),
 		corev1.Node{}.OpenAPIModelName():                                                                                schema_k8sio_api_core_v1_Node(ref),
 		corev1.NodeAddress{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_NodeAddress(ref),
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
@@ -616,6 +617,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.PodIP{}.OpenAPIModelName():                                                                               schema_k8sio_api_core_v1_PodIP(ref),
 		corev1.PodList{}.OpenAPIModelName():                                                                             schema_k8sio_api_core_v1_PodList(ref),
 		corev1.PodLogOptions{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_PodLogOptions(ref),
+		corev1.PodNativeResourceClaimStatus{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_PodNativeResourceClaimStatus(ref),
 		corev1.PodOS{}.OpenAPIModelName():                                                                               schema_k8sio_api_core_v1_PodOS(ref),
 		corev1.PodPortForwardOptions{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_PodPortForwardOptions(ref),
 		corev1.PodProxyOptions{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodProxyOptions(ref),
@@ -1017,6 +1019,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceTaint{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1_DeviceTaint(ref),
 		resourcev1.DeviceToleration{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceToleration(ref),
 		resourcev1.ExactDeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_ExactDeviceRequest(ref),
+		resourcev1.NativeResourceMapping{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1_NativeResourceMapping(ref),
 		resourcev1.NetworkDeviceData{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_NetworkDeviceData(ref),
 		resourcev1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1_OpaqueDeviceConfiguration(ref),
 		resourcev1.ResourceClaim{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceClaim(ref),
@@ -1068,6 +1071,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref),
 		resourcev1beta1.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
 		resourcev1beta1.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
+		resourcev1beta1.NativeResourceMapping{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_NativeResourceMapping(ref),
 		resourcev1beta1.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
 		resourcev1beta1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		resourcev1beta1.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
@@ -1111,6 +1115,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta2_DeviceTaint(ref),
 		resourcev1beta2.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceToleration(ref),
 		resourcev1beta2.ExactDeviceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref),
+		resourcev1beta2.NativeResourceMapping{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_NativeResourceMapping(ref),
 		resourcev1beta2.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref),
 		resourcev1beta2.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta2_OpaqueDeviceConfiguration(ref),
 		resourcev1beta2.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceClaim(ref),
@@ -24971,6 +24976,36 @@ func schema_k8sio_api_core_v1_NamespaceStatus(ref common.ReferenceCallback) comm
 	}
 }
 
+func schema_k8sio_api_core_v1_NativeResourceAllocation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NativeResourceAllocation describes the allocation of a native resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resourceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceName is the native resource name (e.g., \"cpu\", \"memory\").",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"quantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Quantity is the amount of native resource allocated through this claim for this resource.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"resourceName", "quantity"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_Node(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -27933,6 +27968,68 @@ func schema_k8sio_api_core_v1_PodLogOptions(ref common.ReferenceCallback) common
 	}
 }
 
+func schema_k8sio_api_core_v1_PodNativeResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodNativeResourceClaimStatus describes the status of native resources allocated via DRA.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"claimInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ClaimInfo holds a reference to the ResourceClaim that resulted in this allocation.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(corev1.ObjectReference{}.OpenAPIModelName()),
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Containers lists the names of all containers in this pod that reference the claim.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Resources lists the native resources and quantities allocated by this claim.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.NativeResourceAllocation{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"claimInfo", "resources"},
+			},
+		},
+		Dependencies: []string{
+			corev1.NativeResourceAllocation{}.OpenAPIModelName(), corev1.ObjectReference{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_PodOS(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -29055,11 +29152,30 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"nativeResourceClaimStatus": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "NativeResourceClaimStatus contains the status of native resources (like cpu, memory) that were allocated for this pod through DRA claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.PodNativeResourceClaimStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodNativeResourceClaimStatus{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -47178,12 +47294,27 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"nativeResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1.NativeResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName(), resourcev1.NativeResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -47638,6 +47769,13 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
 							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"managesNativeResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
@@ -48236,6 +48374,34 @@ func schema_k8sio_api_resource_v1_ExactDeviceRequest(ref common.ReferenceCallbac
 		},
 		Dependencies: []string{
 			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_NativeResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NativeResourceMapping associates a native resource name with its mapping.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"perAllocatedUnitQuantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -49466,11 +49632,26 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"nativeResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta1.NativeResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName(), resourcev1beta1.NativeResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -50149,6 +50330,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"managesNativeResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -50722,6 +50910,34 @@ func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCall
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_NativeResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NativeResourceMapping associates a native resource name with its mapping.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"perAllocatedUnitQuantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -51858,12 +52074,27 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
+					"nativeResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta2.NativeResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName(), resourcev1beta2.NativeResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -52318,6 +52549,13 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
 							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"managesNativeResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
@@ -52916,6 +53154,34 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_NativeResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NativeResourceMapping associates a native resource name with its mapping.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"perAllocatedUnitQuantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

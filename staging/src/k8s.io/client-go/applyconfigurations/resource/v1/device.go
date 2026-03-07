@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	apicorev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
@@ -113,6 +114,11 @@ type DeviceApplyConfiguration struct {
 	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
 	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty"`
+	// NativeResourceMappings defines the footprint of native resources
+	// that are either provided by this device or required as a dependency for
+	// its operation. The keys of this map are the native resource names
+	// (e.g., "cpu", "memory").
+	NativeResourceMappings map[apicorev1.ResourceName]NativeResourceMappingApplyConfiguration `json:"nativeResourceMappings,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -240,5 +246,19 @@ func (b *DeviceApplyConfiguration) WithBindingFailureConditions(values ...string
 // If called multiple times, the AllowMultipleAllocations field is set to the value of the last call.
 func (b *DeviceApplyConfiguration) WithAllowMultipleAllocations(value bool) *DeviceApplyConfiguration {
 	b.AllowMultipleAllocations = &value
+	return b
+}
+
+// WithNativeResourceMappings puts the entries into the NativeResourceMappings field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the NativeResourceMappings field,
+// overwriting an existing map entries in NativeResourceMappings field with the same key.
+func (b *DeviceApplyConfiguration) WithNativeResourceMappings(entries map[apicorev1.ResourceName]NativeResourceMappingApplyConfiguration) *DeviceApplyConfiguration {
+	if b.NativeResourceMappings == nil && len(entries) > 0 {
+		b.NativeResourceMappings = make(map[apicorev1.ResourceName]NativeResourceMappingApplyConfiguration, len(entries))
+	}
+	for k, v := range entries {
+		b.NativeResourceMappings[k] = v
+	}
 	return b
 }

@@ -341,6 +341,7 @@ func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field
 		}(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, safe.Field(oldObj, func(oldObj *resourcev1beta2.Device) []string { return oldObj.BindingFailureConditions }), oldObj != nil)...)
 
 	// field resourcev1beta2.Device.AllowMultipleAllocations has no validation
+	// field resourcev1beta2.Device.NativeResourceMappings has no validation
 	return errs
 }
 
@@ -842,6 +843,7 @@ func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPa
 			return
 		}(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClassSpec) *string { return oldObj.ExtendedResourceName }), oldObj != nil)...)
 
+	// field resourcev1beta2.DeviceClassSpec.ManagesNativeResources has no validation
 	return errs
 }
 

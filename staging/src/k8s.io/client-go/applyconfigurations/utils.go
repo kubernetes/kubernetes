@@ -782,6 +782,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NamespaceSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NamespaceStatus"):
 		return &applyconfigurationscorev1.NamespaceStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NativeResourceAllocation"):
+		return &applyconfigurationscorev1.NativeResourceAllocationApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NFSVolumeSource"):
 		return &applyconfigurationscorev1.NFSVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Node"):
@@ -864,6 +866,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodExtendedResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodIP"):
 		return &applyconfigurationscorev1.PodIPApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodNativeResourceClaimStatus"):
+		return &applyconfigurationscorev1.PodNativeResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodOS"):
 		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
@@ -1618,6 +1622,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.DeviceTolerationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NativeResourceMapping"):
+		return &applyconfigurationsresourcev1.NativeResourceMappingApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
@@ -1710,6 +1716,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTaintApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceToleration"):
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NativeResourceMapping"):
+		return &applyconfigurationsresourcev1beta1.NativeResourceMappingApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
@@ -1790,6 +1798,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NativeResourceMapping"):
+		return &applyconfigurationsresourcev1beta2.NativeResourceMappingApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):

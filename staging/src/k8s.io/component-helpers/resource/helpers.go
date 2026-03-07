@@ -60,6 +60,8 @@ type PodResourcesOptions struct {
 	SkipPodLevelResources bool
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
+	// Use native resource claim information from pod status to compute the effective pod resource request.
+	UseDRANativeResourceClaimStatus bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -275,6 +277,16 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	}
 
 	maxResourceList(reqs, initContainerReqs)
+
+	// Add resources from native ResourceClaims
+	if opts.UseDRANativeResourceClaimStatus && len(pod.Status.NativeResourceClaimStatus) > 0 {
+		for _, claimStatus := range pod.Status.NativeResourceClaimStatus {
+			for _, resAlloc := range claimStatus.Resources {
+				addResourceList(reqs, v1.ResourceList{resAlloc.ResourceName: resAlloc.Quantity})
+			}
+		}
+	}
+
 	return reqs
 }
 

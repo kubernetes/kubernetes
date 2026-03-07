@@ -1131,6 +1131,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						"BindingConditions":        gomega.Equal(device.BindingConditions),
 						"BindingFailureConditions": gomega.Equal(device.BindingFailureConditions),
 						"BindsToNode":              gomega.Equal(device.BindsToNode),
+						"NativeResourceMappings":   gomega.Equal(device.NativeResourceMappings),
 					}))
 				}
 				return expected

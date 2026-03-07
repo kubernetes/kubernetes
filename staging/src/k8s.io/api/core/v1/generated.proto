@@ -2632,6 +2632,17 @@ message NamespaceStatus {
   repeated NamespaceCondition conditions = 2;
 }
 
+// NativeResourceAllocation describes the allocation of a native resource.
+message NativeResourceAllocation {
+  // ResourceName is the native resource name (e.g., "cpu", "memory").
+  // +required
+  optional string resourceName = 1;
+
+  // Quantity is the amount of native resource allocated through this claim for this resource.
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
+}
+
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
@@ -4117,6 +4128,23 @@ message PodLogOptions {
   optional string stream = 10;
 }
 
+// PodNativeResourceClaimStatus describes the status of native resources allocated via DRA.
+message PodNativeResourceClaimStatus {
+  // ClaimInfo holds a reference to the ResourceClaim that resulted in this allocation.
+  // +required
+  optional ObjectReference claimInfo = 1;
+
+  // Containers lists the names of all containers in this pod that reference the claim.
+  // +optional
+  // +listType=set
+  repeated string containers = 2;
+
+  // Resources lists the native resources and quantities allocated by this claim.
+  // +required
+  // +listType=atomic
+  repeated NativeResourceAllocation resources = 3;
+}
+
 // PodOS defines the OS parameters of a pod.
 message PodOS {
   // Name is the name of the operating system. The currently supported values are linux and windows.
@@ -4928,6 +4956,13 @@ message PodStatus {
   // +featureGate=InPlacePodLevelResourcesVerticalScaling
   // +optional
   optional ResourceRequirements resources = 20;
+
+  // NativeResourceClaimStatus contains the status of native resources (like cpu, memory)
+  // that were allocated for this pod through DRA claims.
+  // +featureGate=DRANativeResources
+  // +optional
+  // +listType=atomic
+  repeated PodNativeResourceClaimStatus nativeResourceClaimStatus = 21;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

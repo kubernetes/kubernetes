@@ -126,6 +126,7 @@ var map_Device = map[string]string{
 	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"allowMultipleAllocations": "AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.\n\nIf AllowMultipleAllocations is set to true, the device can be allocated more than once, and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.",
+	"nativeResourceMappings":   "NativeResourceMappings defines the footprint of native resources that are either provided by this device or required as a dependency for its operation. The keys of this map are the native resource names (e.g., \"cpu\", \"memory\").",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -223,10 +224,11 @@ func (DeviceClassList) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceClassSpec = map[string]string{
-	"":                     "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
-	"selectors":            "Each selector must be satisfied by a device which is claimed via this class.",
-	"config":               "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
-	"extendedResourceName": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
+	"":                       "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
+	"selectors":              "Each selector must be satisfied by a device which is claimed via this class.",
+	"config":                 "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
+	"extendedResourceName":   "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
+	"managesNativeResources": "ManagesNativeResources indicates whether devices belonging to this class have an impact on the node's native resources that need to be accounted for by the scheduler. These are resources typically managed by the Kubelet and reported in Node.Status.Allocatable, such as \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages (e.g., \"hugepages-1Gi\"). A DRA driver can also allocate them, for example, a CPU DRA driver allocating exclusive CPUs or auxiliary node memory dependencies of an accelerator device.",
 }
 
 func (DeviceClassSpec) SwaggerDoc() map[string]string {
@@ -354,6 +356,16 @@ var map_ExactDeviceRequest = map[string]string{
 
 func (ExactDeviceRequest) SwaggerDoc() map[string]string {
 	return map_ExactDeviceRequest
+}
+
+var map_NativeResourceMapping = map[string]string{
+	"":                         "NativeResourceMapping associates a native resource name with its mapping.",
+	"capacityKey":              "CapacityKey references a capacity name defined as a key in the Device.Capacity map. When this field is set, the value associated with this key in the DeviceRequestAllocationResult.ConsumedCapacity map (for a specific claim allocation) determines the base quantity for the native resource mapping. If PerAllocatedUnitQuantity is also set, it is multiplied with the PerAllocatedUnitQuantity. For example, if Device.Capacity has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the native resource mapping will be \"4Gi\".",
+	"perAllocatedUnitQuantity": "PerAllocatedUnitQuantity specifies a quantity associated with the native resource. Its meaning depends on whether CapacityKey is also set: 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the\n    amount of the native resource that the allocated Device is associated\n    with. For example,\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", PerAllocatedUnitQuantity: \"2\"} in its\n       NativeResourceMappings.\n    b. A GPU device that needs additional node memory per GOU allocation would\n       have {ResourceName: \"memory\", PerAllocatedUnitQuantity: \"2Gi\"} in its\n\n2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the\n    quantity retrieved using CapacityKey from ConsumedCapacity. The final native\n    resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", CapacityKey: \"dra.example.com/cores\", PerAllocatedUnitQuantity: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.\nIf PerAllocatedUnitQuantity is not set, it defaults to 1.",
+}
+
+func (NativeResourceMapping) SwaggerDoc() map[string]string {
+	return map_NativeResourceMapping
 }
 
 var map_NetworkDeviceData = map[string]string{

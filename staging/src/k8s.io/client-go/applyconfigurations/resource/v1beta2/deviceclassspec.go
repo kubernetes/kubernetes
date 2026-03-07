@@ -43,6 +43,16 @@ type DeviceClassSpecApplyConfiguration struct {
 	//
 	// This is a beta field.
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty"`
+	// ManagesNativeResources indicates whether devices belonging to this class
+	// have an impact on the node's native resources that need to be accounted for
+	// by the scheduler.
+	// These are resources typically managed by the Kubelet and
+	// reported in Node.Status.Allocatable, such as "cpu", "memory",
+	// "ephemeral-storage", and hugepages (e.g., "hugepages-1Gi").
+	// A DRA driver can also allocate them, for example, a CPU DRA driver
+	// allocating exclusive CPUs or auxiliary node memory dependencies of an
+	// accelerator device.
+	ManagesNativeResources *bool `json:"managesNativeResources,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -82,5 +92,13 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 // If called multiple times, the ExtendedResourceName field is set to the value of the last call.
 func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceName(value string) *DeviceClassSpecApplyConfiguration {
 	b.ExtendedResourceName = &value
+	return b
+}
+
+// WithManagesNativeResources sets the ManagesNativeResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ManagesNativeResources field is set to the value of the last call.
+func (b *DeviceClassSpecApplyConfiguration) WithManagesNativeResources(value bool) *DeviceClassSpecApplyConfiguration {
+	b.ManagesNativeResources = &value
 	return b
 }

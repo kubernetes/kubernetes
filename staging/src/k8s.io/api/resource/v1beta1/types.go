@@ -452,6 +452,52 @@ type BasicDevice struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"bytes,11,opt,name=allowMultipleAllocations"`
+
+	// NativeResourceMappings defines the footprint of native resources
+	// that are either provided by this device or required as a dependency for
+	// its operation. The keys of this map are the native resource names
+	// (e.g., "cpu", "memory").
+	// +optional
+	// +featureGate=DRANativeResources
+	NativeResourceMappings map[v1.ResourceName]NativeResourceMapping `json:"nativeResourceMappings,omitempty" protobuf:"bytes,12,opt,name=nativeResourceMappings"`
+}
+
+// NativeResourceMapping associates a native resource name with its mapping.
+type NativeResourceMapping struct {
+	// CapacityKey references a capacity name defined as a key in the
+	// Device.Capacity map. When this field is set, the value associated with
+	// this key in the DeviceRequestAllocationResult.ConsumedCapacity map
+	// (for a specific claim allocation) determines the base quantity for
+	// the native resource mapping. If PerAllocatedUnitQuantity is also set, it is
+	// multiplied with the PerAllocatedUnitQuantity.
+	// For example, if Device.Capacity has an entry "dra.example.com/memory": "128Gi",
+	// and this field is set to "dra.example.com/memory", then for a claim allocation
+	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
+	// native resource mapping will be "4Gi".
+	// +optional
+	CapacityKey *QualifiedName `json:"capacityKey,omitempty" protobuf:"bytes,1,opt,name=capacityKey"`
+
+	// PerAllocatedUnitQuantity specifies a quantity associated with the native resource.
+	// Its meaning depends on whether CapacityKey is also set:
+	// 1.  If CapacityKey is NOT set: PerAllocatedUnitQuantity directly represents the
+	//     amount of the native resource that the allocated Device is associated
+	//     with. For example,
+	// 	   a. A DRA driver representing each CPU core as a device would have
+	//        {ResourceName: "cpu", PerAllocatedUnitQuantity: "2"} in its
+	//        NativeResourceMappings.
+	//     b. A GPU device that needs additional node memory per GOU allocation would
+	//        have {ResourceName: "memory", PerAllocatedUnitQuantity: "2Gi"} in its
+	//
+	// 2.  If CapacityKey IS set: PerAllocatedUnitQuantity acts as a multiplier to the
+	//     quantity retrieved using CapacityKey from ConsumedCapacity. The final native
+	//     resource amount is ConsumedCapacity[CapacityKey] * PerAllocatedUnitQuantity.
+	//     For example, if a Device's capacity "dra.example.com/cores" is consumed,
+	//     and each "core" provides 2 "cpu"s, the mapping would be:
+	//     {ResourceName: "cpu", CapacityKey: "dra.example.com/cores", PerAllocatedUnitQuantity: "2"}.
+	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+	// If PerAllocatedUnitQuantity is not set, it defaults to 1.
+	// +optional
+	PerAllocatedUnitQuantity *resource.Quantity `json:"perAllocatedUnitQuantity,omitempty" protobuf:"bytes,2,opt,name=perAllocatedUnitQuantity"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1862,6 +1908,19 @@ type DeviceClassSpec struct {
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
+
+	// ManagesNativeResources indicates whether devices belonging to this class
+	// have an impact on the node's native resources that need to be accounted for
+	// by the scheduler.
+	// These are resources typically managed by the Kubelet and
+	// reported in Node.Status.Allocatable, such as "cpu", "memory",
+	// "ephemeral-storage", and hugepages (e.g., "hugepages-1Gi").
+	// A DRA driver can also allocate them, for example, a CPU DRA driver
+	// allocating exclusive CPUs or auxiliary node memory dependencies of an
+	// accelerator device.
+	// +optional
+	// +featureGate=DRANativeResources
+	ManagesNativeResources *bool `json:"managesNativeResources,omitempty" protobuf:"bytes,5,opt,name=managesNativeResources"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

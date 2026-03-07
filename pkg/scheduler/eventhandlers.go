@@ -749,6 +749,7 @@ func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailure
 	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
 		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANativeResources:  utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources),
 	})
 	if len(insufficientResources) != 0 {
 		for i := range insufficientResources {

@@ -98,6 +98,24 @@ func (deviceClassStrategy) AllowUnconditionalUpdate() bool {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
 	dropDisabledDRAExtendedResourceFields(newClass, oldClass)
+	dropDisabledDRANativeResourcesFields(newClass, oldClass)
+}
+
+func dropDisabledDRANativeResourcesFields(newClass, oldClass *resource.DeviceClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
+		return
+	}
+	if draNativeResourcesFeatureInUse(oldClass) {
+		return
+	}
+	newClass.Spec.ManagesNativeResources = nil
+}
+
+func draNativeResourcesFeatureInUse(class *resource.DeviceClass) bool {
+	if class == nil {
+		return false
+	}
+	return class.Spec.ManagesNativeResources != nil
 }
 
 func dropDisabledDRAExtendedResourceFields(newClass, oldClass *resource.DeviceClass) {

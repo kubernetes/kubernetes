@@ -167,6 +167,11 @@ func (in ExactDeviceRequest) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NativeResourceMapping) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.NativeResourceMapping"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NetworkDeviceData) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.NetworkDeviceData"
 }

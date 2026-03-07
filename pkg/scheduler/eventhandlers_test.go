@@ -699,6 +699,7 @@ func TestAdmissionCheck(t *testing.T) {
 	extendedResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: "foo.com/bar", Reason: "Insufficient foo.com/bar", Requested: 1, Unresolvable: true}}
 	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	extendedResource := map[v1.ResourceName]string{"foo.com/bar": "1"}
+	nativeResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 9000, Used: 0, Capacity: 8000, Unresolvable: true}}
 	tests := []struct {
 		name                      string
 		node                      *v1.Node
@@ -706,6 +707,7 @@ func TestAdmissionCheck(t *testing.T) {
 		pod                       *v1.Pod
 		wantAdmissionResults      [][]AdmissionResult
 		enableDRAExtendedResource bool
+		enableDRANativeResources  bool
 	}{
 		{
 			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
@@ -747,10 +749,47 @@ func TestAdmissionCheck(t *testing.T) {
 			wantAdmissionResults:      [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
 			enableDRAExtendedResource: true,
 		},
+		{
+			name: "pod not rejected when DRANativeResources flag is disabled",
+			node: st.MakeNode().Name("fake-node").Capacity(cpu).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NativeResourceClaimStatus = []v1.PodNativeResourceClaimStatus{
+					{
+						ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+						Resources: []v1.NativeResourceAllocation{
+							{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("8")},
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:     [][]AdmissionResult{nil, nil},
+			enableDRANativeResources: false,
+		},
+		{
+			name: "pod rejected when DRANativeResources flag is enabled and pod's native resource claim cannot fit within node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(cpu).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NativeResourceClaimStatus = []v1.PodNativeResourceClaimStatus{
+					{
+						ClaimInfo: v1.ObjectReference{UID: "claim1-uid"},
+						Resources: []v1.NativeResourceAllocation{
+							{ResourceName: v1.ResourceCPU, Quantity: resource.MustParse("8")},
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:     [][]AdmissionResult{{nativeResourceError}, {nativeResourceError}},
+			enableDRANativeResources: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tt.enableDRAExtendedResource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANativeResources, tt.enableDRANativeResources)
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 

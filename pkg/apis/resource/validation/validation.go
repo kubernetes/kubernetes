@@ -865,6 +865,41 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources) {
+		allErrs = append(allErrs, validateNativeResourceMappings(device.NativeResourceMappings, device.Capacity, fldPath.Child("nativeResourceMappings"))...)
+	}
+	return allErrs
+}
+
+func validateNativeResourceMappings(mappings map[corev1.ResourceName]resource.NativeResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for resourceName, mapping := range mappings {
+		keyPath := fldPath.Key(string(resourceName))
+		if !v1helper.IsNativeResource(resourceName) {
+			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a native resource name"))
+		}
+
+		if mapping.PerAllocatedUnitQuantity == nil && mapping.CapacityKey == nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of PerAllocatedUnitQuantity or CapacityKey must be set"))
+		} else {
+			if mapping.CapacityKey != nil && *mapping.CapacityKey == "" {
+				allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "CapacityKey must not be an empty string"))
+			}
+			if mapping.PerAllocatedUnitQuantity != nil {
+				if mapping.PerAllocatedUnitQuantity.Sign() <= 0 {
+					allErrs = append(allErrs, field.Invalid(keyPath.Child("perAllocatedUnitQuantity"), mapping.PerAllocatedUnitQuantity.String(), "must be positive"))
+				}
+			}
+			if mapping.CapacityKey != nil {
+				allErrs = append(allErrs, validateQualifiedName(*mapping.CapacityKey, keyPath.Child("capacityKey"))...)
+				if capacities == nil {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				}
+			}
+		}
+	}
 	return allErrs
 }
 
