@@ -260,11 +260,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	}
 
 	o.DynamicClient, err = f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (o *DeleteOptions) Validate() error {

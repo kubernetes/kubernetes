@@ -150,11 +150,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks to the QuotaOpts to see if there is sufficient information run the command.

@@ -125,10 +125,7 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 		return args, err
 	}
 	err = p.applyOverrides(rootCmd, kuberc, args, errOut)
-	if err != nil {
-		return args, err
-	}
-	return args, nil
+	return args, err
 }
 
 func (p *Preferences) convertPluginPolicy(kuberc *config.Preference) {

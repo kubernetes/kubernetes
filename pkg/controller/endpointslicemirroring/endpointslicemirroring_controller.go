@@ -344,11 +344,7 @@ func (c *Controller) syncEndpoints(ctx context.Context, key string) error {
 	}
 
 	err = c.reconciler.reconcile(ctx, endpoints, endpointSlices)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // queueEndpoints queues the Endpoints resource for processing.

@@ -175,11 +175,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		}
 
 		err := modifyConfig(currMapValue, steps, propertyValue, unset, setRawBytes)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case reflect.String:
 		if steps.moreStepsRemaining() {

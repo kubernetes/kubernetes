@@ -133,11 +133,7 @@ func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory,
 		return nil
 	})
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks ViewLastAppliedOptions for validity.

@@ -145,11 +145,7 @@ func (o *ClusterRoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Comma
 		return printer.PrintObj(obj, o.Out)
 	}
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Run calls the CreateSubcommandOptions.Run in ClusterRoleBindingOptions instance

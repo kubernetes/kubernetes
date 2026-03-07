@@ -166,11 +166,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate makes sure there is no discrepency in provided option values

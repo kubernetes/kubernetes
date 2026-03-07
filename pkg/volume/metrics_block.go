@@ -65,11 +65,7 @@ func (mb *metricsBlock) GetMetrics() (*Metrics, error) {
 	}
 
 	err := mb.getBlockInfo(metrics)
-	if err != nil {
-		return metrics, err
-	}
-
-	return metrics, nil
+	return metrics, err
 }
 
 // getBlockInfo fetches metrics.Capacity by opening the device and seeking to

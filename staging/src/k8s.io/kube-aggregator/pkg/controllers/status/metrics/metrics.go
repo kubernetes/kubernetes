@@ -74,11 +74,7 @@ func (m *Metrics) Register(
 	}
 
 	err = customRegistrationFunc(m.availabilityCollector)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // UnavailableCounter returns a counter to track apiservices marked as unavailable.

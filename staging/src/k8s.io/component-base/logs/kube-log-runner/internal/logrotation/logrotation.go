@@ -197,9 +197,5 @@ func (w *rotationFile) Close() error {
 	}
 
 	err = w.file.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
