@@ -192,6 +192,11 @@ func (s *Status) IsRejected() bool {
 	return code == Unschedulable || code == UnschedulableAndUnresolvable || code == Pending
 }
 
+// IsError returns true if and only if "Status" is non-nil and its Code is "Error".
+func (s *Status) IsError() bool {
+	return s.Code() == Error
+}
+
 // AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
