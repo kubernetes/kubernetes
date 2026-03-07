@@ -85,6 +85,12 @@ linters:
         text: should not be used because managedFields was removed
         path: _test.go$
 
+      # Deprecated Endpoints API required for backward compatibility testing in lease reconciler
+      - linters:
+          - staticcheck
+        text: "corev1.Endpoints is deprecated|corev1.EndpointSubset is deprecated"
+        path: pkg/controlplane/reconcilers/lease_test.go
+
       # Adding unversioned feature gates is allowed in tests
       - linters:
           - forbidigo
