@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -131,29 +132,50 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(ctx context.Contex
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
 func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
-	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pod, pods)
+	// podGroups is sorted from the most preemptable to least preemptable groups of pods.
+	podGroups := groupPodsByPriorityAndQOS(pod, pods)
+	n := len(podGroups)
 
-	// make sure that pods exist to reclaim the requirements
-	unableToMeetRequirements := requirements.subtract(append(append(bestEffortPods, burstablePods...), guaranteedPods...)...)
-	if len(unableToMeetRequirements) > 0 {
-		return nil, fmt.Errorf("no set of running pods found to reclaim resources: %v", unableToMeetRequirements.toString())
+	// build remaining requirements after subtracting from each podGroups group.
+	// remainingReqs[i] represents the remaining resource requirements after
+	// subtracting all pods in podGroups[0:i] (i.e., lower-priority groups).
+	remainingReqs := make([]admissionRequirementList, n+1)
+	remainingReqs[0] = requirements
+
+	for i := 0; i < n; i++ {
+		remainingReqs[i+1] = remainingReqs[i].subtract(podGroups[i]...)
 	}
-	// find the guaranteed pods we would need to evict if we already evicted ALL burstable and besteffort pods.
-	guaranteedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
-	if err != nil {
-		return nil, err
+
+	// If even after subtracting all preemptable pods the requirements are not met,
+	// then no feasible set of pods exists to reclaim resources.
+	if len(remainingReqs[n]) > 0 {
+		return nil, fmt.Errorf(
+			"no set of running pods found to reclaim resources: %v",
+			remainingReqs[n].toString(),
+		)
 	}
-	// Find the burstable pods we would need to evict if we already evicted ALL besteffort pods, and the required guaranteed pods.
-	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guaranteedToEvict...)...))
-	if err != nil {
-		return nil, err
+
+	var podsToPreempt []*v1.Pod
+
+	// Process pod groups from the highest priority to lowest.
+	// at each iteration, we assume that:
+	//   1. All lower-priority groups have already been fully accounted for
+	//      in remainingReqs[i].
+	//   2. All higher-priority pods selected so far (podsToPreempt) will be evicted.
+	// Based on the remaining resource requirements, we select the minimal set
+	// of pods to evict from the current priority/QoS group using getPodsToPreemptByDistance.
+	for i := n - 1; i >= 0; i-- {
+		remainingReq := remainingReqs[i].subtract(podsToPreempt...)
+
+		podsToEvict, err := getPodsToPreemptByDistance(podGroups[i], remainingReq)
+		if err != nil {
+			return nil, err
+		}
+
+		podsToPreempt = append(podsToPreempt, podsToEvict...)
 	}
-	// Find the besteffort pods we would need to evict if we already evicted the required guaranteed and burstable pods.
-	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guaranteedToEvict...)...))
-	if err != nil {
-		return nil, err
-	}
-	return append(append(bestEffortToEvict, burstableToEvict...), guaranteedToEvict...), nil
+
+	return podsToPreempt, nil
 }
 
 // getPodsToPreemptByDistance finds the pods that have pod requests >= admission requirements.
@@ -241,21 +263,77 @@ func (a admissionRequirementList) toString() string {
 	return s + "]"
 }
 
-// sortPodsByQOS returns lists containing besteffort, burstable, and guaranteed pods that
-// can be preempted by preemptor pod.
-func sortPodsByQOS(preemptor *v1.Pod, pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
+// groupPodsByPriorityAndQOS groups pods that the given preemptor pod can preempt.
+//
+//  1. Only pods that are preemptable by the preemptor are considered.
+//  2. Pods are first sorted from lowest to highest based on:
+//     a) Priority / criticality
+//     b) QOS
+//  3. Pods with the same priority and QoS are grouped together. Each group represents
+//     a set of pods that are equally preemptable.
+//  4. Higher priority / QoS pods appear at the end of the returned slice of groups.
+func groupPodsByPriorityAndQOS(preemptor *v1.Pod, pods []*v1.Pod) (podGroups [][]*v1.Pod) {
+	var preemptablePods []*v1.Pod
+
+	// filter pods that the preemptor can preempt.
 	for _, pod := range pods {
 		if kubetypes.Preemptable(preemptor, pod) {
-			switch v1qos.GetPodQOS(pod) {
-			case v1.PodQOSBestEffort:
-				bestEffort = append(bestEffort, pod)
-			case v1.PodQOSBurstable:
-				burstable = append(burstable, pod)
-			case v1.PodQOSGuaranteed:
-				guaranteed = append(guaranteed, pod)
-			default:
+			podQOS := v1qos.GetPodQOS(pod)
+
+			if podQOS != v1.PodQOSBestEffort && podQOS != v1.PodQOSGuaranteed && podQOS != v1.PodQOSBurstable {
+				continue
 			}
+
+			preemptablePods = append(preemptablePods, pod)
 		}
+	}
+
+	// sort from the least priority to the highest priority.
+	sort.Slice(preemptablePods, func(i, j int) bool {
+		firstPod := preemptablePods[i]
+		secondPod := preemptablePods[j]
+
+		// priority / criticality
+		if kubetypes.Preemptable(firstPod, secondPod) {
+			return false
+		}
+		if kubetypes.Preemptable(secondPod, firstPod) {
+			return true
+		}
+
+		// QoS
+		qosRank := map[v1.PodQOSClass]int{
+			v1.PodQOSGuaranteed: 3,
+			v1.PodQOSBurstable:  2,
+			v1.PodQOSBestEffort: 1,
+		}
+
+		return qosRank[v1qos.GetPodQOS(firstPod)] < qosRank[v1qos.GetPodQOS(secondPod)]
+	})
+
+	// grouping phase
+	for _, pod := range preemptablePods {
+		// first pod always starts a group
+		if len(podGroups) == 0 {
+			podGroups = append(podGroups, []*v1.Pod{pod})
+			continue
+		}
+
+		lastGroup := podGroups[len(podGroups)-1]
+		lastPod := lastGroup[len(lastGroup)-1]
+
+		// start a new group if priority or QoS differs
+		if kubetypes.Preemptable(pod, lastPod) ||
+			kubetypes.Preemptable(lastPod, pod) ||
+			v1qos.GetPodQOS(pod) != v1qos.GetPodQOS(lastPod) {
+
+			podGroups = append(podGroups, []*v1.Pod{pod})
+			continue
+		}
+
+		// same priority and same QoS pods are in the same group
+		podGroups[len(podGroups)-1] =
+			append(lastGroup, pod)
 	}
 
 	return
