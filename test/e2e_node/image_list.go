@@ -92,7 +92,7 @@ func updateImageAllowList(ctx context.Context) {
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v1.34.0"
+	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v1.35.2"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage
