@@ -5262,7 +5262,8 @@
       },
       "required": [
         "request",
-        "signerName"
+        "signerName",
+        "usages"
       ],
       "type": "object"
     },
@@ -5593,8 +5594,7 @@
         "serviceAccountName",
         "serviceAccountUID",
         "nodeName",
-        "nodeUID",
-        "stubPKCS10Request"
+        "nodeUID"
       ],
       "type": "object"
     },
