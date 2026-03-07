@@ -620,47 +620,36 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 	}
 }
 
-func TestDescribePodWorkloadReference(t *testing.T) {
+func TestDescribePodSchedulingGroup(t *testing.T) {
 	testCases := []struct {
-		name     string
-		pod      *corev1.Pod
-		expected string
+		name       string
+		pod        *corev1.Pod
+		expected   string
+		unexpected string
 	}{
 		{
-			name: "test1",
+			name: "pod with a scheduling group",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:     "workload",
-						PodGroup: "pg",
+					SchedulingGroup: &corev1.PodSchedulingGroup{
+						PodGroupName: new("pg"),
 					},
 				},
 			},
-			expected: `WorkloadRef:
-  Name:      workload
-  PodGroup:  pg`,
+			expected: "SchedulingGroup:\n  PodGroupName:  pg",
 		},
 		{
-			name: "test2",
+			name: "pod without a scheduling group",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
-				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:               "workload",
-						PodGroup:           "pg",
-						PodGroupReplicaKey: "pg1",
-					},
-				},
+				Spec: corev1.PodSpec{},
 			},
-			expected: `WorkloadRef:
-  Name:                workload
-  PodGroup:            pg
-  PodGroupReplicaKey:  pg1`,
+			unexpected: "SchedulingGroup:",
 		},
 	}
 	for _, tc := range testCases {
@@ -672,8 +661,11 @@ func TestDescribePodWorkloadReference(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !strings.Contains(out, tc.expected) {
+			if len(tc.expected) > 0 && !strings.Contains(out, tc.expected) {
 				t.Errorf("Expected to find %q in output: %q", tc.expected, out)
+			}
+			if len(tc.unexpected) > 0 && strings.Contains(out, tc.unexpected) {
+				t.Errorf("Unexpected to find %q in output: %q", tc.unexpected, out)
 			}
 		})
 	}

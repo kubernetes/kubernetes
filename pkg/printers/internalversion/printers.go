@@ -40,6 +40,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -743,6 +744,16 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(workloadColumnDefinitions, printWorkload)
 	_ = h.TableHandler(workloadColumnDefinitions, printWorkloadList)
+
+	podGroupColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1alpha2.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
+		{Name: "Status", Type: "string", Description: "Status of the PodGroup"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
+	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
 }
 
 // Pass ports=nil for all ports.
@@ -3342,6 +3353,55 @@ func printWorkloadList(list *scheduling.WorkloadList, options printers.GenerateO
 	}
 	return rows, nil
 }
+
+func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	policy := "Basic"
+	if obj.Spec.SchedulingPolicy.Gang != nil {
+		policy = "Gang"
+	}
+
+	status := "Pending"
+	conditionMap := make(map[string]*metav1.Condition)
+	for i := range obj.Status.Conditions {
+		cond := obj.Status.Conditions[i]
+		conditionMap[cond.Type] = &cond
+	}
+	if cond, ok := conditionMap[scheduling.PodGroupScheduled]; ok {
+		status = "Unschedulable"
+		if cond.Status == metav1.ConditionTrue {
+			status = "Scheduled"
+		}
+	}
+	if cond, ok := conditionMap[scheduling.PodGroupDisruptionTarget]; ok {
+		status = cond.Reason
+	}
+
+	workload := "<none>"
+	if ref := obj.Spec.PodGroupTemplateRef; ref != nil {
+		workload = ref.Workload.WorkloadName
+	}
+
+	row.Cells = append(row.Cells, obj.Name, policy, workload, status, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
 func printBoolPtr(value *bool) string {
 	if value != nil {
 		return printBool(*value)

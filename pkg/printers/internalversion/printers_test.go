@@ -8005,10 +8005,10 @@ func TestPrintWorkload(t *testing.T) {
 			Namespace: "ns1",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroups: []scheduling.PodGroup{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
 				{
 					Name: "foo",
-					Policy: scheduling.PodGroupPolicy{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 5,
 						},
@@ -8040,10 +8040,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					Namespace: "ns1",
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "foo",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -8059,10 +8059,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "bar",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -8083,6 +8083,206 @@ func TestPrintWorkloadList(t *testing.T) {
 	rows, err := printWorkloadList(workloadList, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Error generating table rows for WorkloadList: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroup(t *testing.T) {
+	podGroup := &scheduling.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "podgroup1",
+			Namespace: "ns1",
+		},
+		Spec: scheduling.PodGroupSpec{
+			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+				Workload: &scheduling.WorkloadPodGroupTemplateReference{
+					WorkloadName:         "w",
+					PodGroupTemplateName: "t1",
+				},
+			},
+			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+				Gang: &scheduling.GangSchedulingPolicy{
+					MinCount: 5,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Policy, Workload, Status, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"podgroup1", "Gang", "w", "Pending", "<unknown>"}}}
+
+	rows, err := printPodGroup(podGroup, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroup: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroupList(t *testing.T) {
+	podGroupList := &scheduling.PodGroupList{
+		Items: []scheduling.PodGroup{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podgroup1",
+					Namespace: "ns1",
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w1",
+							PodGroupTemplateName: "t1",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup2",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w1",
+							PodGroupTemplateName: "t2",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup3",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w2",
+							PodGroupTemplateName: "t1",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup4",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup5",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup6",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionFalse,
+							Reason: scheduling.PodGroupReasonUnschedulable,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup7",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   scheduling.PodGroupDisruptionTarget,
+							Status: metav1.ConditionTrue,
+							Reason: scheduling.PodGroupReasonPreemptionByScheduler,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Policy, Workload, Status, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"podgroup1", "Gang", "w1", "Pending", "<unknown>"}},
+		{Cells: []interface{}{"podgroup2", "Gang", "w1", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup3", "Basic", "w2", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup4", "Basic", "<none>", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup5", "Basic", "<none>", "Scheduled", "0s"}},
+		{Cells: []interface{}{"podgroup6", "Basic", "<none>", "Unschedulable", "0s"}},
+		{Cells: []interface{}{"podgroup7", "Basic", "<none>", "PreemptionByScheduler", "0s"}},
+	}
+
+	rows, err := printPodGroupList(podGroupList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroupList: %#v", err)
 	}
 
 	for i := range rows {
