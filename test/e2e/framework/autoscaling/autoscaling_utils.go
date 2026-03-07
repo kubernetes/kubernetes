@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,11 +43,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	kubectlportforward "k8s.io/kubectl/pkg/cmd/portforward"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -147,7 +150,40 @@ type ExternalMetricsController struct {
 	httpClient  *http.Client
 }
 
-// NewExternalMetricsController creates a new controller for the external metrics server
+type customPortForwarder struct {
+	forwarder *portforward.PortForwarder
+}
+
+func (cpf *customPortForwarder) ForwardPorts(method string, url *url.URL, opts kubectlportforward.PortForwardOptions) error {
+	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
+	if err != nil {
+		return err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
+	forwarder, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, io.Discard, io.Discard)
+	if err != nil {
+		return err
+	}
+	cpf.forwarder = forwarder
+	// ForwardPorts is expected to block until StopChannel is closed.
+	return forwarder.ForwardPorts()
+}
+
+func (cpf *customPortForwarder) GetPorts() ([]string, error) {
+	if cpf.forwarder == nil {
+		return nil, fmt.Errorf("port forwarder not initialized")
+	}
+	ports, err := cpf.forwarder.GetPorts()
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	for _, p := range ports {
+		result = append(result, fmt.Sprintf("%d:%d", p.Local, p.Remote))
+	}
+	return result, nil
+}
+
 func NewExternalMetricsController(clientSet clientset.Interface, serviceName, namespace string) *ExternalMetricsController {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -202,7 +238,6 @@ func (emc *ExternalMetricsController) sendMetricRequest(ctx context.Context, act
 }
 
 func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Context, action, metricName string, params url.Values) error {
-	// Find the pod
 	pods, err := emc.clientSet.CoreV1().Pods(emc.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "name=" + emc.serviceName,
 	})
@@ -214,57 +249,92 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	podName := pods.Items[0].Name
 
-	// Set up port-forward
 	config, err := framework.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
-	}
-
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
 	stopChan := make(chan struct{})
 	readyChan := make(chan struct{})
 
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
+	customPF := &customPortForwarder{}
+
+	pfOptions := &kubectlportforward.PortForwardOptions{
+		Namespace:     emc.namespace,
+		PodName:       podName,
+		Ports:         []string{"0:6443"},
+		Config:        config,
+		RESTClient:    emc.clientSet.CoreV1().RESTClient(),
+		PodClient:     emc.clientSet.CoreV1().(corev1client.PodsGetter),
+		StopChannel:   stopChan,
+		ReadyChannel:  readyChan,
+		Address:       []string{"localhost"},
+		PortForwarder: customPF,
 	}
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- fw.ForwardPorts()
+		// RunPortForwardContext may return nil on success. Only send
+		// non-nil errors into errChan to avoid sending a nil error
+		// which can be mis-handled by the select below.
+		if err := pfOptions.RunPortForwardContext(ctx); err != nil {
+			select {
+			case errChan <- err:
+			default:
+			}
+		}
 	}()
 
+	// Wait for port-forward to be ready with timeout
+	const readyTimeout = 20 * time.Second
 	select {
 	case <-readyChan:
-		// Ready
+		framework.Logf("port-forward: ready channel signaled")
 	case err := <-errChan:
 		return fmt.Errorf("port-forward failed: %w", err)
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-time.After(readyTimeout):
+		return fmt.Errorf("timeout waiting for port-forward ready")
 	}
 	defer close(stopChan)
 
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
-	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
+	// Verify forwarded ports are reported by custom port-forwarder (poll briefly)
+	var localPort int
+	for i := 0; i < 10; i++ {
+		ports, err := customPF.GetPorts()
+		if err == nil && len(ports) > 0 {
+			// ports format is "local:remote"
+			parts := strings.Split(ports[0], ":")
+			if len(parts) == 2 {
+				if p, err := strconv.Atoi(parts[0]); err == nil && p != 0 {
+					localPort = p
+					break
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
-	localPort := forwardedPorts[0].Local
+	if localPort == 0 {
+		return fmt.Errorf("port-forward ready but no local port reported")
+	}
+	framework.Logf("port-forward: local port %d verified from GetPorts()", localPort)
 
-	// Build URL and make request
+	// Probe TCP connect to ensure listener is accepting before HTTP client uses it
+	addr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	for i := 0; i < 10; i++ {
+		conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			framework.Logf("port-forward: TCP probe to %s successful", addr)
+			break
+		}
+		if i == 9 {
+			return fmt.Errorf("failed to verify port-forward TCP probe to %s: %v", addr, err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
 	if len(params) > 0 {
 		requestURL += "?" + params.Encode()
@@ -282,7 +352,11 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 		framework.Logf("ExternalMetrics %s failure: %v", action, err)
 		return err
 	}
-	defer resp.Body.Close() //nolint: errcheck
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			framework.Logf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
