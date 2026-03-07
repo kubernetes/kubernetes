@@ -208,3 +208,38 @@ func TestRegisterNotification(t *testing.T) {
 	// The advance of cache timestamp should've triggered the notification.
 	verifyNotification(t, ch, true)
 }
+
+func TestUpdateObservedTime(t *testing.T) {
+	cache := newTestCache()
+	timestamp := time.Now()
+	podID, status := getTestPodIDAndStatus(2)
+
+	// Case 1: Refresh time is newer than minTime.
+	cache.Set(podID, status, nil, timestamp.Add(-time.Second))
+	cache.SetObservedTime(podID, timestamp.Add(time.Second))
+	d := cache.getIfNewerThan(podID, timestamp)
+	assert.NotNil(t, d, "observed time is newer than minTime")
+
+	// Case 2: Refresh time is older than minTime, and modified time is also older.
+	cache.SetObservedTime(podID, timestamp.Add(-time.Second))
+	d = cache.getIfNewerThan(podID, timestamp)
+	assert.Nil(t, d, "observed time is older than minTime")
+}
+
+func TestRegisterNotificationUpdateObservedTime(t *testing.T) {
+	cache := newTestCache()
+	timestamp := time.Now()
+	podID, status := getTestPodIDAndStatus(1)
+
+	// Set initial state.
+	cache.Set(podID, status, nil, timestamp.Add(-time.Second))
+
+	// Subscribe for a future timestamp.
+	ch := cache.subscribe(podID, timestamp.Add(time.Second))
+	verifyNotification(t, ch, false)
+
+	// Update observed time to that future timestamp.
+	cache.SetObservedTime(podID, timestamp.Add(time.Second))
+	// The UpdateObservedTime operation should've triggered the notification.
+	verifyNotification(t, ch, true)
+}

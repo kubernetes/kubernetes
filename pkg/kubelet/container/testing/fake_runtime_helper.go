@@ -118,7 +118,7 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 	return nil
 }
 
-func (f *FakeRuntimeHelper) RequestPodReinspect(_ kubetypes.UID) {
+func (f *FakeRuntimeHelper) RequestPodRelist(_ kubetypes.UID, _ bool) {
 	// Not implemented.
 }
 

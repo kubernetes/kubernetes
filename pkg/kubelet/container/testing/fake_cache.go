@@ -53,3 +53,6 @@ func (c *fakeCache) Delete(id types.UID) {
 
 func (c *fakeCache) UpdateTime(_ time.Time) {
 }
+
+func (c *fakeCache) SetObservedTime(id types.UID, timestamp time.Time) {
+}

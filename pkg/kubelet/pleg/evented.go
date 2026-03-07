@@ -118,6 +118,10 @@ func (e *EventedPLEG) Relist() {
 	e.genericPleg.Relist()
 }
 
+func (e *EventedPLEG) RequestRelist(podUID types.UID, reinspect bool) {
+	e.genericPleg.RequestRelist(podUID, reinspect)
+}
+
 // Start starts the Evented PLEG
 func (e *EventedPLEG) Start() {
 	e.runningMu.Lock()
@@ -414,8 +418,4 @@ func (e *EventedPLEG) updateRunningContainerMetric(podStatus *kubecontainer.PodS
 func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventResponse) {
 	duration := time.Duration(time.Now().UnixNano()-event.CreatedAt) * time.Nanosecond
 	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
-}
-
-func (e *EventedPLEG) RequestReinspect(podUID types.UID) {
-	e.genericPleg.RequestReinspect(podUID)
 }
