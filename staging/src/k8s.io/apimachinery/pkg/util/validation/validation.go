@@ -96,7 +96,7 @@ var httpPathRegexp = regexp.MustCompile("^" + httpPathFmt + "$")
 func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(dpPath) == 0 {
-		return append(allErrs, field.Required(fldPath, ""))
+		return append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	}
 
 	segments := strings.SplitN(dpPath, "/", 2)
