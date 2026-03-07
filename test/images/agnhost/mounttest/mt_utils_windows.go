@@ -44,6 +44,10 @@ func fileMode(path string) error {
 		return nil
 	}
 
+	path, err := evalSymlink(path)
+	if err != nil {
+		return err
+	}
 	permissions, err := getFilePerm(path)
 	if err != nil {
 		return err
@@ -58,6 +62,10 @@ func filePerm(path string) error {
 		return nil
 	}
 
+	path, err := evalSymlink(path)
+	if err != nil {
+		return err
+	}
 	permissions, err := getFilePerm(path)
 	if err != nil {
 		return err
@@ -67,31 +75,67 @@ func filePerm(path string) error {
 	return nil
 }
 
-func getFilePerm(path string) (os.FileMode, error) {
-	var (
-		out    bytes.Buffer
-		errOut bytes.Buffer
-	)
+func linkFileOwner(path string) error {
+	// Windows does not have owner UID / GID. However, it has owner SID.
+	// not currently implemented in Kubernetes, so noop.
+	return nil
+}
 
-	// NOTE(claudiub): Symlinks have different permissions which might not match the target's.
-	// We want to evaluate the permissions of the target's not the symlink's.
+func linkFileMode(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	permissions, err := getFilePerm(path)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("mode of Windows link file %q: %v\n", path, permissions)
+	return nil
+}
+
+func linkFilePerm(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	permissions, err := getFilePerm(path)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("perms of Windows link file %q: %v\n", path, permissions)
+	return nil
+}
+
+func evalSymlink(path string) (string, error) {
 	info, err := os.Lstat(path)
 	if err == nil {
 		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
 		if info.Mode()&os.ModeSymlink != 0 || info.Mode()&os.ModeIrregular != 0 {
 			evaluated, err := filepath.EvalSymlinks(path)
 			if err != nil {
-				return 0, err
+				return "", err
 			}
 			path = evaluated
 		}
 	}
 
+	return path, err
+}
+
+func getFilePerm(path string) (os.FileMode, error) {
+	var (
+		out    bytes.Buffer
+		errOut bytes.Buffer
+	)
+
 	cmd := exec.Command("powershell.exe", "-NonInteractive", "./filePermissions.ps1",
 		"-FileName", path)
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
-	err = cmd.Run()
+	err := cmd.Run()
 
 	if err != nil {
 		fmt.Printf("error from PowerShell Script: %v, %v\n", err, errOut.String())
