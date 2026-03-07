@@ -2462,6 +2462,189 @@ func makeBasePodAndStatusWithRestartableInitContainers() (*v1.Pod, *kubecontaine
 	return pod, status
 }
 
+// TestComputePodActionsRegularContainerRestartWithSidecar is a regression test
+// for https://github.com/kubernetes/kubernetes/issues/136910.
+//
+// The sidecar includes a startup probe and startupManager is intentionally left
+// empty in this test. That means computeInitContainerActions cannot mark the
+// pod initialized via the sidecar-running path. In this setup, regular
+// containers in Exited state must still count as initialized, otherwise
+// computePodActions returns early and never restarts crashed regular
+// containers.
+func TestComputePodActionsRegularContainerRestartWithSidecar(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	sidecarRestartPolicy := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "foo-ns",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyAlways,
+			InitContainers: []v1.Container{
+				{
+					Name:  "init-1",
+					Image: "busybox",
+				},
+				{
+					Name:          "sidecar-1",
+					Image:         "busybox",
+					RestartPolicy: &sidecarRestartPolicy,
+					StartupProbe:  &v1.Probe{},
+				},
+			},
+			Containers: []v1.Container{
+				{Name: "foo1", Image: "busybox"},
+				{Name: "foo2", Image: "busybox"},
+			},
+		},
+	}
+
+	baseStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Id:       "sandboxID",
+				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+				Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: "sandboxuid", Attempt: uint32(0)},
+				Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.0.0.1"},
+			},
+		},
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{ID: "initid1"},
+				Name:     "init-1",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+				Hash:     kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			},
+			{
+				ID:    kubecontainer.ContainerID{ID: "sidecarid1"},
+				Name:  "sidecar-1",
+				State: kubecontainer.ContainerStateRunning,
+				Hash:  kubecontainer.HashContainer(&pod.Spec.InitContainers[1]),
+			},
+			{
+				ID:       kubecontainer.ContainerID{ID: "id1"},
+				Name:     "foo1",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 2,
+				Hash:     kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+			},
+			{
+				ID:       kubecontainer.ContainerID{ID: "id2"},
+				Name:     "foo2",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+				Hash:     kubecontainer.HashContainer(&pod.Spec.Containers[1]),
+			},
+		},
+	}
+
+	makePodAndStatus := func() (*v1.Pod, *kubecontainer.PodStatus) {
+		p := pod.DeepCopy()
+		s := &kubecontainer.PodStatus{
+			ID:        baseStatus.ID,
+			Name:      baseStatus.Name,
+			Namespace: baseStatus.Namespace,
+			SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+				{
+					Id:       baseStatus.SandboxStatuses[0].Id,
+					State:    baseStatus.SandboxStatuses[0].State,
+					Metadata: baseStatus.SandboxStatuses[0].Metadata,
+					Network:  baseStatus.SandboxStatuses[0].Network,
+				},
+			},
+			ContainerStatuses: []*kubecontainer.Status{
+				{
+					ID:       baseStatus.ContainerStatuses[0].ID,
+					Name:     baseStatus.ContainerStatuses[0].Name,
+					State:    baseStatus.ContainerStatuses[0].State,
+					ExitCode: baseStatus.ContainerStatuses[0].ExitCode,
+					Hash:     baseStatus.ContainerStatuses[0].Hash,
+				},
+				{
+					ID:    baseStatus.ContainerStatuses[1].ID,
+					Name:  baseStatus.ContainerStatuses[1].Name,
+					State: baseStatus.ContainerStatuses[1].State,
+					Hash:  baseStatus.ContainerStatuses[1].Hash,
+				},
+				{
+					ID:       baseStatus.ContainerStatuses[2].ID,
+					Name:     baseStatus.ContainerStatuses[2].Name,
+					State:    baseStatus.ContainerStatuses[2].State,
+					ExitCode: baseStatus.ContainerStatuses[2].ExitCode,
+					Hash:     baseStatus.ContainerStatuses[2].Hash,
+				},
+				{
+					ID:       baseStatus.ContainerStatuses[3].ID,
+					Name:     baseStatus.ContainerStatuses[3].Name,
+					State:    baseStatus.ContainerStatuses[3].State,
+					ExitCode: baseStatus.ContainerStatuses[3].ExitCode,
+					Hash:     baseStatus.ContainerStatuses[3].Hash,
+				},
+			},
+		}
+		return p, s
+	}
+
+	for desc, test := range map[string]struct {
+		mutatePodFn    func(*v1.Pod)
+		mutateStatusFn func(*kubecontainer.PodStatus)
+		actions        podActions
+	}{
+		"sidecar running, all regular containers exited with error; restart regular containers": {
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0, 1},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+		"sidecar running, one regular container exited with error; restart only that container": {
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses[3].State = kubecontainer.ContainerStateRunning
+				status.ContainerStatuses[3].ExitCode = 0
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+		"RestartPolicy Never, sidecar running, all regular containers succeeded; kill pod": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses[2].ExitCode = 0
+				status.ContainerStatuses[3].ExitCode = 0
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			},
+		},
+	} {
+		p, s := makePodAndStatus()
+		if test.mutatePodFn != nil {
+			test.mutatePodFn(p)
+		}
+		if test.mutateStatusFn != nil {
+			test.mutateStatusFn(s)
+		}
+		actions := m.computePodActions(tCtx, p, s, false)
+		verifyActions(t, &test.actions, &actions, desc)
+	}
+}
+
 func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	// Make sure existing test cases pass with feature enabled
 	TestComputePodActions(t)

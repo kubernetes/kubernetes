@@ -243,15 +243,24 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
+	isRestartableInitContainer := w.isInitContainer() &&
+		w.container.RestartPolicy != nil &&
+		*w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
+
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
+
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,
 			// as this could cause a container that was Ready to become NotReady.
+			// However, for restartable init containers (sidecars) with startup probes, we must
+			// initialize the startup result to Success to ensure computeInitContainerActions can
+			// detect that the pod has completed initialization.
+			// See https://github.com/kubernetes/kubernetes/issues/136910
 			isRestart := false
 			if c.State.Running != nil {
 				containerStartTime := c.State.Running.StartedAt.Time
@@ -259,8 +268,17 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 					isRestart = true
 				}
 			}
+
+			// For sidecars, only set startup probe result on restart (with Success).
+			// Readiness/liveness probes on sidecars should not be seeded, allowing
+			// setReadyStateOnKubeletRestart to preserve the Ready state.
 			if !isRestart {
 				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+			} else if isRestartableInitContainer && w.probeType == startup {
+				// Sidecar was already running before kubelet restart and had passed startup.
+				// Seed with Success so startupManager.Get() returns a valid result, allowing
+				// computeInitContainerActions to detect pod initialization.
+				w.resultsManager.Set(w.containerID, results.Success, w.pod)
 			}
 		} else {
 			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
@@ -281,9 +299,6 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
-
-		isRestartableInitContainer := w.isInitContainer() &&
-			w.container.RestartPolicy != nil && *w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
 
 		// Abort if the container will not be restarted.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
