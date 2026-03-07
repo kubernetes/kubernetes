@@ -254,6 +254,20 @@ status:
         image:
           imageRef: imageRefValue
   message: messageValue
+  nativeResourceClaimStatus:
+  - claimInfo:
+      apiVersion: apiVersionValue
+      fieldPath: fieldPathValue
+      kind: kindValue
+      name: nameValue
+      namespace: namespaceValue
+      resourceVersion: resourceVersionValue
+      uid: uidValue
+    containers:
+    - containersValue
+    resources:
+    - quantity: "0"
+      resourceName: resourceNameValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
   phase: phaseValue

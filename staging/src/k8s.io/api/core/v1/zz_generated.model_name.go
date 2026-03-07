@@ -527,6 +527,11 @@ func (in NamespaceStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NativeResourceAllocation) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NativeResourceAllocation"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Node) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.Node"
 }
@@ -764,6 +769,11 @@ func (in PodList) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodLogOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodLogOptions"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodNativeResourceClaimStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodNativeResourceClaimStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

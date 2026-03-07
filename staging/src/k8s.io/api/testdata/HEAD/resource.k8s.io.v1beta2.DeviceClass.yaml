@@ -44,6 +44,7 @@ spec:
         status:
           available: 1
   extendedResourceName: extendedResourceNameValue
+  managesNativeResources: true
   selectors:
   - cel:
       expression: expressionValue

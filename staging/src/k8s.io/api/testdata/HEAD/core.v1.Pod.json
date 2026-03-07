@@ -2156,6 +2156,28 @@
           "request": "requestValue"
         }
       ]
-    }
+    },
+    "nativeResourceClaimStatus": [
+      {
+        "claimInfo": {
+          "kind": "kindValue",
+          "namespace": "namespaceValue",
+          "name": "nameValue",
+          "uid": "uidValue",
+          "apiVersion": "apiVersionValue",
+          "resourceVersion": "resourceVersionValue",
+          "fieldPath": "fieldPathValue"
+        },
+        "containers": [
+          "containersValue"
+        ],
+        "resources": [
+          {
+            "resourceName": "resourceNameValue",
+            "quantity": "0"
+          }
+        ]
+      }
+    ]
   }
 }

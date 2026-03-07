@@ -154,7 +154,13 @@
         "bindingFailureConditions": [
           "bindingFailureConditionsValue"
         ],
-        "allowMultipleAllocations": true
+        "allowMultipleAllocations": true,
+        "nativeResourceMappings": {
+          "nativeResourceMappingsKey": {
+            "capacityKey": "capacityKeyValue",
+            "perAllocatedUnitQuantity": "0"
+          }
+        }
       }
     ],
     "perDeviceNodeSelection": true,

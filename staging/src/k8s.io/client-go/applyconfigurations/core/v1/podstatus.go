@@ -139,6 +139,9 @@ type PodStatusApplyConfiguration struct {
 	// applied at the pod level if pod-level requests or limits are set in
 	// PodSpec.Resources
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	// NativeResourceClaimStatus contains the status of native resources (like cpu, memory)
+	// that were allocated for this pod through DRA claims.
+	NativeResourceClaimStatus []PodNativeResourceClaimStatusApplyConfiguration `json:"nativeResourceClaimStatus,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -339,5 +342,18 @@ func (b *PodStatusApplyConfiguration) WithAllocatedResources(value corev1.Resour
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PodStatusApplyConfiguration {
 	b.Resources = value
+	return b
+}
+
+// WithNativeResourceClaimStatus adds the given value to the NativeResourceClaimStatus field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the NativeResourceClaimStatus field.
+func (b *PodStatusApplyConfiguration) WithNativeResourceClaimStatus(values ...*PodNativeResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNativeResourceClaimStatus")
+		}
+		b.NativeResourceClaimStatus = append(b.NativeResourceClaimStatus, *values[i])
+	}
 	return b
 }

@@ -1203,6 +1203,16 @@ func (NamespaceStatus) SwaggerDoc() map[string]string {
 	return map_NamespaceStatus
 }
 
+var map_NativeResourceAllocation = map[string]string{
+	"":             "NativeResourceAllocation describes the allocation of a native resource.",
+	"resourceName": "ResourceName is the native resource name (e.g., \"cpu\", \"memory\").",
+	"quantity":     "Quantity is the amount of native resource allocated through this claim for this resource.",
+}
+
+func (NativeResourceAllocation) SwaggerDoc() map[string]string {
+	return map_NativeResourceAllocation
+}
+
 var map_Node = map[string]string{
 	"":         "Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -1794,6 +1804,17 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 	return map_PodLogOptions
 }
 
+var map_PodNativeResourceClaimStatus = map[string]string{
+	"":           "PodNativeResourceClaimStatus describes the status of native resources allocated via DRA.",
+	"claimInfo":  "ClaimInfo holds a reference to the ResourceClaim that resulted in this allocation.",
+	"containers": "Containers lists the names of all containers in this pod that reference the claim.",
+	"resources":  "Resources lists the native resources and quantities allocated by this claim.",
+}
+
+func (PodNativeResourceClaimStatus) SwaggerDoc() map[string]string {
+	return map_PodNativeResourceClaimStatus
+}
+
 var map_PodOS = map[string]string{
 	"":     "PodOS defines the OS parameters of a pod.",
 	"name": "Name is the name of the operating system. The currently supported values are linux and windows. Additional value may be defined in future and can be one of: https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration Clients should expect to handle additional values and treat unrecognized values in this field as os: null",
@@ -1962,6 +1983,7 @@ var map_PodStatus = map[string]string{
 	"extendedResourceClaimStatus": "Status of extended resource claim backed by DRA.",
 	"allocatedResources":          "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
 	"resources":                   "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
+	"nativeResourceClaimStatus":   "NativeResourceClaimStatus contains the status of native resources (like cpu, memory) that were allocated for this pod through DRA claims.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {

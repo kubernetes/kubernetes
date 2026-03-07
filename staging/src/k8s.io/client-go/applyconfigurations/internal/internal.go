@@ -5996,6 +5996,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
+- name: io.k8s.api.core.v1.NativeResourceAllocation
+  map:
+    fields:
+    - name: quantity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: resourceName
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.Node
   map:
     fields:
@@ -6829,6 +6839,25 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.PodNativeResourceClaimStatus
+  map:
+    fields:
+    - name: claimInfo
+      type:
+        namedType: io.k8s.api.core.v1.ObjectReference
+      default: {}
+    - name: containers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: resources
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.NativeResourceAllocation
+          elementRelationship: atomic
 - name: io.k8s.api.core.v1.PodOS
   map:
     fields:
@@ -7156,6 +7185,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: nativeResourceClaimStatus
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodNativeResourceClaimStatus
+          elementRelationship: atomic
     - name: nominatedNodeName
       type:
         scalar: string
@@ -12457,6 +12492,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: nativeResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.NativeResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -12592,6 +12632,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: managesNativeResources
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -12794,6 +12837,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.DeviceToleration
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1.NativeResourceMapping
+  map:
+    fields:
+    - name: capacityKey
+      type:
+        scalar: string
+    - name: perAllocatedUnitQuantity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1.NetworkDeviceData
   map:
     fields:
@@ -13141,6 +13193,11 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
           elementRelationship: atomic
+    - name: nativeResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.NativeResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -13346,6 +13403,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: managesNativeResources
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -13542,6 +13602,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         scalar: string
+- name: io.k8s.api.resource.v1beta1.NativeResourceMapping
+  map:
+    fields:
+    - name: capacityKey
+      type:
+        scalar: string
+    - name: perAllocatedUnitQuantity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1beta1.NetworkDeviceData
   map:
     fields:
@@ -13882,6 +13951,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: nativeResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.NativeResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -14017,6 +14091,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extendedResourceName
       type:
         scalar: string
+    - name: managesNativeResources
+      type:
+        scalar: boolean
     - name: selectors
       type:
         list:
@@ -14219,6 +14296,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceToleration
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.NativeResourceMapping
+  map:
+    fields:
+    - name: capacityKey
+      type:
+        scalar: string
+    - name: perAllocatedUnitQuantity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1beta2.NetworkDeviceData
   map:
     fields:

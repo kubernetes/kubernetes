@@ -65,6 +65,10 @@ spec:
         countersKey:
           value: "0"
     name: nameValue
+    nativeResourceMappings:
+      nativeResourceMappingsKey:
+        capacityKey: capacityKeyValue
+        perAllocatedUnitQuantity: "0"
     nodeName: nodeNameValue
     nodeSelector:
       nodeSelectorTerms:
