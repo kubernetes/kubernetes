@@ -132,6 +132,64 @@
   - 10
   - 15
   - 30
+- name: request_filter_duration_seconds
+  subsystem: apiserver
+  help: Request filter latency distribution in seconds, for each filter type
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - filter
+  buckets:
+  - 0.0001
+  - 0.0003
+  - 0.001
+  - 0.003
+  - 0.01
+  - 0.03
+  - 0.1
+  - 0.3
+  - 1
+  - 5
+  - 10
+  - 15
+  - 30
+- name: request_sli_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution (not counting webhook duration and priority
+    & fairness queue wait times) in seconds for each verb, group, version, resource,
+    subresource, scope and component.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
@@ -175,6 +233,33 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_events_sizes
+  subsystem: apiserver
+  help: Watch event size distribution in bytes
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+  - 65536
+  - 131072
+- name: watch_events_total
+  subsystem: apiserver
+  help: Number of events sent in watch clients
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
 - name: watch_list_duration_seconds
   subsystem: apiserver
   help: Response latency distribution in seconds for watch list requests broken by
