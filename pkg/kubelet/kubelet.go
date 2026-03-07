@@ -610,6 +610,7 @@ func NewMainKubelet(ctx context.Context,
 		sourcesReady:                 config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                 registerNode,
 		registerWithTaints:           registerWithTaints,
+		cgroupsBeingCleaned:          make(map[types.UID]bool),
 		dnsConfigurer:                dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                serviceLister,
 		serviceHasSynced:             serviceHasSynced,
@@ -1195,6 +1196,10 @@ type Kubelet struct {
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()
+	// cgroupCleanupMux protects cgroupsBeingCleaned.
+	cgroupCleanupMux sync.Mutex
+	// cgroupsBeingCleaned tracks pod UIDs whose cgroups are currently being cleaned up.
+	cgroupsBeingCleaned map[types.UID]bool
 
 	// podManager stores the desired set of admitted pods and mirror pods that the kubelet should be
 	// running. The actual set of running pods is stored on the podWorkers. The manager is populated

@@ -17,8 +17,10 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,13 +32,26 @@ type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
 	Cgroups         map[types.UID]CgroupName
+	// DestroyDelay simulates slow Destroy operations by sleeping.
+	DestroyDelay time.Duration
+	// DestroyError if set, Destroy returns this error.
+	DestroyError error
+	// DestroyBlockCh if set, Destroy blocks until the channel is closed.
+	DestroyBlockCh <-chan struct{}
+	// DestroyStartedCh if set, Destroy signals when it starts.
+	DestroyStartedCh chan<- struct{}
+	// DestroyWG if set, Destroy calls Done() on completion.
+	DestroyWG *sync.WaitGroup
+	// DestroyCallCount tracks the number of Destroy calls per cgroup.
+	DestroyCallCount map[string]int
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
 
 func NewFakePodContainerManager() *FakePodContainerManager {
 	return &FakePodContainerManager{
-		Cgroups: make(map[types.UID]CgroupName),
+		Cgroups:          make(map[types.UID]CgroupName),
+		DestroyCallCount: make(map[string]int),
 	}
 }
 
@@ -69,8 +84,37 @@ func (m *FakePodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 
 func (m *FakePodContainerManager) Destroy(_ klog.Logger, name CgroupName) error {
 	m.Lock()
-	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "Destroy")
+	cgroupKey := fmt.Sprintf("%v", name)
+	m.DestroyCallCount[cgroupKey]++
+	delay := m.DestroyDelay
+	returnErr := m.DestroyError
+	blockCh := m.DestroyBlockCh
+	startedCh := m.DestroyStartedCh
+	wg := m.DestroyWG
+	m.Unlock()
+
+	if startedCh != nil {
+		select {
+		case startedCh <- struct{}{}:
+		default:
+		}
+	}
+	if blockCh != nil {
+		<-blockCh
+	}
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	if wg != nil {
+		defer wg.Done()
+	}
+	if returnErr != nil {
+		return returnErr
+	}
+
+	m.Lock()
+	defer m.Unlock()
 	for key, cgname := range m.Cgroups {
 		if reflect.DeepEqual(cgname, name) {
 			delete(m.Cgroups, key)
@@ -125,4 +169,11 @@ func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, pod *v1.Pod
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
 	return nil
+}
+
+func (m *FakePodContainerManager) GetDestroyCallCount(name CgroupName) int {
+	m.Lock()
+	defer m.Unlock()
+	cgroupKey := fmt.Sprintf("%v", name)
+	return m.DestroyCallCount[cgroupKey]
 }
