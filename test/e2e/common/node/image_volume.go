@@ -93,7 +93,7 @@ var _ = SIGDescribe("ImageVolume", func() {
 		Description: Create a Pod using an image volume and a pull policy of Always.
 		This test verifies that the image volume functionality is available by default and works as intended.
 	*/
-	framework.It("should succeed with pod and pull policy of Always [MinimumKubeletVersion:1.35]", func(ctx context.Context) {
+	framework.ConformanceIt("should succeed with pod and pull policy of Always [MinimumKubeletVersion:1.35]", func(ctx context.Context) {
 		var selinuxOptions *v1.SELinuxOptions
 		if selinux.GetEnabled() {
 			selinuxOptions = &v1.SELinuxOptions{
