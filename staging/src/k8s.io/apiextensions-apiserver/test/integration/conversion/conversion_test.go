@@ -340,7 +340,12 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 
 			// Inject the logic for this specific test case
 			proxyHandler.set(handler)
-			defer proxyHandler.set(nil)
+			// Reset the handler to a no-op handler instead of nil.
+			// If we set it to nil, there is a race where the webhook can still get called
+			// between the CRD update and the cacher/watcher being updated.
+			// The webhook will return "unexpected call" (500), which causes the background
+			// cacher/watchers to reinitialize, leading to potential timeouts and flakes.
+			defer proxyHandler.set(NewObjectConverterWebhookHandler(t, nontrivialConverter))
 
 			// Configure the CRD to use the shared webhook server
 			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
