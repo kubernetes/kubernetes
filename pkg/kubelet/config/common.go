@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
+	registry "k8s.io/kubernetes/pkg/registry/core/pod"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -72,6 +74,16 @@ func applyDefaults(logger klog.Logger, pod *api.Pod, source string, isFile bool,
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		logger.V(5).Info("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
+
+	registry.Strategy.PrepareForCreate(context.Background(), pod)
+	// Note: Because of how UID generation happens with static pods (where the UID is derived from the hash of
+	// the object itself, updates to static pods actually don't happen, a new one is just created.
+	// Calling this is likely a no-op, but good to call in case k8s feature developers expect it to be called,
+	// as most pods get PrepareForUpdate called at least once.
+	registry.Strategy.PrepareForUpdate(context.Background(), pod, pod)
+
+	// Unset QOSClass, not expected for static pods
+	pod.Status.QOSClass = ""
 
 	pod.Name = generatePodName(pod.Name, nodeName)
 	logger.V(5).Info("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)

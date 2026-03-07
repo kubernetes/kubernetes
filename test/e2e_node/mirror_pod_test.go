@@ -323,7 +323,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
 
 			ginkgo.By("check mirror pod observedGeneration is always empty")
-			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
+			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(1)))
 		})
 
 		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
