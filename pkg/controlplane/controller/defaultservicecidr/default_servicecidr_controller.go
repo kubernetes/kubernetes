@@ -99,8 +99,7 @@ type Controller struct {
 
 // Start will not return until the default ServiceCIDR exists or stopCh is closed.
 func (c *Controller) Start(ctx context.Context) {
-	defer utilruntime.HandleCrash()
-	stopCh := ctx.Done()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
@@ -114,8 +113,8 @@ func (c *Controller) Start(ctx context.Context) {
 		c.eventBroadcaster.Shutdown()
 	}()
 
-	go c.serviceCIDRInformer.Run(stopCh)
-	if !cache.WaitForNamedCacheSync(controllerName, stopCh, c.serviceCIDRsSynced) {
+	go c.serviceCIDRInformer.RunWithContext(ctx)
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceCIDRsSynced) {
 		return
 	}
 
@@ -131,12 +130,12 @@ func (c *Controller) Start(ctx context.Context) {
 	}
 
 	// run the sync loop in the background with the defined interval
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		err := c.sync()
 		if err != nil {
 			klog.Infof("error trying to sync the default ServiceCIDR: %v", err)
 		}
-	}, c.interval, stopCh)
+	}, c.interval)
 }
 
 func (c *Controller) sync() error {
