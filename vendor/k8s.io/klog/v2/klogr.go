@@ -53,7 +53,7 @@ func (l *klogger) Init(info logr.RuntimeInfo) {
 }
 
 func (l *klogger) Info(level int, msg string, kvList ...interface{}) {
-	merged := serialize.MergeKVs(l.values, kvList)
+	merged := serialize.WithValues(l.values, kvList)
 	// Skip this function.
 	VDepth(l.callDepth+1, Level(level)).InfoSDepth(l.callDepth+1, msg, merged...)
 }
@@ -63,7 +63,7 @@ func (l *klogger) Enabled(level int) bool {
 }
 
 func (l *klogger) Error(err error, msg string, kvList ...interface{}) {
-	merged := serialize.MergeKVs(l.values, kvList)
+	merged := serialize.WithValues(l.values, kvList)
 	ErrorSDepth(l.callDepth+1, err, msg, merged...)
 }
 
