@@ -209,6 +209,48 @@ stuff: 1
 	}
 }
 
+func TestDecodeYAMLWithDirective(t *testing.T) {
+	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`%YAML 1.1
+---
+`)))
+	var obj any
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if obj != nil {
+		t.Fatalf("expected nil document, got: %#v", obj)
+	}
+	if err := s.Decode(&obj); err != io.EOF { //nolint:errorlint
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDecodeYAMLWithDirectiveAndContent(t *testing.T) {
+	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`%YAML 1.1
+---
+stuff: 1
+---
+stuff: 2
+`)))
+	obj := generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":1}` {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	obj = generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":2}` {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if err := s.Decode(&obj); err != io.EOF { //nolint:errorlint
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestDecodeYAMLSeparatorValidation(t *testing.T) {
 	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
