@@ -34,6 +34,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -598,9 +599,31 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 
 			ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
-				// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
-				// for now this only works on amd64
-				e2eskipper.SkipUnlessNodeOSArchIs("amd64")
+				// Get the architecture of the pod
+				ginkgo.By("checking pod architecture compatibility")
+				podArch := strings.TrimSpace(e2eoutput.RunHostCmdOrDie(ns, simplePodName, "uname -m"))
+				// Map to GOARCH values
+				switch podArch {
+				case "x86_64":
+					podArch = "amd64"
+				case "aarch64":
+					podArch = "arm64"
+				default:
+					framework.Failf("unknown pod architecture: %s", podArch)
+				}
+				framework.Logf("Pod architecture: %s", podArch)
+
+				// Get the architecture of kubectl
+				// We could get this by parsing the ELF header, but we already need to be able to run locally kubectl in other tests.
+				kubectlArch := goruntime.GOARCH
+				framework.Logf("kubectl architecture: %s", kubectlArch)
+
+				// Skip if architectures do not match
+				if kubectlArch != podArch {
+					// We could `go build` the correct kubectl binary,
+					// but that assumes we want to test kubectl from kubernetes/kubernetes HEAD / current checkout.
+					e2eskipper.Skipf("kubectl binary architecture mismatch: pod is %q, but kubectl binary is %q", podArch, kubectlArch)
+				}
 
 				ginkgo.By("adding rbac permissions")
 				// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
