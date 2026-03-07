@@ -22,17 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
-)
-
-const (
-	accessDenied string = "access is denied"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -117,25 +112,30 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 
 		username := allOptions[0]
 		password := allOptions[1]
-		if output, err := newSMBMapping(username, password, source); err != nil {
-			klog.Warningf("SMB Mapping(%s) returned with error(%v), output(%s)", source, err, string(output))
-			if isSMBMappingExist(source) {
+		cimOps := cimOperations{}
+		if err := cimOps.NewSMBMapping(username, password, source); err != nil {
+			klog.Warningf("SMB Mapping(%s) returned with error(%v)", source, err)
+			exist, err := cimOps.IsSMBMappingExist(source)
+			if err != nil {
+				return fmt.Errorf("IsSMBMappingExist failed: %v", err)
+			}
+			if exist {
 				valid, err := IsPathValid(source)
 				if !valid {
 					if err == nil || isAccessDeniedError(err) {
 						klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, return error: %v, now begin to remove and remount", source, err)
-						if output, err = removeSMBMapping(source); err != nil {
-							return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+						if err = cimOps.RemoveSMBMapping(source); err != nil {
+							return fmt.Errorf("removeSMBMapping failed: %v", err)
 						}
-						if output, err := newSMBMapping(username, password, source); err != nil {
-							return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
+						if err := cimOps.NewSMBMapping(username, password, source); err != nil {
+							return fmt.Errorf("newSMBMapping(%s) failed: %v", source, err)
 						}
 					}
 				} else {
 					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error(%v)", source, err)
 				}
 			} else {
-				return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
+				return fmt.Errorf("newSMBMapping(%s) failed: %v", source, err)
 			}
 		}
 	}
@@ -161,46 +161,8 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	return nil
 }
 
-// do the SMB mount with username, password, remotepath
-// return (output, error)
-func newSMBMapping(username, password, remotepath string) (string, error) {
-	if username == "" || password == "" || remotepath == "" {
-		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remotepath: %s)", username, sensitiveOptionsRemoved, remotepath)
-	}
-
-	// use PowerShell Environment Variables to store user input string to prevent command line injection
-	// https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-5.1
-	cmdLine := `$PWord = ConvertTo-SecureString -String $Env:smbpassword -AsPlainText -Force` +
-		`;$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Env:smbuser, $PWord` +
-		`;New-SmbGlobalMapping -RemotePath $Env:smbremotepath -Credential $Credential -RequirePrivacy $true`
-	cmd := exec.Command("powershell", "/c", cmdLine)
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("smbuser=%s", username),
-		fmt.Sprintf("smbpassword=%s", password),
-		fmt.Sprintf("smbremotepath=%s", remotepath))
-
-	output, err := cmd.CombinedOutput()
-	return string(output), err
-}
-
-// check whether remotepath is already mounted
-func isSMBMappingExist(remotepath string) bool {
-	cmd := exec.Command("powershell", "/c", `Get-SmbGlobalMapping -RemotePath $Env:smbremotepath`)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("smbremotepath=%s", remotepath))
-	_, err := cmd.CombinedOutput()
-	return err == nil
-}
-
 func isAccessDeniedError(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), accessDenied)
-}
-
-// remove SMB mapping
-func removeSMBMapping(remotepath string) (string, error) {
-	cmd := exec.Command("powershell", "/c", `Remove-SmbGlobalMapping -RemotePath $Env:smbremotepath -Force`)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("smbremotepath=%s", remotepath))
-	output, err := cmd.CombinedOutput()
-	return string(output), err
+	return errors.Is(err, windows.ERROR_ACCESS_DENIED)
 }
 
 // Unmount unmounts the target.
@@ -261,7 +223,8 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	// Try to mount the disk
 	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 
-	if err := ValidateDiskNumber(source); err != nil {
+	sourceDiskNumber, err := ValidateDiskNumber(source)
+	if err != nil {
 		klog.Errorf("diskMount: formatAndMount failed, err: %v", err)
 		return err
 	}
@@ -275,40 +238,17 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		return fmt.Errorf("diskMount: formatOptions are not supported on Windows")
 	}
 
-	cmdString := "Get-Disk -Number $env:source | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru" +
-		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem $env:fstype -Confirm:$false"
-	cmd := mounter.Exec.Command("powershell", "/c", cmdString)
-	env := append(os.Environ(),
-		fmt.Sprintf("source=%s", source),
-		fmt.Sprintf("fstype=%s", fstype),
-	)
-	cmd.SetEnv(env)
-	klog.V(8).Infof("Executing command: %q", cmdString)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
+	cimOps := cimOperations{}
+	err = cimOps.PartitionDisk(sourceDiskNumber)
+	if err != nil {
+		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err)
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
-	volumeIds, err := ListVolumesOnDisk(source)
+	volumeIds, err := cimOps.ListVolumesOnDisk(sourceDiskNumber)
 	if err != nil {
 		return err
 	}
 	driverPath := volumeIds[0]
 	return mounter.MountSensitive(driverPath, target, fstype, options, sensitiveOptions)
-}
-
-// ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
-func ListVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
-	// If a Disk has multiple volumes, Get-Volume may not return items in the same order.
-	cmd := exec.Command("powershell", "/c", "(Get-Disk -DeviceId $env:diskID | Get-Partition | Get-Volume | Sort-Object -Property UniqueId).UniqueId")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("diskID=%s", diskID))
-	klog.V(8).Infof("Executing command: %q", cmd.String())
-	output, err := cmd.CombinedOutput()
-	klog.V(4).Infof("ListVolumesOnDisk id from %s: %s", diskID, string(output))
-	if err != nil {
-		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
-	}
-
-	volumeIds := strings.Split(strings.TrimSpace(string(output)), "\r\n")
-	return volumeIds, nil
 }

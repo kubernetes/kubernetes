@@ -85,11 +85,12 @@ func NormalizeWindowsPath(path string) string {
 }
 
 // ValidateDiskNumber : disk number should be a number in [0, 99]
-func ValidateDiskNumber(disk string) error {
-	if _, err := strconv.Atoi(disk); err != nil {
-		return fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
+func ValidateDiskNumber(disk string) (uint32, error) {
+	n, err := strconv.Atoi(disk)
+	if err != nil {
+		return 0, fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
 	}
-	return nil
+	return uint32(n), err
 }
 
 // isMountPointMatch determines if the mountpoint matches the dir
