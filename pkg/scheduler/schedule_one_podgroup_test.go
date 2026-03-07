@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -102,10 +103,10 @@ func TestPodGroupInfoForPod(t *testing.T) {
 	pInfo4, _ := framework.NewPodInfo(p4)
 
 	now := time.Now()
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: pInfo1, InitialAttemptTimestamp: ptr.To(now)}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: pInfo2, InitialAttemptTimestamp: ptr.To(now.Add(time.Second))}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: pInfo3, InitialAttemptTimestamp: ptr.To(now.Add(2 * time.Second))}
-	qInfo4 := &framework.QueuedPodInfo{PodInfo: pInfo4, InitialAttemptTimestamp: ptr.To(now.Add(time.Second))}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: pInfo1, InitialAttemptTimestamp: ptr.To(metav1.NewTime(now))}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: pInfo2, InitialAttemptTimestamp: ptr.To(metav1.NewTime(now.Add(time.Second)))}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: pInfo3, InitialAttemptTimestamp: ptr.To(metav1.NewTime(now.Add(2 * time.Second)))}
+	qInfo4 := &framework.QueuedPodInfo{PodInfo: pInfo4, InitialAttemptTimestamp: ptr.To(metav1.NewTime(now.Add(time.Second)))}
 
 	tests := []struct {
 		name            string

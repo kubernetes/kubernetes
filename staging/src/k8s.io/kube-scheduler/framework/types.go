@@ -18,7 +18,6 @@ package framework
 
 import (
 	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -229,6 +228,7 @@ func (s QueueingHint) String() string {
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
+// +k8s:deepcopy-gen=true
 type ClusterEvent struct {
 	Resource   EventResource
 	ActionType ActionType
@@ -304,7 +304,7 @@ type QueuedPodInfo interface {
 	// GetPodInfo returns the PodInfo object wrapped by this QueuedPodInfo instance.
 	GetPodInfo() PodInfo
 	// GetTimestamp returns the time pod added to the scheduling queue.
-	GetTimestamp() time.Time
+	GetTimestamp() metav1.Time
 	// GetAttempts returns the number of all schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.
 	GetAttempts() int
@@ -312,7 +312,7 @@ type QueuedPodInfo interface {
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
 	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
 	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
-	GetBackoffExpiration() time.Time
+	GetBackoffExpiration() metav1.Time
 	// GetUnschedulableCount returns the total number of the scheduling attempts that this Pod gets unschedulable.
 	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
 	// this count won't be incremented.
@@ -333,7 +333,7 @@ type QueuedPodInfo interface {
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
-	GetInitialAttemptTimestamp() *time.Time
+	GetInitialAttemptTimestamp() *metav1.Time
 	// GetUnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	// If Pods are rejected at other extension points,
@@ -369,6 +369,7 @@ type PodInfo interface {
 }
 
 // PodResource contains the result of CalculateResource and is intended to be used only internally.
+// +k8s:deepcopy-gen=true
 type PodResource struct {
 	Resource Resource
 	Non0CPU  int64
@@ -376,6 +377,7 @@ type PodResource struct {
 }
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
+// +k8s:deepcopy-gen=true
 type AffinityTerm struct {
 	Namespaces        sets.Set[string]
 	Selector          labels.Selector
@@ -392,6 +394,7 @@ func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
 }
 
 // WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
+// +k8s:deepcopy-gen=true
 type WeightedAffinityTerm struct {
 	AffinityTerm
 	Weight int32
@@ -501,6 +504,8 @@ type Resource interface {
 	GetScalarResources() map[v1.ResourceName]int64
 	// SetMaxResource compares with ResourceList and takes max value for each Resource.
 	SetMaxResource(rl v1.ResourceList)
+	// DeepCopyResource returns a deep copy of the Resource.
+	DeepCopyResource() Resource
 }
 
 // ImageStateSummary provides summarized information about the state of an image.
