@@ -25,4 +25,4 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 knftables is maintained by [Kubernetes SIG Network](https://github.com/kubernetes/community/tree/master/sig-network).
 
 - [sig-network slack channel](https://kubernetes.slack.com/messages/sig-network)
-- [kubernetes-sig-network mailing list](https://groups.google.com/forum/#!forum/kubernetes-sig-network)
+- [kubernetes-sig-network mailing list](https://groups.google.com/a/kubernetes.io/g/sig-network)
