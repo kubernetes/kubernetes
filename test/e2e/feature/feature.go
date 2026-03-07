@@ -207,7 +207,8 @@ var (
 	// Ingress.networking.k8s.io to be present.
 	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-storage
+	// Marks tests that only work with a sigs.k8s.io/kind cluster
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
 
 	// Owner: sig-network
