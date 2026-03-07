@@ -87,6 +87,18 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkAlpha(),
 			},
 		},
+		"spec.usages: nil = invalid": {
+			input: makeValidCSR(tweakUsages(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+		},
+		"spec.usages: empty = invalid": {
+			input: makeValidCSR(tweakUsages([]api.KeyUsage{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -181,6 +193,22 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:          makeValidCSR(withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
 			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
 			subresources: []string{"/status"},
+		},
+		"spec.usages: nil = invalid on update": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(tweakUsages(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+			subresources: []string{"/"},
+		},
+		"spec.usages: empty = invalid on update": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(tweakUsages([]api.KeyUsage{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+			subresources: []string{"/"},
 		},
 	}
 
@@ -290,5 +318,11 @@ func withFailedCondition() func(*api.CertificateSigningRequest) {
 			Type:   api.CertificateFailed,
 			Status: core.ConditionTrue,
 		})
+	}
+}
+
+func tweakUsages(usages []api.KeyUsage) func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Spec.Usages = usages
 	}
 }

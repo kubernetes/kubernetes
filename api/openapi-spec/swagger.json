@@ -5262,7 +5262,8 @@
       },
       "required": [
         "request",
-        "signerName"
+        "signerName",
+        "usages"
       ],
       "type": "object"
     },
