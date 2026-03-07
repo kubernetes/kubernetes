@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -176,6 +177,14 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		}
 	} else if responsibleForPod(oldPod, sched.Profiles) {
 		sched.updatePodInSchedulingQueue(oldPod, newPod)
+	}
+
+	if resource.IsPodResizeDeferred(newPod) && !resource.IsPodResizeDeferred(oldPod) {
+		// The pod has been marked as having a deferred resize. Add it to the scheduling queue to
+		// trigger preemption.
+		if responsibleForPod(oldPod, sched.Profiles) {
+			sched.addPodToSchedulingQueue(newPod)
+		}
 	}
 }
 

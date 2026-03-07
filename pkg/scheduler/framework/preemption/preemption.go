@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -185,6 +186,16 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 	if err != nil {
 		return nil, nil, err
 	}
+	if resource.IsPodResizeDeferred(pod) {
+		// If the pod is resize deferred, we should only consider the node that the pod is currently on
+		// since preemption can only help if victim pods can be removed from that node.
+		node, err := ev.Handler.SnapshotSharedLister().NodeInfos().Get(pod.Spec.NodeName)
+		if node == nil || err != nil {
+			return nil, nil, fmt.Errorf("pod is resize deferred but node %q is not found: %v", pod.Spec.NodeName, err)
+		}
+		potentialNodes = []fwk.NodeInfo{node}
+	}
+
 	if len(potentialNodes) == 0 {
 		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
 		return nil, framework.NewDefaultNodeToStatus(), nil
