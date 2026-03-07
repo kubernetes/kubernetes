@@ -874,46 +874,36 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[st
 	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
 		mapStaleLoadbalancer[svcInfo.hnsID] = true
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
-	} else {
-		// On successful delete, remove hnsId
-		svcInfo.hnsID = ""
 	}
+	svcInfo.hnsID = ""
 
 	if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
 		mapStaleLoadbalancer[svcInfo.nodePorthnsID] = true
 		klog.V(1).ErrorS(err, "Error deleting Hns NodePort policy resource.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
-	} else {
-		// On successful delete, remove hnsId
-		svcInfo.nodePorthnsID = ""
 	}
+	svcInfo.nodePorthnsID = ""
 
 	for _, externalIP := range svcInfo.externalIPs {
 		mapStaleLoadbalancer[externalIP.hnsID] = true
 		if err := hns.deleteLoadBalancer(externalIP.hnsID); err != nil {
 			klog.V(1).ErrorS(err, "Error deleting Hns ExternalIP policy resource.", "hnsID", externalIP.hnsID, "IP", externalIP.ip)
-		} else {
-			// On successful delete, remove hnsId
-			externalIP.hnsID = ""
 		}
+		externalIP.hnsID = ""
 	}
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 		klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources in cleanup", "lbIngressIP", lbIngressIP)
 		if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
 			mapStaleLoadbalancer[lbIngressIP.hnsID] = true
 			klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
-		} else {
-			// On successful delete, remove hnsId
-			lbIngressIP.hnsID = ""
 		}
+		lbIngressIP.hnsID = ""
 
 		if lbIngressIP.healthCheckHnsID != "" {
 			if err := hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID); err != nil {
 				mapStaleLoadbalancer[lbIngressIP.healthCheckHnsID] = true
 				klog.V(1).ErrorS(err, "Error deleting Hns IngressIP HealthCheck policy resource.", "hnsID", lbIngressIP.healthCheckHnsID, "IP", lbIngressIP.ip)
-			} else {
-				// On successful delete, remove hnsId
-				lbIngressIP.healthCheckHnsID = ""
 			}
+			lbIngressIP.healthCheckHnsID = ""
 		}
 	}
 }
@@ -1410,11 +1400,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// In ETP:Cluster, if all endpoints are under termination,
 		// it will have serving and terminating, else only ready and serving
 		if len(hnsEndpoints) == 0 {
-			if svcInfo.winProxyOptimization {
-				// Deleting loadbalancers when there are no endpoints to serve.
-				klog.V(3).InfoS("Cleanup existing ", "endpointInfo", hnsEndpoints, "serviceName", svcName)
-				svcInfo.deleteLoadBalancerPolicy(proxier.mapStaleLoadbalancers)
-			}
+			// Deleting loadbalancers when there are no endpoints to serve.
+			klog.V(3).InfoS("Cleanup existing policies since there are no endpoints", "hnsEndpoints", hnsEndpoints, "serviceName", svcName)
+			svcInfo.deleteLoadBalancerPolicy(proxier.mapStaleLoadbalancers)
 			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "serviceName", svcName)
 			continue
 		}
