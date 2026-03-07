@@ -19,6 +19,7 @@ package namespace
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -68,14 +69,7 @@ func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	}
 	// on create, we require the kubernetes value
 	// we cannot use this in defaults conversion because we let it get removed over life of object
-	hasKubeFinalizer := false
-	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] == api.FinalizerKubernetes {
-			hasKubeFinalizer = true
-			break
-		}
-	}
-	if !hasKubeFinalizer {
+	if !slices.Contains(namespace.Spec.Finalizers, api.FinalizerKubernetes) {
 		if len(namespace.Spec.Finalizers) == 0 {
 			namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
 		} else {
