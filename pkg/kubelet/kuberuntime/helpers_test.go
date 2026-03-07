@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,10 +39,23 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+type fakePodStatusProvider struct {
+	pod    *kubecontainer.Pod
+	status *kubecontainer.PodStatus
+}
 
-func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-	return f(uid, name, namespace)
+func (f fakePodStatusProvider) GetPod(_ context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+	if uid != f.pod.ID {
+		return nil, fmt.Errorf("unexpected pod UID: got %s, want %s", uid, f.pod.ID)
+	}
+	return f.pod, nil
+}
+
+func (f fakePodStatusProvider) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	if pod != f.pod {
+		return nil, fmt.Errorf("Unexpected pod: %v", pod)
+	}
+	return f.status, nil
 }
 
 func TestIsInitContainerFailed(t *testing.T) {

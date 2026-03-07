@@ -533,27 +533,6 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 	return volumeMounts
 }
 
-// getKubeletContainers lists containers managed by kubelet.
-// The boolean parameter specifies whether returns all containers including
-// those already exited and dead containers (used for garbage collection).
-func (m *kubeGenericRuntimeManager) getKubeletContainers(ctx context.Context, allContainers bool) ([]*runtimeapi.Container, error) {
-	logger := klog.FromContext(ctx)
-	filter := &runtimeapi.ContainerFilter{}
-	if !allContainers {
-		filter.State = &runtimeapi.ContainerStateValue{
-			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
-		}
-	}
-
-	containers, err := m.runtimeService.ListContainers(ctx, filter)
-	if err != nil {
-		logger.Error(err, "ListContainers failed")
-		return nil, err
-	}
-
-	return containers, nil
-}
-
 // makeUID returns a randomly generated string.
 func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
@@ -618,23 +597,58 @@ func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Con
 	return cStatus
 }
 
-// getPodContainerStatuses gets all containers' statuses for the pod.
-func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
-	logger := klog.FromContext(ctx)
-	// Select all containers of the given pod.
-	containers, err := m.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{
-		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(uid)},
-	})
-	if err != nil {
-		logger.Error(err, "ListContainers error")
-		return nil, nil, err
+type listOptions struct {
+	// podUID of the pod to filter to.
+	// Optional.
+	podUID kubetypes.UID
+	// onlyRunningReady filters the results to only ready sandboxes or running containers.
+	// Optional.
+	onlyRunningReady bool
+}
+
+func (o *listOptions) containerFilter() *runtimeapi.ContainerFilter {
+	filter := &runtimeapi.ContainerFilter{}
+	if o.podUID != "" {
+		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
 	}
+	if o.onlyRunningReady {
+		filter.State = &runtimeapi.ContainerStateValue{
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		}
+	}
+	return filter
+}
+
+func (o *listOptions) sandboxFilter() *runtimeapi.PodSandboxFilter {
+	filter := &runtimeapi.PodSandboxFilter{}
+	if o.podUID != "" {
+		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
+	}
+	if o.onlyRunningReady {
+		filter.State = &runtimeapi.PodSandboxStateValue{
+			State: runtimeapi.PodSandboxState_SANDBOX_READY,
+		}
+	}
+	return filter
+}
+
+func (m *kubeGenericRuntimeManager) getContainers(ctx context.Context, opts listOptions) ([]*runtimeapi.Container, error) {
+	return m.runtimeService.ListContainers(ctx, opts.containerFilter())
+}
+
+func (m *kubeGenericRuntimeManager) getSandboxes(ctx context.Context, opts listOptions) ([]*runtimeapi.PodSandbox, error) {
+	return m.runtimeService.ListPodSandbox(ctx, opts.sandboxFilter())
+}
+
+// getPodContainerStatuses gets all containers' statuses for the pod.
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, pod *kubecontainer.Pod, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
+	logger := klog.FromContext(ctx)
 
 	statuses := []*kubecontainer.Status{}
 	activeContainerStatuses := []*kubecontainer.Status{}
 	// TODO: optimization: set maximum number of containers per container name to examine.
-	for _, c := range containers {
-		resp, err := m.runtimeService.ContainerStatus(ctx, c.Id, false)
+	for _, c := range pod.Containers {
+		resp, err := m.runtimeService.ContainerStatus(ctx, c.ID.ID, false)
 		// Between List (ListContainers) and check (ContainerStatus) another thread might remove a container, and that is normal.
 		// The previous call (ListContainers) never fails due to a pod container not existing.
 		// Therefore, this method should not either, but instead act as if the previous call failed,
@@ -644,16 +658,16 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		}
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
-			logger.V(4).Info("ContainerStatus return error", "containerID", c.Id, "err", err)
+			logger.V(4).Info("ContainerStatus return error", "containerID", c.ID.ID, "err", err)
 			return nil, nil, err
 		}
 		status := resp.GetStatus()
 		if status == nil {
 			return nil, nil, remote.ErrContainerStatusNil
 		}
-		cStatus := m.convertToKubeContainerStatus(ctx, uid, status)
+		cStatus := m.convertToKubeContainerStatus(ctx, pod.ID, status)
 		statuses = append(statuses, cStatus)
-		if c.PodSandboxId == activePodSandboxID {
+		if c.PodSandboxID == activePodSandboxID {
 			activeContainerStatuses = append(activeContainerStatuses, cStatus)
 		}
 	}

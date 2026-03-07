@@ -119,6 +119,8 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(ctx context.Context, c *runt
 		Image:               c.Image.Image,
 		Hash:                annotatedInfo.Hash,
 		State:               toKubeContainerState(c.State),
+		PodSandboxID:        c.PodSandboxId,
+		CreatedAt:           c.CreatedAt,
 	}, nil
 }
 
@@ -132,8 +134,10 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 	}
 
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
-		State: kubecontainer.SandboxToContainerState(s.State),
+		ID:           kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
+		State:        kubecontainer.SandboxToContainerState(s.State),
+		PodSandboxID: s.Id,
+		CreatedAt:    s.CreatedAt,
 	}, nil
 }
 
