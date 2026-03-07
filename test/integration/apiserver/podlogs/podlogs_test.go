@@ -202,12 +202,9 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	t.Cleanup(cancel)
 
 	origCertCallbackRefreshDuration := transport.CertCallbackRefreshDuration
-	origDialerStopCh := transport.DialerStopCh
 	transport.CertCallbackRefreshDuration = time.Second // make client cert reloading fast
-	transport.DialerStopCh = ctx.Done()
 	t.Cleanup(func() {
 		transport.CertCallbackRefreshDuration = origCertCallbackRefreshDuration
-		transport.DialerStopCh = origDialerStopCh
 	})
 
 	// create a CA to sign the API server's kubelet client cert
@@ -258,6 +255,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 			opts.KubeletConfig.TLSClientConfig.CAFile = kubeletCA
 			opts.KubeletConfig.TLSClientConfig.CertFile = startingCerts.clientCertFile
 			opts.KubeletConfig.TLSClientConfig.KeyFile = startingCerts.clientCertKeyFile
+			opts.KubeletConfig.DialerStopCh = ctx.Done()
 		},
 	})
 	t.Cleanup(tearDownFn)

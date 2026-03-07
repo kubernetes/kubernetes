@@ -39,9 +39,10 @@ type tlsTransportCache struct {
 	transports map[tlsCacheKey]*http.Transport
 }
 
-// DialerStopCh is stop channel that is passed down to dynamic cert dialer.
-// It's exposed as variable for testing purposes to avoid testing for goroutine
-// leakages.
+// DialerStopCh is a global stop channel for the cert-reloading dialer.
+//
+// Deprecated: This variable is no longer used internally. Use Config.DialerStopCh
+// instead to control the lifecycle of cert-reloading dialers per-client.
 var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
@@ -123,7 +124,11 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		dynamicCertDialer := certRotatingDialer(logger, tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
 		dial = dynamicCertDialer.connDialer.DialContext
-		go dynamicCertDialer.run(DialerStopCh)
+		stopCh := config.DialerStopCh
+		if stopCh == nil {
+			stopCh = wait.NeverStop
+		}
+		go dynamicCertDialer.run(stopCh)
 	}
 
 	proxy := http.ProxyFromEnvironment

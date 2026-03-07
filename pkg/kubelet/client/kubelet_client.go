@@ -50,6 +50,10 @@ type KubeletClientConfig struct {
 
 	// Lookup will give us a dialer if the egress selector is configured for it
 	Lookup egressselector.Lookup
+
+	// DialerStopCh is an optional stop channel for the cert-reloading dialer goroutine.
+	// If nil, the dialer goroutine will run for the lifetime of the process.
+	DialerStopCh <-chan struct{}
 }
 
 type KubeletTLSConfig struct {
@@ -121,6 +125,7 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 			// it is clearer to set it explicitly here so we remember that this is happening
 			ReloadTLSFiles: true,
 		},
+		DialerStopCh: c.DialerStopCh,
 	}
 	if !cfg.HasCA() {
 		cfg.TLS.Insecure = true

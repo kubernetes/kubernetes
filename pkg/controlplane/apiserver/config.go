@@ -143,6 +143,7 @@ func BuildGenericConfig(
 	// Disable compression for self-communication, since we are going to be
 	// on a fast local network
 	genericConfig.LoopbackClientConfig.DisableCompression = true
+	genericConfig.LoopbackClientConfig.DialerStopCh = s.DialerStopCh
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
@@ -332,6 +333,7 @@ func CreateConfig(
 				config.Extra.PeerEndpointLeaseReconciler,
 				config.Generic.Serializer,
 				config.Generic.EgressSelector,
+				opts.DialerStopCh,
 			)
 			if err != nil {
 				return nil, nil, err
