@@ -250,7 +250,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		fsType:       fc.FSType,
 		volumeMode:   volumeMode,
 		readOnly:     readOnly,
-		mounter:      mount.NewSafeFormatAndMount(host.GetMounter(), exec.New()),
+		mounter:      mount.NewSafeFormatAndMountWithStorageManager(host.GetMounter(), exec.New(), mount.NewDefaultStorageManager()),
 		deviceUtil:   volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 		mountOptions: volumeutil.MountOptionFromSpec(spec),
 	}, nil

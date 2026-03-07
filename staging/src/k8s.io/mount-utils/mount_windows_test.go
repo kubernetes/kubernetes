@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 	testingexec "k8s.io/utils/exec/testing"
 )
 
@@ -329,12 +330,13 @@ func TestNewSMBMapping(t *testing.T) {
 		},
 	}
 
+	smbManager := SMBManager{}
 	for _, test := range tests {
-		_, err := newSMBMapping(test.username, test.password, test.remotepath)
+		err := smbManager.NewSMBMapping(test.username, test.password, test.remotepath)
 		if test.expectError {
-			assert.NotNil(t, err, "Expect error during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
+			assert.NotNil(t, err, "Expect error during NewSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
 		} else {
-			assert.Nil(t, err, "Expect error is nil during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
+			assert.Nil(t, err, "Expect error is nil during NewSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
 		}
 	}
 }
@@ -353,7 +355,7 @@ func TestIsAccessDeniedError(t *testing.T) {
 			false,
 		},
 		{
-			fmt.Errorf(`PathValid(\\xxx\share) failed with returned output: Test-Path : Access is denied`),
+			fmt.Errorf(`access denied: %w`, windows.ERROR_ACCESS_DENIED),
 			true,
 		},
 	}

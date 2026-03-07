@@ -240,3 +240,16 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	}
 	return getMountRefsByDev(f, realpath)
 }
+
+type FakeStorageManager struct {
+}
+
+// No op on Linux
+func (mgr FakeStorageManager) PartitionDisk(_ DiskIdentifier) error {
+	return nil
+}
+
+func (mgr FakeStorageManager) ListVolumesOnDisk(_ DiskIdentifier) (volumeIDs []VolumeIdentifier, err error) {
+	volumeIDs = append(volumeIDs, "fake_volume_id")
+	return
+}

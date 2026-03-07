@@ -710,7 +710,7 @@ func TestFormatConcurrency(t *testing.T) {
 					mu.Unlock()
 				}))
 			}
-			mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(tc.max, tc.timeout))
+			mounter := NewSafeFormatAndMountWithStorageManager(nil, exec, FakeStorageManager{}, WithMaxConcurrentFormat(tc.max, tc.timeout))
 
 			// we run max+1 goroutines and block the command execution
 			// only max goroutine should be running and the additional one should wait
@@ -791,7 +791,7 @@ func TestFormatTimeout(t *testing.T) {
 			mu.Unlock()
 		}))
 	}
-	mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(maxConcurrency, timeout))
+	mounter := NewSafeFormatAndMountWithStorageManager(nil, exec, FakeStorageManager{}, WithMaxConcurrentFormat(maxConcurrency, timeout))
 
 	for i := 0; i < maxConcurrency+1; i++ {
 		go func() {

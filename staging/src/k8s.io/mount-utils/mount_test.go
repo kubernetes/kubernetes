@@ -203,17 +203,17 @@ func TestWithMaxConcurrentFormat(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("max=%d,timeout=%s", tc.max, timeout.String()), func(t *testing.T) {
-			mounter := NewSafeFormatAndMount(nil, nil, WithMaxConcurrentFormat(tc.max, timeout))
+			mounter := NewSafeFormatAndMountWithStorageManager(nil, nil, FakeStorageManager{}, WithMaxConcurrentFormat(tc.max, timeout))
 
 			if gotSem := mounter.formatSem != nil; gotSem != tc.wantSem {
-				t.Errorf("NewSafeFormatAndMount() got formatSem: %t, want: %t", gotSem, tc.wantSem)
+				t.Errorf("NewSafeFormatAndMountWithStorageManager() got formatSem: %t, want: %t", gotSem, tc.wantSem)
 			}
 			if tc.wantSem {
 				if gotCap := cap(mounter.formatSem); gotCap != tc.max {
-					t.Errorf("NewSafeFormatAndMount() got cap(formatSem): %d, want: %d", gotCap, tc.max)
+					t.Errorf("NewSafeFormatAndMountWithStorageManager() got cap(formatSem): %d, want: %d", gotCap, tc.max)
 				}
 				if mounter.formatTimeout != timeout {
-					t.Errorf("NewSafeFormatAndMount() got formatTimeout: %s, want: %s", mounter.formatTimeout.String(), timeout.String())
+					t.Errorf("NewSafeFormatAndMountWithStorageManager() got formatTimeout: %s, want: %s", mounter.formatTimeout.String(), timeout.String())
 				}
 			}
 		})

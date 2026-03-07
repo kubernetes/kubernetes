@@ -258,7 +258,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
 	defer os.RemoveAll(tmpBlockDir)
 
-	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
+	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true}, mount.FakeStorageManager{})
 	if err != nil {
 		t.Errorf("Failed to make a new device mounter: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 		}
 	}
 
-	du, err := plug.newDeviceUnmounterInternal(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
+	du, err := plug.newDeviceUnmounterInternal(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true}, &mount.FakeStorageManager{})
 	if err != nil {
 		t.Fatalf("Create device unmounter error: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	tmpFSDir, plug := getDeviceMountablePluginWithBlockPath(t, false)
 	defer os.RemoveAll(tmpFSDir)
 
-	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
+	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true}, mount.FakeStorageManager{})
 	if err != nil {
 		t.Errorf("Failed to make a new device mounter: %v", err)
 	}
