@@ -1104,7 +1104,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
-	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
+	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver, c.LongRunningFunc)
 	handler = genericapifilters.WithAuditInit(handler)
 	return handler
 }
