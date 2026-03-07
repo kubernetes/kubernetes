@@ -29,10 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/config"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/manifest/source"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
@@ -50,7 +54,7 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		return NewPlugin(configFile), nil
+		return NewPlugin(configFile)
 	})
 }
 
@@ -87,9 +91,36 @@ type Plugin struct {
 
 var _ admission.Interface = &Plugin{}
 var _ admission.MutationInterface = &Plugin{}
+var _ initializer.WantsManifestLoaders = &Plugin{}
+
+// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
+func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
+	if loaders == nil || loaders.LoadMutatingPolicyManifests == nil {
+		return
+	}
+	loadFunc := loaders.LoadMutatingPolicyManifests
+	a.SetStaticSourceFactory(func(manifestsDir string) (generic.Source[PolicyHook], func(ctx context.Context) error, error) {
+		staticSource := source.NewStaticPolicySource(manifestsDir, a.GetAPIServerID(), compilePolicy,
+			func(dir string) ([]*v1.MutatingAdmissionPolicy, []*v1.MutatingAdmissionPolicyBinding, string, error) {
+				return loadFunc(dir)
+			},
+			func(b *v1.MutatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
+			metrics.MAPManifestType,
+		)
+		if err := staticSource.LoadInitial(); err != nil {
+			return nil, nil, err
+		}
+		return staticSource, staticSource.Run, nil
+	})
+}
 
 // NewPlugin returns a generic admission webhook plugin.
-func NewPlugin(_ io.Reader) *Plugin {
+func NewPlugin(configFile io.Reader) (*Plugin, error) {
+	cfg, err := config.LoadMutatingConfig(configFile)
+	if err != nil {
+		return nil, err
+	}
+
 	// There is no request body to mutate for DELETE, so this plugin never handles that operation.
 	handler := admission.NewHandler(admission.Create, admission.Update, admission.Connect)
 	res := &Plugin{}
@@ -113,7 +144,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 			return NewDispatcher(a, m, patch.NewTypeConverterManager(nil, client.Discovery().OpenAPIV3()))
 		},
 	)
-	return res
+	res.SetStaticManifestsDir(cfg.StaticManifestsDir)
+	return res, nil
 }
 
 // Admit makes an admission decision based on the request attributes.

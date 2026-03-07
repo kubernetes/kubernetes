@@ -30,6 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -39,6 +41,11 @@ import (
 // !TODO: Just pass in a Plugin[H] with accessors to all this information
 type sourceFactory[H any] func(informers.SharedInformerFactory, kubernetes.Interface, dynamic.Interface, meta.RESTMapper) Source[H]
 type dispatcherFactory[H any] func(authorizer.Authorizer, *matching.Matcher, kubernetes.Interface) Dispatcher[H]
+
+// StaticSourceFactory creates a static policy source from a manifest directory.
+// The returned Source should have LoadInitial() already called.
+// The second return value is a function to run the source (file watcher).
+type StaticSourceFactory[H any] func(manifestsDir string) (Source[H], func(ctx context.Context) error, error)
 
 // admissionResources is the list of resources related to CEL-based admission
 // features.
@@ -54,12 +61,26 @@ var admissionResources = []schema.GroupResource{
 type Plugin[H any] struct {
 	*admission.Handler
 
-	sourceFactory     sourceFactory[H]
-	dispatcherFactory dispatcherFactory[H]
+	sourceFactory       sourceFactory[H]
+	dispatcherFactory   dispatcherFactory[H]
+	staticSourceFactory StaticSourceFactory[H]
 
 	source     Source[H]
 	dispatcher Dispatcher[H]
 	matcher    *matching.Matcher
+
+	// staticSource holds a reference to only the static (manifest-based) policy source.
+	// This is used in Dispatch to run static hooks for excluded admission resources
+	// (e.g., VAP/MAP/VAPB/MAPB), allowing static policies to protect those resources
+	// without the circular dependency concern that applies to API-based policies.
+	staticSource Source[H]
+
+	// staticManifestsDir is the path to a directory containing static policy manifests.
+	// When set and the feature gate is enabled, policies are also loaded from this directory.
+	staticManifestsDir string
+
+	// apiServerID is the identity of this API server instance, used for metrics labeling.
+	apiServerID string
 
 	informerFactory   informers.SharedInformerFactory
 	client            kubernetes.Interface
@@ -77,6 +98,7 @@ var (
 	_ initializer.WantsRESTMapper                  = &Plugin[any]{}
 	_ initializer.WantsDynamicClient               = &Plugin[any]{}
 	_ initializer.WantsDrainedNotification         = &Plugin[any]{}
+	_ initializer.WantsAPIServerID                 = &Plugin[any]{}
 	_ initializer.WantsAuthorizer                  = &Plugin[any]{}
 	_ initializer.WantsExcludedAdmissionResources  = &Plugin[any]{}
 	_ admission.InitializationValidator            = &Plugin[any]{}
@@ -133,6 +155,34 @@ func (c *Plugin[H]) SetExcludedAdmissionResources(excludedResources []schema.Gro
 	c.excludedResources.Insert(excludedResources...)
 }
 
+// SetStaticManifestsDir sets the directory containing static policy manifests.
+func (c *Plugin[H]) SetStaticManifestsDir(dir string) {
+	c.staticManifestsDir = dir
+}
+
+// GetStaticManifestsDir returns the directory containing static policy manifests.
+func (c *Plugin[H]) GetStaticManifestsDir() string {
+	return c.staticManifestsDir
+}
+
+// SetStaticSourceFactory sets the factory for creating static policy sources.
+// This should be called before ValidateInitialization.
+func (c *Plugin[H]) SetStaticSourceFactory(factory StaticSourceFactory[H]) {
+	c.staticSourceFactory = factory
+}
+
+// SetAPIServerID implements the WantsAPIServerID interface.
+// The API server ID is used for metrics labeling and must be set before
+// ValidateInitialization is called.
+func (c *Plugin[H]) SetAPIServerID(id string) {
+	c.apiServerID = id
+}
+
+// GetAPIServerID returns the stored API server ID.
+func (c *Plugin[H]) GetAPIServerID() string {
+	return c.apiServerID
+}
+
 // ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
 func (c *Plugin[H]) ValidateInitialization() error {
 	// By default enabled is set to false. It is up to types which embed this
@@ -162,38 +212,88 @@ func (c *Plugin[H]) ValidateInitialization() error {
 		return errors.New("missing authorizer")
 	}
 
-	// Use default matcher
-	namespaceInformer := c.informerFactory.Core().V1().Namespaces()
-	c.matcher = matching.NewMatcher(namespaceInformer.Lister(), c.client)
+	// Guard: if static manifests dir is set but feature gate is off, return an error
+	if len(c.staticManifestsDir) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		return fmt.Errorf("static policy manifests dir %q configured but %s feature gate is not enabled", c.staticManifestsDir, features.ManifestBasedAdmissionControlConfig)
+	}
 
+	namespaceInformer := c.informerFactory.Core().V1().Namespaces()
+
+	// Construct matcher once, avoiding overwriting if already set.
+	if c.matcher == nil {
+		c.matcher = matching.NewMatcher(namespaceInformer.Lister(), c.client)
+	}
 	if err := c.matcher.ValidateInitialization(); err != nil {
 		return err
 	}
 
-	c.source = c.sourceFactory(c.informerFactory, c.client, c.dynamicClient, c.restMapper)
-	c.dispatcher = c.dispatcherFactory(c.authorizer, c.matcher, c.client)
+	// Construct source once, avoiding overwriting if already set.
+	if c.source == nil {
+		apiSource := c.sourceFactory(c.informerFactory, c.client, c.dynamicClient, c.restMapper)
 
-	pluginContext, pluginContextCancel := context.WithCancel(context.Background())
-	go func() {
-		defer pluginContextCancel()
-		<-c.stopCh
-	}()
-
-	go func() {
-		err := c.source.Run(pluginContext)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			utilruntime.HandleError(fmt.Errorf("policy source context unexpectedly closed: %w", err))
+		if len(c.staticManifestsDir) > 0 {
+			if c.staticSourceFactory == nil {
+				return fmt.Errorf("static policy manifests configured in %q but no static source factory is set", c.staticManifestsDir)
+			}
+			staticSource, runFunc, err := c.staticSourceFactory(c.staticManifestsDir)
+			if err != nil {
+				return fmt.Errorf("failed to load static policy manifests from %q: %w", c.staticManifestsDir, err)
+			}
+			// Use composite source that combines static + API sources
+			c.source = NewCompositePolicySource(staticSource, apiSource)
+			// Keep a reference to the static source so Dispatch can run static hooks
+			// for resources that are normally excluded from policy evaluation.
+			c.staticSource = staticSource
+			// Start the file watcher in a background goroutine
+			pluginContextForStatic, pluginContextCancelForStatic := context.WithCancel(context.Background())
+			go func() {
+				defer pluginContextCancelForStatic()
+				<-c.stopCh
+			}()
+			go func() {
+				if err := runFunc(pluginContextForStatic); err != nil && !errors.Is(err, context.Canceled) {
+					utilruntime.HandleError(fmt.Errorf("static policy source context unexpectedly closed: %w", err))
+				}
+			}()
+		} else {
+			// Use only API-based source
+			c.source = apiSource
 		}
-	}()
 
-	err := c.dispatcher.Start(pluginContext)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %w", err))
+		pluginContext, pluginContextCancel := context.WithCancel(context.Background())
+		go func() {
+			defer pluginContextCancel()
+			<-c.stopCh
+		}()
+
+		go func() {
+			err := c.source.Run(pluginContext)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				utilruntime.HandleError(fmt.Errorf("policy source context unexpectedly closed: %w", err))
+			}
+		}()
+
+		c.SetReadyFunc(func() bool {
+			return namespaceInformer.Informer().HasSynced() && c.source.HasSynced()
+		})
 	}
 
-	c.SetReadyFunc(func() bool {
-		return namespaceInformer.Informer().HasSynced() && c.source.HasSynced()
-	})
+	// Construct dispatcher once, avoiding overwriting if already set.
+	if c.dispatcher == nil {
+		c.dispatcher = c.dispatcherFactory(c.authorizer, c.matcher, c.client)
+
+		pluginContext, pluginContextCancel := context.WithCancel(context.Background())
+		go func() {
+			defer pluginContextCancel()
+			<-c.stopCh
+		}()
+
+		err := c.dispatcher.Start(pluginContext)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %w", err))
+		}
+	}
+
 	return nil
 }
 
@@ -205,12 +305,26 @@ func (c *Plugin[H]) Dispatch(
 	if !c.enabled {
 		return nil
 	} else if c.shouldIgnoreResource(a) {
+		// For excluded admission resources (VAP/MAP/VAPB/MAPB), API-based policies
+		// are skipped to prevent circular dependencies. However, static (manifest-based)
+		// policies are safe to evaluate since they don't have self-referential concerns.
+		if c.staticSource != nil {
+			// WaitForReady checks the composite source (static + API) HasSynced.
+			// Strictly only the static source needs to be synced here, but waiting
+			// for both is harmless since they sync at startup together.
+			if !c.WaitForReady() {
+				return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+			}
+			return c.dispatcher.Dispatch(ctx, a, o, c.staticSource.Hooks())
+		}
 		return nil
 	} else if !c.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
-	return c.dispatcher.Dispatch(ctx, a, o, c.source.Hooks())
+	hooks := c.source.Hooks()
+
+	return c.dispatcher.Dispatch(ctx, a, o, hooks)
 }
 
 func (c *Plugin[H]) shouldIgnoreResource(attr admission.Attributes) bool {
