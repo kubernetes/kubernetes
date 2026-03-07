@@ -116,8 +116,9 @@ type DeleteOptions struct {
 	FieldSelector       string
 	DeleteAll           bool
 	DeleteAllNamespaces bool
-	CascadingStrategy   metav1.DeletionPropagation
-	IgnoreNotFound      bool
+	CascadingStrategy      metav1.DeletionPropagation
+	CascadeExplicitlySet   bool
+	IgnoreNotFound         bool
 	DeleteNow           bool
 	ForceDeletion       bool
 	WaitForDeletion     bool
@@ -156,6 +157,9 @@ func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(err)
+			if f := cmd.Flags().Lookup("cascade"); f != nil && f.Changed {
+				o.CascadeExplicitlySet = true
+			}
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete(f))
@@ -395,7 +399,20 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		options.PropagationPolicy = &o.CascadingStrategy
+		policy := o.CascadingStrategy
+		// When --cascade is not explicitly set by the user, honor the
+		// foregroundDeletion finalizer if it is present on the resource.
+		if !o.CascadeExplicitlySet {
+			if accessor, err := meta.Accessor(info.Object); err == nil {
+				for _, f := range accessor.GetFinalizers() {
+					if f == metav1.FinalizerDeleteDependents {
+						policy = metav1.DeletePropagationForeground
+						break
+					}
+				}
+			}
+		}
+		options.PropagationPolicy = &policy
 
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
