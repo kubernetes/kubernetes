@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
@@ -511,6 +512,13 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	if err != nil {
 		return err
 	}
+
+	// Unmount mounts propagated into the emptyDir during pod lifetime.
+	// The directory teardown must not recurse into mounted filesystems.
+	if err := ed.unmountNestedMounts(dir); err != nil {
+		return err
+	}
+
 	if isMnt {
 		if medium == v1.StorageMediumMemory {
 			ed.medium = v1.StorageMediumMemory
@@ -522,6 +530,38 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	}
 	// assume StorageMediumDefault
 	return ed.teardownDefault(dir)
+}
+
+// unmountNestedMounts unmounts any mounts that exist inside the given directory.
+func (ed *emptyDir) unmountNestedMounts(dir string) error {
+	mps, err := ed.mounter.List()
+	if err != nil {
+		return fmt.Errorf("failed to list mounts: %w", err)
+	}
+
+	var nested []string
+	for _, mp := range mps {
+		if mp.Path != dir && mount.PathWithinBase(mp.Path, dir) {
+			nested = append(nested, mp.Path)
+		}
+	}
+
+	if len(nested) == 0 {
+		return nil
+	}
+
+	slices.SortFunc(nested, func(a, b string) int {
+		return len(b) - len(a)
+	})
+
+	for _, p := range nested {
+		klog.V(4).Infof("Unmounting nested mount %s inside emptyDir %s", p, dir)
+		if err := ed.mounter.Unmount(p); err != nil {
+			return fmt.Errorf("failed to unmount nested mount %q inside emptyDir %q: %w", p, dir, err)
+		}
+	}
+
+	return nil
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
