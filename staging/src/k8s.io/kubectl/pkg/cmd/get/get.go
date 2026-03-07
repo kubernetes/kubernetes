@@ -173,7 +173,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f, args))
 		},
-		SuggestFor: []string{"list", "ps"},
+		SuggestFor: []string{"list", "ls"},
 	}
 
 	o.PrintFlags.AddFlags(cmd)

@@ -157,6 +157,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericiooptions.I
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
+		SuggestFor: []string{"inspect"},
 	}
 
 	flags.AddFlags(cmd)
