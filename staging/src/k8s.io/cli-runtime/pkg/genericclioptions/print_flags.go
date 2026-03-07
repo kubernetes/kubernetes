@@ -151,7 +151,7 @@ func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	return f
 }
 
-// WithTypeSetter sets a wrapper than will surround the returned printer with a printer to type resources
+// WithTypeSetter sets a wrapper that will surround the returned printer with a printer to type resources
 func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
 	f.TypeSetterPrinter = printers.NewTypeSetter(scheme)
 	return f
