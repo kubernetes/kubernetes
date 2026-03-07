@@ -153,3 +153,13 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 
 	return authorized, reason, err
 }
+
+// AuthorizeConditionsAware does not yet support caching conditional responses.
+func (ca *cachingAuthorizer) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(ca.Authorize(ctx, a))
+}
+
+// AuthorizeConditionsAware does not yet support evaluating conditional responses.
+func (*cachingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}

@@ -152,6 +152,16 @@ func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return authorizer.DecisionNoOpinion, "", nil
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (t *TestAuthorizer) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(t.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*TestAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 func TestRESTMapperAdmissionPlugin(t *testing.T) {
 	initializer := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil, &doNothingRESTMapper{})
 	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}

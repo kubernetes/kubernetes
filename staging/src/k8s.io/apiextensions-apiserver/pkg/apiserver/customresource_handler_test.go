@@ -849,6 +849,16 @@ func (dummyAuthorizerImpl) Authorize(ctx context.Context, a authorizer.Attribute
 	return authorizer.DecisionAllow, "", nil
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (i dummyAuthorizerImpl) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(i.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (dummyAuthorizerImpl) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 type dummyServiceResolverImpl struct{}
 
 func (dummyServiceResolverImpl) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {

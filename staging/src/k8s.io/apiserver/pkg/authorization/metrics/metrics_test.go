@@ -38,7 +38,9 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 	RegisterMetrics()
 
 	dummyAuthorizer := &dummyAuthorizer{}
+	dummyConditionalAuthorizer := &dummyConditionalAuthorizer{}
 	a := InstrumentedAuthorizer("mytype", "myname", dummyAuthorizer)
+	ac := InstrumentedAuthorizer("myconditionaltype", "myconditionalname", dummyConditionalAuthorizer)
 
 	// allow
 	{
@@ -46,6 +48,19 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 		_, _, _ = a.Authorize(context.Background(), nil)
 		expectedValue := prefix + `
 			apiserver_authorization_decisions_total{decision="allowed",name="myname",type="mytype"} 1
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+			t.Fatal(err)
+		}
+		authorizationDecisionsTotal.Reset()
+	}
+
+	// allow (conditional authorizer)
+	{
+		dummyConditionalAuthorizer.decision = authorizer.ConditionsAwareDecisionAllow("", nil)
+		_, _, _ = ac.Authorize(context.Background(), nil)
+		expectedValue := prefix + `
+			apiserver_authorization_decisions_total{decision="allowed",name="myconditionalname",type="myconditionaltype"} 1
 		`
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
 			t.Fatal(err)
@@ -67,11 +82,38 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 		authorizationDecisionsTotal.Reset()
 	}
 
+	// deny (conditional authorizer)
+	{
+		dummyConditionalAuthorizer.decision = authorizer.ConditionsAwareDecisionDeny("", nil)
+		_, _, _ = ac.Authorize(context.Background(), nil)
+		_, _, _ = ac.Authorize(context.Background(), nil)
+		expectedValue := prefix + `
+			apiserver_authorization_decisions_total{decision="denied",name="myconditionalname",type="myconditionaltype"} 2
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+			t.Fatal(err)
+		}
+		authorizationDecisionsTotal.Reset()
+	}
+
 	// no-opinion emits no metric
 	{
 		dummyAuthorizer.decision = authorizer.DecisionNoOpinion
 		_, _, _ = a.Authorize(context.Background(), nil)
 		_, _, _ = a.Authorize(context.Background(), nil)
+		expectedValue := prefix + `
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+			t.Fatal(err)
+		}
+		authorizationDecisionsTotal.Reset()
+	}
+
+	// no-opinion emits no metric (conditional authorizer)
+	{
+		dummyConditionalAuthorizer.decision = authorizer.ConditionsAwareDecisionNoOpinion("", nil)
+		_, _, _ = ac.Authorize(context.Background(), nil)
+		_, _, _ = ac.Authorize(context.Background(), nil)
 		expectedValue := prefix + `
 		`
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
@@ -92,7 +134,7 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 		}
 		authorizationDecisionsTotal.Reset()
 	}
-
+	// TODO(luxas): Add a test for the conditional decision, once those are introduced
 }
 
 type dummyAuthorizer struct {
@@ -102,4 +144,32 @@ type dummyAuthorizer struct {
 
 func (d *dummyAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	return d.decision, "", d.err
+}
+
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (d *dummyAuthorizer) AuthorizeConditionsAware(ctx context.Context, attrs authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(d.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*dummyAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
+type dummyConditionalAuthorizer struct {
+	decision authorizer.ConditionsAwareDecision
+}
+
+func (d *dummyConditionalAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionPartsFromConditionsAware(d.decision)
+}
+
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (d *dummyConditionalAuthorizer) AuthorizeConditionsAware(ctx context.Context, attrs authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return d.decision
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*dummyConditionalAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
 }

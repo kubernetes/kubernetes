@@ -79,6 +79,16 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
+// AuthorizeConditionsAware delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, encodingPreference authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return r.current.Load().authorizer.AuthorizeConditionsAware(ctx, a, encodingPreference)
+}
+
+// EvaluateConditions delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData, builtinEvaluators authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return r.current.Load().authorizer.EvaluateConditions(ctx, decision, data, builtinEvaluators)
+}
+
 func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }
