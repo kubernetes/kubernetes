@@ -159,6 +159,9 @@ var (
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
 	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+	// The below are only available when the DRADeviceBindingConditions feature gate is enabled.
+	DRABindingConditionsAllocationsTotal *metrics.CounterVec
+	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
@@ -195,6 +198,12 @@ func Register() {
 				podGroupScheduleAttempts,
 				podGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) {
+			RegisterMetrics(
+				DRABindingConditionsAllocationsTotal,
+				DRABindingConditionsPreBindDuration,
 			)
 		}
 	})
@@ -450,6 +459,27 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"status"})
+
+	DRABindingConditionsAllocationsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_bindingconditions_allocations_total",
+			Help:           "Number of scheduling attempts that used devices with BindingConditions",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile", "driver", "status"},
+	)
+
+	DRABindingConditionsPreBindDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_bindingconditions_wait_duration_seconds",
+			Help:           "Time in seconds spent waiting for BindingConditions to be satisfied during PreBind.",
+			Buckets:        metrics.ExponentialBuckets(0.1, 2, 11),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile", "driver", "status"},
+	)
 
 	GetNodeHintDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{

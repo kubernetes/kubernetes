@@ -2190,6 +2190,35 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: nil,
 				},
 			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				// Counter: allocations_total should have exactly one event
+				allocs, err := testutil.GetCounterValuesFromGatherer(
+					g,
+					"scheduler_dra_bindingconditions_allocations_total",
+					map[string]string{
+						"status": "success",
+					},
+					"driver", // group by driver label
+				)
+				require.NoError(tCtx, err)
+
+				var totalAllocs float64
+				for _, v := range allocs {
+					totalAllocs += v
+				}
+				require.InEpsilon(tCtx, float64(1), totalAllocs, 0.1, "expected exactly one successful allocation with BindingConditions")
+
+				// Histogram: one success sample with requires_bindingconditions=true
+				hist, err := testutil.GetHistogramVecFromGatherer(
+					g,
+					"scheduler_dra_bindingconditions_wait_duration_seconds",
+					map[string]string{
+						"status": "success",
+					},
+				)
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, uint64(1), hist.GetAggregatedSampleCount(), "expected one success sample in wait duration histogram")
+			},
 		},
 		"bound-claim-with-failed-binding": {
 			enableDRADeviceBindingConditions:   true,
@@ -2307,8 +2336,37 @@ func testPlugin(tCtx ktesting.TContext) {
 								Obj()
 						},
 					},
-					status: fwk.AsStatus(errors.New("claim " + claim.Name + " binding timeout")),
+					status: fwk.AsStatus(fmt.Errorf("%w: claim=%s", ErrDeviceBindingTimeout, claim.Name)),
 				},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				// Counter: timeouts_total should have exactly one event
+				timeouts, err := testutil.GetCounterValuesFromGatherer(
+					g,
+					"scheduler_dra_bindingconditions_allocations_total",
+					map[string]string{
+						"status": "timeout",
+					},
+					"driver",
+				)
+				require.NoError(tCtx, err)
+
+				var totalTimeouts float64
+				for _, v := range timeouts {
+					totalTimeouts += v
+				}
+				require.InEpsilon(tCtx, float64(1), totalTimeouts, 0.1, "expected exactly one timeout with BindingConditions")
+
+				// Histogram: one timeout sample with requires_bindingconditions=true
+				hist, err := testutil.GetHistogramVecFromGatherer(
+					g,
+					"scheduler_dra_bindingconditions_wait_duration_seconds",
+					map[string]string{
+						"status": "timeout",
+					},
+				)
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, uint64(1), hist.GetAggregatedSampleCount(), "expected one timeout sample in wait duration histogram")
 			},
 		},
 		"bound-claim-with-mixed-binding-conditions": {
@@ -2795,6 +2853,14 @@ func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
 	if features.EnableDRAExtendedResource {
 		testRegistry.MustRegister(metrics.ResourceClaimCreatesTotal)
 		metrics.ResourceClaimCreatesTotal.Reset()
+	}
+	// DRA DeviceBindingConditions metrics.
+	if features.EnableDRADeviceBindingConditions {
+		testRegistry.MustRegister(metrics.DRABindingConditionsAllocationsTotal)
+		testRegistry.MustRegister(metrics.DRABindingConditionsPreBindDuration)
+
+		metrics.DRABindingConditionsAllocationsTotal.Reset()
+		metrics.DRABindingConditionsPreBindDuration.Reset()
 	}
 	return testRegistry
 }
