@@ -90,7 +90,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod)
+	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {

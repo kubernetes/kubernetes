@@ -156,10 +156,7 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 }
 
 func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod, resourceName v1.ResourceName) bool {
-	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !IsResizableContainer(container, containerType) {
-			continue
-		}
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		requestedResources := container.Resources
 		allocatedresources, _ := h.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
 		// For Guaranteed pods, requests must equal limits, so checking requests is sufficient.
