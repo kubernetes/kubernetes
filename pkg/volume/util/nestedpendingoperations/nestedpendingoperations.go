@@ -353,7 +353,19 @@ func (grm *nestedPendingOperations) Wait() {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 
-	for len(grm.operations) > 0 {
+	for {
+		hasPendingOps := false
+		// Check if any operation is still pending
+		for _, op := range grm.operations {
+			if op.operationPending {
+				hasPendingOps = true
+				break
+			}
+		}
+		// If no operations are pending, we are done
+		if !hasPendingOps {
+			break
+		}
 		grm.cond.Wait()
 	}
 }
