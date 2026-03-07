@@ -267,15 +267,28 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 	return nil
 }
 
-// validatePayload returns an error if any path in the payload returns a copy of the payload with the paths cleaned.
+// validatePayload returns an error if any path in the payload is invalid,
+// otherwise it returns a copy of the payload with normalized/cleaned keys.
 func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
-	cleanPayload := make(map[string]FileProjection)
+	cleanPayload := make(map[string]FileProjection, len(payload))
+
 	for k, content := range payload {
-		if err := validatePath(k); err != nil {
+		if k == "" {
+			return nil, fmt.Errorf("invalid path: must not be empty: %q", k)
+		}
+
+		// Normalize first (important on Windows: handles mixed slashes),
+		// then clean so we store a canonical key.
+		ck := filepath.Clean(filepath.FromSlash(k))
+		if ck == "." {
+			return nil, fmt.Errorf("invalid path: must not be '.'")
+		}
+
+		if err := validatePath(ck); err != nil {
 			return nil, err
 		}
 
-		cleanPayload[filepath.Clean(k)] = content
+		cleanPayload[ck] = content
 	}
 
 	return cleanPayload, nil
@@ -284,7 +297,7 @@ func validatePayload(payload map[string]FileProjection) (map[string]FileProjecti
 // validatePath validates a single path, returning an error if the path is
 // invalid.  paths may not:
 //
-// 1. be absolute
+// 1. be absolute or rooted
 // 2. contain '..' as an element
 // 3. start with '..'
 // 4. contain filenames larger than 255 characters
@@ -297,6 +310,25 @@ func validatePath(targetPath string) error {
 	if targetPath == "" {
 		return fmt.Errorf("invalid path: must not be empty: %q", targetPath)
 	}
+	if targetPath == "." {
+		return fmt.Errorf("invalid path: must not be '.'")
+	}
+
+	// Windows-specific hardening:
+	// - reject any volume-qualified path (C:, \\server\share, etc)
+	// - reject rooted/absolute paths (\foo, /foo)
+	// - reject ':' anywhere (defense-in-depth against "\C::" segments)
+	if runtime.GOOS == "windows" {
+		if filepath.VolumeName(targetPath) != "" ||
+			filepath.IsAbs(targetPath) ||
+			strings.HasPrefix(targetPath, `\`) ||
+			strings.HasPrefix(targetPath, `/`) ||
+			strings.ContainsRune(targetPath, ':') {
+			return fmt.Errorf("invalid path: must be relative path: %s", targetPath)
+		}
+	}
+
+	// Keep POSIX abs check too (also blocks /foo on Windows inputs prior to normalization).
 	if path.IsAbs(targetPath) {
 		return fmt.Errorf("invalid path: must be relative path: %s", targetPath)
 	}
@@ -306,6 +338,10 @@ func validatePath(targetPath string) error {
 	}
 
 	items := strings.Split(targetPath, string(os.PathSeparator))
+	// A leading path separator would produce an empty first element.
+	if len(items) > 0 && items[0] == "" {
+		return fmt.Errorf("invalid path: must be relative path: %s", targetPath)
+	}
 	for _, item := range items {
 		if item == ".." {
 			return fmt.Errorf("invalid path: must not contain '..': %s", targetPath)
