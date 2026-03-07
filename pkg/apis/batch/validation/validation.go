@@ -631,7 +631,34 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
+
+	if opts.RejectParallelismChangeForGangScheduledJob {
+		if isGangSchedulingCandidate(oldSpec) && !ptr.Equal(spec.Parallelism, oldSpec.Parallelism) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("parallelism"), spec.Parallelism,
+				"cannot change parallelism for a gang-scheduled Job (completionMode=Indexed, completions=parallelism)"))
+		}
+	}
+
 	return allErrs
+}
+
+// isGangSchedulingCandidate returns true if the job spec meets gang scheduling criteria.
+// This is used during validation to determine if parallelism changes should be blocked.
+func isGangSchedulingCandidate(spec batch.JobSpec) bool {
+	if spec.Parallelism == nil || *spec.Parallelism <= 1 {
+		return false
+	}
+	if spec.CompletionMode == nil || *spec.CompletionMode != batch.IndexedCompletion {
+		return false
+	}
+	if spec.Completions == nil || *spec.Completions != *spec.Parallelism {
+		return false
+	}
+	// If schedulingGroup is already set, a higher-level controller manages gang scheduling.
+	if spec.Template.Spec.SchedulingGroup != nil {
+		return false
+	}
+	return true
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
@@ -1067,6 +1094,8 @@ type JobValidationOptions struct {
 	RequirePrefixedLabels bool
 	// Allow mutable pod resources
 	AllowMutablePodResources bool
+	// Reject parallelism changes for gang-scheduled Jobs
+	RejectParallelismChangeForGangScheduledJob bool
 }
 
 type JobStatusValidationOptions struct {

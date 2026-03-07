@@ -342,17 +342,9 @@ var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
 // name for a ResourceClaimTemplate is valid.
 var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateWorkloadName can be used to check whether the given
-// name for a Workload is valid.
-var ValidateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
-
 // ValidatePodGroupName can be used to check whether the given
 // name for a PodGroup is valid.
-var ValidatePodGroupName = apimachineryvalidation.NameIsDNSLabel
-
-// ValidatePodGroupReplicaKey can be used to check whether the given
-// PodGroupReplicaKey is valid.
-var ValidatePodGroupReplicaKey = apimachineryvalidation.NameIsDNSLabel
+var ValidatePodGroupName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -4727,8 +4719,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		}
 	}
 
-	if spec.WorkloadRef != nil {
-		allErrs = append(allErrs, validateWorkloadReference(spec.WorkloadRef, fldPath.Child("workloadRef"))...)
+	if spec.SchedulingGroup != nil {
+		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -9614,17 +9606,15 @@ func validateNodeSwapStatus(nodeSwapStatus *core.NodeSwapStatus, fldPath *field.
 	return allErrors
 }
 
-func validateWorkloadReference(workloadRef *core.WorkloadReference, fldPath *field.Path) field.ErrorList {
+func validateSchedulingGroup(schedulingGroup *core.PodSchedulingGroup, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, detail := range ValidateWorkloadName(workloadRef.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), workloadRef.Name, detail))
-	}
-	for _, detail := range ValidatePodGroupName(workloadRef.PodGroup, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroup"), workloadRef.PodGroup, detail))
-	}
-	if workloadRef.PodGroupReplicaKey != "" {
-		for _, detail := range ValidatePodGroupReplicaKey(workloadRef.PodGroupReplicaKey, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupReplicaKey"), workloadRef.PodGroupReplicaKey, detail))
+	if schedulingGroup.PodGroupName == nil {
+		// This is a one-of set, but there's only one possible option present right now.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupName"), schedulingGroup.PodGroupName, "must specify one of: `podGroupName`"))
+	} else {
+		name := *schedulingGroup.PodGroupName
+		for _, detail := range ValidatePodGroupName(name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupName"), name, detail))
 		}
 	}
 	return allErrs

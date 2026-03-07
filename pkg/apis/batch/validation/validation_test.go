@@ -2583,6 +2583,124 @@ func TestValidateJobUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
+	validGeneratedSelector := getValidGeneratedSelector()
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	indexedMode := batch.IndexedCompletion
+	nonIndexedMode := batch.NonIndexedCompletion
+
+	gangCandidateJob := func() batch.Job {
+		return batch.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myjob",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "1",
+			},
+			Spec: batch.JobSpec{
+				Selector:       validGeneratedSelector,
+				Template:       validPodTemplateSpec,
+				CompletionMode: &indexedMode,
+				Completions:    ptr.To[int32](4),
+				Parallelism:    ptr.To[int32](4),
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		old     batch.Job
+		update  func(*batch.Job)
+		opts    JobValidationOptions
+		wantErr *field.Error
+	}{
+		"gang candidate with parallelism change is invalid": {
+			old:  gangCandidateJob(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+			wantErr: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.parallelism",
+			},
+		},
+		"gang candidate with parallelism unchanged is allowed": {
+			old:    gangCandidateJob(),
+			opts:   JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {},
+		},
+		"non-candidate completions != parallelism with parallelism change is allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Completions = ptr.To[int32](10)
+				return j
+			}(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"non-indexed job with parallelism change is allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.CompletionMode = &nonIndexedMode
+				j.Spec.Completions = nil
+				return j
+			}(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"option disabled allows parallelism change": {
+			old: gangCandidateJob(),
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"parallelism=1 is not a candidate, change allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Parallelism = ptr.To[int32](1)
+				j.Spec.Completions = ptr.To[int32](1)
+				return j
+			}(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](3)
+			},
+		},
+		"schedulingGroup already set (opt-out) allows parallelism change": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Template.Spec.SchedulingGroup = &api.PodSchedulingGroup{
+					PodGroupName: ptr.To("my-pod-group"),
+				}
+				return j
+			}(),
+			opts: JobValidationOptions{RejectParallelismChangeForGangScheduledJob: true},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+	}
+
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			update := tc.old.DeepCopy()
+			tc.update(update)
+			errs := ValidateJobUpdate(update, &tc.old, tc.opts)
+			var wantErrs field.ErrorList
+			if tc.wantErr != nil {
+				wantErrs = append(wantErrs, tc.wantErr)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateJobUpdateStatus(t *testing.T) {
 	now := time.Now()
 

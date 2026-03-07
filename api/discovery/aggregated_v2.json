@@ -1678,6 +1678,41 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "podgroups",
+              "responseKind": {
+                "group": "",
+                "kind": "PodGroup",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podgroup",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodGroup",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "workloads",
               "responseKind": {
                 "group": "",
@@ -1698,7 +1733,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       ]
     },
