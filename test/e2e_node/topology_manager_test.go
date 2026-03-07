@@ -127,7 +127,7 @@ func detectNUMADistances(numaNodes int) map[int][]int {
 	ginkgo.GinkgoHelper()
 
 	nodeToDistances := make(map[int][]int)
-	for i := 0; i < numaNodes; i++ {
+	for i := range numaNodes {
 		outData, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/distance", i))
 		framework.ExpectNoError(err)
 
@@ -195,7 +195,7 @@ func makeTopologyManagerTestPod(podName string, tmCtnAttributes, tmInitCtnAttrib
 }
 
 func findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
-	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+	for nodeNum := range numaNodes {
 		value, ok := configMap.Annotations[fmt.Sprintf("pcidevice_node%d", nodeNum)]
 		if !ok {
 			framework.Logf("missing pcidevice annotation for NUMA node %d", nodeNum)
@@ -232,7 +232,7 @@ func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
 		return -1, false
 	}
 
-	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+	for nodeNum := range numaNodes {
 		v := pciPerNuma[nodeNum]
 		if v == 0 {
 			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
@@ -472,7 +472,7 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework, numPods int, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
 	podMap := make(map[string]*v1.Pod)
 
-	for podID := 0; podID < numPods; podID++ {
+	for podID := range numPods {
 		podName := fmt.Sprintf("gu-pod-%d", podID)
 		framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 		pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
@@ -1145,7 +1145,7 @@ func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, 
 func runPreferClosestNUMAOptimalAllocationTest(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
 	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
 	podMap := make(map[string]*v1.Pod)
-	for podID := 0; podID < 2; podID++ {
+	for podID := range 2 {
 		numCores := 0
 		for nodeNum := 0 + 2*podID; nodeNum <= 1+2*podID; nodeNum++ {
 			cpus, err := getCPUsPerNUMANode(nodeNum)
@@ -1189,7 +1189,7 @@ func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framew
 		e2eskipper.Skipf("Less than 5 cpus per NUMA node on this system. Skipping test.")
 	}
 	podMap := make(map[string]*v1.Pod)
-	for podID := 0; podID < 2; podID++ {
+	for podID := range 2 {
 		// asks for all but one cpus from one less than half NUMA nodes, and half from the other
 		// plus add one less than half NUMA nodes, to accommodate for reserved cpus
 		numCores := ((numaNodes/2)-1)*(len(cpusPerNUMA)-1) + (len(cpusPerNUMA) / 2) + (numaNodes/2 - 1)

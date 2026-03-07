@@ -302,7 +302,7 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 	portCount := len(config.ServerPorts)
 	serverPodPorts := make([]v1.ContainerPort, portCount)
 
-	for i := 0; i < portCount; i++ {
+	for i := range portCount {
 		portName := fmt.Sprintf("%s-%d", config.Prefix, i)
 
 		serverPodPorts[i] = v1.ContainerPort{

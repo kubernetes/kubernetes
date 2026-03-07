@@ -282,7 +282,7 @@ func (t *topologyTestSuite) setAllowedTopologies(sc *storagev1.StorageClass, top
 	allowedTopologies := []topology{}
 	sc.AllowedTopologies = []v1.TopologySelectorTerm{}
 
-	for i := 0; i < len(topos); i++ {
+	for i := range topos {
 		if i != excludedIndex {
 			exprs := []v1.TopologySelectorLabelRequirement{}
 			for k, v := range topos[i] {

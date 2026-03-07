@@ -580,7 +580,7 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
 		devices := make([]resourceapi.Device, 0)
-		for i := 0; i < maxAllocations; i++ {
+		for i := range maxAllocations {
 			device := resourceapi.Device{
 				Name: fmt.Sprintf("device-%d", i),
 			}
@@ -646,7 +646,7 @@ func DriverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 			}
 		} else if maxAllocations >= 0 {
 			devices := make([]resourceapi.Device, maxAllocations)
-			for i := 0; i < maxAllocations; i++ {
+			for i := range maxAllocations {
 				devices[i] = resourceapi.Device{
 					Name: fmt.Sprintf("device-%02d", i),
 				}
