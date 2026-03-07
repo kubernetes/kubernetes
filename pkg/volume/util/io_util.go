@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -25,7 +24,7 @@ import (
 // IoUtil is a mockable util for common IO operations
 type IoUtil interface {
 	ReadFile(filename string) ([]byte, error)
-	ReadDir(dirname string) ([]os.FileInfo, error)
+	ReadDir(dirname string) ([]os.DirEntry, error)
 	Lstat(name string) (os.FileInfo, error)
 	EvalSymlinks(path string) (string, error)
 }
@@ -40,8 +39,8 @@ func NewIOHandler() IoUtil {
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
-func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+func (handler *osIOHandler) ReadDir(dirname string) ([]os.DirEntry, error) {
+	return os.ReadDir(dirname)
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)

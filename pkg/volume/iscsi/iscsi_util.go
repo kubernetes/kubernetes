@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -927,7 +926,7 @@ func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
 func getVolCount(dir, portal, iqn string) (int, error) {
 	// For FileSystem volumes, the topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0.
 	// For Block volumes, the default topmost dir is volumeDevices.
-	contents, err := ioutil.ReadDir(dir)
+	contents, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
@@ -943,7 +942,7 @@ func getVolCount(dir, portal, iqn string) (int, error) {
 			continue
 		}
 
-		mounts, err := ioutil.ReadDir(filepath.Join(dir, c.Name()))
+		mounts, err := os.ReadDir(filepath.Join(dir, c.Name()))
 		if err != nil {
 			return 0, err
 		}
