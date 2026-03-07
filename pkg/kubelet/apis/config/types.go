@@ -206,14 +206,14 @@ type KubeletConfiguration struct {
 	// Deprecated: no longer has any effect.
 	StreamingConnectionIdleTimeout metav1.Duration
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
-	// status. If node lease feature is not enabled, it is also the frequency that
-	// kubelet posts node status to master. In that case, be cautious when
-	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
+	// status and checks if an update to the API server is necessary. Status
+	// is posted to the API server either when it changes or when
+	// nodeStatusReportFrequency has elapsed since the last report.
 	NodeStatusUpdateFrequency metav1.Duration
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled.
+	// status to the API server if node status does not change. Kubelet will
+	// ignore this frequency and post node status immediately if any change
+	// is detected.
 	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
