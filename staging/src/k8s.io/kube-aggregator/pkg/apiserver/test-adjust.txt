@@ -1,0 +1,2 @@
+FAIL	./test/integration/examples/... [setup failed]
+FAIL
