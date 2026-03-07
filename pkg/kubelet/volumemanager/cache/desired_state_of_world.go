@@ -139,6 +139,10 @@ type DesiredStateOfWorld interface {
 	// so as it can be compared against actual size and volume expansion performed
 	// if necessary
 	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity)
+
+	// SetStateChangedNotify sets a callback that is invoked whenever the state changes.
+	// The callback must be non-blocking.
+	SetStateChangedNotify(fn func())
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -173,6 +177,11 @@ type desiredStateOfWorld struct {
 	podErrors map[types.UniquePodName]sets.Set[string]
 	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
 	seLinuxTranslator util.SELinuxLabelTranslator
+
+	// onStateChanged is an optional callback invoked when this struct changes.
+	// This is used to move from polling to event-driven updates in the kubelet volume manager.
+	// It must be non-blocking.
+	onStateChanged func()
 
 	sync.RWMutex
 }
@@ -268,6 +277,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
@@ -399,6 +409,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		outerVolumeSpecNames: outerVolumeSpecNames,
 		mountRequestTime:     mountRequestTime,
 	}
+
 	return volumeName, nil
 }
 
@@ -436,10 +447,30 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(logger klog.Logger, volumeSpec *
 	return labelInfo.SELinuxMountLabel, labelInfo.PluginSupportsSELinuxContextMount, nil
 }
 
+// broadcastStateChanged calls the callback function if it is set.
+// This should be called with the lock held (presumably a write lock, because we should not be writing while only holding the read lock).
+func (dsw *desiredStateOfWorld) broadcastStateChanged() {
+	if dsw.onStateChanged != nil {
+		dsw.onStateChanged()
+	}
+}
+
+func (dsw *desiredStateOfWorld) SetStateChangedNotify(fn func()) {
+	dsw.Lock()
+	defer dsw.Unlock()
+	if dsw.onStateChanged != nil {
+		// We could support a list of callbacks, but we don't need it today.
+		// It's better to know if we have a bug with multiple "watchers" here.
+		panic("Volume state changed callback is already set")
+	}
+	dsw.onStateChanged = fn
+}
+
 func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
 	reportedVolumes []v1.UniqueVolumeName) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	reportedVolumesMap := make(
 		map[v1.UniqueVolumeName]bool, len(reportedVolumes) /* capacity */)
@@ -459,6 +490,7 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	podName types.UniquePodName, volumeName v1.UniqueVolumeName) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	delete(dsw.podErrors, podName)
 
@@ -485,6 +517,7 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	vol, volExists := dsw.volumesToMount[volumeName]
 	if volExists {
@@ -618,6 +651,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err string) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	if errs, found := dsw.podErrors[podName]; found {
 		if errs.Len() <= maxPodErrors {
@@ -631,6 +665,7 @@ func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err s
 func (dsw *desiredStateOfWorld) PopPodErrors(podName types.UniquePodName) []string {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
 
 	if errs, found := dsw.podErrors[podName]; found {
 		delete(dsw.podErrors, podName)
@@ -653,6 +688,8 @@ func (dsw *desiredStateOfWorld) GetPodsWithErrors() []types.UniquePodName {
 func (dsw *desiredStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
 	dsw.Lock()
 	defer dsw.Unlock()
+	defer dsw.broadcastStateChanged()
+
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
 		return

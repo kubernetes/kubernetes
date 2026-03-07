@@ -192,6 +192,11 @@ type ActualStateOfWorld interface {
 
 	// UpdateReconstructedVolumeAttachability updates volume attachability from the API server.
 	UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, volumeAttachable bool)
+
+	// SetStateChangedNotify sets a callback that is invoked whenever
+	// the externally visible state changes.
+	// The callback must be non-blocking.
+	SetStateChangedNotify(fn func())
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -266,6 +271,13 @@ type actualStateOfWorld struct {
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
+
+	// onStateChanged is an optional callback invoked when this struct changes.
+	// This is used to move from polling to event-driven updates in the kubelet volume manager.
+	// It must be non-blocking.
+	onStateChanged func()
+
+	// RWMutex protects access to the fields of this struct.
 	sync.RWMutex
 }
 
@@ -412,6 +424,7 @@ func (asw *actualStateOfWorld) MarkVolumeExpansionFailedWithFinalError(volumeNam
 	defer asw.Unlock()
 
 	asw.volumesWithFinalExpansionErrors.Insert(volumeName)
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName) {
@@ -419,6 +432,7 @@ func (asw *actualStateOfWorld) RemoveVolumeFromFailedWithFinalErrors(volumeName 
 	defer asw.Unlock()
 
 	asw.volumesWithFinalExpansionErrors.Delete(volumeName)
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool {
@@ -506,6 +520,9 @@ func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(op
 	}
 	podMap[opts.PodName] = opts.PodUID
 	asw.foundDuringReconstruction[opts.VolumeName] = podMap
+
+	asw.broadcastStateChanged()
+
 	return true, nil
 }
 
@@ -525,8 +542,30 @@ func (asw *actualStateOfWorld) CheckAndMarkDeviceUncertainViaReconstruction(volu
 	// determined from node object.
 	volumeObj.deviceMountPath = deviceMountPath
 	asw.attachedVolumes[volumeName] = volumeObj
+
+	asw.broadcastStateChanged()
+
 	return true
 
+}
+
+// broadcastStateChanged calls the callback function if it is set.
+// This should be called with the lock held (presumably a write lock, because we should not be writing while only holding the read lock).
+func (asw *actualStateOfWorld) broadcastStateChanged() {
+	if asw.onStateChanged != nil {
+		asw.onStateChanged()
+	}
+}
+
+func (asw *actualStateOfWorld) SetStateChangedNotify(fn func()) {
+	asw.Lock()
+	defer asw.Unlock()
+	if asw.onStateChanged != nil {
+		// We could support a list of callbacks, but we don't need it today.
+		// It's better to know if we have a bug with multiple "watchers" here.
+		panic("Volume state changed callback is already set")
+	}
+	asw.onStateChanged = fn
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
@@ -583,6 +622,8 @@ func (asw *actualStateOfWorld) UpdateReconstructedDevicePath(volumeName v1.Uniqu
 
 	volumeObj.devicePath = devicePath
 	asw.attachedVolumes[volumeName] = volumeObj
+
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
@@ -605,6 +646,8 @@ func (asw *actualStateOfWorld) UpdateReconstructedVolumeAttachability(volumeName
 		volumeObj.pluginIsAttachable = volumeAttachabilityFalse
 	}
 	asw.attachedVolumes[volumeName] = volumeObj
+
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) GetDeviceMountState(volumeName v1.UniqueVolumeName) operationexecutor.DeviceMountState {
@@ -628,6 +671,8 @@ func (asw *actualStateOfWorld) MarkForInUseExpansionError(volumeName v1.UniqueVo
 		volumeObj.volumeInUseErrorForExpansion = true
 		asw.attachedVolumes[volumeName] = volumeObj
 	}
+
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) operationexecutor.VolumeMountState {
@@ -714,6 +759,8 @@ func (asw *actualStateOfWorld) addVolume(logger klog.Logger,
 	}
 	asw.attachedVolumes[volumeName] = volumeObj
 
+	asw.broadcastStateChanged()
+
 	return nil
 }
 
@@ -781,6 +828,8 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		}
 	}
 
+	asw.broadcastStateChanged()
+
 	return nil
 }
 
@@ -792,6 +841,9 @@ func (asw *actualStateOfWorld) MarkVolumeAsResized(volumeName v1.UniqueVolumeNam
 	if ok {
 		volumeObj.persistentVolumeSize = claimSize
 		asw.attachedVolumes[volumeName] = volumeObj
+
+		asw.broadcastStateChanged()
+
 		return true
 	}
 	return false
@@ -818,6 +870,8 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 			}
 		}
 	}
+
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) SetDeviceMountState(
@@ -844,6 +898,9 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	}
 
 	asw.attachedVolumes[volumeName] = volumeObj
+
+	asw.broadcastStateChanged()
+
 	return nil
 }
 
@@ -858,6 +915,8 @@ func (asw *actualStateOfWorld) InitializeClaimSize(logger klog.Logger, volumeNam
 		volumeObj.persistentVolumeSize = claimSize
 		asw.attachedVolumes[volumeName] = volumeObj
 	}
+
+	asw.broadcastStateChanged()
 }
 
 func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) resource.Quantity {
@@ -894,6 +953,8 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 		delete(asw.foundDuringReconstruction[volumeName], podName)
 	}
 
+	asw.broadcastStateChanged()
+
 	return nil
 }
 
@@ -915,6 +976,9 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 
 	delete(asw.attachedVolumes, volumeName)
 	delete(asw.foundDuringReconstruction, volumeName)
+
+	asw.broadcastStateChanged()
+
 	return nil
 }
 
