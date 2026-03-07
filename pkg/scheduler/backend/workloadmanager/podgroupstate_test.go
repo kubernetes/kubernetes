@@ -92,3 +92,91 @@ func TestPodGroupState_SchedulingTimeout(t *testing.T) {
 		t.Errorf("Expected positive timeout duration after reset, got %v", timeout)
 	}
 }
+
+func TestPodGroupState_PodCounts(t *testing.T) {
+	pgs := newPodGroupState()
+	pod1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pod2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pod3 := st.MakePod().Namespace("ns1").Name("p3").UID("p3").Node("node1").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pod4 := st.MakePod().Namespace("ns1").Name("p4").UID("p4").
+		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+
+	if count := pgs.AllPodsCount(); count != 0 {
+		t.Errorf("Expected AllPodsCount to be 0, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 0 {
+		t.Errorf("Expected ScheduledPodsCount to be 0, got %d", count)
+	}
+
+	pgs.addPod(pod1)
+	pgs.addPod(pod2)
+	pgs.addPod(pod3)
+
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 1 {
+		t.Errorf("Expected ScheduledPodsCount to be 1, got %d", count)
+	}
+
+	pgs.AssumePod(pod1.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+
+	pgs.AssumePod(pod3.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+
+	// Assuming a pod that is not in the group should not change the counts.
+	pgs.AssumePod(pod4.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+
+	pgs.ForgetPod(pod3.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+
+	pgs.ForgetPod(pod1.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 1 {
+		t.Errorf("Expected ScheduledPodsCount to be 1, got %d", count)
+	}
+
+	pgs.AssumePod(pod2.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+
+	// Forgetting a pod that is not assumed should not change the counts.
+	pgs.ForgetPod(pod4.UID)
+	if count := pgs.AllPodsCount(); count != 3 {
+		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
+	}
+	if count := pgs.ScheduledPodsCount(); count != 2 {
+		t.Errorf("Expected ScheduledPodsCount to be 2, got %d", count)
+	}
+}

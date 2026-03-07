@@ -132,8 +132,8 @@ func (pgs *podGroupState) deletePod(podUID types.UID) {
 
 // empty returns true when the group is empty.
 func (pgs *podGroupState) empty() bool {
-	pgs.lock.Lock()
-	defer pgs.lock.Unlock()
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
 
 	return len(pgs.allPods) == 0
 }
@@ -144,6 +144,14 @@ func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 	defer pgs.lock.RUnlock()
 
 	return sets.KeySet(pgs.allPods)
+}
+
+// AllPodsCount returns the number of all pods known to the scheduler for this group.
+func (pgs *podGroupState) AllPodsCount() int {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return len(pgs.allPods)
 }
 
 // UnscheduledPods returns all pods that are unscheduled for this group,
@@ -178,6 +186,14 @@ func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 	return pgs.assignedPods.Clone()
 }
 
+// ScheduledPodsCount returns the number of pods for this group that are either assumed or assigned.
+func (pgs *podGroupState) ScheduledPodsCount() int {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return len(pgs.assumedPods) + len(pgs.assignedPods)
+}
+
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 // A new deadline is created if one doesn't exist, or if the previous one has expired.
 func (pgs *podGroupState) SchedulingTimeout() time.Duration {
@@ -198,7 +214,21 @@ func (pgs *podGroupState) AssumePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
-	pgs.assumedPods.Insert(podUID)
+	pod := pgs.allPods[podUID]
+	// A scheduling pod may be removed from the cluster.
+	// In that case, we just ignore it.
+	if pod == nil {
+		return
+	}
+
+	// If the pod is already assigned, put it into assignedPods.
+	// Otherwise put it to assumedPods.
+	if pod.Spec.NodeName != "" {
+		pgs.assignedPods.Insert(podUID)
+	} else {
+		pgs.assumedPods.Insert(podUID)
+	}
+
 	pgs.unscheduledPods.Delete(podUID)
 }
 
@@ -207,6 +237,21 @@ func (pgs *podGroupState) ForgetPod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
-	pgs.unscheduledPods.Insert(podUID)
+	pod := pgs.allPods[podUID]
+	// A scheduling pod may be removed from the cluster.
+	// In that case, we just ignore it.
+	if pod == nil {
+		return
+	}
+
 	pgs.assumedPods.Delete(podUID)
+
+	// If the pod is already assigned, put it into assignedPods.
+	// Otherwise, put it into assumedPods.
+	if pod.Spec.NodeName != "" {
+		pgs.assignedPods.Insert(podUID)
+	} else {
+		pgs.unscheduledPods.Insert(podUID)
+	}
+
 }
