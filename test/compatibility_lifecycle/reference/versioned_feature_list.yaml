@@ -433,6 +433,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+- name: DelayedPreemption
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
