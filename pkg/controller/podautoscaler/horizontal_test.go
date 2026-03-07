@@ -61,6 +61,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -5579,5 +5580,344 @@ func TestBuildQuantity(t *testing.T) {
 					q.String(), q.Format)
 			}
 		})
+	}
+}
+
+func TestHasFallbackFailureThresholdElapsed(t *testing.T) {
+	metricName := "test-metric"
+	failureDuration := int64(300) // 5 minutes
+
+	baseMetricSpec := autoscalingv2.MetricSpec{
+		Type: autoscalingv2.ExternalMetricSourceType,
+		External: &autoscalingv2.ExternalMetricSource{
+			Metric: autoscalingv2.MetricIdentifier{
+				Name:     metricName,
+				Selector: &metav1.LabelSelector{},
+			},
+			Target: autoscalingv2.MetricTarget{
+				Type:  autoscalingv2.ValueMetricType,
+				Value: resource.NewMilliQuantity(1000, resource.DecimalSI),
+			},
+			Fallback: &autoscalingv2.ExternalMetricFallback{
+				FailureDurationSeconds: &failureDuration,
+				Replicas:               5,
+			},
+		},
+	}
+
+	tests := []struct {
+		name                          string
+		firstFailureTime              *metav1.Time
+		expectedResult                bool
+		expectedMetricFetchStatusType autoscalingv2.MetricFetchStatusType
+		// if true, check that FirstFailureTime in status is non-nil
+		expectFirstFailureTimeSet bool
+	}{
+		{
+			name:                          "nil firstFailureTime should initialize and return false",
+			firstFailureTime:              nil,
+			expectedResult:                false,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFailing,
+			expectFirstFailureTimeSet:     true,
+		},
+		{
+			name:                          "zero firstFailureTime should initialize and return false",
+			firstFailureTime:              &metav1.Time{},
+			expectedResult:                false,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFailing,
+			expectFirstFailureTimeSet:     true,
+		},
+		{
+			name:                          "recent failure (within threshold) should return false",
+			firstFailureTime:              &metav1.Time{Time: time.Now().Add(-1 * time.Minute)},
+			expectedResult:                false,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFailing,
+			expectFirstFailureTimeSet:     true,
+		},
+		{
+			name:                          "failure just before threshold should return false",
+			firstFailureTime:              &metav1.Time{Time: time.Now().Add(-time.Duration(failureDuration-10) * time.Second)},
+			expectedResult:                false,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFailing,
+			expectFirstFailureTimeSet:     true,
+		},
+		{
+			name:                          "failure past threshold should return true and set fallback status",
+			firstFailureTime:              &metav1.Time{Time: time.Now().Add(-time.Duration(failureDuration+1) * time.Second)},
+			expectedResult:                true,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFallback,
+			expectFirstFailureTimeSet:     true,
+		},
+		{
+			name:                          "failure well past threshold should return true",
+			firstFailureTime:              &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+			expectedResult:                true,
+			expectedMetricFetchStatusType: autoscalingv2.MetricFetchFallback,
+			expectFirstFailureTimeSet:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			status := autoscalingv2.MetricStatus{}
+			result := hasFallbackFailureThresholdElapsed(baseMetricSpec, &status, tt.firstFailureTime)
+			assert.Equal(t, tt.expectedResult, result)
+			assert.Equal(t, autoscalingv2.ExternalMetricSourceType, status.Type)
+			assert.NotNil(t, status.External)
+			assert.Equal(t, metricName, status.External.Metric.Name)
+			assert.NotNil(t, status.External.MetricFetchStatus)
+			assert.Equal(t, tt.expectedMetricFetchStatusType, *status.External.MetricFetchStatus)
+			if tt.expectFirstFailureTimeSet {
+				assert.NotNil(t, status.External.FirstFailureTime)
+			}
+		})
+	}
+}
+
+func TestExternalMetricFallback(t *testing.T) {
+	failureDuration := int64(300) // 5 minutes
+	fallbackReplicas := int32(5)
+
+	targetTypes := []struct {
+		name                    string
+		targetType              autoscalingv2.MetricTargetType
+		targetMilliValue        int64
+		successReportedLevels   []uint64
+		successExpectedReplicas int32
+	}{
+		{
+			name:                    "value",
+			targetType:              autoscalingv2.ValueMetricType,
+			targetMilliValue:        6666,
+			successReportedLevels:   []uint64{6666}, // within tolerance of target → returns currentReplicas
+			successExpectedReplicas: 3,
+		},
+		{
+			name:                    "averageValue",
+			targetType:              autoscalingv2.AverageValueMetricType,
+			targetMilliValue:        2222,
+			successReportedLevels:   []uint64{8600}, // 8600/2222 per pod ≈ 3.87 → ceil = 4
+			successExpectedReplicas: 4,
+		},
+	}
+
+	for _, target := range targetTypes {
+		tests := []struct {
+			name                    string
+			featureGateEnabled      bool
+			fallback                *autoscalingv2.ExternalMetricFallback
+			metricFetchError        bool
+			firstFailureTime        *metav1.Time
+			expectedDesiredReplicas int32
+			expectedError           bool
+			expectedFallbackActive  bool
+		}{
+			{
+				name:               "feature gate disabled, metric fetch error returns error",
+				featureGateEnabled: false,
+				fallback: &autoscalingv2.ExternalMetricFallback{
+					FailureDurationSeconds: &failureDuration,
+					Replicas:               fallbackReplicas,
+				},
+				metricFetchError:        true,
+				expectedDesiredReplicas: 0,
+				expectedError:           true,
+				expectedFallbackActive:  false,
+			},
+			{
+				name:                    "feature gate enabled, no fallback configured, metric fetch error returns error",
+				featureGateEnabled:      true,
+				fallback:                nil,
+				metricFetchError:        true,
+				expectedDesiredReplicas: 0,
+				expectedError:           true,
+				expectedFallbackActive:  false,
+			},
+			{
+				name:               "feature gate enabled, fallback configured, first failure initializes timer",
+				featureGateEnabled: true,
+				fallback: &autoscalingv2.ExternalMetricFallback{
+					FailureDurationSeconds: &failureDuration,
+					Replicas:               fallbackReplicas,
+				},
+				metricFetchError:        true,
+				firstFailureTime:        nil, // first failure
+				expectedDesiredReplicas: 0,
+				expectedError:           true,
+				expectedFallbackActive:  false,
+			},
+			{
+				name:               "feature gate enabled, fallback configured, within failure duration returns error",
+				featureGateEnabled: true,
+				fallback: &autoscalingv2.ExternalMetricFallback{
+					FailureDurationSeconds: &failureDuration,
+					Replicas:               fallbackReplicas,
+				},
+				metricFetchError:        true,
+				firstFailureTime:        &metav1.Time{Time: time.Now().Add(-1 * time.Minute)},
+				expectedDesiredReplicas: 0,
+				expectedError:           true,
+				expectedFallbackActive:  false,
+			},
+			{
+				name:               "feature gate enabled, fallback configured, past failure duration returns fallback replicas",
+				featureGateEnabled: true,
+				fallback: &autoscalingv2.ExternalMetricFallback{
+					FailureDurationSeconds: &failureDuration,
+					Replicas:               fallbackReplicas,
+				},
+				metricFetchError:        true,
+				firstFailureTime:        &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+				expectedDesiredReplicas: fallbackReplicas,
+				expectedError:           false,
+				expectedFallbackActive:  true,
+			},
+			{
+				name:               "feature gate enabled, fallback configured, successful metric fetch returns normal replicas",
+				featureGateEnabled: true,
+				fallback: &autoscalingv2.ExternalMetricFallback{
+					FailureDurationSeconds: &failureDuration,
+					Replicas:               fallbackReplicas,
+				},
+				metricFetchError:        false,
+				expectedDesiredReplicas: target.successExpectedReplicas,
+				expectedError:           false,
+				expectedFallbackActive:  false,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(target.name+"/"+tt.name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAExternalMetricFallback, tt.featureGateEnabled)
+
+				metricTarget := autoscalingv2.MetricTarget{}
+				if target.targetType == autoscalingv2.ValueMetricType {
+					metricTarget.Type = autoscalingv2.ValueMetricType
+					metricTarget.Value = resource.NewMilliQuantity(target.targetMilliValue, resource.DecimalSI)
+				} else {
+					metricTarget.Type = autoscalingv2.AverageValueMetricType
+					metricTarget.AverageValue = resource.NewMilliQuantity(target.targetMilliValue, resource.DecimalSI)
+				}
+
+				metricSpec := autoscalingv2.MetricSpec{
+					Type: autoscalingv2.ExternalMetricSourceType,
+					External: &autoscalingv2.ExternalMetricSource{
+						Metric: autoscalingv2.MetricIdentifier{
+							Name:     "qps",
+							Selector: &metav1.LabelSelector{},
+						},
+						Target:   metricTarget,
+						Fallback: tt.fallback,
+					},
+				}
+
+				var currentMetrics []autoscalingv2.MetricStatus
+				if tt.firstFailureTime != nil {
+					currentMetrics = []autoscalingv2.MetricStatus{
+						{
+							Type: autoscalingv2.ExternalMetricSourceType,
+							External: &autoscalingv2.ExternalMetricStatus{
+								Metric: autoscalingv2.MetricIdentifier{
+									Name:     "qps",
+									Selector: &metav1.LabelSelector{},
+								},
+								FirstFailureTime: tt.firstFailureTime,
+							},
+						},
+					}
+				}
+
+				tc := testCase{
+					minReplicas:    2,
+					maxReplicas:    6,
+					specReplicas:   3,
+					statusReplicas: 3,
+					metricsTarget:  []autoscalingv2.MetricSpec{metricSpec},
+					reportedLevels: target.successReportedLevels,
+				}
+
+				testClient, _, _, testEMClient, testScaleClient := tc.prepareTestClient(t)
+
+				if tt.metricFetchError {
+					testEMClient = &emfake.FakeExternalMetricsClient{}
+					testEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, fmt.Errorf("simulated external metrics failure")
+					})
+				}
+
+				metricsClient := metrics.NewRESTMetricsClient(
+					(&metricsfake.Clientset{}).MetricsV1beta1(),
+					&cmfake.FakeCustomMetricsClient{},
+					testEMClient,
+				)
+
+				informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+
+				tCtx := ktesting.Init(t)
+				hpaController := NewHorizontalController(
+					tCtx,
+					(&fake.Clientset{}).CoreV1(),
+					testScaleClient,
+					testClient.AutoscalingV2(),
+					testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+					metricsClient,
+					informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
+					informerFactory.Core().V1().Pods(),
+					100*time.Millisecond,
+					5*time.Minute,
+					defaultTestingTolerance,
+					defaultTestingCPUInitializationPeriod,
+					defaultTestingDelayOfInitialReadinessStatus,
+				)
+
+				hpa := &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-namespace",
+					},
+					Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+						ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+							Kind:       "ReplicationController",
+							Name:       "test-rc",
+							APIVersion: "v1",
+						},
+						MinReplicas: ptr.To[int32](2),
+						MaxReplicas: 6,
+					},
+					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+						CurrentReplicas: 3,
+						DesiredReplicas: 3,
+						CurrentMetrics:  currentMetrics,
+					},
+				}
+
+				selector, _ := labels.Parse("name=test-pod")
+				status := autoscalingv2.MetricStatus{}
+
+				replicaCount, _, _, condition, err := hpaController.computeStatusForExternalMetric(3, 3, metricSpec, hpa, selector, &status)
+
+				if tt.expectedError {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+
+				assert.Equal(t, tt.expectedDesiredReplicas, replicaCount)
+
+				if tt.expectedFallbackActive {
+					assert.Equal(t, autoscalingv2.ExternalMetricFallbackActive, condition.Type)
+					assert.Equal(t, v1.ConditionTrue, condition.Status)
+					assert.Equal(t, "UsingFallbackValue", condition.Reason)
+					assert.Equal(t, ptr.To(autoscalingv2.MetricFetchFallback), status.External.MetricFetchStatus)
+				}
+
+				if !tt.expectedFallbackActive && !tt.expectedError {
+					if assert.NotNil(t, status.External) {
+						assert.Equal(t, ptr.To(autoscalingv2.MetricFetchHealthy), status.External.MetricFetchStatus)
+						assert.Nil(t, status.External.FirstFailureTime)
+					}
+				}
+			})
+		}
 	}
 }
