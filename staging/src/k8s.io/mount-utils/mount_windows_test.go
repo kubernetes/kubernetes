@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 	testingexec "k8s.io/utils/exec/testing"
 )
 
@@ -330,41 +331,11 @@ func TestNewSMBMapping(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := newSMBMapping(test.username, test.password, test.remotepath)
+		err := NewSMBMapping(test.username, test.password, test.remotepath)
 		if test.expectError {
 			assert.NotNil(t, err, "Expect error during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
 		} else {
 			assert.Nil(t, err, "Expect error is nil during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
-		}
-	}
-}
-
-func TestIsValidPath(t *testing.T) {
-	tests := []struct {
-		remotepath     string
-		expectedResult bool
-		expectError    bool
-	}{
-		{
-			"c:",
-			true,
-			false,
-		},
-		{
-			"invalid-path",
-			false,
-			false,
-		},
-	}
-
-	for _, test := range tests {
-		result, err := isValidPath(test.remotepath)
-		assert.Equal(t, result, test.expectedResult, "Expect result not equal with isValidPath(%s) return: %q, expected: %q, error: %v",
-			test.remotepath, result, test.expectedResult, err)
-		if test.expectError {
-			assert.NotNil(t, err, "Expect error during isValidPath(%s)", test.remotepath)
-		} else {
-			assert.Nil(t, err, "Expect error is nil during isValidPath(%s)", test.remotepath)
 		}
 	}
 }
@@ -383,7 +354,7 @@ func TestIsAccessDeniedError(t *testing.T) {
 			false,
 		},
 		{
-			fmt.Errorf(`PathValid(\\xxx\share) failed with returned output: Test-Path : Access is denied`),
+			fmt.Errorf(`access denied: %w`, windows.ERROR_ACCESS_DENIED),
 			true,
 		},
 	}
