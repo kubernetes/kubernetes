@@ -368,7 +368,7 @@ users:
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
 		},
-		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
 	}
 	statuszWantBodyBeta1 := &statuszv1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
