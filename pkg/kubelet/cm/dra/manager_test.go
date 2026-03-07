@@ -805,7 +805,7 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 			pod:         genTestPod(),
 			claim: func() *resourceapi.ResourceClaim {
 				claim := genTestClaim(claimName, "driver-without-plugin", deviceName, podUID)
-				claim.Status.Allocation.Devices.Results[0].RequiresNodePreparation = ptr.To(false)
+				claim.Status.Allocation.Devices.Results[0].RequiresNodePreparation = new(bool)
 				return claim
 			}(),
 			expectedClaimInfoState: state.ClaimInfoState{
