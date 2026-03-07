@@ -357,7 +357,6 @@ func (t *Tracker) pushEvent(oldObj, newObj any) {
 	t.rwMutex.Lock()
 	defer t.rwMutex.Unlock()
 	for _, handler := range t.eventHandlers {
-		handler := handler
 		if oldObj == nil {
 			t.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)

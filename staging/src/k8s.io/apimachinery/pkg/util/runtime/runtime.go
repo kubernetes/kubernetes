@@ -55,7 +55,6 @@ func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		additionalHandlersWithContext := make([]func(context.Context, interface{}), len(additionalHandlers))
 		for i, handler := range additionalHandlers {
-			handler := handler // capture loop variable
 			additionalHandlersWithContext[i] = func(_ context.Context, r interface{}) {
 				handler(r)
 			}

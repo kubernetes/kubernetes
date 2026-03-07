@@ -54,7 +54,6 @@ func TestRunCordonOrUncordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.description, func(t *testing.T) {
 			err := RunCordonOrUncordon(test.drainer, test.node, test.desired)
 			if test.expectedError == nil {

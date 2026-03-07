@@ -116,7 +116,6 @@ func findCEL(t *testing.T, s *schema.Structural, root bool, pth *field.Path) (ma
 	}
 
 	for k, v := range s.Properties {
-		v := v
 		sub, err := findCEL(t, &v, false, pth.Child("properties").Child(k))
 		if err != nil {
 			return nil, err

@@ -3016,8 +3016,6 @@ func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*te
 		for i := 0; i < b.N; i++ {
 			c := make(chan error)
 			for j := range parallel {
-				j := j
-				i := i
 				go func(pod v1.Pod) {
 					pod.Name = fmt.Sprintf("post%d-%d-%d-%d", parallel, b.N, j, i)
 					_, err := client.CoreV1().RESTClient().Post().

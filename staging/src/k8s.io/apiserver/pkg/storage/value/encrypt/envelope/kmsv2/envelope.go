@@ -523,7 +523,6 @@ func generateCacheKey(encryptedDEKSourceType kmstypes.EncryptedDEKSourceType, en
 	// Sort the annotations by key.
 	keys := make([]string, 0, len(annotations))
 	for k := range annotations {
-		k := k
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

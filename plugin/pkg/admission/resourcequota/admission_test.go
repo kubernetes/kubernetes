@@ -1417,7 +1417,6 @@ func TestAdmitBelowVolumeAttributesClassQuotaLimitWhenPVCScopeUpdated(t *testing
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.desc, func(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
