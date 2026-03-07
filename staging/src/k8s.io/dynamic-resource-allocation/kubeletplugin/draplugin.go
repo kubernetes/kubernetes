@@ -732,6 +732,18 @@ func (d *Helper) Stop() {
 // called, then the kubelet plugin does not manage any ResourceSlice
 // objects.
 //
+// Note that the order of slices in the provided resources
+// is significant: ResourceSlices start with a name prefix based on
+// their index, and the allocator uses this order to prioritize allocation
+// (first-fit). Also, upgrading to this naming from an older
+// version using random names without the index at the beginning will
+// cause existing slices to be recreated.
+// See [resourceslice.Pool.Slices] for more details.
+//
+// Pools are sorted first so that pools with devices which have binding
+// conditions are tried last, then by name. So the name can also be used to
+// indicate preference when a driver publishes more than one pool.
+//
 // PublishResources does not block, so it might still take a while
 // after it returns before all information is actually written
 // to the API server.

@@ -66,6 +66,18 @@ const (
 	// causes redundant delete API calls) and not too long that a human mistake
 	// doesn't get fixed while that human is waiting for it.
 	DefaultSyncDelay = 30 * time.Second
+
+	// alphanums is the set of available characters for ResourceSlice names.
+	// We omit vowels to reduce the chances of "bad words" being formed.
+	alphanums = "bcdfghjklmnpqrstvwxz2456789"
+
+	// resourceSliceIndexLength is the length of the encoded index in the
+	// ResourceSlice name. 14 characters is the minimum needed to represent
+	// the maximum int value in base27 safely.
+	resourceSliceIndexLength = 14
+
+	// nameSeparator is used to separate parts of the ResourceSlice name.
+	nameSeparator = "-"
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -119,6 +131,12 @@ type Controller struct {
 // DriverResources is a complete description of all resources synchronized by the controller.
 type DriverResources struct {
 	// Each driver may manage different resource pools.
+	//
+	// The key in the map is the pool name. Pools are
+	// sorted first so that pools with devices which
+	// have binding conditions are tried last, then by name.
+	// So the name can also be used to indicate preference
+	// when a driver publishes more than one pool.
 	Pools map[string]Pool
 }
 
@@ -140,6 +158,21 @@ type Pool struct {
 	// that each resulting slice is valid. See the API
 	// definition for details, in particular the limit on
 	// the number of devices.
+	//
+	// ResourceSlices start with a name prefix based on their
+	// index in this list. This has two important consequences:
+	// 1. Priority: The allocator sorts ResourceSlices
+	//    lexicographically by name and uses a first-fit strategy.
+	//    Since the index is at the beginning of the name, the order
+	//    in this list determines the allocation priority. Driver
+	//    authors can influence priority by putting preferred slices
+	//    first. Likewise, within a slice the preferred devices should
+	//    be listed first.
+	// 2. Migration: When upgrading from a driver version that used
+	//    randomly generated names without index at the beginning,
+	//    existing ResourceSlices will be deleted and recreated with
+	//    names starting with the new prefix:
+	//    [encoded index]-[owner name (if not nil)]-[driver name]-
 	//
 	// If slices are not valid, then the controller will
 	// log errors produced by the apiserver.
@@ -639,9 +672,6 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Slices that don't match any driver slice need to be deleted.
-	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
-
 	// Determine highest generation.
 	var generation int64
 	for _, slice := range slices {
@@ -650,67 +680,28 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Everything older is obsolete.
-	currentSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
+	// Classify existing slices. If an existing slice has wrong generation
+	// or doesn't match a desired index, it's obsolete.
+	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
+	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
+
 	for _, slice := range slices {
+		// Wrong generation is always obsolete.
 		if slice.Spec.Pool.Generation < generation {
 			obsoleteSlices = append(obsoleteSlices, slice)
-		} else {
-			currentSlices = append(currentSlices, slice)
+			continue
 		}
-	}
-	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
-	// Match each existing slice against the desired slices.
-	// Two slices "match" if they contain exactly the
-	// same device IDs, in an arbitrary order. As a
-	// special case, slices are also considered
-	// "matched" in the scenario where there's a single
-	// existing slice and a single desired slice. Such a
-	// matched slice gets updated with the desired
-	// content if there is a difference.
-	//
-	// In the case where there is more than one existing
-	// or desired slices, adding or removing devices is
-	// done by deleting the old slice and creating a new one.
-	//
-	// This is primarily a simplification of the code:
-	// to support adding or removing devices from
-	// existing slices, we would have to identify "most
-	// similar" slices (= minimal editing distance).
-	//
-	// In currentSliceForDesiredSlice we keep track of
-	// which desired slice has a matched slice.
-	//
-	// At the end of the loop, each current slice is either
-	// a match or obsolete.
-	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-	if len(currentSlices) == 1 && len(pool.Slices) == 1 {
-		// If there's just one existing slice and one desired slice, assume
-		// they "matched" such that if required, it is the existing slice
-		// which gets updated and we avoid an unnecessary deletion and
-		// recreation of the slice.
-		currentSliceForDesiredSlice[0] = currentSlices[0]
-	} else {
-		for _, currentSlice := range currentSlices {
-			matched := false
-			for i := range pool.Slices {
-				if _, ok := currentSliceForDesiredSlice[i]; ok {
-					// Already has a match.
-					continue
-				}
-				if sameSlice(currentSlice, &pool.Slices[i]) {
-					currentSliceForDesiredSlice[i] = currentSlice
-					logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				obsoleteSlices = append(obsoleteSlices, currentSlice)
-				logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
+		index := decodeIndex(slice.Name)
+		if index >= 0 && index < len(pool.Slices) {
+			if _, ok := currentSliceForDesiredSlice[index]; !ok {
+				currentSliceForDesiredSlice[index] = slice
+				logger.V(5).Info("Matched existing slice by index", "slice", klog.KObj(slice), "matchIndex", index)
+				continue
 			}
 		}
+		obsoleteSlices = append(obsoleteSlices, slice)
+		logger.V(5).Info("Unmatched existing slice (obsolete)", "slice", klog.KObj(slice))
 	}
 
 	// Desired metadata which must be set in each slice.
@@ -815,10 +806,15 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				},
 			)
 		}
-		generateName := c.driverName + "-"
+		// The GenerateName follows the scheme:
+		// [encoded index]-[owner name (if not nil)]-[driver name]-
+		// This ensures that the index is at the beginning of the name,
+		// and the API server handles uniqueness by appending a random suffix.
+		generateName := encodeIndex(i) + nameSeparator
 		if c.owner != nil {
-			generateName = c.owner.Name + "-" + generateName
+			generateName += c.owner.Name + nameSeparator
 		}
+		generateName += c.driverName + nameSeparator
 		slice := &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: ownerReferences,
@@ -969,25 +965,6 @@ func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bo
 	return copied
 }
 
-func sameSlice(existingSlice *resourceapi.ResourceSlice, desiredSlice *Slice) bool {
-	if len(existingSlice.Spec.Devices) != len(desiredSlice.Devices) {
-		return false
-	}
-
-	existingDevices := sets.New[string]()
-	for _, device := range existingSlice.Spec.Devices {
-		existingDevices.Insert(device.Name)
-	}
-	for _, device := range desiredSlice.Devices {
-		if !existingDevices.Has(device.Name) {
-			return false
-		}
-	}
-
-	// Same number of devices, names all present -> equal.
-	return true
-}
-
 // copyTaintTimeAdded copies existing TimeAdded values from one slice into
 // the other if the other one doesn't have it for a taint. Both input
 // slices are read-only.
@@ -1062,4 +1039,39 @@ func refIfNotZero[T comparable](t T) *T {
 		return nil
 	}
 	return &t
+}
+
+// decodeIndex decodes an integer from the start of a string.
+// It returns -1 if the string does not start with resourceSliceIndexLength
+// characters from alphanums.
+func decodeIndex(name string) int {
+	if len(name) < resourceSliceIndexLength {
+		return -1
+	}
+	const base = len(alphanums)
+	var res int
+	for i := range resourceSliceIndexLength {
+		char := name[i]
+		idx := strings.IndexByte(alphanums, char)
+		if idx == -1 {
+			return -1
+		}
+		res = res*base + idx
+	}
+	return res
+}
+
+// encodeIndex encodes an integer into a deterministic string, padded with
+// the first character of alphanums to resourceSliceIndexLength characters.
+// resourceSliceIndexLength characters is the minimum needed to represent
+// the maximum int value in base27 safely.
+func encodeIndex(index int) string {
+	val := index
+	const base = len(alphanums)
+	res := make([]byte, resourceSliceIndexLength)
+	for i := resourceSliceIndexLength - 1; i >= 0; i-- {
+		res[i] = alphanums[val%base]
+		val /= base
+	}
+	return string(res)
 }

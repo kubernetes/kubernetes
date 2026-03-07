@@ -895,6 +895,33 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 	}
 }
 
+type AllocatorTestCase struct {
+	features                 Features
+	claimsToAllocate         []wrapResourceClaim
+	allocatedDevices         []DeviceID
+	allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
+	allocatedCapacityDevices ConsumedCapacityCollection
+	classes                  []*resourceapi.DeviceClass
+	slices                   []*resourceapi.ResourceSlice
+	node                     *v1.Node
+
+	expectResults []any
+	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+
+	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
+	// which doesn't provide the stats and also falls over with excessive runtime for them.
+	expectNumAllocateOneInvocations int64
+
+	// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
+	// different values for specific implementations (e.g. "experimental").
+	//
+	// Ignored unless expectNumAllocateOneInvocations is also set.
+	// expectNumAllocateOneInvocations should contain the "best" result, so
+	// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
+	// implementations.
+	expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
+}
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
@@ -947,33 +974,7 @@ func TestAllocator(t *testing.T,
 		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
 
-	testcases := map[string]struct {
-		features                 Features
-		claimsToAllocate         []wrapResourceClaim
-		allocatedDevices         []DeviceID
-		allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-		allocatedCapacityDevices ConsumedCapacityCollection
-		classes                  []*resourceapi.DeviceClass
-		slices                   []*resourceapi.ResourceSlice
-		node                     *v1.Node
-
-		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error
-
-		// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
-		// which doesn't provide the stats and also falls over with excessive runtime for them.
-		expectNumAllocateOneInvocations int64
-
-		// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
-		// different values for specific implementations (e.g. "experimental").
-		//
-		// Ignored unless expectNumAllocateOneInvocations is also set.
-		// expectNumAllocateOneInvocations should contain the "best" result, so
-		// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
-		// implementations.
-		expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
-	}{
-
+	testcases := map[string]AllocatorTestCase{
 		"empty": {},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -4445,7 +4446,7 @@ func TestAllocator(t *testing.T,
 			),
 			classes: objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 4), driverA,
+				sliceWithDevices(slice4, node1, resourcePool(pool1, 4), driverA,
 					device(device1, fromCounters, nil).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
@@ -4454,12 +4455,12 @@ func TestAllocator(t *testing.T,
 						).
 						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 				),
-				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 4), driverA,
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 4), driverA,
 					counterSet(counterSet1, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
 				),
-				sliceWithDevices(slice3, node1, resourcePool(pool1, 4), driverA,
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 4), driverA,
 					device(device2, fromCounters, nil).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet2, map[string]resource.Quantity{
@@ -4467,7 +4468,7 @@ func TestAllocator(t *testing.T,
 							}),
 						),
 				),
-				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 4), driverA,
+				sliceWithCounterSets(slice1, node1, resourcePool(pool1, 4), driverA,
 					counterSet(counterSet2, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
@@ -6463,6 +6464,78 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
+
+	t.Run("interrupt", func(t *testing.T) {
+		for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
+			t.Run(name, func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				g := gomega.NewWithT(t)
+
+				// This testcase is a smaller variant of the one in https://github.com/kubernetes/kubernetes/issues/131730#issuecomment-2873598287.
+				// That one took over 30 seconds, this one here only 0.07 seconds.
+				// But even that is too long when we interrupt in the near future or
+				// even before starting...
+				classLister := informerLister[resourceapi.DeviceClass]{
+					objs: []*resourceapi.DeviceClass{class(classA, driverA)},
+				}
+				claimsToAllocate := unwrap(claimWithRequests(claim0, nil,
+					request(req0, classA, 6),
+				))
+				slices := unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+					device(device3, nil, nil),
+					device(device4, nil, nil),
+					device("device-5", nil, nil),
+				))
+				node := node(node1, region1)
+
+				switch name {
+				case "off":
+				case "timeout":
+					c, cancel := context.WithTimeout(ctx, time.Nanosecond)
+					defer cancel()
+					ctx = c
+				case "deadline":
+					c, cancel := context.WithDeadline(ctx, time.Now())
+					defer cancel()
+					ctx = c
+				case "cancel":
+					c, cancel := context.WithCancel(ctx)
+					cancel()
+					ctx = c
+				}
+
+				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
+				g.Expect(err).ToNot(gomega.HaveOccurred())
+				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
+				t.Logf("got error %v", err)
+				if ctx.Err() != nil {
+					if !errors.Is(err, ctx.Err()) {
+						t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
+					}
+				} else {
+					if err != nil {
+						t.Fatalf("expected no error, got %v", err)
+					}
+				}
+			})
+		}
+	})
+}
+
+func RunTestAllocator(t *testing.T,
+	supportedFeatures Features,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		allocateState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error),
+	testcases map[string]AllocatorTestCase) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
@@ -6536,64 +6609,6 @@ func TestAllocator(t *testing.T,
 			}
 		})
 	}
-
-	t.Run("interrupt", func(t *testing.T) {
-		for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
-			t.Run(name, func(t *testing.T) {
-				_, ctx := ktesting.NewTestContext(t)
-				g := gomega.NewWithT(t)
-
-				// This testcase is a smaller variant of the one in https://github.com/kubernetes/kubernetes/issues/131730#issuecomment-2873598287.
-				// That one took over 30 seconds, this one here only 0.07 seconds.
-				// But even that is too long when we interrupt in the near future or
-				// even before starting...
-				classLister := informerLister[resourceapi.DeviceClass]{
-					objs: []*resourceapi.DeviceClass{class(classA, driverA)},
-				}
-				claimsToAllocate := unwrap(claimWithRequests(claim0, nil,
-					request(req0, classA, 6),
-				))
-				slices := unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-					device(device1, nil, nil),
-					device(device2, nil, nil),
-					device(device3, nil, nil),
-					device(device4, nil, nil),
-					device("device-5", nil, nil),
-				))
-				node := node(node1, region1)
-
-				switch name {
-				case "off":
-				case "timeout":
-					c, cancel := context.WithTimeout(ctx, time.Nanosecond)
-					defer cancel()
-					ctx = c
-				case "deadline":
-					c, cancel := context.WithDeadline(ctx, time.Now())
-					defer cancel()
-					ctx = c
-				case "cancel":
-					c, cancel := context.WithCancel(ctx)
-					cancel()
-					ctx = c
-				}
-
-				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
-				g.Expect(err).ToNot(gomega.HaveOccurred())
-				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
-				t.Logf("got error %v", err)
-				if ctx.Err() != nil {
-					if !errors.Is(err, ctx.Err()) {
-						t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
-					}
-				} else {
-					if err != nil {
-						t.Fatalf("expected no error, got %v", err)
-					}
-				}
-			})
-		}
-	})
 }
 
 type informerLister[T any] struct {

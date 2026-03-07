@@ -118,10 +118,10 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	resources.Pools[poolName] = resourceslice.Pool{Slices: []resourceslice.Slice{{}}}
 	controller.Update(resources)
 
-	// One empty slice should remain, after removing the full ones and adding the empty one.
+	// A slice should be updated to be empty, and the rest should be deleted.
 	emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
 	tCtx.Eventually(listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
-	expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
+	expectStats = resourceslice.Stats{NumCreates: int64(numSlices), NumUpdates: 1, NumDeletes: int64(numSlices) - 1}
 
 	// There is a window of time where the ResourceSlice exists and is
 	// returned in a list but before that ResourceSlice is accounted for
