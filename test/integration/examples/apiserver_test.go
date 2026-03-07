@@ -456,16 +456,39 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 		t.Error("expected non-empty resource version for fischer list")
 	}
 
-	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "badname",
-		},
-	}, metav1.CreateOptions{})
-	if banFlunder && err == nil {
+	var lastErr error
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "badname",
+			},
+		}, metav1.CreateOptions{})
+
+		lastErr = err
+		if banFlunder {
+			// expect error, if creation succeeds, retry
+			if err == nil {
+				_ = wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "badname", metav1.DeleteOptions{})
+				return false, nil
+			}
+			// got expected error, stop polling
+			return true, err
+		} else {
+			// expect no error
+			if err != nil {
+				// Creation failed, retry
+				return false, nil
+			}
+			// Got expected success, stop polling
+			return true, nil
+		}
+	})
+
+	if banFlunder && lastErr == nil {
 		t.Fatal("expect flunder:badname not admitted when wardle feature gates are specified")
 	}
 	if !banFlunder {
-		if err != nil {
+		if lastErr != nil {
 			t.Fatal("expect flunder:badname admitted when wardle feature gates are not specified")
 		} else {
 			defer wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "badname", metav1.DeleteOptions{})
