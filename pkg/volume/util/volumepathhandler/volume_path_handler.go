@@ -96,10 +96,10 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	// Check and create mapPath
 	_, err := os.Stat(mapPath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("cannot validate map path: %s: %v", mapPath, err)
+		return fmt.Errorf("cannot validate map path: %s: %w", mapPath, err)
 	}
 	if err = os.MkdirAll(mapPath, 0750); err != nil {
-		return fmt.Errorf("failed to mkdir %s: %v", mapPath, err)
+		return fmt.Errorf("failed to mkdir %s: %w", mapPath, err)
 	}
 
 	if bindMount {
@@ -115,16 +115,16 @@ func mapBindMountDevice(devicePath string, mapPath string, linkName string) erro
 	file, err := os.Stat(linkPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to stat file %s: %v", linkPath, err)
+			return fmt.Errorf("failed to stat file %s: %w", linkPath, err)
 		}
 
 		// Create file
 		newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
 		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", linkPath, err)
+			return fmt.Errorf("failed to open file %s: %w", linkPath, err)
 		}
 		if err := newFile.Close(); err != nil {
-			return fmt.Errorf("failed to close file %s: %v", linkPath, err)
+			return fmt.Errorf("failed to close file %s: %w", linkPath, err)
 		}
 	} else {
 		// Check if device file
@@ -140,7 +140,7 @@ func mapBindMountDevice(devicePath string, mapPath string, linkName string) erro
 	// Bind mount file
 	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: utilexec.New()}
 	if err := mounter.MountSensitiveWithoutSystemd(devicePath, linkPath, "" /* fsType */, []string{"bind"}, nil); err != nil {
-		return fmt.Errorf("failed to bind mount devicePath: %s to linkPath %s: %v", devicePath, linkPath, err)
+		return fmt.Errorf("failed to bind mount devicePath: %s to linkPath %s: %w", devicePath, linkPath, err)
 	}
 
 	return nil
@@ -152,7 +152,7 @@ func mapSymlinkDevice(devicePath string, mapPath string, linkName string) error 
 	// stale across node reboot.
 	linkPath := filepath.Join(mapPath, string(linkName))
 	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
+		return fmt.Errorf("failed to remove file %s: %w", linkPath, err)
 	}
 	return os.Symlink(devicePath, linkPath)
 }
@@ -182,14 +182,14 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 		// Check if linkPath still exists
 		if _, err := os.Stat(linkPath); err != nil {
 			if !os.IsNotExist(err) {
-				return fmt.Errorf("failed to check if path %s exists: %v", linkPath, err)
+				return fmt.Errorf("failed to check if path %s exists: %w", linkPath, err)
 			}
 			// linkPath has already been removed
 			return nil
 		}
 		// Remove file
 		if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
+			return fmt.Errorf("failed to remove file %s: %w", linkPath, err)
 		}
 		return nil
 	}
@@ -197,12 +197,12 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 	// Unmount file
 	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: utilexec.New()}
 	if err := mounter.Unmount(linkPath); err != nil {
-		return fmt.Errorf("failed to unmount linkPath %s: %v", linkPath, err)
+		return fmt.Errorf("failed to unmount linkPath %s: %w", linkPath, err)
 	}
 
 	// Remove file
 	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
+		return fmt.Errorf("failed to remove file %s: %w", linkPath, err)
 	}
 
 	return nil
@@ -228,7 +228,7 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	klog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
 	err := os.RemoveAll(mapPath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove directory %s: %v", mapPath, err)
+		return fmt.Errorf("failed to remove directory %s: %w", mapPath, err)
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 			return false, nil
 		}
 		// Return error from Lstat()
-		return false, fmt.Errorf("failed to Lstat file %s: %v", mapPath, err)
+		return false, fmt.Errorf("failed to Lstat file %s: %w", mapPath, err)
 	}
 	// If file exits and it's symbolic link, return true and no error
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
@@ -270,7 +270,7 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 		}
 
 		// Return error from Lstat()
-		return false, fmt.Errorf("failed to Lstat file %s: %v", mapPath, err)
+		return false, fmt.Errorf("failed to Lstat file %s: %w", mapPath, err)
 	}
 	// If file exits and it's device, return true and no error
 	if fi.Mode()&os.ModeDevice == os.ModeDevice {
