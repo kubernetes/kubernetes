@@ -32,6 +32,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
@@ -49,7 +50,8 @@ import (
 )
 
 const (
-	maxConfigLength = 10 * 1 << 20 // 10MB
+	maxConfigLength      = 10 * 1 << 20 // 10MB
+	nodeCriticalPriority = schedulingapi.SystemCriticalPriority + 1000
 )
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
@@ -175,6 +177,11 @@ func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) 
 		}
 	}
 
+	warning := getStaticPodPriorityWarning(newPod)
+	if warning != "" {
+		logger.Info(warning, "pod", klog.KObj(newPod))
+	}
+
 	return true, v1Pod, nil
 }
 
@@ -221,4 +228,21 @@ func tryDecodePodList(logger klog.Logger, data []byte, defaultFn defaultFunc) (p
 		return true, pods, err
 	}
 	return true, *v1Pods, err
+}
+
+func getStaticPodPriorityWarning(pod *api.Pod) string {
+	podSpec := pod.Spec
+
+	switch {
+	case podSpec.Priority == nil && len(podSpec.PriorityClassName) > 0:
+		return "Static Pod has non-nil PriorityClassName and nil Priority. Kubelet will not make use of the priority. Mirror pod creation may fail."
+
+	case podSpec.Priority != nil && len(podSpec.PriorityClassName) == 0:
+		return "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority."
+
+	case podSpec.Priority != nil && (*podSpec.Priority != nodeCriticalPriority || podSpec.PriorityClassName != schedulingapi.SystemNodeCritical):
+		return fmt.Sprintf("Static Pod has a priority other than %d or a priorityClassName other than %s. Mirror Pod may be attempted to be evicted from the node ineffectively.", nodeCriticalPriority, schedulingapi.SystemNodeCritical)
+	}
+
+	return ""
 }
