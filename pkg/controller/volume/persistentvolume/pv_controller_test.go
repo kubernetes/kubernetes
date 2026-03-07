@@ -87,11 +87,13 @@ func TestControllerSync(t *testing.T) {
 			name:            "5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
 			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
 			expectedVolumes: volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			initialClaims:   withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
+			initialClaims:   noclaims,
 			expectedClaims:  withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				claim := withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil))[0]
+				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
@@ -371,6 +373,7 @@ func TestControllerSync(t *testing.T) {
 			return len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
 				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
 		})
+
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
