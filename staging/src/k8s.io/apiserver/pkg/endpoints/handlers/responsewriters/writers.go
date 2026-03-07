@@ -99,7 +99,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		attribute.String("mediaType", mediaType),
 		attribute.String("encoder", string(encoder.Identifier())))
 	req = req.WithContext(ctx)
-	defer span.End(5 * time.Second)
+	defer span.End(0 * time.Second)
 
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
@@ -109,7 +109,8 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		ctx:             ctx,
 	}
 
-	err := encoder.Encode(object, w)
+	traceW := span.WrapWriter(w, "Encoding")
+	err := encoder.Encode(object, traceW)
 	if err == nil {
 		err = w.Close()
 		if err != nil {
@@ -200,6 +201,7 @@ type deferredResponseWriter struct {
 	hasWritten  bool
 	hw          http.ResponseWriter
 	w           io.Writer
+	gzipWriter  *gzip.Writer
 	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
 	totalBytes int
 	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
@@ -257,25 +259,23 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	w.hasWritten = true
 
 	hw := w.hw
+	span := tracing.SpanFromContext(w.ctx)
+	networkW := span.WrapWriter(hw, "Network")
+
 	header := hw.Header()
 	switch {
-	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
+	case w.contentEncoding == "gzip":
 		header.Set("Content-Encoding", "gzip")
 		header.Add("Vary", "Accept-Encoding")
 
 		gw := gzipPool.Get().(*gzip.Writer)
-		gw.Reset(hw)
-
-		w.w = gw
+		gw.Reset(networkW)
+		w.gzipWriter = gw
+		w.w = span.WrapWriter(gw, "gzip")
 	default:
-		w.w = hw
+		w.w = networkW
 	}
 
-	span := tracing.SpanFromContext(w.ctx)
-	span.AddEvent("About to start writing response",
-		attribute.String("writer", fmt.Sprintf("%T", w.w)),
-		attribute.Int("size", len(p)),
-	)
 
 	header.Set("Content-Type", w.mediaType)
 	hw.WriteHeader(w.statusCode)
@@ -310,11 +310,11 @@ func (w *deferredResponseWriter) Close() (err error) {
 		return err
 	}
 
-	switch t := w.w.(type) {
-	case *gzip.Writer:
-		err = t.Close()
-		t.Reset(nil)
-		gzipPool.Put(t)
+	if w.gzipWriter != nil {
+		err = w.gzipWriter.Close()
+		w.gzipWriter.Reset(nil)
+		gzipPool.Put(w.gzipWriter)
+		w.gzipWriter = nil
 	}
 	return err
 }
