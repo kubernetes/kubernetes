@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiserverfeat "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
@@ -44,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
+	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
 	"k8s.io/cloud-provider/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
@@ -571,7 +575,7 @@ users:
 		"--authentication-skip-lookup",
 		"--authentication-kubeconfig", apiserverConfig.Name(),
 		"--authorization-kubeconfig", apiserverConfig.Name(),
-		"--authorization-always-allow-paths", "/statusz,/flagz",
+		"--authorization-always-allow-paths", "/statusz,/flagz,/configz",
 		"--kubeconfig", apiserverConfig.Name(),
 		"--leader-elect=false",
 	}
@@ -591,6 +595,7 @@ users:
 	}
 	statuszURL := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
 	flagzURL := fmt.Sprintf("https://127.0.0.1:%s/flagz", port)
+	configzURL := fmt.Sprintf("https://127.0.0.1:%s/configz", port)
 
 	// read self-signed server cert disk
 	pool := x509.NewCertPool()
@@ -688,6 +693,55 @@ users:
 			}
 		})
 	}
+
+	t.Run("configz", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, configzURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+		r, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to GET /configz: %v", err)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		defer func() {
+			_ = r.Body.Close()
+		}()
+
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("want status %d, got %d", http.StatusOK, r.StatusCode)
+		}
+
+		var configz map[string]unstructured.Unstructured
+		if err := json.Unmarshal(body, &configz); err != nil {
+			t.Fatalf("failed to unmarshal configz: %v", err)
+		}
+		cfg, ok := configz["kubecontrollermanager.config.k8s.io"]
+		if !ok {
+			t.Fatalf("configz missing 'kubecontrollermanager.config.k8s.io' key")
+		}
+		if cfg.GetAPIVersion() != "kubecontrollermanager.config.k8s.io/v1alpha1" {
+			t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+		}
+		if cfg.GetKind() != "KubeControllerManagerConfiguration" {
+			t.Errorf("unexpected Kind: %s", cfg.GetKind())
+		}
+
+		// confirm that they expose public config type
+		var kcmConfig kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration
+		err = json.Unmarshal(body, &struct {
+			ComponentConfig *kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration `json:"kubecontrollermanager.config.k8s.io"`
+		}{ComponentConfig: &kcmConfig})
+		if err != nil {
+			t.Errorf("failed to deserialize into public config type: %v", err)
+		}
+	})
 }
 
 func TestKubeControllerManagerInformerMetrics(t *testing.T) {
@@ -836,4 +890,150 @@ users:
 	if !foundKCM {
 		t.Errorf("expected to find informer_queued_items metric with name=\"kube-controller-manager\" label")
 	}
+}
+
+func TestCloudControllerManagerServingZPages(t *testing.T) {
+	if !cloudprovider.IsCloudProvider("fake") {
+		cloudprovider.RegisterCloudProvider("fake", fakeCloudProviderFactory)
+	}
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(tokenFile, "\n%s,system:cloud-controller-manager,system:cloud-controller-manager,\"\"\n", token); err != nil {
+		t.Fatal(err)
+	}
+	if err = tokenFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(apiserverConfig, `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: cloud-controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: cloud-controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	flags := []string{
+		"--authentication-skip-lookup",
+		"--authentication-kubeconfig", apiserverConfig.Name(),
+		"--authorization-kubeconfig", apiserverConfig.Name(),
+		"--authorization-always-allow-paths", "/statusz,/flagz,/configz",
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+		"--cloud-provider=fake",
+		"--webhook-secure-port=0",
+	}
+	secureOptions, secureInfo, tearDownFn, err := cloudControllerManagerTester{}.StartTestServer(t, ctx, flags)
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	if secureInfo == nil {
+		t.Fatalf("SecureServing not enabled")
+	}
+	_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+	}
+	configzURL := fmt.Sprintf("https://127.0.0.1:%s/configz", port)
+
+	// read self-signed server cert disk
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+	client := &http.Client{Transport: tr}
+
+	t.Run("configz", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, configzURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+		r, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to GET /configz: %v", err)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		defer func() {
+			_ = r.Body.Close()
+		}()
+
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("want status %d, got %d", http.StatusOK, r.StatusCode)
+		}
+
+		var configz map[string]unstructured.Unstructured
+		if err := json.Unmarshal(body, &configz); err != nil {
+			t.Fatalf("failed to unmarshal configz: %v", err)
+		}
+		cfg, ok := configz["cloudcontrollermanager.config.k8s.io"]
+		if !ok {
+			t.Fatalf("configz missing 'cloudcontrollermanager.config.k8s.io' key")
+		}
+		if cfg.GetAPIVersion() != "cloudcontrollermanager.config.k8s.io/v1alpha1" {
+			t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+		}
+		if cfg.GetKind() != "CloudControllerManagerConfiguration" {
+			t.Errorf("unexpected Kind: %s", cfg.GetKind())
+		}
+
+		// confirm that they expose public config type
+		var ccmConfig cloudproviderconfigv1alpha1.CloudControllerManagerConfiguration
+		err = json.Unmarshal(body, &struct {
+			ComponentConfig *cloudproviderconfigv1alpha1.CloudControllerManagerConfiguration `json:"cloudcontrollermanager.config.k8s.io"`
+		}{ComponentConfig: &ccmConfig})
+		if err != nil {
+			t.Errorf("failed to deserialize into public config type: %v", err)
+		}
+	})
 }

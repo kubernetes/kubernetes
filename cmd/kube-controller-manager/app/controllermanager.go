@@ -30,6 +30,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,10 +77,12 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	configv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	configv1alpha1conversion "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
@@ -196,10 +199,16 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
 	defer c.EventBroadcaster.Shutdown()
 
-	if cfgz, err := configz.New(ConfigzName); err == nil {
-		cfgz.Set(c.ComponentConfig)
-	} else {
-		logger.Error(err, "Unable to register configz")
+	externalConfig := &configv1alpha1.KubeControllerManagerConfiguration{}
+	if err := configv1alpha1conversion.Convert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(&c.ComponentConfig, externalConfig, nil); err != nil {
+		return fmt.Errorf("unable to convert configz: %w", err)
+	}
+	externalConfig.SetGroupVersionKind(configv1alpha1.SchemeGroupVersion.WithKind("KubeControllerManagerConfiguration"))
+
+	if cfgz, err := configz.New(ConfigzName); err != nil {
+		return fmt.Errorf("unable to register configz: %w", err)
+	} else if err := cfgz.Set(externalConfig); err != nil {
+		return fmt.Errorf("unable to set configz: %w", err)
 	}
 
 	// Setup any healthz checks we will want to use.
