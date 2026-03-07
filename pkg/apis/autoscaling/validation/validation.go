@@ -354,10 +354,7 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"), opts)...)
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
-	}
+	allErrs = append(allErrs, validateValueOrAverageValue(src.Target, fldPath.Child("target"))...)
 
 	return allErrs
 }
@@ -367,14 +364,7 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
-	}
-
-	if src.Target.Value != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("value"), "may not set both a target value for metric and a per-pod target"))
-	}
+	allErrs = append(allErrs, validateValueOrAverageValue(src.Target, fldPath.Child("target"))...)
 
 	return allErrs
 }
@@ -408,14 +398,7 @@ func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSou
 	}
 
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
-	}
-
-	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
-	}
+	allErrs = append(allErrs, validateUtilizationOrAverageValue(src.Target, fldPath.Child("target"))...)
 
 	return allErrs
 }
@@ -428,14 +411,7 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 	}
 
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
-	}
-
-	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
-	}
+	allErrs = append(allErrs, validateUtilizationOrAverageValue(src.Target, fldPath.Child("target"))...)
 
 	return allErrs
 }
@@ -477,6 +453,41 @@ func validateMetricIdentifier(id autoscaling.MetricIdentifier, fldPath *field.Pa
 		for _, msg := range content.IsPathSegmentName(id.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), id.Name, msg))
 		}
+	}
+	return allErrs
+}
+
+func validateValueOrAverageValue(target autoscaling.MetricTarget, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if target.Value == nil && target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("averageValue"),
+			"must set either a target value or averageValue"))
+	}
+
+	if target.Value != nil && target.AverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("value"),
+			"must not set both a target value or averageValue"))
+	}
+
+	return allErrs
+}
+
+func validateUtilizationOrAverageValue(target autoscaling.MetricTarget, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if target.AverageUtilization == nil && target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("averageUtilization"),
+			"must set either a target raw value or a target utilization",
+		))
+	}
+
+	if target.AverageUtilization != nil && target.AverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(
+			fldPath.Child("averageValue"),
+			"must not set both a target raw value and a target utilization",
+		))
 	}
 	return allErrs
 }
