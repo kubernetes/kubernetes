@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+const processEventConcurrency = 10
+
 // Decoder implements the watch.Decoder interface for io.ReadClosers that
 // have contents which consist of a series of watchEvent objects encoded
 // with the given streaming decoder. The internal objects will be then
@@ -46,17 +48,9 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 // if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 	var got metav1.WatchEvent
-	res, _, err := d.decoder.Decode(nil, &got)
+	got, err := decodeWatchEvent(d.decoder)
 	if err != nil {
 		return "", nil, err
-	}
-	if res != &got {
-		return "", nil, fmt.Errorf("unable to decode to metav1.WatchEvent")
-	}
-	switch got.Type {
-	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
-	default:
-		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}
 
 	obj, err := runtime.Decode(d.embeddedDecoder, got.Object.Raw)
@@ -64,6 +58,91 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
 	return watch.EventType(got.Type), obj, nil
+}
+
+func decodeWatchEvent(decoder streaming.Decoder) (metav1.WatchEvent, error) {
+	var got metav1.WatchEvent
+	res, _, err := decoder.Decode(nil, &got)
+	if err != nil {
+		return metav1.WatchEvent{}, err
+	}
+	if res != &got {
+		return metav1.WatchEvent{}, fmt.Errorf("unable to decode to metav1.WatchEvent")
+	}
+	switch got.Type {
+	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
+	default:
+		return metav1.WatchEvent{}, fmt.Errorf("got invalid watch event type: %v", got.Type)
+	}
+	return got, nil
+}
+
+func (d *Decoder) ConcurrentDecode() <-chan *watch.EventData {
+	p := concurrentOrderedEventProcessing{
+		resultChan:      make(chan *watch.EventData, processEventConcurrency-1),
+		processingQueue: make(chan chan *watch.EventData, processEventConcurrency-1),
+		decoder:         d.decoder,
+		embeddedDecoder: d.embeddedDecoder,
+	}
+	go func() {
+		p.scheduleEventProcessing()
+	}()
+	go func() {
+		p.collectEventProcessing()
+	}()
+	return p.resultChan
+}
+
+type concurrentOrderedEventProcessing struct {
+	resultChan      chan *watch.EventData
+	processingQueue chan chan *watch.EventData
+	decoder         streaming.Decoder
+	embeddedDecoder runtime.Decoder
+}
+
+func (p *concurrentOrderedEventProcessing) scheduleEventProcessing() {
+	for {
+		got, err := decodeWatchEvent(p.decoder)
+		processingResponse := make(chan *watch.EventData, 1)
+		p.processingQueue <- processingResponse
+		go func(watchEvent *metav1.WatchEvent, response chan<- *watch.EventData) {
+			pr := &watch.EventData{
+				Action: watch.EventType(watchEvent.Type),
+			}
+			if err != nil {
+				pr.Err = err
+			} else {
+				obj, err := runtime.Decode(p.embeddedDecoder, got.Object.Raw)
+				if err != nil {
+					pr.Err = fmt.Errorf("unable to decode watch event: %v", err)
+				} else {
+					pr.Object = obj
+				}
+			}
+			response <- pr
+		}(&got, processingResponse)
+		if err != nil {
+			// close decoder reader
+			p.decoder.Close()
+			return
+		}
+	}
+}
+
+func (p *concurrentOrderedEventProcessing) collectEventProcessing() {
+	for {
+		processingResponse, ok := <-p.processingQueue
+		if !ok {
+			return
+		}
+		r := <-processingResponse
+		p.resultChan <- r
+		if r.Err != nil {
+			// after send error, close resultChan
+			close(p.resultChan)
+			return
+		}
+	}
 }
 
 // Close closes the underlying r.
