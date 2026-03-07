@@ -3933,6 +3933,27 @@ type PodSpec struct {
 	// +featureGate=GenericWorkload
 	// +optional
 	WorkloadRef *WorkloadReference
+	// EvictionInterceptors reference interceptors that respond to EvictionRequests.
+	// Interceptors should observe and communicate through the EvictionRequest API to help with
+	// the graceful termination of a pod. The interceptors are selected sequentially, in the order
+	// in which they appear in the list.
+	//
+	// Interceptors should periodically report on an eviction progress by updating the
+	// .status.interceptors[].heartbeatTime field of the EvictionRequest object. If this field is
+	// not updated within 20 minutes, the eviction request is passed over to the next interceptor at
+	// a higher index. If there is no other interceptor, the last default imperative-eviction.k8s.io
+	// interceptor will evict the pod using the imperative Eviction API (/evict endpoint).
+	//
+	// The maximum length of the interceptors list is 15.
+	// Interceptors are not supported when the pod is part of a workload (.spec.workloadRef is set).
+	// This field is immutable.
+	// +featureGate=EvictionRequestAPI
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	EvictionInterceptors []EvictionInterceptor
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
@@ -4535,6 +4556,19 @@ type EphemeralContainer struct {
 	// support namespace targeting then the result of setting this field is undefined.
 	// +optional
 	TargetContainerName string
+}
+
+// EvictionInterceptor allows you to identify the interceptor responding to the EvictionRequest.
+// Interceptors should observe and communicate through the EvictionRequest API to help with
+// the graceful eviction of a target (e.g. termination of a pod).
+// +structType=atomic
+type EvictionInterceptor struct {
+	// Name must be a fully qualified domain name of at most 253 characters in length, consisting
+	// only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com).
+	// This field must be unique for each interceptor.
+	// This field is required.
+	// +required
+	Name string
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

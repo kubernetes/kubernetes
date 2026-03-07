@@ -97,6 +97,11 @@ func (in HPAControllerConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImperativeEvictionInterceptorControllerConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kube-controller-manager.config.v1alpha1.ImperativeEvictionInterceptorControllerConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in JobControllerConfiguration) OpenAPIModelName() string {
 	return "io.k8s.kube-controller-manager.config.v1alpha1.JobControllerConfiguration"
 }

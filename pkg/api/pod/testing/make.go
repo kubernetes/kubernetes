@@ -256,6 +256,12 @@ func SetWorkloadRef(workloadRef *api.WorkloadReference) Tweak {
 	}
 }
 
+func SetEvictionInterceptors(evictionInterceptors ...api.EvictionInterceptor) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.EvictionInterceptors = evictionInterceptors
+	}
+}
+
 func MakeContainer(name string, tweaks ...TweakContainer) api.Container {
 	cnr := api.Container{
 		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent",

@@ -14588,6 +14588,23 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated workloadRef",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetEvictionInterceptors(core.EvictionInterceptor{
+					Name: "foo.example.com",
+				}, core.EvictionInterceptor{
+					Name: "bar.example.com",
+				}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetEvictionInterceptors(core.EvictionInterceptor{
+					Name: "foo.example.com",
+				}, core.EvictionInterceptor{
+					Name: "new.example.com",
+				}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated eviction interceptors",
 		},
 	}
 
@@ -23063,6 +23080,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.StartupProbe",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeDevices[*]",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
+		"EvictionInterceptors[*].Name",
 		"HostAliases",
 		"Hostname",
 		"HostnameOverride",
@@ -30608,6 +30626,199 @@ func TestValidateWorkloadReference(t *testing.T) {
 		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+func TestValidateEvictionInterceptors(t *testing.T) {
+	successCases := map[string]*core.Pod{
+		"none": podtest.MakePod("", podtest.SetEvictionInterceptors()),
+		"correct": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.example.com",
+			},
+		)),
+		"multiple": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.example.com",
+			}, core.EvictionInterceptor{
+				Name: "bar.example.com",
+			},
+		)),
+	}
+	for name, pod := range successCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	var maxLimitInterceptors []core.EvictionInterceptor
+	for i := range 16 {
+		maxLimitInterceptors = append(maxLimitInterceptors, core.EvictionInterceptor{
+			Name: fmt.Sprintf("%d-foo.example.com", i),
+		})
+	}
+
+	failureCases := map[string]*core.Pod{
+		"workload not supported": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.example.com",
+			},
+		), podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"max items": podtest.MakePod("", podtest.SetEvictionInterceptors(maxLimitInterceptors...)),
+		"duplicate": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.example.com",
+			}, core.EvictionInterceptor{
+				Name: "bar.example.com",
+			}, core.EvictionInterceptor{
+				Name: "foo.example.com",
+			},
+		)),
+		"empty name": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "",
+			}, core.EvictionInterceptor{
+				Name: "foo.example.com",
+			},
+		)),
+		"invalid": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "Invalid ",
+			},
+		)),
+		"reserved suffix k8s.io": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.k8s.io",
+			},
+		)),
+		"reserved suffix kubernetes.io": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.kubernetes.io",
+			},
+		)),
+		"two segments": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "example.com",
+			},
+		)),
+		"with path": podtest.MakePod("", podtest.SetEvictionInterceptors(
+			core.EvictionInterceptor{
+				Name: "foo.example.com/bar",
+			},
+		)),
+	}
+	for name, pod := range failureCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+func TestValidateEvictionRequestParticipantName(t *testing.T) {
+	goodValues := []string{
+		"dev.foo.io",
+		"foo.example.com",
+		"this.is.a.really.long.fqdn",
+		"bbc.co.uk",
+		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
+		"hyphens-are-good.foo.io",
+		strings.Repeat("a", 63) + ".foo.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 54) + ".foo.io",
+	}
+	for _, val := range goodValues {
+		if err := ValidateEvictionRequestParticipantName(field.NewPath(""), val, EvictionRequestParticipantReservedSuffixes).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		"",
+		" ",
+		".",
+		"...",
+		".io",
+		"com",
+		".com",
+		"a.com",
+		"k8s.io",
+		".k8s.io",
+		"Dev.k8s.io",
+		"dev.k8s.io.",
+		"dev.k8s.io",
+		"dev.K8s.io",
+		"kubernetes.io",
+		".kubernetes.io",
+		"Dev.kubernetes.io",
+		"dev.kubernetes.io.",
+		"dev.kubernetes.io",
+		"dev.Kubernetes.io",
+		".foo.example.com",
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+		"underscores_are_bad.k8s.io",
+		"foo@bar.example.com",
+		"http://foo.example.com",
+		strings.Repeat("a", 64) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := ValidateEvictionRequestParticipantName(field.NewPath(""), val, EvictionRequestParticipantReservedSuffixes).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
+		}
+	}
+}
+
+func TestValidateForbiddenReservedSuffixes(t *testing.T) {
+	goodValues := []string{
+		"dev-kubernetes.io",
+		"dev-k8s.io",
+		"dev-k8s.io",
+		"foo.dev-k8s.io",
+		"this.is.a.really.long.fqdn",
+		"bbc.co.uk",
+		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
+		"hyphens-are-good.foo.io",
+		strings.Repeat("a", 63) + ".foo.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 54) + ".foo.io",
+	}
+	for _, val := range goodValues {
+		if err := validateForbiddenReservedSuffixes(field.NewPath(""), val, "domain names", EvictionRequestParticipantReservedSuffixes).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		"k8s.io",
+		"k8s.io.",
+		".k8s.io",
+		"Dev.k8s.io",
+		"dev.k8s.io...",
+		"dev.k8s.io",
+		"dev.K8s.io",
+		"kubernetes.io",
+		".kubernetes.io",
+		"...kubernetes.io.",
+		"Dev.kubernetes.io",
+		"dev.kubernetes.io.",
+		"dev.kubernetes.io. ",
+		"dev.kubernetes.io",
+		" dev.kubernetes.io",
+		"dev.kubernetes.io ",
+		"dev.Kubernetes.io",
+		strings.Repeat("a", 64) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := validateForbiddenReservedSuffixes(field.NewPath(""), val, "domain names", EvictionRequestParticipantReservedSuffixes).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
 		}
 	}
 }

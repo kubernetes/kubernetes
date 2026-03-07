@@ -194,6 +194,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,H
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerInitialReadinessDelay
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ImperativeEvictionInterceptorControllerConfiguration,ConcurrentImperativeEvictionInterceptorControllerSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
@@ -209,6 +210,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,GarbageCollectorController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,Generic
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,HPAController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ImperativeEvictionInterceptorController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,JobController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,KubeCloudShared
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,LegacySATokenCleaner

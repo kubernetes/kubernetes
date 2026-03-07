@@ -102,6 +102,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ServiceCIDRController,
 		names.StorageVersionMigratorController,
 		names.SELinuxWarningController,
+		names.ImperativeEvictionInterceptorController,
 	)
 
 	for _, name := range KnownControllers() {

@@ -90,6 +90,9 @@ var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
 
+// UUIDPattern Regex for UUID that allows uppercase
+var uuidRegex = regexp.MustCompile(`(?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$`)
+
 var allowedEphemeralContainerFields = map[string]bool{
 	"Name":                     true,
 	"Image":                    true,
@@ -120,6 +123,8 @@ var allowedEphemeralContainerFields = map[string]bool{
 // In future, they can be expanded to values from
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
+
+var EvictionRequestParticipantReservedSuffixes = []string{".k8s.io", ".kubernetes.io"}
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -363,6 +368,15 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
 	}
 	return allErrs
+}
+
+// IsUUID can be used to check whether the given value is valid UUID in RFC 4122 normalized form, upper case is allowed
+func IsUUID(value string) []string {
+	var errors []string
+	if !uuidRegex.MatchString(value) {
+		errors = append(errors, "must be UUID in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters")
+	}
+	return errors
 }
 
 // validateOverhead can be used to check whether the given Overhead is valid.
@@ -4729,6 +4743,17 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.WorkloadRef != nil {
 		allErrs = append(allErrs, validateWorkloadReference(spec.WorkloadRef, fldPath.Child("workloadRef"))...)
+	}
+
+	if len(spec.EvictionInterceptors) > 0 {
+		if spec.WorkloadRef != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("evictionInterceptors"), fmt.Sprintf("eviction interceptors are not supported when %v is set", fldPath.Child("workloadRef"))))
+		} else {
+			allErrs = append(allErrs, ValidateEvictionInterceptors(spec.EvictionInterceptors, fldPath.Child("evictionInterceptors"), EvictionInterceptorValidationOptions{
+				MaxItems:                  15,
+				ForbiddenReservedSuffixes: EvictionRequestParticipantReservedSuffixes,
+			})...)
+		}
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -9664,5 +9689,77 @@ func validateVolumeStatus(volumeStatus core.VolumeStatus, fldPath *field.Path) f
 		allErrors = append(allErrors, field.Forbidden(fldPath, "may not specify more than 1 volume type"))
 	}
 
+	return allErrors
+}
+
+type EvictionInterceptorValidationOptions struct {
+	MaxItems                     int
+	ForbiddenReservedSuffixes    []string
+	MarkDeclarativeErrorsCovered bool
+}
+
+func ValidateEvictionInterceptors(evictionInterceptors []core.EvictionInterceptor, fldPath *field.Path, opts EvictionInterceptorValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if len(evictionInterceptors) > opts.MaxItems {
+		maxItemsError := field.TooMany(fldPath, len(evictionInterceptors), opts.MaxItems).WithOrigin("maxItems")
+		if opts.MarkDeclarativeErrorsCovered {
+			maxItemsError = maxItemsError.MarkCoveredByDeclarative()
+		}
+		return append(allErrs, maxItemsError)
+	}
+	uniqueErrors := validate.Unique(context.TODO(), operation.Operation{}, fldPath, evictionInterceptors, nil,
+		func(a core.EvictionInterceptor, b core.EvictionInterceptor) bool { return a.Name == b.Name })
+	if opts.MarkDeclarativeErrorsCovered {
+		uniqueErrors = uniqueErrors.MarkCoveredByDeclarative()
+	}
+	allErrs = append(allErrs, uniqueErrors...)
+
+	for i, interceptor := range evictionInterceptors {
+		namePath := fldPath.Index(i).Child("name")
+		if len(interceptor.Name) == 0 {
+			// TODO: EvictionInterceptor.Name should have +k8s:required once Pod moves to declarative validation
+			allErrs = append(allErrs, field.Required(namePath, ""))
+		} else {
+			allErrs = append(allErrs, ValidateEvictionRequestParticipantName(namePath, interceptor.Name, opts.ForbiddenReservedSuffixes)...)
+		}
+	}
+	return allErrs
+}
+
+// ValidateEvictionRequestParticipantName validates similar to IsFullyQualifiedDomainName and IsFullyQualifiedName with a couple of differences:
+// - domain name must not end with a dot
+// - domain must have at least three segments
+// - each segment must be a DNS1123Label
+// - reservedSuffixes are not being used
+func ValidateEvictionRequestParticipantName(fldPath *field.Path, name string, reservedSuffixes []string) field.ErrorList {
+	var allErrors field.ErrorList
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) > 0 {
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+	}
+	if len(strings.Split(name, ".")) < 3 {
+		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least three segments separated by dots"))
+	}
+	for label := range strings.SplitSeq(name, ".") {
+		if errs := validation.IsDNS1123Label(label); len(errs) > 0 {
+			return append(allErrors, field.Invalid(fldPath, label, strings.Join(errs, ",")))
+		}
+	}
+	return append(allErrors, validateForbiddenReservedSuffixes(fldPath, name, "domain names", reservedSuffixes)...)
+}
+
+// validateForbiddenReservedSuffixes checks that the reservedSuffixes are not being used
+func validateForbiddenReservedSuffixes(fldPath *field.Path, value string, suffixesName string, reservedSuffixes []string) field.ErrorList {
+	var allErrors field.ErrorList
+	for _, suffix := range reservedSuffixes {
+		cleanValue := strings.TrimRight(strings.TrimSpace(strings.ToLower(value)), ".")
+		if strings.HasSuffix(cleanValue, suffix) || cleanValue == strings.Trim(suffix, ".") {
+			var userFormattedPrefixes []string
+			for _, reservedSuffix := range reservedSuffixes {
+				userFormattedPrefixes = append(userFormattedPrefixes, "*"+reservedSuffix)
+			}
+			return append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("%s %s are reserved", suffixesName, strings.Join(userFormattedPrefixes, ", "))))
+		}
+	}
 	return allErrors
 }

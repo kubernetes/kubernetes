@@ -1793,7 +1793,12 @@
       "name": "nameValue",
       "podGroup": "podGroupValue",
       "podGroupReplicaKey": "podGroupReplicaKeyValue"
-    }
+    },
+    "evictionInterceptors": [
+      {
+        "name": "nameValue"
+      }
+    ]
   },
   "status": {
     "observedGeneration": 17,
