@@ -135,6 +135,35 @@ func TestBroadcasterShutdown(t *testing.T) {
 	goleak.VerifyNone(t)
 }
 
+// TestStartEventWatcherExitsOnDirectShutdown is a regression test for the
+// hot-loop that occurred when Broadcaster.Shutdown() closed the watcher's
+// result channel before the cancellation context was cancelled.
+//
+// When NewBroadcaster is called without a context, Shutdown() sequentially:
+//
+//  1. Calls e.Broadcaster.Shutdown() → watcher result channels are closed via
+//     closeAll(); all queued events have already been delivered at this point.
+//  2. Calls e.cancel() → cancelationCtx is cancelled.
+//
+// Between steps 1 and 2 there is a window where ResultChan() is closed but
+// cancelationCtx.Done() has not yet fired. The goroutine inside
+// StartEventWatcher must detect the closed channel (ok == false) and return
+// cleanly instead of spinning. goleak.VerifyTestMain (installed in
+// main_test.go) will report a leaked goroutine if the fix regresses.
+func TestStartEventWatcherExitsOnDirectShutdown(t *testing.T) {
+	// No context → haveCtxCancelation is false, so no background Broadcaster
+	// shutdown goroutine; Shutdown() is fully synchronous here.
+	caster := NewBroadcaster(WithSleepDuration(0))
+	caster.StartStructuredLogging(0)
+
+	// Direct shutdown: closes watcher channels first, then cancels context.
+	caster.Shutdown()
+
+	// goleak.VerifyTestMain checks for leaks across the whole test binary, but
+	// explicitly verifying here surfaces any regression in this specific path.
+	goleak.VerifyNone(t)
+}
+
 func TestNonRacyShutdown(t *testing.T) {
 	// Attempt to simulate previously racy conditions, and ensure that no race
 	// occurs: Nominally, calling "Eventf" *followed by* shutdown from the same
