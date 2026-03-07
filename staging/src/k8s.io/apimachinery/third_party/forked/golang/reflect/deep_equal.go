@@ -345,10 +345,10 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.Slice:
-		if v1.IsNil() || v1.Len() == 0 {
+		if v1.IsNil() {
 			return true
 		}
-		if v1.Len() > v2.Len() {
+		if v1.Len() != v2.Len() {
 			return false
 		}
 		if v1.Pointer() == v2.Pointer() {

@@ -150,8 +150,8 @@ func TestDerivatives(t *testing.T) {
 		{[]string{}, []string(nil), true},
 		{[]string(nil), []string{}, true},
 		{[]string{"1"}, []string(nil), false},
-		{[]string{}, []string{"1", "2", "3"}, true},
-		{[]string{"1"}, []string{"1", "2", "3"}, true},
+		{[]string{}, []string{"1", "2", "3"}, false},
+		{[]string{"1"}, []string{"1", "2", "3"}, false},
 		{[]string{"1", "2", "3"}, []string{}, false},
 	}
 
