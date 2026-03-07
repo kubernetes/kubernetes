@@ -99,7 +99,7 @@ func (v neqTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:              v.TagName(),
 		StabilityLevel:   TagStabilityLevelAlpha,
-		Scopes:           v.ValidScopes().UnsortedList(),
+		Scopes:           sets.List(v.ValidScopes()),
 		Description:      "Verifies the field's value is not equal to a specific disallowed value. Supports string, integer, and boolean types.",
 		PayloadsRequired: true,
 		PayloadsType:     codetags.ValueTypeRaw,

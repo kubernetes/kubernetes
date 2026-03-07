@@ -87,7 +87,7 @@ func (itv ifTagValidator) Docs() TagDoc {
 			Type:        codetags.ArgTypeString,
 			Required:    true,
 		}},
-		Scopes: itv.ValidScopes().UnsortedList(),
+		Scopes: sets.List(itv.ValidScopes()),
 	}
 
 	doc.PayloadsType = codetags.ValueTypeTag

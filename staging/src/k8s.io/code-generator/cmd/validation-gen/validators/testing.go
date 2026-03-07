@@ -128,7 +128,7 @@ func (frtv fixedResultTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            frtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         frtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(frtv.ValidScopes()),
 	}
 	doc.PayloadsType = codetags.ValueTypeString
 	if frtv.error {
