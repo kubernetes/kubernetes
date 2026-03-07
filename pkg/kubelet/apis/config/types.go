@@ -316,6 +316,14 @@ type KubeletConfiguration struct {
 	MaxOpenFiles int64
 	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
 	NodeStatusMaxImages int32
+	// systemMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System memory contention pressure.
+	SystemMemoryContentionThreshold float64
+	// systemDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System disk contention pressure.
+	SystemDiskContentionThreshold float64
+	// kubepodsMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods memory contention pressure.
+	KubepodsMemoryContentionThreshold float64
+	// kubepodsDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods disk contention pressure.
+	KubepodsDiskContentionThreshold float64
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver

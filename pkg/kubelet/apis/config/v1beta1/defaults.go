@@ -160,6 +160,18 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.ImageGCLowThresholdPercent == nil {
 		obj.ImageGCLowThresholdPercent = ptr.To[int32](80)
 	}
+	if obj.SystemMemoryContentionThreshold == nil {
+		obj.SystemMemoryContentionThreshold = ptr.To[float64](0.9)
+	}
+	if obj.SystemDiskContentionThreshold == nil {
+		obj.SystemDiskContentionThreshold = ptr.To[float64](0.9)
+	}
+	if obj.KubepodsMemoryContentionThreshold == nil {
+		obj.KubepodsMemoryContentionThreshold = ptr.To[float64](0.9)
+	}
+	if obj.KubepodsDiskContentionThreshold == nil {
+		obj.KubepodsDiskContentionThreshold = ptr.To[float64](0.9)
+	}
 	if obj.VolumeStatsAggPeriod == zeroDuration {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 	}

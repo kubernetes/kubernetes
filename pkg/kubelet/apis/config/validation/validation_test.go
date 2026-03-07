@@ -93,6 +93,10 @@ var (
 		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 3 * time.Second},
 		},
+		SystemMemoryContentionThreshold:   0.9,
+		SystemDiskContentionThreshold:     0.9,
+		KubepodsMemoryContentionThreshold: 0.9,
+		KubepodsDiskContentionThreshold:   0.9,
 	}
 )
 
@@ -764,6 +768,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.ImageMinimumGCAge = metav1.Duration{Duration: 1 * time.Nanosecond}
 				return conf
 			},
+		}, {
+			name: "invalid SystemMemoryContentionThreshold set to 0",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.SystemMemoryContentionThreshold = 0
+				return conf
+			},
+			errMsg: "invalid configuration: systemMemoryContentionThreshold 0 must be greater than 0 and less than or equal to 1",
 		},
 	}
 

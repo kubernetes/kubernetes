@@ -449,6 +449,26 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.SystemMemoryContentionThreshold != nil {
+		in, out := &in.SystemMemoryContentionThreshold, &out.SystemMemoryContentionThreshold
+		*out = new(float64)
+		**out = **in
+	}
+	if in.SystemDiskContentionThreshold != nil {
+		in, out := &in.SystemDiskContentionThreshold, &out.SystemDiskContentionThreshold
+		*out = new(float64)
+		**out = **in
+	}
+	if in.KubepodsMemoryContentionThreshold != nil {
+		in, out := &in.KubepodsMemoryContentionThreshold, &out.KubepodsMemoryContentionThreshold
+		*out = new(float64)
+		**out = **in
+	}
+	if in.KubepodsDiskContentionThreshold != nil {
+		in, out := &in.KubepodsDiskContentionThreshold, &out.KubepodsDiskContentionThreshold
+		*out = new(float64)
+		**out = **in
+	}
 	if in.KubeAPIQPS != nil {
 		in, out := &in.KubeAPIQPS, &out.KubeAPIQPS
 		*out = new(int32)

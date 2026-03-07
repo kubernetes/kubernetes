@@ -518,6 +518,22 @@ type KubeletConfiguration struct {
 	// Default: 50
 	// +optional
 	NodeStatusMaxImages *int32 `json:"nodeStatusMaxImages,omitempty"`
+	// systemMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System memory contention pressure.
+	// Default: 0.9
+	// +optional
+	SystemMemoryContentionThreshold *float64 `json:"systemMemoryContentionThreshold,omitempty"`
+	// systemDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System disk contention pressure.
+	// Default: 0.9
+	// +optional
+	SystemDiskContentionThreshold *float64 `json:"systemDiskContentionThreshold,omitempty"`
+	// kubepodsMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods memory contention pressure.
+	// Default: 0.9
+	// +optional
+	KubepodsMemoryContentionThreshold *float64 `json:"kubepodsMemoryContentionThreshold,omitempty"`
+	// kubepodsDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods disk contention pressure.
+	// Default: 0.9
+	// +optional
+	KubepodsDiskContentionThreshold *float64 `json:"kubepodsDiskContentionThreshold,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// The value must be a non-negative number.
 	// Default: 1000000

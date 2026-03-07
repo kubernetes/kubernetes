@@ -661,6 +661,13 @@ const (
 	// Enables ordered namespace deletion.
 	OrderedNamespaceDeletion featuregate.Feature = "OrderedNamespaceDeletion"
 
+	// owner: @roycaihw
+	// kep: https://kep.k8s.io/5394
+	// alpha: v1.36
+	//
+	// Enables kubelet to report node conditions based on PSI (Pressure Stall Information)
+	PSINodeCondition featuregate.Feature = "PSINodeCondition"
+
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
 	//
@@ -1602,6 +1609,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
+	PSINodeCondition: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodAndContainerStatsFromCRI: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2378,6 +2389,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	OpportunisticBatching: {},
 
 	OrderedNamespaceDeletion: {},
+
+	PSINodeCondition: {},
 
 	PodAndContainerStatsFromCRI: {},
 
