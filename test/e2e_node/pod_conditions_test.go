@@ -62,7 +62,7 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 		addAfterEachForCleaningUpPods(f)
 	})
 
-	ginkgo.Context("without PodReadyToStartContainersCondition condition", func() {
+	f.Context("without PodReadyToStartContainersCondition condition", f.WithNodeConformance(), func() {
 		ginkgo.It("a pod without init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, false, false))
 		ginkgo.It("a pod with init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, true, false))
 		ginkgo.It("a pod failing to mount volumes and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, false))

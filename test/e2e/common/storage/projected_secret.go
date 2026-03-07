@@ -411,7 +411,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	//The secret is in pending during volume creation until the secret objects are available
 	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
 	//Slow (~5 mins)
-	f.It("Should fail non-optional pod creation due to secret object does not exist", f.WithSlow(), func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to secret object does not exist", f.WithSlow(), f.WithNodeConformance(), func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		pod := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
@@ -422,7 +422,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	//Secret object defined for the pod, If a key is specified which is not present in the secret,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	//Slow (~5 mins)
-	f.It("Should fail non-optional pod creation due to the key in the secret object does not exist", f.WithSlow(), func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to the key in the secret object does not exist", f.WithSlow(), f.WithNodeConformance(), func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		pod := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)

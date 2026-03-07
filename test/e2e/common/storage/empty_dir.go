@@ -48,7 +48,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.Context("when FSGroup is specified [LinuxOnly]", func() {
+	f.Context("when FSGroup is specified [LinuxOnly]", f.WithNodeConformance(), func() {
 
 		ginkgo.BeforeEach(func() {
 			// Windows does not support the FSGroup SecurityContext option.
@@ -298,7 +298,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		Testname: EmptyDir, Memory backed volume is sized to specified limit
 		Description: A Pod created with an 'emptyDir' Volume backed by memory should be sized to user provided value.
 	*/
-	ginkgo.It("pod should support memory backed volumes of specified size", func(ctx context.Context) {
+	f.It("pod should support memory backed volumes of specified size", f.WithNodeConformance(), func(ctx context.Context) {
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"

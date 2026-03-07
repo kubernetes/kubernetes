@@ -33,7 +33,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", func() {
+var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("mount-rro")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Mount recursive read-only", func() {
