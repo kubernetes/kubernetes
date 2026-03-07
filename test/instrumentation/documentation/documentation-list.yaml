@@ -5160,39 +5160,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: watch_events_sizes
-  subsystem: apiserver
-  help: Watch event size distribution in bytes
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  - version
-  buckets:
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-  - 65536
-  - 131072
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: watch_events_total
-  subsystem: apiserver
-  help: Number of events sent in watch clients
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  - version
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: authenticated_user_requests
   help: Counter of authenticated requests broken out by username.
   type: Counter
@@ -5317,6 +5284,39 @@
   help: CEL evaluation time in seconds.
   type: Histogram
   stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_events_sizes
+  subsystem: apiserver
+  help: Watch event size distribution in bytes
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+  - 65536
+  - 131072
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_events_total
+  subsystem: apiserver
+  help: Number of events sent in watch clients
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

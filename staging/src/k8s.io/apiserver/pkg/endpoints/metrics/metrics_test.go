@@ -527,3 +527,49 @@ func TestCleanListScope(t *testing.T) {
 		})
 	}
 }
+
+func TestWatchEventsSizes(t *testing.T) {
+	Register()
+	WatchEventsSizes.Reset()
+	defer WatchEventsSizes.Reset()
+
+	want := `
+		# HELP apiserver_watch_events_sizes [BETA] Watch event size distribution in bytes
+		# TYPE apiserver_watch_events_sizes histogram
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="1024"} 0
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="2048"} 0
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="4096"} 1
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="8192"} 2
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="16384"} 2
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="32768"} 2
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="65536"} 2
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="131072"} 2
+		apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="+Inf"} 2
+		apiserver_watch_events_sizes_sum{group="group",resource="resource",version="version"} 12288
+		apiserver_watch_events_sizes_count{group="group",resource="resource",version="version"} 2
+	`
+
+	WatchEventsSizes.WithLabelValues("group", "version", "resource").Observe(4096.0)
+	WatchEventsSizes.WithLabelValues("group", "version", "resource").Observe(8192.0)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_watch_events_sizes"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWatchEventsTotal(t *testing.T) {
+	Register()
+	WatchEvents.Reset()
+	defer WatchEvents.Reset()
+
+	want := `
+		# HELP apiserver_watch_events_total [BETA] Number of events sent in watch clients
+		# TYPE apiserver_watch_events_total counter
+		apiserver_watch_events_total{group="group",resource="resource",version="version"} 1
+	`
+
+	WatchEvents.WithLabelValues("group", "version", "resource").Inc()
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_watch_events_total"); err != nil {
+		t.Fatal(err)
+	}
+}
