@@ -1415,6 +1415,7 @@ var map_NodeSystemInfo = map[string]string{
 	"operatingSystem":         "The Operating System reported by the node",
 	"architecture":            "The Architecture reported by the node",
 	"swap":                    "Swap Info reported by the node.",
+	"runningInUserNamespace":  "Whether the node is running in a user namespace.",
 }
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
