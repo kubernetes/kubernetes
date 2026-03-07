@@ -596,7 +596,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 
-			for i := 0; i < 499; i++ {
+			for range 499 {
 				podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
 					*pod.Spec.ActiveDeadlineSeconds--
 				})
@@ -1323,12 +1323,12 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 	}, []string{"node"})
 	r.MustRegister(h)
 
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		wg.Add(1)
 		go func(i int) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
-			for retries := 0; retries < iterations; retries++ {
+			for retries := range iterations {
 				pod := scenario.Pod(i, retries)
 
 				// create the pod, capture the change events, then delete the pod

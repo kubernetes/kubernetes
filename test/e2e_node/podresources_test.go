@@ -2019,7 +2019,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 			ginkgo.By(fmt.Sprintf("Issuing %d List() calls in a tight loop", tries))
 			startTime := time.Now()
-			for try := 0; try < tries; try++ {
+			for range tries {
 				_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
 				errs = append(errs, err)
 			}

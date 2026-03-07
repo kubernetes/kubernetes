@@ -98,7 +98,7 @@ func currentBinDir() (envName, content string) {
 // directly in the root (as in `make test-e2e` or `ginkgo ./test/e2e`), or somewhere deep inside
 // the _output directory (`ginkgo _output/bin/e2e.test` where `_output/bin` is actually a symlink).
 func repoRootDefault() string {
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		path := "." + strings.Repeat("/..", i)
 		if _, err := os.Stat(path + "/test/e2e/framework"); err == nil {
 			return path

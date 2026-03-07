@@ -105,7 +105,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
-				for i := 0; i < restartCount; i++ {
+				for i := range restartCount {
 					ginkgo.By(fmt.Sprintf("Killing container runtime iteration %d", i))
 					// Wait for container runtime to be running
 					var pid int

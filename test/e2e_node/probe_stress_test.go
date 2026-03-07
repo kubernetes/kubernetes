@@ -162,7 +162,7 @@ func createProbeStressPod(numContainers int, generator func(i int) (v1.Probe, []
 	podName := "probe-stress-" + string(uuid.NewUUID())
 	containers := make([]v1.Container, numContainers)
 
-	for i := 0; i < numContainers; i++ {
+	for i := range numContainers {
 		probe, ports, args := generator(i)
 		containers[i] = v1.Container{
 			Name:            fmt.Sprintf("container-%d", i),

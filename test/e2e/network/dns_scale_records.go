@@ -61,7 +61,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
 
 		var namespaces []string
-		for i := 0; i < numNs; i++ {
+		for range numNs {
 			ns, _ := f.CreateNamespace(ctx, f.BaseName, nil)
 			namespaces = append(namespaces, ns.Name)
 			f.AddNamespacesToDelete(ns)
@@ -82,7 +82,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 		dnsTest.createUtilPodLabel(ctx, "e2e-dns-scale-records")
 		ginkgo.DeferCleanup(dnsTest.deleteUtilPod)
 		framework.Logf("Querying %v%% of service records", checkServicePercent*100)
-		for i := 0; i < len(services); i++ {
+		for i := range services {
 			if i%(1/checkServicePercent) != 0 {
 				continue
 			}
@@ -105,7 +105,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 
 func generateServicesInNamespaces(namespaces []string, num int) []*v1.Service {
 	services := make([]*v1.Service, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		services[i] = &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "svc-" + strconv.Itoa(i),

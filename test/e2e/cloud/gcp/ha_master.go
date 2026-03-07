@@ -236,10 +236,10 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 		zone := framework.TestContext.CloudConfig.Zone
 		step(ctx, None, "")
 		numAdditionalReplicas := 2
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for range numAdditionalReplicas {
 			step(ctx, AddReplica, zone)
 		}
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for range numAdditionalReplicas {
 			step(ctx, RemoveReplica, zone)
 		}
 	})
@@ -254,10 +254,10 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 		// If numAdditionalReplicas is larger then the number of remaining zones in the region,
 		// we create a few masters in the same zone and zone entry is repeated in additionalReplicaZones.
 		numAdditionalReplicas := 2
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for i := range numAdditionalReplicas {
 			step(ctx, AddReplica, zones[i%len(zones)])
 		}
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for i := range numAdditionalReplicas {
 			step(ctx, RemoveReplica, zones[i%len(zones)])
 		}
 	})
@@ -280,12 +280,12 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 		//
 		// If numAdditionalReplicas is larger then the number of remaining zones in the region,
 		// we create a few masters in the same zone and zone entry is repeated in additionalReplicaZones.
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for i := range numAdditionalReplicas {
 			step(ctx, AddReplica, zones[i%len(zones)])
 		}
 
 		// Remove master repilcas.
-		for i := 0; i < numAdditionalReplicas; i++ {
+		for i := range numAdditionalReplicas {
 			step(ctx, RemoveReplica, zones[i%len(zones)])
 		}
 

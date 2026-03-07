@@ -548,7 +548,7 @@ func needsNodePorts(svc *v1.Service) bool {
 // then attempts to send the updated service. It tries up to 3 times in the
 // face of timeouts and conflicts.
 func (j *TestJig) UpdateService(ctx context.Context, update func(*v1.Service)) (*v1.Service, error) {
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		service, err := j.Client.CoreV1().Services(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get Service %q: %w", j.Name, err)

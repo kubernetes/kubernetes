@@ -175,7 +175,7 @@ func NewLogsVerifier(ctx context.Context, c clientset.Interface) *LogsSizeVerifi
 		workers:       workers,
 	}
 	verifier.wg.Add(workersNo)
-	for i := 0; i < workersNo; i++ {
+	for i := range workersNo {
 		workers[i] = &LogSizeGatherer{
 			data:        verifier.data,
 			wg:          &verifier.wg,

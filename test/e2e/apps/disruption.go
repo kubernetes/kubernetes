@@ -648,7 +648,7 @@ func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interfac
 }
 
 func createPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n int) {
-	for i := 0; i < n; i++ {
+	for i := range n {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),

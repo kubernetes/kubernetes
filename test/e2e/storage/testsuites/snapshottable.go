@@ -315,7 +315,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 					framework.ExpectNoError(err)
 					volumesInUse := node.Status.VolumesInUse
 					framework.Logf("current volumes in use: %+v", volumesInUse)
-					for i := 0; i < len(volumesInUse); i++ {
+					for i := range volumesInUse {
 						if strings.HasSuffix(string(volumesInUse[i]), volumeName) {
 							return false
 						}

@@ -180,7 +180,7 @@ func PrePullAllImages(ctx context.Context) error {
 					pullErr error
 					output  []byte
 				)
-				for retryCount := 0; retryCount < maxImagePullRetries; retryCount++ {
+				for retryCount := range maxImagePullRetries {
 					select {
 					case <-ctx.Done():
 						return

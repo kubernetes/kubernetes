@@ -68,7 +68,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), sk
 				iterations := 5
 				var totalDurationMs int64
 
-				for i := 0; i < iterations; i++ {
+				for range iterations {
 					start := time.Now()
 					nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
 					duration := time.Since(start)
@@ -160,7 +160,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", skipUnlessWindows(func() {
 				iterations := 1
 				var totalDurationMs int64
 
-				for i := 0; i < iterations; i++ {
+				for range iterations {
 					start := time.Now()
 					nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
 					duration := time.Since(start)
@@ -260,7 +260,7 @@ func findWindowsNodes(ctx context.Context, f *framework.Framework) ([]v1.Node, e
 func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName string) []*v1.Pod {
 	var pods []*v1.Pod
 
-	for i := 0; i < numPods; i++ {
+	for i := range numPods {
 		podName := "statscollectiontest-" + string(uuid.NewUUID())
 		pod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

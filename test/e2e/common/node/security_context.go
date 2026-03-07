@@ -209,7 +209,7 @@ var _ = SIGDescribe("Security Context", func() {
 				e2eskipper.Skipf("node is not setup for userns with kubelet mappings: %v", err)
 			}
 
-			for i := 0; i < 4; i++ {
+			for range 4 {
 				// makePod(false) creates the pod with user namespace
 				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 				createdPod := podClient.Create(ctx, makePod(false))

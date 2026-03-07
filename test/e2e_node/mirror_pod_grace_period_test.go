@@ -114,7 +114,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			uid := pod.UID
 
 			ginkgo.By("update the pod manifest multiple times during the graceful termination period")
-			for i := 0; i < 300; i++ {
+			for i := range 300 {
 				err = createStaticPod(podPath, staticPodName, ns,
 					fmt.Sprintf("image-%d", i), v1.RestartPolicyAlways)
 				framework.ExpectNoError(err)
