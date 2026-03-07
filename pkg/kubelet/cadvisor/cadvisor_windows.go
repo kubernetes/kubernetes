@@ -80,3 +80,7 @@ func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cu.winStatsClient.GetDirFsInfo(path)
 }
+
+func IsPsiEnabled(_ context.Context) bool {
+	return false
+}
