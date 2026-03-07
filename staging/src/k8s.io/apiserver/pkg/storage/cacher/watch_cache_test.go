@@ -1274,7 +1274,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			desc:            "resourceVersion is non-zero",
 			resourceVersion: 5,
 			want: `
-		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
+		# HELP apiserver_watch_cache_read_wait_seconds [BETA] Histogram of time spent waiting for a watch cache to become fresh.
     # TYPE apiserver_watch_cache_read_wait_seconds histogram
 	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
