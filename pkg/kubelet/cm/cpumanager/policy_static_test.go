@@ -1784,7 +1784,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(4, 5, 68, 69),
+			expCSet:     cpuset.New(2, 3, 66, 67),
 		},
 		{
 			// large odd integer cpu required on smt-enabled
@@ -1819,7 +1819,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				PreferAlignByUnCoreCacheOption: "true",
 			},
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
 			pod: WithPodUID(
 				makeMultiContainerPod(
 					[]struct{ request, limit string }{}, // init container
@@ -1842,7 +1842,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				PreferAlignByUnCoreCacheOption: "true",
 			},
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
 			pod: WithPodUID(
 				makeMultiContainerPod(
 					[]struct{ request, limit string }{}, // init container
