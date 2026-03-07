@@ -1526,7 +1526,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 		},
 		wantErrors: field.ErrorList{
 			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:bar", "ClusterTrustBundle for signerName k8s.io/bar must be named with prefix k8s.io:bar:"),
-			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable"),
+			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable").WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative(),
 		},
 	}, {
 		description: "adding certificate allowed",
