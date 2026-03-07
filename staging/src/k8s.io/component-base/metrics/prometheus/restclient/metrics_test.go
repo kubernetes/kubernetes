@@ -81,7 +81,7 @@ func TestClientGOMetrics(t *testing.T) {
 				metrics.TransportCreateCalls.Increment("hit")
 			},
 			want: `
-			            # HELP rest_client_transport_create_calls_total [ALPHA] Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached
+			            # HELP rest_client_transport_create_calls_total [ALPHA] Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, miss-gc: recreated and added back to the cache after being garbage collected, uncacheable: created and not cached
 			            # TYPE rest_client_transport_create_calls_total counter
 			            rest_client_transport_create_calls_total{result="hit"} 1
 				`,
