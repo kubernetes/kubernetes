@@ -48,7 +48,10 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
+	"k8s.io/component-base/metrics/prometheus/restclient"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -146,6 +149,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(ctx context.Context, opts options.CompletedOptions) error {
+	restclient.Register()
+	workqueue.Register()
+	fifo.Register()
+	leaderelection.Register()
+
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", utilversion.Get())
 

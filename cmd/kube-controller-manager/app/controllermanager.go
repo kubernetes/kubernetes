@@ -63,8 +63,12 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	leaderelectionmetrics "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	restclientmetrics "k8s.io/component-base/metrics/prometheus/restclient"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -554,6 +558,10 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	controllersmetrics.Register()
+	restclientmetrics.Register()
+	workqueue.Register()
+	fifo.Register()
+	leaderelectionmetrics.Register()
 	return controllerContext, nil
 }
 

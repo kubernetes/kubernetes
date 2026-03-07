@@ -49,8 +49,12 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	leaderelectionmetrics "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	"k8s.io/component-base/metrics/prometheus/restclient"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -495,6 +499,10 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
 	controllersmetrics.Register()
+	restclient.Register()
+	workqueue.Register()
+	fifo.Register()
+	leaderelectionmetrics.Register()
 	return ctx, nil
 }
 

@@ -57,7 +57,11 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	leaderelectionmetrics "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
+	"k8s.io/component-base/metrics/prometheus/restclient"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -169,6 +173,11 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
 func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *scheduler.Scheduler) error {
+	restclient.Register()
+	workqueue.Register()
+	fifo.Register()
+	leaderelectionmetrics.Register()
+
 	logger := klog.FromContext(ctx)
 
 	// To help debugging, immediately log version

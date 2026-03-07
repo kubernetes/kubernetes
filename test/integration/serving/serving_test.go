@@ -48,6 +48,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
+	"k8s.io/component-base/metrics/prometheus/restclient"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
@@ -745,7 +748,10 @@ users:
 
 	legacyregistry.Reset()
 	cache.ResetInformerNamesForTesting()
+	restclient.Register()
+	workqueue.Register()
 	fifo.Register()
+	leaderelection.Register()
 	_, ctx := ktesting.NewTestContext(t)
 	flags := []string{
 		"--authentication-skip-lookup",

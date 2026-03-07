@@ -17,6 +17,8 @@ limitations under the License.
 package leaderelection
 
 import (
+	"sync"
+
 	"k8s.io/client-go/tools/leaderelection"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -38,10 +40,17 @@ var (
 	}, []string{"name"})
 )
 
-func init() {
-	legacyregistry.MustRegister(leaderGauge)
-	legacyregistry.MustRegister(leaderSlowpathCounter)
-	leaderelection.SetProvider(prometheusMetricsProvider{})
+var registerOnce sync.Once
+
+// Register registers leaderelection metrics to the legacy registry.
+// This is typically called from component Run() functions after feature gates are parsed,
+// to support native histogram options.
+func Register() {
+	registerOnce.Do(func() {
+		legacyregistry.MustRegister(leaderGauge)
+		legacyregistry.MustRegister(leaderSlowpathCounter)
+		leaderelection.SetProvider(prometheusMetricsProvider{})
+	})
 }
 
 type prometheusMetricsProvider struct{}
