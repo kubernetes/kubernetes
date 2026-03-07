@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -328,6 +329,173 @@ func TestPatchPodStatus(t *testing.T) {
 
 			if diff := cmp.Diff(tc.statusToUpdate, retrievedPod.Status); diff != "" {
 				t.Errorf("unexpected pod status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	tests := []struct {
+		name        string
+		pod         *v1.Pod
+		client      *clientsetfake.Clientset
+		ctx         context.Context
+		wantErr     bool
+		validateErr func(error) bool
+	}{
+		{
+			name: "Successful pod deletion",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+				_, _ = client.CoreV1().Pods("test-ns").Create(context.TODO(), &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Namespace: "test-ns",
+					},
+				}, metav1.CreateOptions{})
+				return client
+			}(),
+			ctx:     context.TODO(),
+			wantErr: false,
+		},
+		{
+			name: "Pod not found error",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "non-existent-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client:  clientsetfake.NewClientset(),
+			ctx:     context.TODO(),
+			wantErr: true,
+			validateErr: func(err error) bool {
+				return apierrors.IsNotFound(err)
+			},
+		},
+		{
+			name: "Context cancellation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+				client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					// Check if context is cancelled and simulate the error
+					if action.GetNamespace() == "test-ns" {
+						return true, nil, context.Canceled
+					}
+					return false, nil, nil
+				})
+				return client
+			}(),
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.TODO())
+				cancel() // Cancel immediately
+				return ctx
+			}(),
+			wantErr: true,
+			validateErr: func(err error) bool {
+				return errors.Is(err, context.Canceled)
+			},
+		},
+		{
+			name: "Network error (retriable)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+				client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					return true, nil, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+				})
+				return client
+			}(),
+			ctx:     context.TODO(),
+			wantErr: true,
+			validateErr: func(err error) bool {
+				return net.IsConnectionRefused(err)
+			},
+		},
+		{
+			name: "Permission error (non-retriable)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+				client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewForbidden(
+						v1.Resource("pods"),
+						"test-pod",
+						errors.New("forbidden"),
+					)
+				})
+				return client
+			}(),
+			ctx:     context.TODO(),
+			wantErr: true,
+			validateErr: func(err error) bool {
+				return apierrors.IsForbidden(err)
+			},
+		},
+		{
+			name: "Internal server error (retriable)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+			},
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+				client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewInternalError(errors.New("internal server error"))
+				})
+				return client
+			}(),
+			ctx:     context.TODO(),
+			wantErr: true,
+			validateErr: func(err error) bool {
+				return apierrors.IsInternalError(err)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := DeletePod(tc.ctx, tc.client, tc.pod)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("Expected error, got nil")
+				}
+				if tc.validateErr != nil && !tc.validateErr(err) {
+					t.Fatalf("Unexpected error type: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				// Verify pod was deleted
+				_, getErr := tc.client.CoreV1().Pods(tc.pod.Namespace).Get(tc.ctx, tc.pod.Name, metav1.GetOptions{})
+				if !apierrors.IsNotFound(getErr) {
+					t.Fatalf("Expected pod to be deleted, but got error: %v", getErr)
+				}
 			}
 		})
 	}
