@@ -60,6 +60,9 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) {
 		csiDriver.Spec.ServiceAccountTokenInSecrets = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		csiDriver.Spec.PreventPodSchedulingIfMissing = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -111,6 +114,11 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if oldCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		newCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
+	}
+
+	if oldCSIDriver.Spec.PreventPodSchedulingIfMissing == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		newCSIDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 
 	// Any changes to the spec increment the generation number.

@@ -1506,6 +1506,8 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 func TestCSIDriverValidation(t *testing.T) {
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1521,6 +1523,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	notSELinuxMount := false
 	serviceAccountTokenInSecrets := true
 	notServiceAccountTokenInSecrets := false
+	preventPodSchedulingIfMissing := false
 	supportedFSGroupPolicy := storage.FileFSGroupPolicy
 	invalidFSGroupPolicy := storage.FSGroupPolicy("invalid-mode")
 	validNodeAllocatableUpdatePeriodSeconds := int64(10)
@@ -1529,78 +1532,86 @@ func TestCSIDriverValidation(t *testing.T) {
 	successCases := []storage.CSIDriver{{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &podInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// driver name: dot only
 		ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi.driver"},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &podInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &notStorageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &notStorageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// driver name: dash only
 		ObjectMeta: metav1.ObjectMeta{Name: "io-kubernetes-storage-csi-driver"},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &notPodInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// driver name: numbers
 		ObjectMeta: metav1.ObjectMeta{Name: "1csi2driver3"},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &podInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// driver name: dot and dash
 		ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi-driver"},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &podInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &notPodInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachRequired,
-			PodInfoOnMount:    &podInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachNotRequired,
-			PodInfoOnMount:    &notPodInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1612,7 +1623,8 @@ func TestCSIDriverValidation(t *testing.T) {
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
 			},
-			SELinuxMount: &seLinuxMount,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1624,20 +1636,8 @@ func TestCSIDriverValidation(t *testing.T) {
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecycleEphemeral,
 			},
-			SELinuxMount: &seLinuxMount,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: driverName},
-		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachNotRequired,
-			PodInfoOnMount:    &notPodInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
-				storage.VolumeLifecycleEphemeral,
-				storage.VolumeLifecyclePersistent,
-			},
-			SELinuxMount: &seLinuxMount,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1649,9 +1649,9 @@ func TestCSIDriverValidation(t *testing.T) {
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecycleEphemeral,
 				storage.VolumeLifecyclePersistent,
-				storage.VolumeLifecycleEphemeral,
 			},
-			SELinuxMount: &seLinuxMount,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1660,18 +1660,35 @@ func TestCSIDriverValidation(t *testing.T) {
 			PodInfoOnMount:    &notPodInfoOnMount,
 			RequiresRepublish: &notRequiresRepublish,
 			StorageCapacity:   &storageCapacity,
-			FSGroupPolicy:     &supportedFSGroupPolicy,
-			SELinuxMount:      &seLinuxMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				storage.VolumeLifecycleEphemeral,
+				storage.VolumeLifecyclePersistent,
+				storage.VolumeLifecycleEphemeral,
+			},
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			FSGroupPolicy:                 &supportedFSGroupPolicy,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// SELinuxMount: false
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &attachNotRequired,
-			PodInfoOnMount:    &notPodInfoOnMount,
-			RequiresRepublish: &notRequiresRepublish,
-			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &notSELinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &notSELinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// With NodeAllocatableUpdatePeriodSeconds set to nil (valid)
@@ -1682,6 +1699,7 @@ func TestCSIDriverValidation(t *testing.T) {
 			RequiresRepublish:                  &notRequiresRepublish,
 			StorageCapacity:                    &storageCapacity,
 			SELinuxMount:                       &seLinuxMount,
+			PreventPodSchedulingIfMissing:      &preventPodSchedulingIfMissing,
 			NodeAllocatableUpdatePeriodSeconds: nil,
 		},
 	}, {
@@ -1693,42 +1711,46 @@ func TestCSIDriverValidation(t *testing.T) {
 			RequiresRepublish:                  &notRequiresRepublish,
 			StorageCapacity:                    &storageCapacity,
 			SELinuxMount:                       &seLinuxMount,
+			PreventPodSchedulingIfMissing:      &preventPodSchedulingIfMissing,
 			NodeAllocatableUpdatePeriodSeconds: &validNodeAllocatableUpdatePeriodSeconds,
 		},
 	}, {
 		// With ServiceAccountTokenInSecrets set to true with TokenRequests
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:               &attachNotRequired,
-			PodInfoOnMount:               &notPodInfoOnMount,
-			RequiresRepublish:            &notRequiresRepublish,
-			StorageCapacity:              &storageCapacity,
-			SELinuxMount:                 &seLinuxMount,
-			ServiceAccountTokenInSecrets: &serviceAccountTokenInSecrets,
-			TokenRequests:                tokenRequests,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
+			ServiceAccountTokenInSecrets:  &serviceAccountTokenInSecrets,
+			TokenRequests:                 tokenRequests,
 		},
 	}, {
 		// With ServiceAccountTokenInSecrets set to false with TokenRequests
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:               &attachNotRequired,
-			PodInfoOnMount:               &notPodInfoOnMount,
-			RequiresRepublish:            &notRequiresRepublish,
-			StorageCapacity:              &storageCapacity,
-			SELinuxMount:                 &seLinuxMount,
-			ServiceAccountTokenInSecrets: &notServiceAccountTokenInSecrets,
-			TokenRequests:                tokenRequests,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
+			ServiceAccountTokenInSecrets:  &notServiceAccountTokenInSecrets,
+			TokenRequests:                 tokenRequests,
 		},
 	}, {
 		// With ServiceAccountTokenInSecrets set to nil (not set)
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:               &attachNotRequired,
-			PodInfoOnMount:               &notPodInfoOnMount,
-			RequiresRepublish:            &notRequiresRepublish,
-			StorageCapacity:              &storageCapacity,
-			SELinuxMount:                 &seLinuxMount,
-			ServiceAccountTokenInSecrets: nil,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			RequiresRepublish:             &notRequiresRepublish,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
+			ServiceAccountTokenInSecrets:  nil,
 		},
 	}}
 
@@ -1740,45 +1762,50 @@ func TestCSIDriverValidation(t *testing.T) {
 	errorCases := []storage.CSIDriver{{
 		ObjectMeta: metav1.ObjectMeta{Name: invalidName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &attachRequired,
-			PodInfoOnMount:  &podInfoOnMount,
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                &attachRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: longName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &attachNotRequired,
-			PodInfoOnMount:  &notPodInfoOnMount,
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// AttachRequired not set
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  nil,
-			PodInfoOnMount:  &podInfoOnMount,
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                nil,
+			PodInfoOnMount:                &podInfoOnMount,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// PodInfoOnMount not set
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &attachNotRequired,
-			PodInfoOnMount:  nil,
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                nil,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// StorageCapacity not set
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &attachNotRequired,
-			PodInfoOnMount:  &podInfoOnMount,
-			StorageCapacity: nil,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &podInfoOnMount,
+			StorageCapacity:               nil,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// invalid mode
@@ -1790,17 +1817,19 @@ func TestCSIDriverValidation(t *testing.T) {
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				"no-such-mode",
 			},
-			SELinuxMount: &seLinuxMount,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// invalid fsGroupPolicy
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &attachNotRequired,
-			PodInfoOnMount:  &notPodInfoOnMount,
-			FSGroupPolicy:   &invalidFSGroupPolicy,
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			FSGroupPolicy:                 &invalidFSGroupPolicy,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}, {
 		// no SELinuxMount
@@ -1818,17 +1847,19 @@ func TestCSIDriverValidation(t *testing.T) {
 			PodInfoOnMount:                     &notPodInfoOnMount,
 			StorageCapacity:                    &storageCapacity,
 			SELinuxMount:                       &seLinuxMount,
+			PreventPodSchedulingIfMissing:      &preventPodSchedulingIfMissing,
 			NodeAllocatableUpdatePeriodSeconds: &invalidNodeAllocatableUpdatePeriodSeconds,
 		},
 	}, {
 		// ServiceAccountTokenInSecrets set without TokenRequests (invalid)
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:               &attachNotRequired,
-			PodInfoOnMount:               &notPodInfoOnMount,
-			StorageCapacity:              &storageCapacity,
-			SELinuxMount:                 &seLinuxMount,
-			ServiceAccountTokenInSecrets: &serviceAccountTokenInSecrets,
+			AttachRequired:                &attachNotRequired,
+			PodInfoOnMount:                &notPodInfoOnMount,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
+			ServiceAccountTokenInSecrets:  &serviceAccountTokenInSecrets,
 		},
 	}}
 
@@ -1842,6 +1873,8 @@ func TestCSIDriverValidation(t *testing.T) {
 func TestCSIDriverValidationUpdate(t *testing.T) {
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1859,6 +1892,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	notSELinuxMount := false
 	serviceAccountTokenInSecrets := true
 	notServiceAccountTokenInSecrets := false
+	preventPodSchedulingIfMissing := false
 	validNodeAllocatableUpdatePeriodSeconds := int64(10)
 	invalidNodeAllocatableUpdatePeriodSeconds := int64(9)
 	tokenRequests := []storage.TokenRequest{{Audience: "test-audience"}}
@@ -1873,8 +1907,9 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				storage.VolumeLifecycleEphemeral,
 				storage.VolumeLifecyclePersistent,
 			},
-			StorageCapacity: &storageCapacity,
-			SELinuxMount:    &seLinuxMount,
+			StorageCapacity:               &storageCapacity,
+			SELinuxMount:                  &seLinuxMount,
+			PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 		},
 	}
 
@@ -2383,6 +2418,140 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			}
 			newCSIDriver := oldCSIDriver.DeepCopy()
 			newCSIDriver.Spec.SELinuxMount = test.newValue
+			err := ValidateCSIDriverUpdate(newCSIDriver, oldCSIDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+}
+
+func TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
+	tests := []struct {
+		name                               string
+		featureEnabled                     bool
+		preventPodSchedulingIfMissingValue *bool
+		expectError                        bool
+	}{{
+		name:                               "feature enabled, nil value",
+		featureEnabled:                     true,
+		preventPodSchedulingIfMissingValue: nil,
+		expectError:                        true,
+	}, {
+		name:                               "feature enabled, non-nil value",
+		featureEnabled:                     true,
+		preventPodSchedulingIfMissingValue: ptr.To(true),
+		expectError:                        false,
+	}, {
+		name:                               "feature disabled, nil value",
+		featureEnabled:                     false,
+		preventPodSchedulingIfMissingValue: nil,
+		expectError:                        false,
+	}, {
+		name:                               "feature disabled, non-nil value",
+		featureEnabled:                     false,
+		preventPodSchedulingIfMissingValue: ptr.To(true),
+		expectError:                        false,
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureEnabled)
+			csiDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.preventPodSchedulingIfMissingValue,
+				},
+			}
+			err := ValidateCSIDriver(csiDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+
+	updateTests := []struct {
+		name           string
+		featureEnabled bool
+		oldValue       *bool
+		newValue       *bool
+		expectError    bool
+	}{{
+		name:           "feature enabled, nil->nil",
+		featureEnabled: true,
+		oldValue:       nil,
+		newValue:       nil,
+		expectError:    true, // populated by defaulting and required when feature is enabled
+	}, {
+		name:           "feature enabled, nil->set",
+		featureEnabled: true,
+		oldValue:       nil,
+		newValue:       ptr.To(true),
+		expectError:    false,
+	}, {
+		name:           "feature enabled, set->set",
+		featureEnabled: true,
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(true),
+		expectError:    false,
+	}, {
+		name:           "feature enabled, set->nil",
+		featureEnabled: true,
+		oldValue:       ptr.To(true),
+		newValue:       nil,
+		expectError:    true, // populated by defaulting and required when feature is enabled
+	}, {
+		name:           "feature disabled, nil->nil",
+		featureEnabled: false,
+		oldValue:       nil,
+		newValue:       nil,
+		expectError:    false,
+	}, {
+		name:           "feature disabled, nil->set",
+		featureEnabled: false,
+		oldValue:       nil,
+		newValue:       ptr.To(true),
+		expectError:    false,
+	}, {
+		name:           "feature disabled, set->set",
+		featureEnabled: false,
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(true),
+		expectError:    false,
+	}, {
+		name:           "feature disabled, set->nil",
+		featureEnabled: false,
+		oldValue:       ptr.To(true),
+		newValue:       nil,
+		expectError:    false,
+	}}
+	for _, test := range updateTests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureEnabled)
+			oldCSIDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.oldValue,
+				},
+			}
+			newCSIDriver := oldCSIDriver.DeepCopy()
+			newCSIDriver.Spec.PreventPodSchedulingIfMissing = test.newValue
 			err := ValidateCSIDriverUpdate(newCSIDriver, oldCSIDriver)
 			if test.expectError && err == nil {
 				t.Error("Expected validation error, got nil")
