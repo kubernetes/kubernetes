@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +51,7 @@ type Tester struct {
 	clusterScope        bool
 	createOnUpdate      bool
 	generatesName       bool
+	newObjectModifier   func(object runtime.Object)
 	returnDeletedObject bool
 	namer               func(int) string
 	userInfo            user.Info
@@ -58,9 +60,10 @@ type Tester struct {
 
 func New(t *testing.T, storage rest.Storage) *Tester {
 	return &Tester{
-		T:       t,
-		storage: storage,
-		namer:   defaultNamer,
+		T:                 t,
+		storage:           storage,
+		namer:             defaultNamer,
+		newObjectModifier: func(_ runtime.Object) {},
 	}
 }
 
@@ -87,6 +90,16 @@ func (t *Tester) AllowCreateOnUpdate() *Tester {
 
 func (t *Tester) GeneratesName() *Tester {
 	t.generatesName = true
+	return t
+}
+
+func (t *Tester) NewObjectModifier(newObjectModifier func(object runtime.Object)) *Tester {
+	t.newObjectModifier = func(object runtime.Object) {
+		if !t.generatesName {
+			panic("NewObjectModifier is only supported for objects with generated names")
+		}
+		newObjectModifier(object)
+	}
 	return t
 }
 
@@ -284,6 +297,7 @@ func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFu
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -300,6 +314,7 @@ func (t *Tester) testCreateDryRun(obj runtime.Object, getFn GetFunc) {
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(2))
+	t.newObjectModifier(foo)
 
 	_, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -317,6 +332,7 @@ func (t *Tester) testCreateDryRunEquals(obj runtime.Object) {
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(2))
+	t.newObjectModifier(foo)
 
 	createdFake, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -347,6 +363,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(2))
+	t.newObjectModifier(foo)
 
 	created, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -407,6 +424,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 	objectMeta.SetName(t.namer(1))
 	objectMeta.SetNamespace(t.TestNamespace())
+	t.newObjectModifier(valid)
 
 	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -541,6 +559,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(2))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -577,6 +596,7 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(3))
+	t.newObjectModifier(foo)
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -604,6 +624,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(4))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -625,6 +646,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	ctx := t.TestContext()
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(5))
+	t.newObjectModifier(foo)
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.SetUID(types.UID("UID0000"))
 	if err := createFn(ctx, foo); err != nil {
@@ -646,6 +668,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 	ctx := t.TestContext()
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(6))
+	t.newObjectModifier(foo)
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.SetAnnotations(map[string]string{"A": "1"})
 	if err := createFn(ctx, foo); err != nil {
@@ -701,6 +724,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 	foo := obj.DeepCopyObject()
 	name := t.namer(7)
 	t.setObjectMeta(foo, name)
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -725,6 +749,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 	foo := obj.DeepCopyObject()
 	name := t.namer(8)
 	t.setObjectMeta(foo, name)
+	t.newObjectModifier(foo)
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -755,6 +780,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object, opts metav1.UpdateOptions) {
 	t.setObjectMeta(obj, t.namer(0))
+	t.newObjectModifier(obj)
 	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &opts)
 	if t.createOnUpdate {
 		if err != nil {
@@ -777,6 +803,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -789,8 +816,9 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	objectMeta := t.getObjectMetaOrFail(storedFoo)
 	objectMeta.SetName(t.namer(1))
 	objectMeta.SetNamespace("not-default")
+	t.newObjectModifier(storedFoo)
 
-	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(1), rest.DefaultUpdatedObjectInfo(storedFoo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if obj != nil || updated {
 		t.Errorf("expected nil object and not updated")
 	}
@@ -809,6 +837,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -860,6 +889,7 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	t.setObjectMeta(foo, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.SetUID(types.UID("UID0000"))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -895,6 +925,7 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -939,6 +970,7 @@ func (t *Tester) testDeleteDryRunGracefulHasdefault(obj runtime.Object, createFn
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	defer t.delete(ctx, foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -966,6 +998,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1000,6 +1033,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(2))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1034,6 +1068,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(3))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1119,6 +1154,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(5))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1141,6 +1177,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(6))
+	t.newObjectModifier(foo)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1193,21 +1230,16 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(5))
+	t.newObjectModifier(obj)
 
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
-	if t.requestInfo != nil {
-		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
-	}
+	ctx1 := genericapirequest.WithNamespace(t.TestContext(), "bar3")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
-	if t.requestInfo != nil {
-		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
-	}
+	ctx2 := genericapirequest.WithNamespace(t.TestContext(), "bar4")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
 	_, err = t.storage.(rest.Creater).Create(ctx2, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1242,6 +1274,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 func (t *Tester) testGetFound(obj runtime.Object) {
 	ctx := t.TestContext()
 	t.setObjectMeta(obj, t.namer(1))
+	t.newObjectModifier(obj)
 
 	existing, err := t.storage.(rest.Creater).Create(ctx, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1261,17 +1294,12 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 }
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
-	if t.requestInfo != nil {
-		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
-	}
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
-	if t.requestInfo != nil {
-		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
-	}
+	ctx1 := genericapirequest.WithNamespace(t.TestContext(), "bar1")
+	ctx2 := genericapirequest.WithNamespace(t.TestContext(), "bar2")
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
+	t.newObjectModifier(obj)
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1291,6 +1319,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 func (t *Tester) testGetNotFound(obj runtime.Object) {
 	ctx := t.TestContext()
 	t.setObjectMeta(obj, t.namer(2))
+	t.newObjectModifier(obj)
 	_, err := t.storage.(rest.Creater).Create(ctx, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1328,10 +1357,15 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 
 	foo1 := obj.DeepCopyObject()
 	t.setObjectMeta(foo1, t.namer(1))
+	t.newObjectModifier(foo1)
 	foo2 := obj.DeepCopyObject()
 	t.setObjectMeta(foo2, t.namer(2))
+	t.newObjectModifier(foo2)
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
+	slices.SortFunc(existing, func(a, b runtime.Object) int {
+		return strings.Compare(t.getObjectMetaOrFail(a).GetName(), t.getObjectMetaOrFail(b).GetName())
+	})
 
 	listObj, err := t.storage.(rest.Lister).List(ctx, nil)
 	if err != nil {
@@ -1362,6 +1396,9 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	foo4Meta.SetLabels(testLabels)
 
 	objs := ([]runtime.Object{foo3, foo4})
+	slices.SortFunc(objs, func(a, b runtime.Object) int {
+		return strings.Compare(t.getObjectMetaOrFail(a).GetName(), t.getObjectMetaOrFail(b).GetName())
+	})
 
 	assignFn(objs)
 	filtered := []runtime.Object{objs[1]}
@@ -1416,6 +1453,9 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	foo4Meta.SetLabels(testLabels)
 
 	objs := ([]runtime.Object{foo3, foo4})
+	slices.SortFunc(objs, func(a, b runtime.Object) int {
+		return strings.Compare(t.getObjectMetaOrFail(a).GetName(), t.getObjectMetaOrFail(b).GetName())
+	})
 
 	assignFn(objs)
 
