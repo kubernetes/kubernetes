@@ -44,12 +44,12 @@ import (
 // depend on its stability. It is primarily for internal use by controllers.
 type ControllerRevisionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Data is the serialized representation of the state.
+	// data is the serialized representation of the state.
 	Data *runtime.RawExtension `json:"data,omitempty"`
-	// Revision indicates the revision of the state represented by Data.
+	// revision indicates the revision of the state represented by Data.
 	Revision *int64 `json:"revision,omitempty"`
 }
 
