@@ -29,16 +29,11 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -69,22 +64,14 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.EffectiveVersion) *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
 		// If a resource has to be stored in a version that is not the
-		// latest, then it can be listed here. Usually this is the case
-		// when a new version for a resource gets introduced and a
-		// downgrade to an older apiserver that doesn't know the new
-		// version still needs to be supported for one release.
+		// default auto-calculated version, it can be listed here.
 		//
-		// Example from Kubernetes 1.24 where csistoragecapacities had just
-		// graduated to GA:
-		//
-		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
-		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
-		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
-		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
-		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
-		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
-		scheduling.Resource("workloads").WithVersion("v1alpha1"),
+		// In most cases, overrides are not needed. The emulatedStorageVersion
+		// function automatically selects the correct storage version:
+		// - beta→GA: stores as beta for one release (n-1 compat)
+		// - alpha→beta: stores as beta immediately (alpha has no compat guarantee)
+		// - alpha→alpha: stores as latest alpha (alpha has no compat guarantee)
+		// - new resources: stores as the best version at the emulation version
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
