@@ -707,6 +707,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles, s); err != nil {
 		return err
 	}
+	out.GoTraceback = in.GoTraceback
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ContainerLogMaxWorkers, &out.ContainerLogMaxWorkers, s); err != nil {
 		return err
 	}
@@ -969,6 +970,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.UserNamespaces = (*configv1beta1.UserNamespaces)(unsafe.Pointer(in.UserNamespaces))
+	out.GoTraceback = in.GoTraceback
 	return nil
 }
 

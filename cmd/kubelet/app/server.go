@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -542,6 +543,11 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	logger.Info("Kubelet version", "kubeletVersion", version.Get())
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
+	if s.KubeletConfiguration.GoTraceback != "" {
+		debug.SetTraceback(s.KubeletConfiguration.GoTraceback)
+		logger.Info("Updated GOTRACEBACK setting", "traceback", s.KubeletConfiguration.GoTraceback)
+	}
 
 	if err := initForOS(ctx, s.WindowsService, s.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %w", err)
