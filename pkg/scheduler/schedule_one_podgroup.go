@@ -24,14 +24,19 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -120,7 +125,7 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 	logger := klog.FromContext(ctx)
 
 	// Get the actual pod group state
-	podGroupState, err := sched.WorkloadManager.PodGroupState(pInfo.Pod.Namespace, pInfo.Pod.Spec.WorkloadRef)
+	podGroupState, err := sched.PodGroupManager.PodGroupState(pInfo.Pod.Namespace, pInfo.Pod.Spec.SchedulingGroup)
 	if err != nil {
 		return nil, fmt.Errorf("error while retrieving pod group state: %w", err)
 	}
@@ -128,8 +133,8 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:   pInfo.Pod.Namespace,
-			WorkloadRef: pInfo.Pod.Spec.WorkloadRef,
+			Namespace: pInfo.Pod.Namespace,
+			Name:      *pInfo.Pod.Spec.SchedulingGroup.PodGroupName,
 		},
 		QueuedPodInfos: make([]*framework.QueuedPodInfo, 0, len(unscheduledPods)+1),
 	}
@@ -461,12 +466,44 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 	case podGroupFeasible:
 		logger.V(2).Info("Successfully scheduled a pod group", "podGroup", klog.KObj(podGroupInfo), "scheduledPods", scheduledPods, "unschedulablePods", unschedulablePods)
 		metrics.PodGroupScheduled(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
+		go sched.updatePodGroupScheduledCondition(ctx, podGroupInfo.Namespace, podGroupInfo.Name,
+			metav1.ConditionTrue, schedulingapi.PodGroupConditionScheduled, "All required pods have been successfully scheduled")
 	case podGroupUnschedulable:
 		logger.V(2).Info("Unable to schedule a pod group", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods)
 		metrics.PodGroupUnschedulable(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
+		go sched.updatePodGroupScheduledCondition(ctx, podGroupInfo.Namespace, podGroupInfo.Name,
+			metav1.ConditionFalse, schedulingapi.PodGroupConditionUnschedulable, "PodGroup cannot be scheduled due to insufficient resources")
 	case podGroupWaitingOnPreemption:
 		logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods)
 		metrics.PodGroupWaitingOnPreemption(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
+		go sched.updatePodGroupScheduledCondition(ctx, podGroupInfo.Namespace, podGroupInfo.Name,
+			metav1.ConditionFalse, schedulingapi.PodGroupConditionPreempted, "PodGroup is waiting for preemption to complete")
+	}
+}
+
+// updatePodGroupScheduledCondition updates the PodGroupScheduled condition on a PodGroup.
+func (sched *Scheduler) updatePodGroupScheduledCondition(ctx context.Context, namespace, name string, conditionStatus metav1.ConditionStatus, reason, message string) {
+	logger := klog.FromContext(ctx)
+	err := retry.OnError(retry.DefaultBackoff, util.Retriable, func() error {
+		podGroup, err := sched.client.SchedulingV1alpha2().PodGroups(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if podGroup.Status.Conditions == nil {
+			podGroup.Status.Conditions = make([]metav1.Condition, 0)
+		}
+		apimeta.SetStatusCondition(&podGroup.Status.Conditions, metav1.Condition{
+			Type:               schedulingapi.PodGroupConditionTypeScheduled,
+			Status:             conditionStatus,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: podGroup.Generation,
+		})
+		_, err = sched.client.SchedulingV1alpha2().PodGroups(namespace).UpdateStatus(ctx, podGroup, metav1.UpdateOptions{})
+		return err
+	})
+	if err != nil {
+		logger.Error(err, "Failed to update PodGroup status", "podGroup", klog.KRef(namespace, name))
 	}
 }
 

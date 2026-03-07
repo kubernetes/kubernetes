@@ -76,7 +76,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
-		fwk.Workload,
+		fwk.PodGroup,
 	}
 )
 
@@ -156,7 +156,7 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}})
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.All}})
 	}
 	return events
 }
@@ -650,26 +650,20 @@ type QueuedPodGroupInfo struct {
 type PodGroupInfo struct {
 	// Namespace is a namespace of this pod group.
 	Namespace string
-	// WorkloadRef is a reference to this particular pod group.
-	WorkloadRef *v1.WorkloadReference
+	// Name is a name of this pod group.
+	Name string
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
-	// WorkloadManager.PodGroupState can be used for that.
+	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
 }
 
 func (pgi *PodGroupInfo) GetName() string {
-	if pgi.WorkloadRef == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s/%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
+	return pgi.Name
 }
 
 func (pgi *PodGroupInfo) GetNamespace() string {
-	if pgi.WorkloadRef == nil {
-		return ""
-	}
 	return pgi.Namespace
 }
 
