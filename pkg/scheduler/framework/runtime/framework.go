@@ -75,6 +75,11 @@ type frameworkImpl struct {
 	permitPlugins        []fwk.PermitPlugin
 	batchablePlugins     []fwk.SignPlugin
 
+	placementGeneratePlugins []fwk.PlacementGeneratePlugin
+
+	placementScorePlugins      []fwk.PlacementScorePlugin
+	placementScorePluginWeight map[string]int
+
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
 
@@ -83,7 +88,7 @@ type frameworkImpl struct {
 	eventRecorder    events.EventRecorder
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
-	workloadManager  fwk.WorkloadManager
+	podGroupManager  fwk.PodGroupManager
 	logger           klog.Logger
 
 	sharedCSIManager fwk.CSIManager
@@ -130,6 +135,8 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
+		{&plugins.PlacementScore, &f.placementScorePlugins},
 	}
 }
 
@@ -156,7 +163,7 @@ type frameworkOptions struct {
 	waitingPods            *waitingPodsMap
 	podsInPreBind          *podsInPreBindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
-	workloadManager        fwk.WorkloadManager
+	podGroupManager        fwk.PodGroupManager
 	logger                 *klog.Logger
 }
 
@@ -256,10 +263,10 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	}
 }
 
-// WithWorkloadManager sets Workload manager for the scheduling frameworkImpl.
-func WithWorkloadManager(workloadManager fwk.WorkloadManager) Option {
+// WithPodGroupManager sets Pod group manager for the scheduling frameworkImpl.
+func WithPodGroupManager(podGroupManager fwk.PodGroupManager) Option {
 	return func(o *frameworkOptions) {
-		o.workloadManager = workloadManager
+		o.podGroupManager = podGroupManager
 	}
 }
 
@@ -330,7 +337,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
 		sharedCSIManager:     options.sharedCSIManager,
-		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
 		podsInPreBind:        options.podsInPreBind,
 		clientSet:            options.clientSet,
@@ -343,7 +349,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
 		apiDispatcher:        options.apiDispatcher,
-		workloadManager:      options.workloadManager,
+		podGroupManager:      options.podGroupManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -431,16 +437,37 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
 	}
-
-	if err := getScoreWeights(f, append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...)); err != nil {
-		return nil, err
+	if len(f.placementGeneratePlugins) > 1 {
+		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
 	}
+
+	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
+	if err != nil {
+		return nil, fmt.Errorf("score plugins: %w", err)
+	}
+	f.scorePluginWeight = podScoreWeights
 
 	// Verifying the score weights again since Plugin.Name() could return a different
 	// value from the one used in the configuration.
 	for _, scorePlugin := range f.scorePlugins {
 		if f.scorePluginWeight[scorePlugin.Name()] == 0 {
 			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		placementScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.PlacementScorePlugin](), append(profile.Plugins.PlacementScore.Enabled, profile.Plugins.MultiPoint.Enabled...))
+		if err != nil {
+			return nil, fmt.Errorf("placement score plugins: %w", err)
+		}
+		f.placementScorePluginWeight = placementScoreWeights
+
+		// Verifying the placement score weights again since Plugin.Name() could return a different
+		// value from the one used in the configuration.
+		for _, placementScorePlugin := range f.placementScorePlugins {
+			if f.placementScorePluginWeight[placementScorePlugin.Name()] == 0 {
+				return nil, fmt.Errorf("placement score plugin %q is not configured with weight", placementScorePlugin.Name())
+			}
 		}
 	}
 
@@ -532,12 +559,12 @@ func (f *frameworkImpl) Close() error {
 	return errors.Join(errs...)
 }
 
-// getScoreWeights makes sure that, between MultiPoint-Score plugin weights and individual Score
+// getValidScoreWeights makes sure that, between MultiPoint-Score plugin weights and individual Score
 // plugin weights there is not an overflow of MaxTotalScore.
-func getScoreWeights(f *frameworkImpl, plugins []config.Plugin) error {
+// pluginType is the type of the plugin for which it's valid to define weight, such as Score or PlacementScore.
+func getValidScoreWeights(f *frameworkImpl, pluginType reflect.Type, plugins []config.Plugin) (map[string]int, error) {
+	weights := make(map[string]int)
 	var totalPriority int64
-	scorePlugins := reflect.ValueOf(&f.scorePlugins).Elem()
-	pluginType := scorePlugins.Type().Elem()
 	for _, e := range plugins {
 		pg := f.pluginsMap[e.Name]
 		if !reflect.TypeOf(pg).Implements(pluginType) {
@@ -546,23 +573,23 @@ func getScoreWeights(f *frameworkImpl, plugins []config.Plugin) error {
 
 		// We append MultiPoint plugins to the list of Score plugins. So if this plugin has already been
 		// encountered, let the individual Score weight take precedence.
-		if _, ok := f.scorePluginWeight[e.Name]; ok {
+		if _, ok := weights[e.Name]; ok {
 			continue
 		}
 		// a weight of zero is not permitted, plugins can be disabled explicitly
 		// when configured.
-		f.scorePluginWeight[e.Name] = int(e.Weight)
-		if f.scorePluginWeight[e.Name] == 0 {
-			f.scorePluginWeight[e.Name] = 1
+		weights[e.Name] = int(e.Weight)
+		if weights[e.Name] == 0 {
+			weights[e.Name] = 1
 		}
 
 		// Checks totalPriority against MaxTotalScore to avoid overflow
-		if int64(f.scorePluginWeight[e.Name])*fwk.MaxNodeScore > fwk.MaxTotalScore-totalPriority {
-			return fmt.Errorf("total score of Score plugins could overflow")
+		if int64(weights[e.Name])*fwk.MaxScore > fwk.MaxTotalScore-totalPriority {
+			return nil, fmt.Errorf("total score of Score plugins could overflow")
 		}
-		totalPriority += int64(f.scorePluginWeight[e.Name]) * fwk.MaxNodeScore
+		totalPriority += int64(weights[e.Name]) * fwk.MaxScore
 	}
-	return nil
+	return weights, nil
 }
 
 type orderedSet struct {
@@ -1293,6 +1320,8 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl fwk.PreScorePl
 // It returns a list that stores scores from each plugin and total score for each Node.
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
+//
+// This function mostly duplicates RunPlacementScorePlugins. Any changes to it should likely be reflected in both places.
 func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (ns []fwk.NodePluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -1419,6 +1448,138 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	startTime := time.Now()
 	status := pl.ScoreExtensions().NormalizeScore(ctx, state, pod, nodeScoreList)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.ScoreExtensionNormalize, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return status
+}
+
+// RunPlacementScorePlugins runs the set of configured scoring plugins.
+// It returns a list that stores scores from each plugin and total score for each Placement.
+// It also returns *Status, which is set to non-success if any of the plugins returns
+// a non-success status.
+//
+// This function mostly duplicates RunScorePlugins. Any changes to it should likely be reflected in both places.
+func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	allPlacementPluginScores := make([]fwk.PlacementPluginScores, len(podGroupAssignments))
+	numPlugins := len(f.placementScorePlugins)
+	plugins := make([]fwk.PlacementScorePlugin, 0, numPlugins)
+	pluginToPlacementScores := make(map[string][]fwk.PlacementScore, numPlugins)
+	for _, pl := range f.placementScorePlugins {
+		plugins = append(plugins, pl)
+		pluginToPlacementScores[pl.Name()] = make([]fwk.PlacementScore, len(podGroupAssignments))
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := parallelize.NewResultChannel[error]()
+
+	if len(plugins) > 0 {
+		logger := klog.FromContext(ctx)
+		verboseLogs := logger.V(4).Enabled()
+		if verboseLogs {
+			logger = klog.LoggerWithName(logger, "PlacementScore")
+		}
+		// Run ScorePlacement method for each placement in parallel.
+		f.Parallelizer().Until(ctx, len(podGroupAssignments), func(index int) {
+			pga := podGroupAssignments[index]
+			logger := logger
+			if verboseLogs {
+				logger = klog.LoggerWithValues(logger, "placement", pga.Placement.Name)
+			}
+			for _, pl := range plugins {
+				ctx := ctx
+				if verboseLogs {
+					logger := klog.LoggerWithName(logger, pl.Name())
+					ctx = klog.NewContext(ctx, logger)
+				}
+				s, status := f.runPlacementScorePlugin(ctx, pl, state, podGroupInfo, pga)
+				if !status.IsSuccess() {
+					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+					errCh.SendWithCancel(err, cancel)
+					return
+				}
+				pluginToPlacementScores[pl.Name()][index] = fwk.PlacementScore{
+					Placement: pga.Placement,
+					Score:     s,
+				}
+			}
+		}, metrics.PlacementScore)
+		if err := errCh.Receive(); err != nil {
+			return nil, fwk.AsStatus(fmt.Errorf("running PlacementScore plugins: %w", err))
+		}
+	}
+
+	// Run NormalizePlacementScore method for each PlacementScorePlugin in parallel.
+	f.Parallelizer().Until(ctx, len(plugins), func(index int) {
+		pl := plugins[index]
+		if pl.PlacementScoreExtensions() == nil {
+			return
+		}
+		placementScoreList := pluginToPlacementScores[pl.Name()]
+		status := f.runPlacementScoreExtension(ctx, pl, state, podGroupInfo, placementScoreList)
+		if !status.IsSuccess() {
+			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+			errCh.SendWithCancel(err, cancel)
+			return
+		}
+	}, metrics.PlacementScore)
+	if err := errCh.Receive(); err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("running NormalizePlacementScore on PlacementScore plugins: %w", err))
+	}
+
+	// Apply score weight for each PlacementScorePlugin in parallel,
+	// and then, build allPlacementPluginScores.
+	f.Parallelizer().Until(ctx, len(podGroupAssignments), func(index int) {
+		placementPluginScores := fwk.PlacementPluginScores{
+			Placement: podGroupAssignments[index].Placement,
+			Scores:    make([]fwk.PluginScore, len(plugins)),
+		}
+
+		for i, pl := range plugins {
+			weight := f.placementScorePluginWeight[pl.Name()]
+			placementScoreList := pluginToPlacementScores[pl.Name()]
+			score := placementScoreList[index].Score
+
+			if score > fwk.MaxScore || score < fwk.MinScore {
+				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, fwk.MinScore, fwk.MaxScore)
+				errCh.SendWithCancel(err, cancel)
+				return
+			}
+			weightedScore := score * int64(weight)
+			placementPluginScores.Scores[i] = fwk.PluginScore{
+				Name:  pl.Name(),
+				Score: weightedScore,
+			}
+			placementPluginScores.TotalScore += weightedScore
+		}
+		allPlacementPluginScores[index] = placementPluginScores
+	}, metrics.PlacementScore)
+	if err := errCh.Receive(); err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("applying score defaultWeights on PlacementScore plugins: %w", err))
+	}
+
+	return allPlacementPluginScores, nil
+}
+
+func (f *frameworkImpl) runPlacementScorePlugin(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.ScorePlacement(ctx, state, podGroup, placement)
+	}
+	startTime := time.Now()
+	s, status := pl.ScorePlacement(ctx, state, podGroup, placement)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementScore, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return s, status
+}
+
+func (f *frameworkImpl) runPlacementScoreExtension(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placementScoreList []fwk.PlacementScore) *fwk.Status {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PlacementScoreExtensions().NormalizePlacementScore(ctx, state, podGroup, placementScoreList)
+	}
+	startTime := time.Now()
+	status := pl.PlacementScoreExtensions().NormalizePlacementScore(ctx, state, podGroup, placementScoreList)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementScoreExtensionNormalize, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
 }
 
@@ -1830,6 +1991,46 @@ func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]ti
 	f.waitingPods.add(waitingPod)
 }
 
+// RunPlacementGeneratePlugins runs the set of configured PlacementGeneratePlugins and returns the generated placements.
+// If no plugins are defined, the input placement is returned instead.
+func (f *frameworkImpl) RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) (placements []*fwk.Placement, status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementGenerate, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	placement := &fwk.Placement{
+		Nodes: nodes,
+	}
+
+	if len(f.placementGeneratePlugins) == 0 {
+		return []*fwk.Placement{placement}, nil
+	}
+
+	plugin := f.placementGeneratePlugins[0]
+
+	result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
+	if !status.IsSuccess() {
+		return nil, status.WithPlugin(plugin.Name())
+	}
+
+	if len(result.Placements) == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+	}
+
+	return result.Placements, nil
+}
+
+func (f *frameworkImpl) runPlacementGeneratePlugin(ctx context.Context, pl fwk.PlacementGeneratePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.GeneratePlacements(ctx, state, podGroup, parentPlacement)
+	}
+	startTime := time.Now()
+	placements, status := pl.GeneratePlacements(ctx, state, podGroup, parentPlacement)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementGenerate, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return placements, status
+}
+
 func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {
 	return f.waitingPods.get(pod.UID) != nil
 }
@@ -1936,9 +2137,12 @@ func (f *frameworkImpl) ListPlugins() *config.Plugins {
 		for i := 0; i < plugins.Len(); i++ {
 			name := plugins.Index(i).Interface().(fwk.Plugin).Name()
 			p := config.Plugin{Name: name}
+			// Weights apply only to score and placement score plugins.
 			if extName == "ScorePlugin" {
-				// Weights apply only to score plugins.
 				p.Weight = int32(f.scorePluginWeight[name])
+			}
+			if extName == "PlacementScorePlugin" {
+				p.Weight = int32(f.placementScorePluginWeight[name])
 			}
 			cfgs = append(cfgs, p)
 		}
@@ -1979,9 +2183,9 @@ func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
 	return f.sharedCSIManager
 }
 
-// WorkloadManager returns the WorkloadManager of the framework.
-func (f *frameworkImpl) WorkloadManager() fwk.WorkloadManager {
-	return f.workloadManager
+// PodGroupManager returns the PodGroupManager of the framework.
+func (f *frameworkImpl) PodGroupManager() fwk.PodGroupManager {
+	return f.podGroupManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

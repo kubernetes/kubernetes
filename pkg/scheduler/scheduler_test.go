@@ -692,7 +692,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: fwk.DeviceClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: fwk.Workload, ActionType: fwk.All}: {
+				{Resource: fwk.PodGroup, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
@@ -885,7 +885,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All,
 				fwk.ResourceClaim:         fwk.All,
 				fwk.DeviceClass:           fwk.All,
-				fwk.Workload:              fwk.All,
+				fwk.PodGroup:              fwk.All,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
@@ -1075,7 +1075,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
 				fwk.ResourceClaim:         fwk.All - fwk.Delete,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-				fwk.Workload:              fwk.Add,
+				fwk.PodGroup:              fwk.Add,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,

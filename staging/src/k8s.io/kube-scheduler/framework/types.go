@@ -170,7 +170,7 @@ const (
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-	Workload              EventResource = "scheduling.k8s.io/Workload"
+	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -637,6 +637,21 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 }
 
+// PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
+// Typically used as an input to pod group scheduling cycle plugins.
+type PodGroupInfo interface {
+	// GetUnscheduledPods returns pods that are currently being considered for scheduling.
+	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	// This structure only contains the pods considered for scheduling in the pod group scheduling cycle.
+	GetUnscheduledPods() []*v1.Pod
+
+	// GetName returns the PodGroup name.
+	GetName() string
+
+	// GetNamespace returns the namespace the pod group belongs to.
+	GetNamespace() string
+}
+
 // Placement determines the resources to be considered when scheduling a pod group.
 // Pod group scheduling cycle can check multiple placements and select the one that results
 // in the best pod assignments.
@@ -648,4 +663,22 @@ type Placement struct {
 	// Nodes specifies the nodes that are valid for this placement.
 	// Scheduler will try to schedule the pod group using only those nodes.
 	Nodes []NodeInfo
+}
+
+// ProposedAssignment associates pod of a pod group with a proposed node assignment, determined in pod group scheduling cycle.
+type ProposedAssignment interface {
+	// GetPod returns the pod that has the proposed node assignment.
+	GetPod() *v1.Pod
+	// GetNodeName returns the name of the proposed node for the pod.
+	GetNodeName() string
+}
+
+// PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.
+// Can be used in the pod group scheduling cycle to determine the best placement for a pod group.
+type PodGroupAssignments struct {
+	*Placement
+	// ProposedAssignments associates pods with proposed nodes that were determined for a given placement
+	// during the pod group scheduling cycle.
+	// The pods are guaranteed to also be present in the PodGroupInfo.
+	ProposedAssignments []ProposedAssignment
 }

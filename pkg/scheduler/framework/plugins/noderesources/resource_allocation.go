@@ -36,7 +36,7 @@ import (
 )
 
 // scorer is decorator for resourceAllocationScorer
-type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
+type scorer func(strategy *config.ScoringStrategy) *resourceAllocationScorer
 
 // DRACaches holds various caches used for DRA-related computations
 type DRACaches struct {
@@ -150,9 +150,29 @@ func (r *resourceAllocationScorer) score(
 		return 0, fwk.NewStatus(fwk.Error, "resources not found")
 	}
 
-	allocated := make([]int64, len(r.resources))
-	requested := make([]int64, len(r.resources))
-	allocatable := make([]int64, len(r.resources))
+	requested, allocated, allocatable := r.calculateNodeAllocatableRequest(ctx, nodeInfo, podRequests, draPreScoreState)
+
+	score := r.scorer(requested, allocated, allocatable)
+
+	if loggerV := logger.V(10); loggerV.Enabled() { // Serializing these maps is costly.
+		loggerV.Info("Listed internal info for allocatable resources, requested resources and score", "pod",
+			klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
+			"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
+		)
+	}
+
+	return score, nil
+}
+
+func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
+	ctx context.Context,
+	nodeInfo fwk.NodeInfo,
+	podRequests []int64,
+	draPreScoreState *draPreScoreState,
+) (requested []int64, allocated []int64, allocatable []int64) {
+	requested = make([]int64, len(r.resources))
+	allocated = make([]int64, len(r.resources))
+	allocatable = make([]int64, len(r.resources))
 	for i := range r.resources {
 		resource := v1.ResourceName(r.resources[i].Name)
 		// If it's an extended resource, and the pod doesn't request it.
@@ -169,17 +189,7 @@ func (r *resourceAllocationScorer) score(
 		allocated[i] = nodeAllocated
 		requested[i] = allocated[i] + podRequests[i]
 	}
-
-	score := r.scorer(requested, allocated, allocatable)
-
-	if loggerV := logger.V(10); loggerV.Enabled() { // Serializing these maps is costly.
-		loggerV.Info("Listed internal info for allocatable resources, requested resources and score", "pod",
-			klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
-			"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
-		)
-	}
-
-	return score, nil
+	return requested, allocated, allocatable
 }
 
 // calculateResourceAllocatableRequest returns 2 parameters:
@@ -190,7 +200,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 	nodeInfo fwk.NodeInfo,
 	resource v1.ResourceName,
 	draPreScoreState *draPreScoreState,
-) (int64, int64) {
+) (allocatable int64, allocated int64) {
 	requested := nodeInfo.GetNonZeroRequested()
 	if r.useRequested {
 		requested = nodeInfo.GetRequested()

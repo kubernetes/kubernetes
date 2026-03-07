@@ -31,7 +31,7 @@ import (
 )
 
 func TestDeclarativeValidate(t *testing.T) {
-	apiVersions := []string{"v1alpha1"} // Workload is currently only in v1alpha1
+	apiVersions := []string{"v1alpha2"} // Workload is currently only in v1alpha2
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -55,35 +55,35 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid": {
 			input: mkValidWorkload(),
 		},
-		"empty podGroups": {
-			input:        mkValidWorkload(clearPodGroups()),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups"), "must have at least one item").MarkAlpha()},
+		"empty podGroupTemplates": {
+			input:        mkValidWorkload(clearPodGroupTemplates()),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplates"), "must have at least one item").MarkAlpha()},
 		},
-		"too many podGroups": {
-			input:        mkValidWorkload(setManyPodGroups(scheduling.WorkloadMaxPodGroups + 1)),
-			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkAlpha()},
+		"too many podGroupTemplates": {
+			input:        mkValidWorkload(setManyPodGroupTemplates(scheduling.WorkloadMaxPodGroupTemplates + 1)),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("spec", "podGroupTemplates"), scheduling.WorkloadMaxPodGroupTemplates+1, scheduling.WorkloadMaxPodGroupTemplates).WithOrigin("maxItems").MarkAlpha()},
 		},
-		"empty podGroup name": {
+		"empty podGroupTemplate name": {
 			input:        mkValidWorkload(setPodGroupName(0, "")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("name"), "").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplates").Index(0).Child("name"), "").MarkAlpha()},
 		},
-		"invalid podGroup name": {
+		"invalid podGroupTemplate name": {
 			input:        mkValidWorkload(setPodGroupName(0, "Invalid_Name")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name").MarkAlpha()},
 		},
-		"duplicate podGroup names": {
-			input:        mkValidWorkload(addPodGroup("main")),
-			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("spec", "podGroups").Index(1), nil).MarkAlpha()},
+		"duplicate podGroupTemplate names": {
+			input:        mkValidWorkload(addPodGroupTemplate("main")),
+			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("spec", "podGroupTemplates").Index(1), nil).MarkAlpha()},
 		},
 		// Declarative validation treats 0 as "missing" and returns Required error
 		// instead of checking minimum constraint and returning Invalid error.
 		"gang minCount zero": {
 			input:        mkValidWorkload(setPodGroupMinCount(0, 0)),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), "").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), "").MarkAlpha()},
 		},
 		"gang minCount negative": {
 			input:        mkValidWorkload(setPodGroupMinCount(0, -1)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), nil, "").WithOrigin("minimum").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum").MarkAlpha()},
 		},
 		"valid with controllerRef": {
 			input: mkValidWorkload(setControllerRef("apps", "Deployment", "my-deployment")),
@@ -121,11 +121,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"policy with neither basic nor gang": {
 			input:        mkValidWorkload(clearPodGroupPolicy(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union").MarkAlpha()},
 		},
 		"policy with both basic and gang": {
 			input:        mkValidWorkload(setBothPolicies(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union").MarkAlpha()},
 		},
 		"valid with basic policy": {
 			input: mkValidWorkload(setBasicPolicy(0)),
@@ -139,7 +139,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
-	apiVersions := []string{"v1alpha1"} // Workload is currently only in v1alpha1
+	apiVersions := []string{"v1alpha2"} // Workload is currently only in v1alpha2
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -165,26 +165,26 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 		},
-		"invalid update empty podGroups": {
+		"invalid update empty podGroupTemplates": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
-			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroups()),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroupTemplates()),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item").MarkAlpha(),
-				field.Invalid(field.NewPath("spec", "podGroups"), []scheduling.PodGroup{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Required(field.NewPath("spec", "podGroupTemplates"), "must have at least one item").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates"), []scheduling.PodGroupTemplate{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
-		"invalid update too many podGroups": {
+		"invalid update too many podGroupTemplates": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
-			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroups(scheduling.WorkloadMaxPodGroups+1)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroupTemplates(scheduling.WorkloadMaxPodGroupTemplates+1)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkAlpha(),
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "podGroupTemplates"), scheduling.WorkloadMaxPodGroupTemplates+1, scheduling.WorkloadMaxPodGroupTemplates).WithOrigin("maxItems").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
-		"invalid update podGroups": {
+		"invalid update podGroupTemplate": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), addPodGroup("worker1")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
+			updateObj:    mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
 		},
 		"invalid update controllerRef": {
 			oldObj:       mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
@@ -195,20 +195,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), clearPodGroupPolicy(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"invalid update with both basic and gang": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setBothPolicies(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"valid update from gang to basic policy": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha()},
 		},
 	}
 	for k, tc := range testCases {
@@ -234,10 +234,10 @@ func mkValidWorkload(tweaks ...func(obj *scheduling.Workload)) scheduling.Worklo
 			Namespace: "default",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroups: []scheduling.PodGroup{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
 				{
 					Name: "main",
-					Policy: scheduling.PodGroupPolicy{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 1,
 						},
@@ -258,25 +258,25 @@ func setResourceVersion(v string) func(obj *scheduling.Workload) {
 	}
 }
 
-func clearPodGroups() func(obj *scheduling.Workload) {
+func clearPodGroupTemplates() func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups = nil
+		obj.Spec.PodGroupTemplates = nil
 	}
 }
 
-func setEmptyPodGroups() func(obj *scheduling.Workload) {
+func setEmptyPodGroupTemplates() func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups = []scheduling.PodGroup{}
+		obj.Spec.PodGroupTemplates = []scheduling.PodGroupTemplate{}
 	}
 }
 
-func setManyPodGroups(n int) func(obj *scheduling.Workload) {
+func setManyPodGroupTemplates(n int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups = make([]scheduling.PodGroup, n)
-		for i := range obj.Spec.PodGroups {
-			obj.Spec.PodGroups[i] = scheduling.PodGroup{
+		obj.Spec.PodGroupTemplates = make([]scheduling.PodGroupTemplate, n)
+		for i := range obj.Spec.PodGroupTemplates {
+			obj.Spec.PodGroupTemplates[i] = scheduling.PodGroupTemplate{
 				Name: fmt.Sprintf("group-%d", i),
-				Policy: scheduling.PodGroupPolicy{
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 1,
 					},
@@ -286,11 +286,11 @@ func setManyPodGroups(n int) func(obj *scheduling.Workload) {
 	}
 }
 
-func addPodGroup(name string) func(obj *scheduling.Workload) {
+func addPodGroupTemplate(name string) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups = append(obj.Spec.PodGroups, scheduling.PodGroup{
+		obj.Spec.PodGroupTemplates = append(obj.Spec.PodGroupTemplates, scheduling.PodGroupTemplate{
 			Name: name,
-			Policy: scheduling.PodGroupPolicy{
+			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
 					MinCount: 1,
 				},
@@ -301,25 +301,25 @@ func addPodGroup(name string) func(obj *scheduling.Workload) {
 
 func setPodGroupName(pgIdx int, name string) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups[pgIdx].Name = name
+		obj.Spec.PodGroupTemplates[pgIdx].Name = name
 	}
 }
 
 func setPodGroupMinCount(pgIdx, min int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups[pgIdx].Policy.Gang.MinCount = int32(min)
+		obj.Spec.PodGroupTemplates[pgIdx].SchedulingPolicy.Gang.MinCount = int32(min)
 	}
 }
 
 func clearPodGroupPolicy(pgIdx int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups[pgIdx].Policy = scheduling.PodGroupPolicy{}
+		obj.Spec.PodGroupTemplates[pgIdx].SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{}
 	}
 }
 
 func setBasicPolicy(pgIdx int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups[pgIdx].Policy = scheduling.PodGroupPolicy{
+		obj.Spec.PodGroupTemplates[pgIdx].SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
 			Basic: &scheduling.BasicSchedulingPolicy{},
 		}
 	}
@@ -327,7 +327,7 @@ func setBasicPolicy(pgIdx int) func(obj *scheduling.Workload) {
 
 func setBothPolicies(pgIdx int) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
-		obj.Spec.PodGroups[pgIdx].Policy = scheduling.PodGroupPolicy{
+		obj.Spec.PodGroupTemplates[pgIdx].SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
 			Basic: &scheduling.BasicSchedulingPolicy{},
 			Gang:  &scheduling.GangSchedulingPolicy{MinCount: 1},
 		}

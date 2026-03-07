@@ -94,10 +94,11 @@ type PriorityClassList struct {
 // Workload allows for expressing scheduling constraints that should be used
 // when managing lifecycle of workloads from scheduling perspective,
 // including scheduling, preemption, eviction and other phases.
+// Workload API enablement is toggled by the GenericWorkload feature gate.
 type Workload struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// Name must be a DNS subdomain.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	//
 	// +optional
 	metav1.ObjectMeta
@@ -122,8 +123,8 @@ type WorkloadList struct {
 	Items []Workload
 }
 
-// WorkloadMaxPodGroups is the maximum number of pod groups per Workload.
-const WorkloadMaxPodGroups = 8
+// WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
+const WorkloadMaxPodGroupTemplates = 8
 
 // WorkloadSpec defines the desired state of a Workload.
 type WorkloadSpec struct {
@@ -135,13 +136,13 @@ type WorkloadSpec struct {
 	// +optional
 	ControllerRef *TypedLocalObjectReference
 
-	// PodGroups is the list of pod groups that make up the Workload.
-	// The maximum number of pod groups is 8. This field is immutable.
+	// PodGroupTemplates is the list of templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
 	//
 	// +required
 	// +listType=map
 	// +listMapKey=name
-	PodGroups []PodGroup
+	PodGroupTemplates []PodGroupTemplate
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
@@ -165,22 +166,29 @@ type TypedLocalObjectReference struct {
 	Name string
 }
 
-// PodGroup represents a set of pods with a common scheduling policy.
-type PodGroup struct {
-	// Name is a unique identifier for the PodGroup within the Workload.
+// PodGroupTemplate represents a template for a set of pods with a scheduling policy.
+type PodGroupTemplate struct {
+	// Name is a unique identifier for the PodGroupTemplate within the Workload.
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
 	Name string
 
-	// Policy defines the scheduling policy for this PodGroup.
+	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	//
 	// +required
-	Policy PodGroupPolicy
+	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	SchedulingConstraints *PodGroupSchedulingConstraints
 }
 
-// PodGroupPolicy defines the scheduling configuration for a PodGroup.
-type PodGroupPolicy struct {
+// PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
+// +union
+type PodGroupSchedulingPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
 	// standard Kubernetes scheduling behavior.
 	//
@@ -213,4 +221,154 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	MinCount int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroup represents a runtime instance of pods grouped together.
+// PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
+// Workload.podGroupTemplates.
+// PodGroup API enablement is toggled by the GenericWorkload feature gate.
+type PodGroup struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	//
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the desired state of the PodGroup.
+	//
+	// +required
+	Spec PodGroupSpec
+
+	// Status represents the current observed state of the PodGroup.
+	//
+	// +optional
+	Status PodGroupStatus
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroupList contains a list of PodGroup resources.
+type PodGroupList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	//
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodGroups.
+	Items []PodGroup
+}
+
+// PodGroupSpec defines the desired state of a PodGroup.
+type PodGroupSpec struct {
+	// PodGroupTemplateRef references a PodGroup template within other object (e.g. Workload)
+	// that was used to create the PodGroup. This field is immutable.
+	// This field is required but we might loosen this assumption in the future
+	// if a need for standalone, template-less Pod groups arises.
+	//
+	// +optional
+	PodGroupTemplateRef *PodGroupTemplateReference
+
+	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
+	// It is copied from the template on PodGroup creation.
+	// This field is immutable.
+	//
+	// +required
+	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
+	// It is copied from the template on PodGroup creation. This field is immutable.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	SchedulingConstraints *PodGroupSchedulingConstraints
+}
+
+// PodGroupStatus represents information about the status of a pod group.
+type PodGroupStatus struct {
+	// Conditions represent the latest observations of the PodGroup's state.
+	//
+	// Known condition types:
+	// - "PodGroupScheduled": Indicates whether the scheduling requirement has been satisfied.
+	//   - Status=True: All required pods have been assigned to nodes.
+	//   - Status=False: Scheduling failed (e.g. unschedulable, preempted, etc.).
+	//
+	// Known reasons for PodGroupScheduled condition:
+	// - "Scheduled": All required pods have been successfully scheduled.
+	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
+	//   affinity/anti-affinity rules, or insufficient capacity for the gang.
+	// - "Preempted": The PodGroup was preempted to make room for higher-priority workloads.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
+}
+
+// Well-known condition types for PodGroups.
+const (
+	// Scheduled indicates whether the scheduling requirement for the PodGroup has been satisfied.
+	PodGroupConditionTypeScheduled string = "PodGroupScheduled"
+)
+
+// Well-known condition reasons for PodGroups.
+const (
+	// Scheduled indicates that all required pods have been successfully scheduled.
+	PodGroupConditionScheduled string = "Scheduled"
+	// Unschedulable indicates that the PodGroup cannot be scheduled due to resource constraints,
+	// affinity/anti-affinity rules, or insufficient capacity for the gang.
+	PodGroupConditionUnschedulable string = "Unschedulable"
+	// Preempted indicates the PodGroup was preempted to make room for higher-priority workloads.
+	PodGroupConditionPreempted string = "Preempted"
+)
+
+// PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
+// +union
+type PodGroupTemplateReference struct {
+	// Workload references the PodGroupTemplate within the Workload object that was used to create
+	// the PodGroup.
+	//
+	// +optional
+	// +oneOf=TemplateReference
+	Workload *WorkloadPodGroupTemplateReference
+}
+
+// WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
+type WorkloadPodGroupTemplateReference struct {
+	// WorkloadName defines the name of the Workload object.
+	//
+	// +required
+	WorkloadName string
+
+	// PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.
+	//
+	// +required
+	PodGroupTemplateName string
+}
+
+// PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.
+type PodGroupSchedulingConstraints struct {
+	// TopologyConstraints defines the topology constraints for the pod group.
+	// This field is required but we might loosen this assumption in the future
+	// if more types of constraints are added.
+	//
+	// +optional
+	// +listType=atomic
+	TopologyConstraints []TopologyConstraint
+}
+
+// TopologyConstraint defines a topology constraint for a PodGroup.
+type TopologyConstraint struct {
+	// TopologyKey specifies the key of the node label representing the topology domain.
+	// All pods within the PodGroup must be colocated within the same domain instance.
+	// Different replicas of the PodGroup can land on different domain instances.
+	// Examples: "topology.kubernetes.io/rack"
+	//
+	// +required
+	TopologyKey string
 }

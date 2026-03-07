@@ -63,25 +63,29 @@ var ExtensionPoints = []string{
 	Unreserve,
 	Permit,
 	Sign,
+	PlacementGenerate,
 }
 
 const (
-	PreFilter                   = "PreFilter"
-	Filter                      = "Filter"
-	PreFilterExtensionAddPod    = "PreFilterExtensionAddPod"
-	PreFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
-	PostFilter                  = "PostFilter"
-	PreScore                    = "PreScore"
-	Score                       = "Score"
-	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
-	PreBind                     = "PreBind"
-	PreBindPreFlight            = "PreBindPreFlight"
-	Bind                        = "Bind"
-	PostBind                    = "PostBind"
-	Reserve                     = "Reserve"
-	Unreserve                   = "Unreserve"
-	Permit                      = "Permit"
-	Sign                        = "Sign"
+	PreFilter                        = "PreFilter"
+	Filter                           = "Filter"
+	PreFilterExtensionAddPod         = "PreFilterExtensionAddPod"
+	PreFilterExtensionRemovePod      = "PreFilterExtensionRemovePod"
+	PostFilter                       = "PostFilter"
+	PreScore                         = "PreScore"
+	Score                            = "Score"
+	ScoreExtensionNormalize          = "ScoreExtensionNormalize"
+	PreBind                          = "PreBind"
+	PreBindPreFlight                 = "PreBindPreFlight"
+	Bind                             = "Bind"
+	PostBind                         = "PostBind"
+	Reserve                          = "Reserve"
+	Unreserve                        = "Unreserve"
+	Permit                           = "Permit"
+	Sign                             = "Sign"
+	PlacementGenerate                = "PlacementGenerate"
+	PlacementScore                   = "PlacementScore"
+	PlacementScoreExtensionNormalize = "PlacementScoreExtensionNormalize"
 )
 
 const (
