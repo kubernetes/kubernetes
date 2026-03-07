@@ -251,7 +251,7 @@ const (
 
 // Evaluate considers this rule and decides if this dependency is allowed.
 func (r Rule) Evaluate(imp string) Disposition {
-	// To pass, an import muct be allowed and not forbidden.
+	// To pass, an import must be allowed and not forbidden.
 	// Check forbidden first.
 	for _, forbidden := range r.ForbiddenPrefixes {
 		klog.V(5).Infof("checking %q against forbidden prefix %q", imp, forbidden)
@@ -363,7 +363,7 @@ func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*F
 	for _, imp := range uniq(direct, indirect) {
 		if unmassage(imp) == realPkgPath {
 			// Tests in package "foo_test" depend on the test package for
-			// "foo" (if both exist in a giver directory).
+			// "foo" (if both exist in a given directory).
 			continue
 		}
 		klog.V(4).Infof("considering import %q %s %q", pkg.PkgPath, relate(imp), imp)
@@ -494,7 +494,7 @@ func (boss *ImportBoss) verifyInverseRules(pkg *packages.Package, restrictionFil
 	for _, imp := range boss.transitiveIncomingImports[pkg.PkgPath] {
 		if unmassage(imp) == realPkgPath {
 			// Tests in package "foo_test" depend on the test package for
-			// "foo" (if both exist in a giver directory).
+			// "foo" (if both exist in a given directory).
 			continue
 		}
 		klog.V(4).Infof("considering import %q %s %q", pkg.PkgPath, relate(imp), imp)
