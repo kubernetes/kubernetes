@@ -19,21 +19,27 @@ package oidc
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/go-jose/go-jose.v2"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
+	utilsnet "k8s.io/utils/net"
 )
 
 const (
@@ -41,6 +47,7 @@ const (
 	authWebPath            = "/auth"
 	tokenWebPath           = "/token"
 	jwksWebPath            = "/jwks"
+	rsaKeyBitSize          = 2048
 )
 
 var (
@@ -254,4 +261,54 @@ func GetSignatureAlgorithm[K JoseKey](key K) jose.SignatureAlgorithm {
 	default:
 		panic("unknown key type") // should be impossible
 	}
+}
+
+// RSAGenerateKey generates an RSA key pair for testing.
+func RSAGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
+	require.NoError(t, err)
+
+	return privateKey, &privateKey.PublicKey
+}
+
+// GenerateCert generates a self-signed certificate for localhost/127.0.0.1
+// and returns the cert bytes, key bytes, and file paths where they are stored.
+func GenerateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath string) {
+	t.Helper()
+
+	tempDir := t.TempDir()
+	certFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.crt")
+	keyFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.key")
+
+	cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures("localhost", []net.IP{utilsnet.ParseIPSloppy("127.0.0.1")}, nil, tempDir)
+	require.NoError(t, err)
+
+	return cert, key, certFilePath, keyFilePath
+}
+
+// WriteTempFile writes content to a temporary file and returns its path.
+// The file is automatically cleaned up when the test completes.
+func WriteTempFile(t *testing.T, content string) string {
+	t.Helper()
+	file, err := os.CreateTemp("", "oidc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return file.Name()
+}
+
+// IndentCertificateAuthority indents the certificate authority to match
+// the format of the generated authentication config.
+func IndentCertificateAuthority(caCert string) string {
+	return strings.ReplaceAll(caCert, "\n", "\n        ")
 }

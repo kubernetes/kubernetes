@@ -1,0 +1,249 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package egressselector
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync/atomic"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
+	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/oidc"
+)
+
+func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath string) {
+	t.Helper()
+
+	caKey, err := testutils.NewPrivateKey()
+	require.NoError(t, err, "Failed to generate CA key")
+
+	caCert, err := certutil.NewSelfSignedCACert(certutil.Config{
+		CommonName: "Test CA",
+	}, caKey)
+	require.NoError(t, err, "Failed to create CA certificate")
+
+	serverKey, err := testutils.NewPrivateKey()
+	require.NoError(t, err, "Failed to generate server key")
+
+	serverCert, err := testutils.NewSignedCert(&certutil.Config{
+		CommonName: serverName,
+		AltNames:   certutil.AltNames{DNSNames: []string{serverName}},
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}, serverKey, caCert, caKey)
+	require.NoError(t, err, "Failed to create server certificate")
+
+	clientKey, err := testutils.NewPrivateKey()
+	require.NoError(t, err, "Failed to generate client key")
+
+	clientCert, err := testutils.NewSignedCert(&certutil.Config{
+		CommonName: "test-client",
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}, clientKey, caCert, caKey)
+	require.NoError(t, err, "Failed to create client certificate")
+
+	caCertPath = filepath.Join(tempDir, "ca.crt")
+	require.NoError(t, os.WriteFile(caCertPath, testutils.EncodeCertPEM(caCert), 0600), "Failed to write CA cert")
+
+	serverCertPath = filepath.Join(tempDir, "server.crt")
+	serverKeyPath = filepath.Join(tempDir, "server.key")
+	require.NoError(t, os.WriteFile(serverCertPath, testutils.EncodeCertPEM(serverCert), 0600), "Failed to write server cert")
+
+	serverKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(serverKey)
+	require.NoError(t, err, "Failed to marshal server key")
+	require.NoError(t, os.WriteFile(serverKeyPath, serverKeyPEM, 0600), "Failed to write server key")
+
+	clientCertPath = filepath.Join(tempDir, "client.crt")
+	clientKeyPath = filepath.Join(tempDir, "client.key")
+	require.NoError(t, os.WriteFile(clientCertPath, testutils.EncodeCertPEM(clientCert), 0600), "Failed to write client cert")
+
+	clientKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(clientKey)
+	require.NoError(t, err, "Failed to marshal client key")
+	require.NoError(t, os.WriteFile(clientKeyPath, clientKeyPEM, 0600), "Failed to write client key")
+
+	return caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath
+}
+
+// runTLSEgressProxy runs an HTTP CONNECT proxy with TLS.
+func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath string, called *atomic.Bool, observedSNI *atomic.Value) (string, error) {
+	t.Helper()
+
+	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load server cert: %w", err)
+	}
+
+	clientCAs, err := certutil.NewPool(caCertPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load CA cert pool: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    clientCAs,
+		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			observedSNI.Store(hello.ServerName)
+			return nil, nil
+		},
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", tlsConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to start TLS listener: %w", err)
+	}
+
+	proxyAddr := listener.Addr().String()
+
+	server := &http.Server{Handler: oidc.NewHTTPConnectProxyHandler(t, called)}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			t.Logf("TLS egress proxy serve error: %v", err)
+		}
+	}()
+
+	t.Cleanup(func() {
+		if err := server.Close(); err != nil {
+			t.Logf("Failed to close server: %v", err)
+		}
+	})
+
+	return proxyAddr, nil
+}
+
+// TestTLSServerName verifies that the tlsServerName field in the egress selector configuration
+// correctly overrides SNI for TLS certificate validation when connecting through a proxy.
+func TestTLSServerName(t *testing.T) {
+	tempDir := t.TempDir()
+
+	proxyHostname := "egress-proxy.example.com"
+
+	caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath := generateTestCerts(t, tempDir, proxyHostname)
+
+	testCases := []struct {
+		name              string
+		tlsServerName     string
+		expectProxyCalled bool
+		expectedSNI       string
+		description       string
+	}{
+		{
+			name:              "matching tlsServerName succeeds TLS handshake",
+			tlsServerName:     proxyHostname,
+			expectProxyCalled: true,
+			expectedSNI:       proxyHostname,
+			description:       "SNI override matches cert SANs, connection succeeds",
+		},
+		{
+			name:              "mismatched tlsServerName fails TLS handshake",
+			tlsServerName:     "wrong-hostname.example.com",
+			expectProxyCalled: false,
+			expectedSNI:       "wrong-hostname.example.com",
+			description:       "SNI override doesn't match cert SANs, connection fails",
+		},
+		{
+			name:              "empty tlsServerName uses dial address and fails",
+			tlsServerName:     "",
+			expectProxyCalled: false,
+			expectedSNI:       "",
+			description:       "Without tlsServerName, uses dial address 127.0.0.1 which fails cert validation",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var proxyCalled atomic.Bool
+			var observedSNI atomic.Value
+
+			proxyAddr, err := runTLSEgressProxy(t, serverCertPath, serverKeyPath, caCertPath, &proxyCalled, &observedSNI)
+			require.NoError(t, err, "Failed to start TLS egress proxy")
+			t.Logf("TLS egress proxy ready at %s (cert issued for: %s)", proxyAddr, proxyHostname)
+
+			caCertContent, _, caFilePath, caKeyFilePath := oidc.GenerateCert(t)
+			_, publicKey := oidc.RSAGenerateKey(t)
+			oidcServer := oidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
+
+			egressConfig := fmt.Sprintf(`
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      tcp:
+        url: https://%s
+        tlsConfig:
+          caBundle: %s
+          clientCert: %s
+          clientKey: %s
+          tlsServerName: %s
+`, proxyAddr, caCertPath, clientCertPath, clientKeyPath, tc.tlsServerName)
+
+			authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - foo
+    certificateAuthority: |
+        %s
+    egressSelectorType: cluster
+  claimMappings:
+    username:
+      expression: "'test-' + claims.sub"
+`, oidcServer.URL(), oidc.IndentCertificateAuthority(string(caCertContent)))
+
+			customFlags := []string{
+				fmt.Sprintf("--egress-selector-config-file=%s", oidc.WriteTempFile(t, egressConfig)),
+				fmt.Sprintf("--authentication-config=%s", oidc.WriteTempFile(t, authenticationConfig)),
+				"--authorization-mode=RBAC",
+			}
+
+			server := kubeapiserverapptesting.StartTestServerOrDie(
+				t,
+				kubeapiserverapptesting.NewDefaultTestServerOptions(),
+				customFlags,
+				framework.SharedEtcd(),
+			)
+			t.Cleanup(server.TearDownFn)
+
+			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(oidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+
+			if sni, _ := observedSNI.Load().(string); sni != tc.expectedSNI {
+				t.Errorf("expected SNI=%q, got=%q", tc.expectedSNI, sni)
+			}
+
+			if tc.expectProxyCalled != proxyCalled.Load() {
+				t.Errorf("expected proxy called=%v, got=%v", tc.expectProxyCalled, proxyCalled.Load())
+			}
+		})
+	}
+}
