@@ -18,6 +18,7 @@ linters:
     - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
     - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
     - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+    - "preferredmarkers" # Ensure preferred markers are used when multiple forms are available.
     # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
     - "ssatags" # Ensure lists have a listType tag.
     # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
@@ -47,6 +48,16 @@ lintersConfig:
         type: "All"
         dependsOn:
           - "k8s:optional"
+  preferredmarkers:
+    markers:
+      - preferredIdentifier: "optional"
+        equivalentIdentifiers:
+          - identifier: "k8s:optional"
+          - identifier: "kubebuilder:validation:Optional"
+      - preferredIdentifier: "required"
+        equivalentIdentifiers:
+          - identifier: "k8s:required"
+          - identifier: "kubebuilder:validation:Required"
   # jsonTags:
   #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
   # nomaps:
