@@ -39,6 +39,8 @@ type C struct {
 	y string
 }
 
+var benchmarkHash uint32
+
 func (c C) String() string {
 	return fmt.Sprintf("%d:%s", c.x, c.y)
 }
@@ -144,4 +146,26 @@ func TestDeepObjectPointer(t *testing.T) {
 			t.Errorf("hash1 (%d) and hash3(%d) must be the same because although they point to different objects, they have the same values for wheel size", hash1, hash3)
 		}
 	}
+}
+
+func BenchmarkDeepHashObject(b *testing.B) {
+	hasher := adler32.New()
+	obj := map[string]interface{}{
+		"ints":   []int{1, 2, 3, 4, 5},
+		"strings": []string{
+			"eight", "six", "seven", "five", "three", "oh", "nine",
+		},
+		"nested": map[string]B{
+			"a": {x: []int{8, 6, 7}, y: map[string]bool{"5": true, "3": true, "0": true, "9": true}},
+			"b": {x: []int{1, 2, 3}, y: map[string]bool{"x": true, "y": false}},
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		DeepHashObject(hasher, obj)
+	}
+	b.StopTimer()
+	benchmarkHash = hasher.Sum32()
 }
