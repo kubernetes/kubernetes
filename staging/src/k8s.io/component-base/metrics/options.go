@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"go.yaml.in/yaml/v2"
-	"k8s.io/component-base/metrics/api/v1"
+	v1 "k8s.io/component-base/metrics/api/v1"
 )
 
 var (
