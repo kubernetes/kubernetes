@@ -725,16 +725,17 @@ func dropDefaults(s *spec.Schema) {
 	delete(s.Extensions, "x-kubernetes-selectable-fields")
 }
 
-func verifyKubectlExplain(ns, name, pattern string) error {
-	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
-	if err != nil {
-		return fmt.Errorf("failed to explain %s: %w", name, err)
-	}
-	r := regexp.MustCompile(pattern)
-	if !r.Match([]byte(result)) {
-		return fmt.Errorf("kubectl explain %s result {%s} doesn't match pattern {%s}", name, result, pattern)
-	}
-	return nil
+func verifyKubectlExplain(ns, resource, pattern string) error {
+	return wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+		result, err := e2ekubectl.RunKubectl(ns, "explain", resource)
+		if err != nil {
+			return false, nil
+		}
+		if !regexp.MustCompile(pattern).MatchString(result) {
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 // definitionName returns the openapi definition name for given CRD in given version
