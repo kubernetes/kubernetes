@@ -85,14 +85,14 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]TopologyHint
 	// GetPodTopologyHints returns a map of resource names to a list of possible
 	// concrete resource allocations per Pod in terms of NUMA locality hints.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint
+	GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]TopologyHint
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -235,7 +235,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
