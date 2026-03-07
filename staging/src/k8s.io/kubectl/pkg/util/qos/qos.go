@@ -21,11 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var supportedQoSComputeResources = sets.New[string](string(core.ResourceCPU), string(core.ResourceMemory))
-
-func isSupportedQoSComputeResource(name core.ResourceName) bool {
-	return supportedQoSComputeResources.Has(string(name))
-}
+var supportedQoSComputeResources = sets.New(core.ResourceCPU, core.ResourceMemory)
 
 // GetPodQOS returns the QoS class of a pod persisted in the PodStatus.QOSClass field.
 // If PodStatus.QOSClass is empty, it returns value of ComputePodQOS() which evaluates pod's QoS class.
@@ -36,96 +32,87 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 	return ComputePodQOS(pod)
 }
 
-// processResourceList adds non-zero quantities for supported QoS compute resources
-// quantities from newList to list.
-func processResourceList(list, newList core.ResourceList) {
-	for name, quantity := range newList {
-		if !isSupportedQoSComputeResource(name) {
-			continue
-		}
-		if quantity.Sign() == 1 {
-			delta := quantity.DeepCopy()
-			if _, exists := list[name]; !exists {
-				list[name] = delta
-			} else {
-				delta.Add(list[name])
-				list[name] = delta
-			}
-		}
-	}
-}
-
-// getQOSResources returns a set of resource names from the provided resource list that:
-// 1. Are supported QoS compute resources
-// 2. Have quantities greater than zero
-func getQOSResources(list core.ResourceList) sets.Set[string] {
-	qosResources := sets.New[string]()
-	for name, quantity := range list {
-		if !isSupportedQoSComputeResource(name) {
-			continue
-		}
-		if quantity.Sign() == 1 {
-			qosResources.Insert(string(name))
-		}
-	}
-	return qosResources
-}
-
 // ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
 // expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
-// A pod is besteffort if none of its containers have specified any requests or limits.
-// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
-// A pod is burstable if limits and requests do not match across all containers.
+// A pod is BestEffort if none of its containers have specified any cpu or memory requests or limits.
+// A pod is Guaranteed only when cpu & memory requests and limits are specified for all the containers and they are equal.
+// A pod is Burstable if cpu & memory limits and requests do not match across all containers.
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
-	requests := core.ResourceList{}
-	limits := core.ResourceList{}
-	isGuaranteed := true
+	// When pod-level resources are specified, we use them to determine QoS class.
 	if pod.Spec.Resources != nil {
-		if pod.Spec.Resources.Requests != nil {
-			// process requests
-			processResourceList(requests, pod.Spec.Resources.Requests)
-		}
+		return requirementsQOS(pod.Spec.Resources)
+	}
 
-		if pod.Spec.Resources.Limits != nil {
-			// process limits
-			processResourceList(limits, pod.Spec.Resources.Limits)
-			qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
-			if !qosLimitResources.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
-				isGuaranteed = false
+	// Iterator for Init & main Containers.
+	containerIter := func(yield func(*core.Container) bool) {
+		for _, c := range pod.Spec.InitContainers {
+			if !yield(&c) {
+				return
 			}
 		}
-	} else {
-		// note, ephemeral containers are not considered for QoS as they cannot define resources
-		allContainers := []core.Container{}
-		allContainers = append(allContainers, pod.Spec.Containers...)
-		allContainers = append(allContainers, pod.Spec.InitContainers...)
-		for _, container := range allContainers {
-			// process requests
-			processResourceList(requests, container.Resources.Requests)
-			// process limits
-			processResourceList(limits, container.Resources.Limits)
-			qosLimitResources := getQOSResources(container.Resources.Limits)
-			if !qosLimitResources.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
-				isGuaranteed = false
+		for _, c := range pod.Spec.Containers {
+			if !yield(&c) {
+				return
 			}
 		}
 	}
 
-	if len(requests) == 0 && len(limits) == 0 {
+	var podQOS core.PodQOSClass
+	for container := range containerIter {
+		containerQOS := requirementsQOS(&container.Resources)
+		if containerQOS == core.PodQOSBurstable {
+			return containerQOS // If any container is Burstable, we know the pod isn't BestEffort or Guaranteed
+		} else if podQOS == "" {
+			podQOS = containerQOS
+		} else if podQOS != containerQOS {
+			return core.PodQOSBurstable // If one container is BestEffort and another is Guaranteed, the pod is Burstable
+		}
+	}
+	if podQOS == "" { // This can only happen if there aren't any containers (not possible in production).
+		podQOS = core.PodQOSBestEffort
+	}
+	return podQOS
+}
+
+// requirementsQOS gets the QOSClass based on a single set of resource requirements. This may need
+// to be aggregated to determine pod QOS.
+func requirementsQOS(resources *core.ResourceRequirements) core.PodQOSClass {
+	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
 		return core.PodQOSBestEffort
 	}
-	// Check is requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
-			}
+
+	var qos core.PodQOSClass
+	for res := range supportedQoSComputeResources {
+		resQOS := resourceQOS(resources, res)
+		if resQOS == core.PodQOSBurstable {
+			return resQOS // If any resource is Burstable, we know the pod isn't BestEffort or Guaranteed
+		} else if qos == "" {
+			qos = resQOS
+		} else if qos != resQOS {
+			// A mismatch indicates some but not all QOS resources are specified, so the pod must be
+			// burstable.
+			return core.PodQOSBurstable
 		}
 	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
+	return qos
+}
+
+// resourceQOS determines the QOS "shape" of the given resource in the requirements:
+// - BestEffort: Request and Limit are both zero
+// - Burstable: Request != Limit
+// - Guaranteed: Request and Limit are equal and non-zero
+func resourceQOS(resources *core.ResourceRequirements, res core.ResourceName) core.PodQOSClass {
+	req := resources.Requests[res]
+	lim := resources.Limits[res]
+
+	if !req.Equal(lim) {
+		// If they're not equal we know at least one is non-zero, so we know it's neither guaranteed nor best effort.
+		return core.PodQOSBurstable
+	} else if req.IsZero() {
+		// req == lim, so no need to check lim.IsZero()
+		return core.PodQOSBestEffort
+	} else {
+		// req == lim != 0
 		return core.PodQOSGuaranteed
 	}
-	return core.PodQOSBurstable
 }
