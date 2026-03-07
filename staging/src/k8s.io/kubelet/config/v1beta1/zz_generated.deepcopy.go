@@ -409,6 +409,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
+	out.DRAManagerReconcilePeriod = in.DRAManagerReconcilePeriod
 	if in.TopologyManagerPolicyOptions != nil {
 		in, out := &in.TopologyManagerPolicyOptions, &out.TopologyManagerPolicyOptions
 		*out = make(map[string]string, len(*in))

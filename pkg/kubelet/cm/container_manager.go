@@ -191,6 +191,7 @@ type NodeConfig struct {
 	CPUManagerPolicyOptions      map[string]string
 	TopologyManagerScope         string
 	CPUManagerReconcilePeriod    time.Duration
+	DRAManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	PodPidsLimit                 int64
