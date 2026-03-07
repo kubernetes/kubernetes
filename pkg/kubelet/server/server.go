@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,6 +67,7 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
+	translator "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -940,13 +942,6 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-// proxyStream proxies stream to url.
-func proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
-	// TODO(random-liu): Set MaxBytesPerSec to throttle the stream.
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
-	handler.ServeHTTP(w, r)
-}
-
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
@@ -968,8 +963,20 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
+		servermetrics.IncWebSocketStreamingRequest("attach")
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		handler = translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -993,7 +1000,20 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
+		servermetrics.IncWebSocketStreamingRequest("exec")
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		handler = translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -1034,12 +1054,21 @@ func writeJSONResponse(logger klog.Logger, response *restful.Response, data []by
 func (s *Server) getPortForward(request *restful.Request, response *restful.Response) {
 	params := getPortForwardRequestParams(request)
 
-	portForwardOptions, err := portforward.NewV4Options(request.Request)
-	if err != nil {
-		utilruntime.HandleError(err)
-		response.WriteError(http.StatusBadRequest, err)
-		return
+	websocketSPDYTunnel := utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithTunnelingProtocol(request.Request)
+	var portForwardOptions *portforward.V4Options
+	var err error
+	if websocketSPDYTunnel {
+		portForwardOptions = &portforward.V4Options{}
+	} else {
+		portForwardOptions, err = portforward.NewV4Options(request.Request)
+		if err != nil {
+			utilruntime.HandleError(err)
+			response.WriteError(http.StatusBadRequest, err) //nolint:errcheck
+			return
+		}
 	}
+
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -1055,7 +1084,13 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for tunneling websockets, wrap with tunneling handling.
+	if websocketSPDYTunnel {
+		servermetrics.IncWebSocketStreamingRequest("portforward")
+		handler = translator.NewTunnelingHandler(handler)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // checkpoint handles the checkpoint API request. It checks if the requested

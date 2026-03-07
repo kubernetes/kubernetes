@@ -88,6 +88,17 @@ var (
 		},
 		[]string{"provider"},
 	)
+	// WebSocketStreamingRequests counts WebSocket streaming requests received by the kubelet,
+	// labeled by subresource.
+	WebSocketStreamingRequests = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeletSubsystem,
+			Name:           "websocket_streaming_requests_total",
+			Help:           "Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"subresource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -100,7 +111,13 @@ func Register() {
 		legacyregistry.MustRegister(HTTPInflightRequests)
 		legacyregistry.MustRegister(VolumeStatCalDuration)
 		legacyregistry.MustRegister(MetricsProvider)
+		legacyregistry.MustRegister(WebSocketStreamingRequests)
 	})
+}
+
+// ResetForTest resets metrics that support reset, for use in unit tests.
+func ResetForTest() {
+	WebSocketStreamingRequests.Reset()
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.
@@ -119,4 +136,10 @@ type MetricsProviderType string
 func SetMetricsProvider(provider MetricsProviderType) {
 	MetricsProvider.Reset()
 	MetricsProvider.WithLabelValues(string(provider)).Set(1)
+}
+
+// IncWebSocketStreamingRequest increments the count of WebSocket streaming requests received
+// by the kubelet for the given subresource (exec/attach/portforward).
+func IncWebSocketStreamingRequest(subresource string) {
+	WebSocketStreamingRequests.WithLabelValues(subresource).Inc()
 }

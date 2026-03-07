@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	translator "k8s.io/apiserver/pkg/util/proxy"
+	proxymetrics "k8s.io/apiserver/pkg/util/proxy/metrics"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -90,7 +92,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 
 // AttachREST implements the attach subresource for a Pod
 type AttachREST struct {
-	Store       *genericregistry.Store
+	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
 	Authorizer  authorizer.Authorizer
 }
@@ -123,12 +125,21 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.AttachLocation(ctx, r.Store, r.KubeletConn, name, attachOpts)
+
+	location, connInfo, err := pod.AttachLocation(ctx, r.Store, r.KubeletConn, name, attachOpts)
 	if err != nil {
 		return nil, err
 	}
+	transport := connInfo.Transport
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			proxymetrics.IncWebSocketStreamingRequest(ctx, "attach", "proxied_to_kubelet")
+			return handler, nil
+		}
+		proxymetrics.IncWebSocketStreamingRequest(ctx, "attach", "translated_at_apiserver")
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -156,7 +167,7 @@ func (r *AttachREST) ConnectMethods() []string {
 
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
-	Store       *genericregistry.Store
+	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
 	Authorizer  authorizer.Authorizer
 }
@@ -189,12 +200,21 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ExecLocation(ctx, r.Store, r.KubeletConn, name, execOpts)
+
+	location, connInfo, err := pod.ExecLocation(ctx, r.Store, r.KubeletConn, name, execOpts)
 	if err != nil {
 		return nil, err
 	}
+	transport := connInfo.Transport
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			proxymetrics.IncWebSocketStreamingRequest(ctx, "exec", "proxied_to_kubelet")
+			return handler, nil
+		}
+		proxymetrics.IncWebSocketStreamingRequest(ctx, "exec", "translated_at_apiserver")
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -222,7 +242,7 @@ func (r *ExecREST) ConnectMethods() []string {
 
 // PortForwardREST implements the portforward subresource for a Pod
 type PortForwardREST struct {
-	Store       *genericregistry.Store
+	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
 	Authorizer  authorizer.Authorizer
 }
@@ -266,12 +286,20 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
+	location, connInfo, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
 	if err != nil {
 		return nil, err
 	}
+	transport := connInfo.Transport
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.PortForwardWebsockets) {
+		// If the node supports websocket tunneling, revert to legacy proxy, and let kubelet handle it.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			proxymetrics.IncWebSocketStreamingRequest(ctx, "portforward", "proxied_to_kubelet")
+			return handler, nil
+		}
+		proxymetrics.IncWebSocketStreamingRequest(ctx, "portforward", "translated_at_apiserver")
 		tunnelingHandler := translator.NewTunnelingHandler(handler)
 		handler = translator.NewTranslatingHandler(handler, tunnelingHandler, wsstream.IsWebSocketRequestWithTunnelingProtocol)
 	}
@@ -282,4 +310,11 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
+}
+
+// Given features node supports, return true if kubelet supports websocket
+// translation/tunneling, false otherwise.
+func checkNodeSupportsWebsockets(nodeFeatures []string) bool {
+	nodeSupportsWebsockets := slices.Contains(nodeFeatures, string(features.ExtendWebSocketsToKubelet))
+	return nodeSupportsWebsockets
 }
