@@ -185,7 +185,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRADeviceBindingConditions)
 				})
 			},
 		},
@@ -197,7 +197,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRADeviceBindingConditions)
 				})
 			},
 		},
