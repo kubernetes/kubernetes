@@ -70,26 +70,12 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && obj.Image != nil && obj.Image.PullPolicy == "" {
-		// PullPolicy defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
-		_, tag, _, _ := parsers.ParseImageName(obj.Image.Reference)
-		if tag == "latest" {
-			obj.Image.PullPolicy = v1.PullAlways
-		} else {
-			obj.Image.PullPolicy = v1.PullIfNotPresent
-		}
+		obj.Image.PullPolicy = defaultImagePullPolicy(obj.Image.Reference)
 	}
 }
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
-		// Ignore error and assume it has been validated elsewhere
-		_, tag, _, _ := parsers.ParseImageName(obj.Image)
-
-		// Check image tag
-		if tag == "latest" {
-			obj.ImagePullPolicy = v1.PullAlways
-		} else {
-			obj.ImagePullPolicy = v1.PullIfNotPresent
-		}
+		obj.ImagePullPolicy = defaultImagePullPolicy(obj.Image)
 	}
 	if obj.TerminationMessagePath == "" {
 		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
@@ -524,4 +510,16 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	if len(podLims) > 0 {
 		pod.Spec.Resources.Limits = podLims
 	}
+}
+
+// defaultImagePullPolicy returns the default pull policy for the given image ref.
+// In most cases "PullIfNotPresent" is returned. The exception is if the "latest" tag
+// is used *and* an image digest is not provided.
+func defaultImagePullPolicy(ref string) v1.PullPolicy {
+	// Ignore parsing errors and assume the image reference has been validated elsewhere.
+	_, tag, digest, _ := parsers.ParseImageName(ref)
+	if tag == "latest" && digest == "" {
+		return v1.PullAlways
+	}
+	return v1.PullIfNotPresent
 }
