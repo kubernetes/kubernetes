@@ -2663,6 +2663,131 @@ func Test_SelectHost(t *testing.T) {
 	}
 }
 
+func Test_analyzePluginInfluence(t *testing.T) {
+	tests := []struct {
+		name                   string
+		nodeScores             []fwk.NodePluginScores
+		topK                   int
+		wantBaselineWinner     string
+		wantByPlugin           map[string]pluginInfluenceMetrics
+	}{
+		{
+			name: "captures winner changes and ranking perturbation",
+			topK: 2,
+			nodeScores: []fwk.NodePluginScores{
+				{
+					Name:       "node-a",
+					TotalScore: 100,
+					Randomizer: 10,
+					Scores: []fwk.PluginScore{
+						{Name: "PluginA", Score: 60},
+						{Name: "PluginB", Score: 40},
+					},
+				},
+				{
+					Name:       "node-b",
+					TotalScore: 95,
+					Randomizer: 2,
+					Scores: []fwk.PluginScore{
+						{Name: "PluginA", Score: 10},
+						{Name: "PluginB", Score: 85},
+					},
+				},
+				{
+					Name:       "node-c",
+					TotalScore: 50,
+					Randomizer: 1,
+					Scores: []fwk.PluginScore{
+						{Name: "PluginA", Score: 50},
+						{Name: "PluginB", Score: 0},
+					},
+				},
+			},
+			wantBaselineWinner: "node-a",
+			wantByPlugin: map[string]pluginInfluenceMetrics{
+				"PluginA": {
+					pluginName:       "PluginA",
+					winnerChanged:    true,
+					topKOverlapRatio: 1.0,
+					meanRankShift:    2.0 / 3.0,
+					scoreRange:       50,
+				},
+				"PluginB": {
+					pluginName:       "PluginB",
+					winnerChanged:    false,
+					topKOverlapRatio: 0.5,
+					meanRankShift:    2.0 / 3.0,
+					scoreRange:       85,
+				},
+			},
+		},
+		{
+			name: "respects randomizer when ablated scores tie",
+			topK: 1,
+			nodeScores: []fwk.NodePluginScores{
+				{
+					Name:       "node-a",
+					TotalScore: 20,
+					Randomizer: 1,
+					Scores: []fwk.PluginScore{
+						{Name: "TieBreaker", Score: 5},
+					},
+				},
+				{
+					Name:       "node-b",
+					TotalScore: 20,
+					Randomizer: 9,
+					Scores: []fwk.PluginScore{
+						{Name: "TieBreaker", Score: 5},
+					},
+				},
+			},
+			wantBaselineWinner: "node-b",
+			wantByPlugin: map[string]pluginInfluenceMetrics{
+				"TieBreaker": {
+					pluginName:       "TieBreaker",
+					winnerChanged:    false,
+					topKOverlapRatio: 1.0,
+					meanRankShift:    0,
+					scoreRange:       0,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWinner, gotMetrics := analyzePluginInfluence(tt.nodeScores, tt.topK)
+			if gotWinner != tt.wantBaselineWinner {
+				t.Fatalf("unexpected baseline winner: got %q, want %q", gotWinner, tt.wantBaselineWinner)
+			}
+
+			if len(gotMetrics) != len(tt.wantByPlugin) {
+				t.Fatalf("unexpected metrics count: got %d, want %d", len(gotMetrics), len(tt.wantByPlugin))
+			}
+
+			for _, got := range gotMetrics {
+				want, ok := tt.wantByPlugin[got.pluginName]
+				if !ok {
+					t.Fatalf("unexpected plugin %q", got.pluginName)
+				}
+				if got.winnerChanged != want.winnerChanged {
+					t.Errorf("winnerChanged mismatch for plugin %q: got %v, want %v", got.pluginName, got.winnerChanged, want.winnerChanged)
+				}
+				if got.scoreRange != want.scoreRange {
+					t.Errorf("scoreRange mismatch for plugin %q: got %d, want %d", got.pluginName, got.scoreRange, want.scoreRange)
+				}
+				if math.Abs(got.topKOverlapRatio-want.topKOverlapRatio) > 1e-9 {
+					t.Errorf("topKOverlapRatio mismatch for plugin %q: got %v, want %v", got.pluginName, got.topKOverlapRatio, want.topKOverlapRatio)
+				}
+				if math.Abs(got.meanRankShift-want.meanRankShift) > 1e-9 {
+					t.Errorf("meanRankShift mismatch for plugin %q: got %v, want %v", got.pluginName, got.meanRankShift, want.meanRankShift)
+				}
+			}
+		})
+	}
+}
+
 func TestFindNodesThatPassExtenders(t *testing.T) {
 	absentStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [PreFilter]")
 

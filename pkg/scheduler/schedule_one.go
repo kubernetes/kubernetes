@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,9 @@ import (
 const (
 	// Percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent = 10
+	// pluginInfluenceAnalysisTopK controls how many top-ranked nodes are compared
+	// when evaluating plugin influence in diagnostics logs.
+	pluginInfluenceAnalysisTopK = 5
 	// minFeasibleNodesToFind is the minimum number of nodes that would be scored
 	// in each scheduling cycle. This is a semi-arbitrary value to ensure that a
 	// certain minimum of nodes are checked for feasibility. This in turn helps
@@ -1048,7 +1052,156 @@ func prioritizeNodes(
 			loggerVTen.Info("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
 	}
+
+	loggerVSix := logger.V(6)
+	if loggerVSix.Enabled() {
+		logPluginInfluenceAnalysis(loggerVSix, pod, nodesScores, pluginInfluenceAnalysisTopK)
+	}
 	return nodesScores, nil
+}
+
+type pluginInfluenceMetrics struct {
+	pluginName        string
+	winnerChanged     bool
+	topKOverlapRatio  float64
+	meanRankShift     float64
+	scoreRange        int64
+}
+
+type rankedNode struct {
+	name       string
+	totalScore int64
+	randomizer int
+}
+
+func analyzePluginInfluence(nodeScores []fwk.NodePluginScores, topK int) (string, []pluginInfluenceMetrics) {
+	if len(nodeScores) == 0 {
+		return "", nil
+	}
+	if topK <= 0 {
+		topK = 1
+	}
+	if topK > len(nodeScores) {
+		topK = len(nodeScores)
+	}
+
+	pluginSet := make(map[string]struct{})
+	contributionsByNode := make([]map[string]int64, len(nodeScores))
+	for i, nodeScore := range nodeScores {
+		contributionsByNode[i] = make(map[string]int64, len(nodeScore.Scores))
+		for _, pluginScore := range nodeScore.Scores {
+			pluginSet[pluginScore.Name] = struct{}{}
+			contributionsByNode[i][pluginScore.Name] += pluginScore.Score
+		}
+	}
+
+	if len(pluginSet) == 0 {
+		return "", nil
+	}
+
+	pluginNames := make([]string, 0, len(pluginSet))
+	for pluginName := range pluginSet {
+		pluginNames = append(pluginNames, pluginName)
+	}
+	sort.Strings(pluginNames)
+
+	baselineRanking := rankNodes(nodeScores, contributionsByNode, "")
+	baselineWinner := baselineRanking[0].name
+	baselinePositions := make(map[string]int, len(baselineRanking))
+	baselineTopK := make(map[string]struct{}, topK)
+	for i, node := range baselineRanking {
+		baselinePositions[node.name] = i
+		if i < topK {
+			baselineTopK[node.name] = struct{}{}
+		}
+	}
+
+	metrics := make([]pluginInfluenceMetrics, 0, len(pluginNames))
+	for _, pluginName := range pluginNames {
+		ablatedRanking := rankNodes(nodeScores, contributionsByNode, pluginName)
+		ablatedPositions := make(map[string]int, len(ablatedRanking))
+		for i, node := range ablatedRanking {
+			ablatedPositions[node.name] = i
+		}
+
+		overlap := 0
+		for i := 0; i < topK; i++ {
+			if _, ok := baselineTopK[ablatedRanking[i].name]; ok {
+				overlap++
+			}
+		}
+
+		totalShift := 0
+		for nodeName, baselinePos := range baselinePositions {
+			ablatedPos := ablatedPositions[nodeName]
+			if baselinePos > ablatedPos {
+				totalShift += baselinePos - ablatedPos
+			} else {
+				totalShift += ablatedPos - baselinePos
+			}
+		}
+
+		var minScore, maxScore int64
+		for i := range nodeScores {
+			score := contributionsByNode[i][pluginName]
+			if i == 0 || score < minScore {
+				minScore = score
+			}
+			if i == 0 || score > maxScore {
+				maxScore = score
+			}
+		}
+
+		metrics = append(metrics, pluginInfluenceMetrics{
+			pluginName:       pluginName,
+			winnerChanged:    ablatedRanking[0].name != baselineWinner,
+			topKOverlapRatio: float64(overlap) / float64(topK),
+			meanRankShift:    float64(totalShift) / float64(len(nodeScores)),
+			scoreRange:       maxScore - minScore,
+		})
+	}
+
+	return baselineWinner, metrics
+}
+
+func rankNodes(nodeScores []fwk.NodePluginScores, contributionsByNode []map[string]int64, ablatedPlugin string) []rankedNode {
+	ranking := make([]rankedNode, len(nodeScores))
+	for i, nodeScore := range nodeScores {
+		totalScore := nodeScore.TotalScore
+		if ablatedPlugin != "" {
+			totalScore -= contributionsByNode[i][ablatedPlugin]
+		}
+		ranking[i] = rankedNode{
+			name:       nodeScore.Name,
+			totalScore: totalScore,
+			randomizer: nodeScore.Randomizer,
+		}
+	}
+	sort.Slice(ranking, func(i, j int) bool {
+		return ranking[i].totalScore > ranking[j].totalScore ||
+			(ranking[i].totalScore == ranking[j].totalScore && ranking[i].randomizer > ranking[j].randomizer)
+	})
+	return ranking
+}
+
+func logPluginInfluenceAnalysis(logger klog.Logger, pod *v1.Pod, nodeScores []fwk.NodePluginScores, topK int) {
+	if len(nodeScores) < 2 {
+		return
+	}
+
+	baselineWinner, influenceMetrics := analyzePluginInfluence(nodeScores, topK)
+	if len(influenceMetrics) == 0 {
+		return
+	}
+
+	if topK > len(nodeScores) {
+		topK = len(nodeScores)
+	}
+
+	logger.Info("Plugin influence analysis for pod scoring", "pod", klog.KObj(pod), "winner", baselineWinner, "nodes", len(nodeScores), "plugins", len(influenceMetrics), "topK", topK)
+	for _, pluginMetrics := range influenceMetrics {
+		logger.Info("Plugin influence result", "pod", klog.KObj(pod), "plugin", pluginMetrics.pluginName, "winnerChanged", pluginMetrics.winnerChanged, "topKOverlapRatio", pluginMetrics.topKOverlapRatio, "meanRankShift", pluginMetrics.meanRankShift, "scoreRange", pluginMetrics.scoreRange)
+	}
 }
 
 type sortedNodeScores struct {

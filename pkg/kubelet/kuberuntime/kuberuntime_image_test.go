@@ -53,6 +53,26 @@ func TestPullImage(t *testing.T) {
 	assert.Equal(t, []string{"busybox"}, images[0].RepoTags)
 }
 
+func TestPullImageReturnsCanonicalImageID(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Simulate runtime behavior where PullImage returns one ref (input-based),
+	// but ImageStatus exposes a canonical content ID.
+	fakeImageService.Lock()
+	fakeImageService.Images["busybox"] = &runtimeapi.Image{
+		Id:       "sha256:canonical",
+		RepoTags: []string{"busybox"},
+	}
+	fakeImageService.Unlock()
+
+	imageRef, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:canonical", imageRef)
+	assert.Nil(t, creds)
+}
+
 func TestPullImageWithError(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
