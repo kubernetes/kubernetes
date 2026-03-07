@@ -90,3 +90,27 @@ type CycleState interface {
 	// nil if the context being cloned is nil.
 	Clone() CycleState
 }
+
+// PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.
+// StateData stored by one plugin can be read, altered, or deleted by another plugin that operates on a pod group.
+// PodGroupCycleState does not provide any data protection, as all plugins are assumed to be
+// trusted.
+type PodGroupCycleState interface {
+	// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordPluginMetrics() bool
+	// Read retrieves data with the given "key" from PodGroupCycleState. If the key is not
+	// present, ErrNotFound is returned.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Read(key StateKey) (StateData, error)
+	// Write stores the given "val" in PodGroupCycleState with the given "key".
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Write(key StateKey, val StateData)
+	// Delete deletes data with the given key from PodGroupCycleState.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Delete(key StateKey)
+}

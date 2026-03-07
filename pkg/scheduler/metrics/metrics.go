@@ -63,6 +63,7 @@ var ExtensionPoints = []string{
 	Unreserve,
 	Permit,
 	Sign,
+	PlacementGenerate,
 }
 
 const (
@@ -82,6 +83,7 @@ const (
 	Unreserve                   = "Unreserve"
 	Permit                      = "Permit"
 	Sign                        = "Sign"
+	PlacementGenerate           = "PlacementGenerate"
 )
 
 const (
