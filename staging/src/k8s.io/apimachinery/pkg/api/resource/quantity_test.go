@@ -553,6 +553,68 @@ func TestQuantityParse(t *testing.T) {
 	}
 }
 
+// TestQuantityParseInt tests that various integer quantities parse correctly
+// and that they can be represented as int64.
+func TestQuantityParseInt(t *testing.T) {
+	table := []struct {
+		input             string
+		expect            Quantity
+		expectToGoDecPath bool
+	}{
+		{"0", intQuantity(0, 0, DecimalSI), false},
+		{"2048", intQuantity(2048, 0, DecimalSI), false},
+		{"1k", intQuantity(1000, 0, DecimalSI), false},
+		{"1.3E+6", intQuantity(13, 5, DecimalExponent), false},
+		{"922337203685477580", intQuantity(922337203685477580, 0, DecimalSI), false},
+		{"-922337203685477580", intQuantity(-922337203685477580, 0, DecimalSI), false},
+		// value larger than 1000000000000000000(1e18) would fail if skipping attempting
+		// to convert inf.Dec because maxInt64Factors = 18, see issue#135487
+		{"1000000000000000000", intQuantity(1000000000000000000, 0, DecimalSI), false},
+		{"9223372036854775807", intQuantity(mostPositive, 0, DecimalSI), false},
+		{"-9223372036854775807", intQuantity(mostNegative+1, 0, DecimalSI), false},
+		{"9223372036854.775807M", intQuantity(9223372036854775807, 0, DecimalSI), false},
+		{"92233720368.54775807E+8", intQuantity(9223372036854775807, 0, DecimalExponent), false},
+		// values that are expected to go to Dec path
+		{"1.0", Quantity{}, true},
+		{"9223372036854775808", Quantity{}, true},  // mostPositive + 1
+		{"-9223372036854775808", Quantity{}, true}, // mostNegative, intended to go dec path
+		{"99999999999999999999", Quantity{}, true},
+	}
+
+	for _, item := range table {
+		got, err := ParseQuantity(item.input)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", item.input, err)
+			continue
+		}
+
+		j, ok := got.AsInt64()
+
+		if item.expectToGoDecPath {
+			if ok {
+				t.Errorf("%v: expected not to be able to convert to int64, got %d", item.input, j)
+			}
+			continue
+		}
+
+		if e, a := item.expect, got; e.Cmp(a) != 0 {
+			t.Errorf("%v: expected %v, got %v", item.input, e.String(), a.String())
+		}
+		if e, a := item.expect.Format, got.Format; e != a {
+			t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+		}
+
+		i, ok := item.expect.AsInt64()
+		if !ok {
+			t.Errorf("%v: expected to be able to convert expected value to int64, got %d", item.input, i)
+			continue
+		}
+		if i != j {
+			t.Errorf("%v: expected equivalent representation as int64: %d %d", item.input, i, j)
+		}
+	}
+}
+
 func TestQuantityRoundUp(t *testing.T) {
 	table := []struct {
 		in     string
