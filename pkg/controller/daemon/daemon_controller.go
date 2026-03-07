@@ -589,7 +589,6 @@ func (dsc *DaemonSetsController) addPod(logger klog.Logger, obj interface{}) {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
 		dsc.deletePod(logger, pod)
-		return
 	}
 
 	// If it has a ControllerRef, that's all that matters.
@@ -608,6 +607,9 @@ func (dsc *DaemonSetsController) addPod(logger klog.Logger, obj interface{}) {
 		return
 	}
 
+	if pod.DeletionTimestamp != nil {
+		return
+	}
 	// Otherwise, it's an orphan. Get a list of all matching DaemonSets and sync
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
