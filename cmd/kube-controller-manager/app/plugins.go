@@ -21,6 +21,7 @@ import (
 	// This should probably be part of some configuration fed into the build for a
 	// given binary target.
 
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -51,8 +52,8 @@ func ProbeAttachableVolumePlugins(logger klog.Logger, config persistentvolumecon
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
+func GetDynamicPluginProber(ctx context.Context, config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(ctx, config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable

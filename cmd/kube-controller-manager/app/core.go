@@ -383,7 +383,7 @@ func newPersistentVolumeAttachDetachController(ctx context.Context, controllerCo
 		csiDriverInformer,
 		controllerContext.InformerFactory.Storage().V1().VolumeAttachments(),
 		plugins,
-		GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		GetDynamicPluginProber(ctx, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 		controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 		controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 		controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
@@ -1137,7 +1137,7 @@ func newSELinuxWarningController(ctx context.Context, controllerContext Controll
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		csiDriverInformer,
 		plugins,
-		GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		GetDynamicPluginProber(ctx, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start SELinux warning controller: %w", err)

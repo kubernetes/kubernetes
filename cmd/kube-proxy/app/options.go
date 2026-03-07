@@ -387,7 +387,7 @@ func (o *Options) Run(ctx context.Context) error {
 // Return an error when updated
 func (o *Options) runLoop(ctx context.Context) error {
 	if o.watcher != nil {
-		o.watcher.Run()
+		o.watcher.Run(ctx)
 	}
 
 	// run the proxy in goroutine
