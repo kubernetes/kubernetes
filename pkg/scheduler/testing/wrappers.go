@@ -872,6 +872,33 @@ func (p *PodWrapper) WorkloadRef(workloadRef *v1.WorkloadReference) *PodWrapper 
 	return p
 }
 
+type NamespaceWrapper struct {
+	ns *v1.Namespace
+}
+
+func MakeNamespace() *NamespaceWrapper {
+	return &NamespaceWrapper{
+		ns: &v1.Namespace{},
+	}
+}
+
+func (n *NamespaceWrapper) Name(name string) *NamespaceWrapper {
+	n.ns.Name = name
+	return n
+}
+
+func (n *NamespaceWrapper) Obj() *v1.Namespace {
+	return n.ns
+}
+
+func (n *NamespaceWrapper) Label(k, v string) *NamespaceWrapper {
+	if len(n.ns.Labels) == 0 {
+		n.ns.Labels = make(map[string]string)
+	}
+	n.ns.Labels[k] = v
+	return n
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 

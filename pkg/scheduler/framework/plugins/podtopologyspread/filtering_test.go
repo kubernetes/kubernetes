@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +54,7 @@ var stateCmpOpts = []cmp.Option{
 		p2.sort()
 		return p1[0] == p2[0] && p1[1] == p2[1]
 	}),
+	cmpopts.IgnoreUnexported(preFilterState{}),
 }
 
 var (
@@ -3450,7 +3452,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 }
 
-func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) fwk.PodInfo {
 	podInfo, err := framework.NewPodInfo(pod)
 	if err != nil {
 		t.Fatal(err)
