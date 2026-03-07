@@ -569,9 +569,9 @@ func TestStatusz(t *testing.T) {
 		t.Fatalf("Got error reading response body: %v", err)
 	}
 
-	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /healthz /metrics\n$`)
+	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /flagz /healthz /metrics\n$`)
 	if reg.FindStringSubmatch(string(resBody)) == nil {
-		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /healthz /metrics")
+		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /flagz /healthz /metrics")
 	}
 }
 
