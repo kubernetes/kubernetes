@@ -47509,7 +47509,6 @@ func schema_k8sio_api_resource_v1_DeviceClass(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48359,7 +48358,6 @@ func schema_k8sio_api_resource_v1_ResourceClaim(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48591,7 +48589,6 @@ func schema_k8sio_api_resource_v1_ResourceClaimTemplate(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48672,7 +48669,6 @@ func schema_k8sio_api_resource_v1_ResourceClaimTemplateSpec(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -50017,7 +50013,6 @@ func schema_k8sio_api_resource_v1beta1_DeviceClass(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -50845,7 +50840,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaim(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -51077,7 +51071,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimTemplate(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -51158,7 +51151,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimTemplateSpec(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -52189,7 +52181,6 @@ func schema_k8sio_api_resource_v1beta2_DeviceClass(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -53039,7 +53030,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaim(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -53271,7 +53261,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimTemplate(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -53352,7 +53341,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimTemplateSpec(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
