@@ -69,7 +69,7 @@ func TestTLSConfigKey(t *testing.T) {
 
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
-	getCert := &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }}
+	getCert := &GetCertHolder{GetCert: func(ctx context.Context) (*tls.Certificate, error) { return nil, nil }}
 	uniqueConfigurations := map[string]*Config{
 		"proxy":    {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
 		"no tls":   {},
@@ -132,7 +132,7 @@ func TestTLSConfigKey(t *testing.T) {
 		"getCert2": {
 			TLS: TLSConfig{
 				KeyData:       []byte{1},
-				GetCertHolder: &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }},
+				GetCertHolder: &GetCertHolder{GetCert: func(context.Context) (*tls.Certificate, error) { return nil, nil }},
 			},
 		},
 		"getCert1, key 2": {
