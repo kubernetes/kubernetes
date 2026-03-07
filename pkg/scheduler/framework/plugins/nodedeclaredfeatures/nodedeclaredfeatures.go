@@ -152,7 +152,7 @@ func (pl *NodeDeclaredFeatures) EventsToRegister(_ context.Context) ([]fwk.Clust
 			QueueingHintFn: pl.isSchedulableAfterNodeChange,
 		},
 		{
-			Event:          fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
+			Event:          fwk.ClusterEvent{Resource: fwk.PodItself, ActionType: fwk.Update},
 			QueueingHintFn: pl.isSchedulableAfterPodUpdate,
 		},
 	}, nil
