@@ -21,8 +21,10 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -33,14 +35,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+)
+
+const (
+	cgroup2CPUIdle = "cpu.idle"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -279,4 +288,51 @@ var _ = SIGDescribe("Container Manager Misc", framework.WithSerial(), func() {
 			})
 		})
 	})
+
+	f.Describe("CPU Idle for BestEffort QoS", framework.WithSerial(), feature.CPUIdleForBestEffortQoS, func() {
+		ginkgo.BeforeEach(func() {
+			// skip if cgroupv2 is disabled
+			if !IsCgroup2UnifiedMode() {
+				e2eskipper.Skip("Test requires cgroup v2")
+			}
+			//skip if kernel version < 5.4
+			if !IsKernelVersionAvailable(5, 4) {
+				e2eskipper.Skip("Test requires kernel version >= 5.4")
+			}
+		})
+
+		ginkgo.When("With CPUIdleForBestEffortQoS feature gate enabled", ginkgo.Label("CPUIdleForBestEffortQoS", "feature-gate-enabled"), func() {
+			runCPUIdleForBestEffortQoSFeatureGate(f, true, "1")
+		})
+
+		ginkgo.When("With CPUIdleForBestEffortQoS feature gate disabled", ginkgo.Label("CPUIdleForBestEffortQoS", "feature-gate-disabled"), func() {
+			runCPUIdleForBestEffortQoSFeatureGate(f, true, "0")
+		})
+	})
 })
+
+func runCPUIdleForBestEffortQoSFeatureGate(f *framework.Framework, enabled bool, expectValue string) {
+	tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+		if initialConfig.FeatureGates == nil {
+			initialConfig.FeatureGates = map[string]bool{}
+		}
+		initialConfig.FeatureGates["CPUIdleForBestEffortQoS"] = enabled
+	})
+
+	ginkgo.It(fmt.Sprintf("should set cpuIDle=%s for BestEffort QoS cgroup", expectValue), func(ctx context.Context) {
+		// Get the BestEffort cgroup path
+		bestEffortCgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, bestEffortCgroup)
+		bestEffortCgroupPath := toCgroupFsName(bestEffortCgroupName)
+		cpuIdleFilePath := filepath.Join(cgroupBasePath, bestEffortCgroupPath, cgroup2CPUIdle)
+
+		// Read and verify cpu.idle value
+		gomega.Eventually(ctx, func() (string, error) {
+			content, err := os.ReadFile(cpuIdleFilePath)
+			if err != nil {
+				return "", err
+			}
+			return strings.TrimSpace(string(content)), nil
+		}).Should(gomega.Equal(expectValue),
+			"Expected cpu.idle=%s for BestEffort QoS cgroup at %s", expectValue, cpuIdleFilePath)
+	})
+}

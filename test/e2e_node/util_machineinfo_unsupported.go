@@ -29,6 +29,10 @@ func IsCgroup2UnifiedMode() bool {
 	return false
 }
 
+func IsKernelVersionAvailable(major, minor int) bool {
+	return false
+}
+
 func isHTEnabled() bool {
 	return false
 }

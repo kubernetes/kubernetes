@@ -29,6 +29,8 @@ import (
 	"strings"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
+	"k8s.io/apimachinery/pkg/util/version"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/utils/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -109,4 +111,13 @@ func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 	}
 
 	return numaNodes, nil
+}
+
+func IsKernelVersionAvailable(major, minor int) bool {
+	kernelVersion, err := utilkernel.GetVersion()
+	if err != nil {
+		return false
+	}
+	requireVersion := version.MustParseGeneric(fmt.Sprintf("%d.%d", major, minor))
+	return kernelVersion.AtLeast(requireVersion)
 }
