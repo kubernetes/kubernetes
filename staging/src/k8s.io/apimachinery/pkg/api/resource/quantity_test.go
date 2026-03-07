@@ -410,19 +410,16 @@ func TestQuantityParse(t *testing.T) {
 				t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
 			}
 
-			if asDec {
-				if i, ok := got.AsInt64(); i != 0 || ok {
-					t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
-				}
-				continue
-			}
+			// Check AsInt64 for both int64Amount and infDecAmount representations
+			// With the fix for issue #135487, infDecAmount should also return int64 when representable
 			i, ok := item.expect.AsInt64()
 			if !ok {
 				continue
 			}
 			j, ok := got.AsInt64()
 			if !ok {
-				if got.d.Dec == nil && got.i.scale >= 0 {
+				// Only error if we expect the value to be representable as int64
+				if !asDec && got.d.Dec == nil && got.i.scale >= 0 {
 					t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
 				}
 				continue
@@ -549,6 +546,62 @@ func TestQuantityParse(t *testing.T) {
 		_, err := ParseQuantity(item)
 		if err == nil {
 			t.Errorf("%v parsed unexpectedly", item)
+		}
+	}
+}
+
+// TestQuantityParseMaxInt64 tests parsing of quantities near math.MaxInt64
+// This is a regression test for issue #135487 where resource.MustParse fails
+// to parse quantities near math.MaxInt64 correctly.
+func TestQuantityParseMaxInt64(t *testing.T) {
+	table := []struct {
+		input       string
+		expectValue int64
+		expectOk    bool
+	}{
+		// math.MaxInt64 = 9223372036854775807 (19 digits)
+		// This value previously failed because maxInt64Factors = 18
+		{"9223372036854775807", math.MaxInt64, true},
+		{"-9223372036854775807", -math.MaxInt64, true},
+
+		// math.MinInt64 = -9223372036854775808
+		// Note: math.MinInt64 as positive would overflow
+		{"-9223372036854775808", math.MinInt64, true},
+
+		// Values that should work via the fast path (18 digits or less)
+		{"922337203685477580", 922337203685477580, true},
+		{"-922337203685477580", -922337203685477580, true},
+
+		// Values larger than MaxInt64 cannot be represented as int64
+		{"9223372036854775808", 0, false},
+		{"99999999999999999999", 0, false},
+	}
+
+	for _, item := range table {
+		quantityFromParse, err := ParseQuantity(item.input)
+		if err != nil {
+			t.Errorf("%v: unexpected parse error: %v", item.input, err)
+			continue
+		}
+
+		valueFromParse, okFromParse := quantityFromParse.AsInt64()
+		if okFromParse != item.expectOk {
+			t.Errorf("%v: AsInt64() returned ok=%v, expected ok=%v", item.input, okFromParse, item.expectOk)
+		}
+		if item.expectOk && valueFromParse != item.expectValue {
+			t.Errorf("%v: AsInt64() returned %d, expected %d", item.input, valueFromParse, item.expectValue)
+		}
+
+		// Also verify that NewQuantity works correctly for comparison
+		if item.expectOk {
+			quantityFromNew := NewQuantity(item.expectValue, DecimalSI)
+			valueFromNew, okFromNew := quantityFromNew.AsInt64()
+			if !okFromNew {
+				t.Errorf("%v: NewQuantity(%d).AsInt64() returned ok=false", item.input, item.expectValue)
+			}
+			if valueFromNew != item.expectValue {
+				t.Errorf("%v: NewQuantity(%d).AsInt64() = %d, expected %d", item.input, item.expectValue, valueFromNew, item.expectValue)
+			}
 		}
 	}
 }
