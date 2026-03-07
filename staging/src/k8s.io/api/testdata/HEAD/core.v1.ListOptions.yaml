@@ -5,6 +5,7 @@ fieldSelector: fieldSelectorValue
 kind: ListOptions
 labelSelector: labelSelectorValue
 limit: 7
+omitManagedFields: true
 resourceVersion: resourceVersionValue
 resourceVersionMatch: resourceVersionMatchValue
 sendInitialEvents: true
