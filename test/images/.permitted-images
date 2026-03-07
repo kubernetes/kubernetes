@@ -24,7 +24,6 @@ registry.k8s.io/e2e-test-images/node-perf/npb-is
 registry.k8s.io/e2e-test-images/node-perf/pytorch-wide-deep
 registry.k8s.io/e2e-test-images/nonewprivs
 registry.k8s.io/e2e-test-images/nonroot
-registry.k8s.io/e2e-test-images/perl
 registry.k8s.io/e2e-test-images/regression-issue-74839
 registry.k8s.io/e2e-test-images/resource-consumer
 registry.k8s.io/e2e-test-images/sample-apiserver
