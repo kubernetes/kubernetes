@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -45,6 +46,7 @@ const (
 type fakePodKiller struct {
 	killedPods          []*v1.Pod
 	errDuringPodKilling bool
+	podStatus           map[string]*v1.PodStatus
 }
 
 func newFakePodKiller(errPodKilling bool) *fakePodKiller {
@@ -53,6 +55,7 @@ func newFakePodKiller(errPodKilling bool) *fakePodKiller {
 
 func (f *fakePodKiller) clear() {
 	f.killedPods = []*v1.Pod{}
+	f.podStatus = nil
 }
 
 func (f *fakePodKiller) getKilledPods() []*v1.Pod {
@@ -65,6 +68,15 @@ func (f *fakePodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 		return fmt.Errorf("problem killing pod %v", pod)
 	}
 	f.killedPods = append(f.killedPods, pod)
+	// Simulate status update
+	status := &v1.PodStatus{}
+	if fn != nil {
+		fn(status)
+		if f.podStatus == nil {
+			f.podStatus = make(map[string]*v1.PodStatus)
+		}
+		f.podStatus[pod.Name] = status
+	}
 	return nil
 }
 
@@ -204,6 +216,20 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			for i, reason := range filteredReason {
 				if reason.GetReason() != r.expectReasons[i].GetReason() {
 					t.Fatalf("expect reasons %v, got reasons %v", r.expectReasons, filteredReason)
+				}
+			}
+
+			// Verify status message
+			if !r.expectErr && len(outputPods) > 0 {
+				expectedCurrentMsg := fmt.Sprintf("%s: %s", message, klog.KObj(admitPodRef))
+				for _, p := range outputPods {
+					if status, ok := podKiller.podStatus[p.Name]; ok {
+						if status.Message != expectedCurrentMsg {
+							t.Errorf("Expect status message %q, got %q", expectedCurrentMsg, status.Message)
+						}
+					} else {
+						t.Errorf("Pod %s was killed but no status update recorded", p.Name)
+					}
 				}
 			}
 		})
