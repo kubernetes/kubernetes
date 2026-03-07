@@ -162,7 +162,7 @@ func class(name, driver string) *resourceapi.DeviceClass {
 
 func classWithRequiresNodePreparation(name, driver string, requiresNodePreparation bool) *resourceapi.DeviceClass {
 	c := class(name, driver)
-	c.Spec.RequiresNodePreparation = ptr.To(requiresNodePreparation)
+	c.Spec.RequiresNodePreparation = &requiresNodePreparation
 	return c
 }
 
@@ -694,7 +694,7 @@ func (in wrapDeviceRequestAllocationResult) withConsumedCapacity(shareID *apityp
 
 func (in wrapDeviceRequestAllocationResult) withRequiresNodePreparation(requiresNodePreparation bool) resourceapi.DeviceRequestAllocationResult {
 	out := in.DeepCopy()
-	out.RequiresNodePreparation = ptr.To(requiresNodePreparation)
+	out.RequiresNodePreparation = &requiresNodePreparation
 	return *out
 }
 
