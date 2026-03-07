@@ -172,10 +172,13 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			devsLen := int64(deviceCount) // shortcut
 			ginkgo.By("Waiting for the resource exported by the sample device plugin to become available on the local node")
 
-			gomega.Eventually(ctx, isNodeReadyWithAllocatableSampleResources).
-				WithArguments(f, devsLen).
-				WithTimeout(5 * time.Minute).
-				Should(HaveAllocatableDevices())
+			gomega.Eventually(ctx, func(ctx context.Context) (*v1.Node, error) {
+				node, ready := getLocalTestNode(ctx, f)
+				if !ready {
+					return nil, fmt.Errorf("expected node to be ready=%t", ready)
+				}
+				return node, nil
+			}).WithTimeout(5 * time.Minute).Should(HaveAllocatableDevices(devsLen))
 		})
 
 		framework.It("should deploy pod consuming devices first but fail with admission error after kubelet restart in case device plugin hasn't re-registered", framework.WithFlaky(), func(ctx context.Context) {
@@ -213,8 +216,6 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			restartKubelet(ctx)
 
 			ginkgo.By("waiting for the kubelet to be ready again")
-			// Wait for the Kubelet to be ready.
-
 			gomega.Eventually(ctx, e2enode.TotalReady).
 				WithArguments(f.ClientSet).
 				WithTimeout(2 * time.Minute).
@@ -238,21 +239,97 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			// `/var/lib/kubelet/device-plugins/registered`). Because of this, the capacity and allocatable corresponding
 			// to the resource exposed by the device plugin should be zero.
 
-			gomega.Eventually(ctx, isNodeReadyWithAllocatableSampleResources).
-				WithArguments(f, int64(0)).
-				WithTimeout(5 * time.Minute).
-				Should(HaveAllocatableDevices())
+			gomega.Eventually(ctx, func(ctx context.Context) (*v1.Node, error) {
+				node, ready := getLocalTestNode(ctx, f)
+				if !ready {
+					return nil, fmt.Errorf("expected node to be ready=%t", ready)
+				}
+				return node, nil
+			}).WithTimeout(5 * time.Minute).Should(HaveAllocatableDevices(0))
 
 			ginkgo.By("Checking that pod requesting devices failed to start because of admission error")
 
 			// NOTE: The device plugin won't re-register again and this is intentional.
 			// Because of this, the testpod (requesting a device) should fail with an admission error.
 
-			gomega.Eventually(ctx, getPod).
+			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, testPod.Name).
 				WithTimeout(time.Minute).
-				Should(HaveFailedWithAdmissionError(),
+				Should(HaveFailedWithUnexpectedAdmissionError(),
 					"the pod succeeded to start, when it should fail with the admission error")
+
+			ginkgo.By("removing application pods")
+			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		})
+
+		// this test case specically targets how kubelet will handle a stateless
+		// restart in which it's node resource still has extended resources but
+		// the device manager checkpoint is missing. correctly updating the
+		// resource capacity to fix the mismatch allows the pod to be rejected
+		// in admission to the allocation manager.
+		framework.It("should deploy pod consuming devices first but fail with InsufficientResource error after kubelet restart with missing checkpoint", framework.WithFlaky(), func(ctx context.Context) {
+			var err error
+			podCMD := "while true; do sleep 1000; done;"
+
+			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, e2enode.SampleDeviceResourceName))
+
+			pod := makeBusyboxDeviceRequiringPod(e2enode.SampleDeviceResourceName, podCMD)
+			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			ginkgo.By("making sure all the pods are ready")
+
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "Ready", 120*time.Second, testutils.PodRunningReady)
+			framework.ExpectNoError(err, "pod %s/%s did not go running", testPod.Namespace, testPod.Name)
+			framework.Logf("pod %s/%s running", testPod.Namespace, testPod.Name)
+
+			ginkgo.By("stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+
+			ginkgo.By("removing kubelet device plugin data")
+			err = os.RemoveAll(devicePluginDir)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("stopping all the local containers - using CRI")
+			rs, _, err := getCRIClient()
+			framework.ExpectNoError(err)
+			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
+			framework.ExpectNoError(err)
+			for _, sandbox := range sandboxes {
+				gomega.Expect(sandbox.Metadata).ToNot(gomega.BeNil())
+				ginkgo.By(fmt.Sprintf("deleting pod using CRI: %s/%s -> %s", sandbox.Metadata.Namespace, sandbox.Metadata.Name, sandbox.Id))
+
+				err := rs.RemovePodSandbox(ctx, sandbox.Id)
+				framework.ExpectNoError(err)
+			}
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet(ctx)
+
+			ginkgo.By("waiting for the kubelet to be ready again")
+			gomega.Eventually(ctx, e2enode.TotalReady).
+				WithArguments(f.ClientSet).
+				WithTimeout(2 * time.Minute).
+				Should(gomega.BeEquivalentTo(1))
+
+			ginkgo.By("Waiting for the resource capacity/allocatable exported by the sample device plugin to become zero")
+
+			// when the kubelet checkpoint is missing, the resource should be
+			// zero'd immediately instead of waiting for the stopped endpoint
+			// grace period (5 minutes).
+			// see: https://github.com/kubernetes/kubernetes/pull/137335
+
+			gomega.Expect(getLocalTestNode(ctx, f)).To(HaveAllocatableDevices(0))
+
+			ginkgo.By("Checking that pod requesting devices failed to start because of InsufficientResource error")
+
+			// NOTE: The device plugin won't re-register again and this is intentional.
+			// Because of this, the testpod (requesting a device) should fail with an admission error.
+
+			gomega.Eventually(ctx, getPodByName).
+				WithArguments(f, testPod.Name).
+				WithTimeout(time.Minute).
+				Should(HaveFailedWithInsufficientResourcesError(e2enode.SampleDeviceResourceName),
+					"the pod succeeded to start, when it should fail with the InsufficientResource error")
 
 			ginkgo.By("removing application pods")
 			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
@@ -348,40 +425,17 @@ func isNodeReadyWithSampleResources(ctx context.Context, f *framework.Framework)
 }
 
 // HaveAllocatableDevices verifies that a node has allocatable devices.
-func HaveAllocatableDevices() types.GomegaMatcher {
-	return gomega.And(
-		// This additional matcher checks for the final error condition.
-		gcustom.MakeMatcher(func(hasAllocatable bool) (bool, error) {
-			if !hasAllocatable {
-				return false, fmt.Errorf("expected node to be have allocatable devices=%t", hasAllocatable)
-			}
-			return true, nil
-		}),
-		hasAllocatable(true),
-	)
-}
+func HaveAllocatableDevices(devCount int64) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(node *v1.Node) (bool, error) {
+		if e2enode.CountSampleDeviceCapacity(node) != devCount {
+			return false, fmt.Errorf("expected devices capacity to be: %d", devCount)
+		}
 
-// hasAllocatable matches if node is ready i.e. ready is true.
-func hasAllocatable(hasAllocatable bool) types.GomegaMatcher {
-	return gcustom.MakeMatcher(func(hasAllocatableDevices bool) (bool, error) {
-		return hasAllocatableDevices == hasAllocatable, nil
-	}).WithTemplate("expected Node with allocatable {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasAllocatable)
-}
-
-func isNodeReadyWithAllocatableSampleResources(ctx context.Context, f *framework.Framework, devCount int64) (bool, error) {
-	node, ready := getLocalTestNode(ctx, f)
-	if !ready {
-		return false, fmt.Errorf("expected node to be ready=%t", ready)
-	}
-
-	if e2enode.CountSampleDeviceCapacity(node) != devCount {
-		return false, fmt.Errorf("expected devices capacity to be: %d", devCount)
-	}
-
-	if e2enode.CountSampleDeviceAllocatable(node) != devCount {
-		return false, fmt.Errorf("expected devices allocatable to be: %d", devCount)
-	}
-	return true, nil
+		if e2enode.CountSampleDeviceAllocatable(node) != devCount {
+			return false, fmt.Errorf("expected devices allocatable to be: %d", devCount)
+		}
+		return true, nil
+	})
 }
 
 func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framework) (bool, error) {
@@ -396,48 +450,40 @@ func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framewo
 	return true, nil
 }
 
-// HaveFailedWithAdmissionError verifies that a pod fails at admission.
-func HaveFailedWithAdmissionError() types.GomegaMatcher {
-	return gomega.And(
-		gcustom.MakeMatcher(func(hasFailed bool) (bool, error) {
-			if !hasFailed {
-				return false, fmt.Errorf("expected pod to have failed=%t", hasFailed)
-			}
-			return true, nil
-		}),
-		hasFailed(true),
-	)
-}
-
-// hasFailed matches if pod has failed.
-func hasFailed(hasFailed bool) types.GomegaMatcher {
-	return gcustom.MakeMatcher(func(hasPodFailed bool) (bool, error) {
-		return hasPodFailed == hasFailed, nil
-	}).WithTemplate("expected Pod failed {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasFailed)
-}
-
 func getPodByName(ctx context.Context, f *framework.Framework, podName string) (*v1.Pod, error) {
 	return e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
 }
 
-func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
-	pod, err := getPodByName(ctx, f, podName)
-	if err != nil {
-		return false, err
-	}
+// HaveFailedWithUnexpectedAdmissionError verifies that a pod fails at admission
+// with an unexpected error.
+func HaveFailedWithUnexpectedAdmissionError() types.GomegaMatcher {
+	return haveFailedWithPodReasonAndMessage(
+		"UnexpectedAdmissionError",
+		"Allocate failed due to no healthy devices present; cannot allocate unhealthy devices",
+	)
+}
 
-	expectedStatusReason := "UnexpectedAdmissionError"
-	expectedStatusMessage := "Allocate failed due to no healthy devices present; cannot allocate unhealthy devices"
+// HaveFailedWithInsufficientResourcesError verifies that a pod fails at
+// admission with insufficient resources.
+func HaveFailedWithInsufficientResourcesError(resourceName string) types.GomegaMatcher {
+	return haveFailedWithPodReasonAndMessage(
+		"OutOf"+resourceName,
+		"Insufficient "+resourceName,
+	)
+}
 
-	// This additional matcher checks for the final error condition.
-	if pod.Status.Phase != v1.PodFailed {
-		return false, fmt.Errorf("expected pod to reach phase %q, got final phase %q instead.", v1.PodFailed, pod.Status.Phase)
-	}
-	if pod.Status.Reason != expectedStatusReason {
-		return false, fmt.Errorf("expected pod status reason to be %q, got %q instead.", expectedStatusReason, pod.Status.Reason)
-	}
-	if !strings.Contains(pod.Status.Message, expectedStatusMessage) {
-		return false, fmt.Errorf("expected pod status reason to contain %q, got %q instead.", expectedStatusMessage, pod.Status.Message)
-	}
-	return true, nil
+// haveFailedWithPodReasonAndMessage verifies that a pod fails with details.
+func haveFailedWithPodReasonAndMessage(expectedStatusReason, expectedStatusMessage string) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase != v1.PodFailed {
+			return false, fmt.Errorf("expected pod to reach phase %q, got final phase %q instead.", v1.PodFailed, pod.Status.Phase)
+		}
+		if pod.Status.Reason != expectedStatusReason {
+			return false, fmt.Errorf("expected pod status reason to be %q, got %q instead.", expectedStatusReason, pod.Status.Reason)
+		}
+		if !strings.Contains(pod.Status.Message, expectedStatusMessage) {
+			return false, fmt.Errorf("expected pod status reason to contain %q, got %q instead.", expectedStatusMessage, pod.Status.Message)
+		}
+		return true, nil
+	})
 }

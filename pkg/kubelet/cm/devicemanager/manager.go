@@ -868,7 +868,7 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		if err != nil {
 			return err
 		}
-		if allocDevices == nil || len(allocDevices) <= 0 {
+		if len(allocDevices) == 0 {
 			continue
 		}
 

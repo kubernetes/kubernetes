@@ -976,10 +976,10 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
 
 			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
-			gomega.Eventually(ctx, getPod).
+			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, pod1.Name).
 				WithTimeout(time.Minute).
-				Should(HaveFailedWithAdmissionError(),
+				Should(HaveFailedWithUnexpectedAdmissionError(),
 					"the pod succeeded to start, when it should fail with the admission error")
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
