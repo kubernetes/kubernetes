@@ -94,7 +94,9 @@ func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, 
 		UpdateFunc: func(old, newObj interface{}) {
 			ttlc.updateNode(logger, old, newObj)
 		},
-		DeleteFunc: ttlc.deleteNode,
+		DeleteFunc: func(obj interface{}) {
+			ttlc.deleteNode(logger, obj)
+		},
 	})
 
 	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
@@ -121,8 +123,7 @@ var (
 
 // Run begins watching and syncing.
 func (ttlc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
-
+	defer utilruntime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL controller")
 
@@ -148,7 +149,7 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type", "type", fmt.Sprintf("%T", obj))
 		return
 	}
 
@@ -167,7 +168,7 @@ func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type", "type", fmt.Sprintf("%T", newObj))
 		return
 	}
 	// Processing all updates of nodes guarantees that we will update
@@ -178,17 +179,17 @@ func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	ttlc.enqueueNode(logger, node)
 }
 
-func (ttlc *Controller) deleteNode(obj interface{}) {
+func (ttlc *Controller) deleteNode(logger klog.Logger, obj interface{}) {
 	_, ok := obj.(*v1.Node)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Could not get object from tombstone", "obj", obj)
 			return
 		}
 		_, ok = tombstone.Obj.(*v1.Node)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a node", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 	}
@@ -233,7 +234,7 @@ func (ttlc *Controller) processItem(ctx context.Context) bool {
 	}
 
 	ttlc.queue.AddRateLimited(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error processing work item: TTL", "item", key)
 	return true
 }
 

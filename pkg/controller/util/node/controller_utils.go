@@ -200,24 +200,14 @@ func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface
 
 	err := controller.AddOrUpdateTaintOnNode(ctx, kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to taint %+v unresponsive Node %q: %v",
-				taintsToAdd,
-				node.Name,
-				err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to taint unresponsive Node", "node", klog.KRef("", node.Name), "taintsToAdd", taintsToAdd)
 		return false
 	}
 	logger.V(4).Info("Added taint to node", "taint", taintsToAdd, "node", klog.KRef("", node.Name))
 
 	err = controller.RemoveTaintOffNode(ctx, kubeClient, node.Name, node, taintsToRemove...)
 	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to remove %+v unneeded taint from unresponsive Node %q: %v",
-				taintsToRemove,
-				node.Name,
-				err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to remove unneeded taint from unresponsive Node", "node", klog.KRef("", node.Name), "taintsToRemove", taintsToRemove)
 		return false
 	}
 	logger.V(4).Info("Made sure that node has no taint", "node", klog.KRef("", node.Name), "taint", taintsToRemove)
@@ -230,12 +220,7 @@ func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface
 func AddOrUpdateLabelsOnNode(ctx context.Context, kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
 	logger := klog.FromContext(ctx)
 	if err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate); err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to update labels %+v for Node %q: %v",
-				labelsToUpdate,
-				node.Name,
-				err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to update labels for Node", "node", klog.KRef("", node.Name), "labelsToUpdate", labelsToUpdate)
 		return false
 	}
 	logger.V(4).Info("Updated labels to node", "label", labelsToUpdate, "node", klog.KRef("", node.Name))
@@ -243,23 +228,23 @@ func AddOrUpdateLabelsOnNode(ctx context.Context, kubeClient clientset.Interface
 }
 
 // CreateAddNodeHandler creates an add node handler.
-func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+func CreateAddNodeHandler(logger klog.Logger, f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		node := originalObj.(*v1.Node).DeepCopy()
 		if err := f(node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add: %v", err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Error while processing Node Add", "node", klog.KObj(node))
 		}
 	}
 }
 
 // CreateUpdateNodeHandler creates a node update handler. (Common to lifecycle and ipam)
-func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
+func CreateUpdateNodeHandler(logger klog.Logger, f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
 		node := origNewObj.(*v1.Node).DeepCopy()
 		prevNode := origOldObj.(*v1.Node).DeepCopy()
 
 		if err := f(prevNode, node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Error while processing Node Update", "node", klog.KObj(node), "prevNode", klog.KObj(prevNode))
 		}
 	}
 }
@@ -284,7 +269,7 @@ func CreateDeleteNodeHandler(logger klog.Logger, f func(node *v1.Node) error) fu
 		}
 		node := originalNode.DeepCopy()
 		if err := f(node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Error while processing Node Delete", "node", klog.KObj(node))
 		}
 	}
 }

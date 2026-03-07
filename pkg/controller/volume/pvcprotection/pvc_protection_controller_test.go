@@ -562,7 +562,7 @@ func TestPVCProtectionController(t *testing.T) {
 			if ctrl.queue.Len() > 0 {
 				logger.V(5).Info("Non-empty queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
 				ctx := context.TODO()
-				ctrl.processNextWorkItem()
+				ctrl.processNextWorkItem(logger)
 				for ctrl.pvcProcessingStore.namespaceQueue.Len() != 0 {
 					ctrl.processPVCsByNamespace(ctx)
 				}
