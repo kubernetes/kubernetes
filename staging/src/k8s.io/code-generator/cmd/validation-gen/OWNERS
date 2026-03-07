@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Approvers are inherited from parent OWNERS
+
+# Additional reviewers are inherited from parent OWNERS
+reviewers:
+  - aaron-prindle
+  - lalitc375
+  - yongruilin
+labels:
+  - sig/api-machinery
+  - area/code-generation
