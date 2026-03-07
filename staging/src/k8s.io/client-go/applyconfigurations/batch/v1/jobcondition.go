@@ -29,17 +29,17 @@ import (
 //
 // JobCondition describes current state of a job.
 type JobConditionApplyConfiguration struct {
-	// Type of job condition, Complete or Failed.
+	// type of job condition, Complete or Failed.
 	Type *batchv1.JobConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status *corev1.ConditionStatus `json:"status,omitempty"`
-	// Last time the condition was checked.
+	// lastProbeTime is the last time the condition was checked.
 	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
-	// Last time the condition transit from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// (brief) reason for the condition's last transition.
+	// reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// Human readable message indicating details about last transition.
+	// message is a human readable string indicating details about the transition.
 	Message *string `json:"message,omitempty"`
 }
 

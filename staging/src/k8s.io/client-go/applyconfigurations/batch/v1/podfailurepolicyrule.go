@@ -28,7 +28,7 @@ import (
 // PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
 // One of onExitCodes and onPodConditions, but not both, can be used in each rule.
 type PodFailurePolicyRuleApplyConfiguration struct {
-	// Specifies the action taken on a pod failure when the requirements are satisfied.
+	// action specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
 	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
@@ -42,9 +42,9 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 	// Additional values are considered to be added in the future. Clients should
 	// react to an unknown action by skipping the rule.
 	Action *batchv1.PodFailurePolicyAction `json:"action,omitempty"`
-	// Represents the requirement on the container exit codes.
+	// onExitCodes represents the requirement on the container exit codes.
 	OnExitCodes *PodFailurePolicyOnExitCodesRequirementApplyConfiguration `json:"onExitCodes,omitempty"`
-	// Represents the requirement on the pod conditions. The requirement is represented
+	// onPodConditions represents the requirement on the pod conditions. The requirement is represented
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	OnPodConditions []PodFailurePolicyOnPodConditionsPatternApplyConfiguration `json:"onPodConditions,omitempty"`
