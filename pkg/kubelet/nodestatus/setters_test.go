@@ -748,7 +748,7 @@ func TestMachineInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "inactive device plugin resources should have their capacity set to 0",
+			desc: "inactive device plugin resources should have their capacity and allocatable removed",
 			node: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -770,13 +770,11 @@ func TestMachineInfo(t *testing.T) {
 						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
 					},
 				},
 			},
