@@ -49,6 +49,21 @@ var (
 		Vertical Pod Autoscaler (VPA). Because of this, the values may not match those
 		from standard OS tools like 'top', as the metrics are designed to provide a
 		stable signal for autoscalers rather than for pinpoint accuracy.
+        
+		Despite its name, this command is not equivalent to operating system tools
+        such as the Linux 'top' command. It reports aggregated, cluster-scoped
+        resource usage as understood by Kubernetes.
+
+        CPU values represent recent actual usage and are reported in cores
+        (or millicores). Memory values represent working set usage and may exclude
+        some reclaimable cache. These values are independent of configured resource
+        requests or limits.
+
+        Percentage values are calculated relative to node allocatable CPU and memory,
+        not pod-level requests or limits.
+
+        Metrics represent short-lived usage samples and do not provide historical
+        or long-term trend information.
 
 		When to use this command:
 
