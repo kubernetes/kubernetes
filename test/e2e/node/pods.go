@@ -611,7 +611,12 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			framework.ExpectNoError(err, "failed to query for pod")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
 		})
-		ginkgo.It("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
+		/*
+			Release: v1.36
+			Testname: Pods Generation set in pod conditions
+			Description: Verify pod generation is set with pod conditions
+		*/
+		framework.ConformanceIt("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
 			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
