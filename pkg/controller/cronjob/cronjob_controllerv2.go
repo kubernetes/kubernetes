@@ -132,7 +132,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 
 // Run starts the main goroutine responsible for watching and syncing jobs.
 func (jm *ControllerV2) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)
