@@ -22,10 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -183,7 +180,6 @@ func TestNamespacesForPod(t *testing.T) {
 	for desc, test := range map[string]struct {
 		input           *v1.Pod
 		runtimeHandlers map[string]kubecontainer.RuntimeHandler
-		usernsEnabled   bool
 		expected        *runtimeapi.NamespaceOption
 		expErr          bool
 	}{
@@ -247,7 +243,6 @@ func TestNamespacesForPod(t *testing.T) {
 					HostUsers: &[]bool{false}[0],
 				},
 			},
-			usernsEnabled: true,
 			runtimeHandlers: map[string]kubecontainer.RuntimeHandler{
 				"": {
 					SupportsUserNamespaces: true,
@@ -264,33 +259,12 @@ func TestNamespacesForPod(t *testing.T) {
 				},
 			},
 		},
-		// The hostUsers field can't be set to any value if the feature is disabled.
-		"hostUsers: false and feature disabled --> error": {
-			input: &v1.Pod{
-				Spec: v1.PodSpec{
-					HostUsers: &[]bool{false}[0],
-				},
-			},
-			usernsEnabled: false,
-			expErr:        true,
-		},
-		// The hostUsers field can't be set to any value if the feature is disabled.
-		"hostUsers: true and feature disabled --> error": {
-			input: &v1.Pod{
-				Spec: v1.PodSpec{
-					HostUsers: &[]bool{true}[0],
-				},
-			},
-			usernsEnabled: false,
-			expErr:        true,
-		},
 		"error if runtime handler not found": {
 			input: &v1.Pod{
 				Spec: v1.PodSpec{
 					HostUsers: &[]bool{false}[0],
 				},
 			},
-			usernsEnabled: true,
 			runtimeHandlers: map[string]kubecontainer.RuntimeHandler{
 				"other": {},
 			},
@@ -302,13 +276,10 @@ func TestNamespacesForPod(t *testing.T) {
 					HostUsers: &[]bool{false}[0],
 				},
 			},
-			usernsEnabled: true,
-			expErr:        true,
+			expErr: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, test.usernsEnabled)
-
 			fakeRuntimeHelper := kubecontainertest.FakeRuntimeHelper{
 				RuntimeHandlers: test.runtimeHandlers,
 			}

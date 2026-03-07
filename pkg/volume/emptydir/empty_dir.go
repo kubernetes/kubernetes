@@ -36,7 +36,6 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
@@ -295,9 +294,7 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 		// hostUsers field is interpreted as true by default, so a pod is by default
 		// not confined by a user namespace.
 		userNamespacesEnabled := false
-		if usernamespacefeature.EnabledUserNamespacesSupport() {
-			userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
-		}
+		userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
 		hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir, userNamespacesEnabled)
 		klog.V(3).Infof("assignQuota called, hasQuotas = %t userNamespacesEnabled = %t", hasQuotas, userNamespacesEnabled)
 		if err != nil {
@@ -528,9 +525,7 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
 		// Remove any quota
 		userNamespacesEnabled := false
-		if usernamespacefeature.EnabledUserNamespacesSupport() {
-			userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
-		}
+		userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
 		err := fsquota.ClearQuota(ed.mounter, dir, userNamespacesEnabled)
 		if err != nil {
 			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)

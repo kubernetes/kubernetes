@@ -65,12 +65,10 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx con
 	}
 	config.Linux = cl
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesSupport) {
-		if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
-			for _, mount := range config.Mounts {
-				mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids
-				mount.GidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Gids
-			}
+	if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
+		for _, mount := range config.Mounts {
+			mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids
+			mount.GidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Gids
 		}
 	}
 	return nil
