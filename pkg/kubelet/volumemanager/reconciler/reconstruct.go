@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"path/filepath"
 )
 
 // readyToUnmount returns true when reconciler can start unmounting volumes.
@@ -48,7 +50,6 @@ func (rc *reconciler) readyToUnmount() bool {
 // put the volumes to volumesFailedReconstruction to be cleaned up later when DesiredStateOfWorld
 // is populated.
 func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
-	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(logger, rc.kubeletPodsDir)
 	if err != nil {
 		logger.Error(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
@@ -58,18 +59,13 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 	reconstructedVolumeNames := []v1.UniqueVolumeName{}
 	for _, volume := range podVolumes {
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			logger.V(4).Info("Volume exists in actual state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
-			// There is nothing to reconstruct
 			continue
 		}
 		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
-			logger.Info("Could not construct volume information", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
-			// We can't reconstruct the volume. Remember to check DSW after it's fully populated and force unmount the volume when it's orphaned.
 			rc.volumesFailedReconstruction = append(rc.volumesFailedReconstruction, volume)
 			continue
 		}
-		logger.V(4).Info("Adding reconstructed volume to actual state and node status", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 		gvl := &globalVolumeInfo{
 			volumeName:        reconstructedVolume.volumeName,
 			volumeSpec:        reconstructedVolume.volumeSpec,
@@ -78,22 +74,55 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 			blockVolumeMapper: reconstructedVolume.blockVolumeMapper,
 			mounter:           reconstructedVolume.mounter,
 		}
-		if cachedInfo, ok := reconstructedVolumes[reconstructedVolume.volumeName]; ok {
-			gvl = cachedInfo
+		if cached, ok := reconstructedVolumes[reconstructedVolume.volumeName]; ok {
+			gvl = cached
 		}
 		gvl.addPodVolume(reconstructedVolume)
-
-		reconstructedVolumeNames = append(reconstructedVolumeNames, reconstructedVolume.volumeName)
 		reconstructedVolumes[reconstructedVolume.volumeName] = gvl
+		reconstructedVolumeNames = append(reconstructedVolumeNames, reconstructedVolume.volumeName)
+	}
+
+	kubeletRootDir := filepath.Dir(rc.kubeletPodsDir)
+
+	csiGlobalVolumes, err := rc.getVolumesFromCSIGlobalDir(
+		logger,
+		kubeletRootDir,
+		rc.mounter,
+	)
+
+	if err != nil {
+		logger.Error(err, "Cannot get CSI global mount volumes from disk")
+		return
+	}
+
+	for _, csiVol := range csiGlobalVolumes {
+		// csiVol is already *reconstructedVolume
+
+		if _, ok := reconstructedVolumes[csiVol.volumeName]; ok {
+			continue
+		}
+
+		gvl := &globalVolumeInfo{
+			volumeName:        csiVol.volumeName,
+			volumeSpec:        csiVol.volumeSpec,
+			devicePath:        csiVol.devicePath,
+			deviceMounter:     csiVol.deviceMounter,
+			blockVolumeMapper: csiVol.blockVolumeMapper,
+			mounter:           csiVol.mounter,
+			podVolumes:        map[volumetypes.UniquePodName]*reconstructedVolume{},
+		}
+
+		gvl.addPodVolume(csiVol)
+
+		reconstructedVolumes[csiVol.volumeName] = gvl
+		reconstructedVolumeNames = append(reconstructedVolumeNames, csiVol.volumeName)
 	}
 
 	if len(reconstructedVolumes) > 0 {
-		// Add the volumes to ASW
 		rc.updateStates(logger, reconstructedVolumes)
-
-		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
 	}
+
 	logger.V(2).Info("Volume reconstruction finished")
 }
 
