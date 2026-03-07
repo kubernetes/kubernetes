@@ -206,7 +206,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 	if config.volumeDirExists {
-		if err := os.MkdirAll(volPath, perm); err != nil {
+		if err := os.MkdirAll(volPath, defaultPerm); err != nil {
 			t.Errorf("fail to create path: %s", volPath)
 		}
 	}
@@ -278,7 +278,7 @@ func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
 		}
 		return fmt.Errorf("SetUp() failed: %v", err)
 	}
-	if e, a := perm, fileinfo.Mode().Perm(); e != a {
+	if e, a := defaultPerm, fileinfo.Mode().Perm(); e != a {
 		return fmt.Errorf("unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
 	}
 	return nil
@@ -1203,6 +1203,156 @@ func TestTmpfsMountOptions(t *testing.T) {
 			}
 			if expectedOption := fmt.Sprintf("size=%d", testCase.sizeLimit.Value()); !testCase.sizeLimit.IsZero() && !doesStringArrayContainSubstring(options, expectedOption) {
 				t.Errorf("size option is not expected when is zero. options: %v", options)
+			}
+		})
+	}
+}
+
+func TestSetupDirStickyBit(t *testing.T) {
+	tests := []struct {
+		name          string
+		stickyBit     bool
+		wantPerm      os.FileMode
+		wantStickyBit bool
+	}{
+		{
+			name:          "with sticky bit",
+			stickyBit:     true,
+			wantPerm:      0777,
+			wantStickyBit: true,
+		},
+		{
+			name:          "without sticky bit",
+			stickyBit:     false,
+			wantPerm:      0777,
+			wantStickyBit: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir, err := os.MkdirTemp("", "empty_dir_test")
+			if err != nil {
+				t.Fatalf("error creating temp dir: %v", err)
+			}
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					t.Errorf("failed to remove temp dir: %v", err)
+				}
+			}()
+
+			testDir := filepath.Join(tempDir, "test-dir")
+
+			ed := &emptyDir{
+				stickyBit: tt.stickyBit,
+			}
+
+			if err := ed.setupDir(testDir); err != nil {
+				t.Fatalf("unexpected error setting up directory: %v", err)
+			}
+
+			fi, err := os.Stat(testDir)
+			if err != nil {
+				t.Fatalf("error getting file info: %v", err)
+			}
+
+			if fi.Mode().Perm() != tt.wantPerm {
+				t.Errorf("got permission %v, want %v", fi.Mode().Perm(), tt.wantPerm)
+			}
+
+			gotSticky := fi.Mode()&os.ModeSticky != 0
+			if gotSticky != tt.wantStickyBit {
+				t.Errorf("got sticky bit %v, want %v", gotSticky, tt.wantStickyBit)
+			}
+		})
+	}
+}
+
+func TestNewMounterStickyBitFeatureGate(t *testing.T) {
+	stickyBitTrue := true
+	stickyBitFalse := false
+
+	tests := []struct {
+		name              string
+		featureEnabled    bool
+		stickyBit         *bool
+		expectedStickyBit bool
+	}{
+		{
+			name:              "feature enabled, stickyBit true",
+			featureEnabled:    true,
+			stickyBit:         &stickyBitTrue,
+			expectedStickyBit: true,
+		},
+		{
+			name:              "feature enabled, stickyBit false",
+			featureEnabled:    true,
+			stickyBit:         &stickyBitFalse,
+			expectedStickyBit: false,
+		},
+		{
+			name:              "feature enabled, stickyBit nil",
+			featureEnabled:    true,
+			stickyBit:         nil,
+			expectedStickyBit: false,
+		},
+		{
+			name:              "feature disabled, stickyBit true",
+			featureEnabled:    false,
+			stickyBit:         &stickyBitTrue,
+			expectedStickyBit: false,
+		},
+		{
+			name:              "feature disabled, stickyBit false",
+			featureEnabled:    false,
+			stickyBit:         &stickyBitFalse,
+			expectedStickyBit: false,
+		},
+		{
+			name:              "feature disabled, stickyBit nil",
+			featureEnabled:    false,
+			stickyBit:         nil,
+			expectedStickyBit: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirStickyBit, tt.featureEnabled)
+
+			tmpDir, err := utiltesting.MkTmpdir("emptydirTest")
+			if err != nil {
+				t.Fatalf("can't make a temp dir: %v", err)
+			}
+			defer func() {
+				if err := os.RemoveAll(tmpDir); err != nil {
+					t.Errorf("failed to remove temp dir %s: %v", tmpDir, err)
+				}
+			}()
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						StickyBit: tt.stickyBit,
+					},
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID("test-pod-uid"),
+				},
+			}
+
+			mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, mount.NewFakeMounter(nil), &fakeMountDetector{})
+			if err != nil {
+				t.Fatalf("unexpected error creating mounter: %v", err)
+			}
+
+			ed := mounter.(*emptyDir)
+			if ed.stickyBit != tt.expectedStickyBit {
+				t.Errorf("expected stickyBit=%v, got %v", tt.expectedStickyBit, ed.stickyBit)
 			}
 		})
 	}
