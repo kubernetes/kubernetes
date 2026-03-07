@@ -19528,9 +19528,6 @@
           "description": "spec represents the specification of the CSI Driver."
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -19943,9 +19940,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "audience"
-      ],
       "type": "object"
     },
     "io.k8s.api.storage.v1.VolumeAttachment": {
@@ -20051,7 +20045,6 @@
       },
       "required": [
         "attacher",
-        "source",
         "nodeName"
       ],
       "type": "object"
@@ -20079,9 +20072,6 @@
           "description": "detachError represents the last error encountered during detach operation, if any. This field must only be set by the entity completing the detach operation, i.e. the external-attacher."
         }
       },
-      "required": [
-        "attached"
-      ],
       "type": "object"
     },
     "io.k8s.api.storage.v1.VolumeAttributesClass": {
@@ -20112,7 +20102,8 @@
         }
       },
       "required": [
-        "driverName"
+        "driverName",
+        "parameters"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
@@ -20216,7 +20207,8 @@
         }
       },
       "required": [
-        "driverName"
+        "driverName",
+        "parameters"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
@@ -20286,6 +20278,9 @@
           "description": "Status of the migration."
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {

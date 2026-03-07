@@ -34,7 +34,7 @@ type StorageVersionMigration struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Specification of the migration.
-	// +optional
+	// +required
 	Spec StorageVersionMigrationSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// Status of the migration.
 	// +optional
@@ -46,6 +46,7 @@ type StorageVersionMigrationSpec struct {
 	// The resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
+	// +required
 	Resource metav1.GroupResource `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 }
 
@@ -72,6 +73,7 @@ type StorageVersionMigrationStatus struct {
 	// ResourceVersion to compare with the GC cache for performing the migration.
 	// This is the current resource version of given group, version and resource when
 	// kube-controller-manager first observes this StorageVersionMigration resource.
+	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 

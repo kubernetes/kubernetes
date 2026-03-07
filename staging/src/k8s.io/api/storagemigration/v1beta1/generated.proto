@@ -37,7 +37,7 @@ message StorageVersionMigration {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the migration.
-  // +optional
+  // +required
   optional StorageVersionMigrationSpec spec = 2;
 
   // Status of the migration.
@@ -61,6 +61,7 @@ message StorageVersionMigrationSpec {
   // The resource that is being migrated. The migrator sends requests to
   // the endpoint serving the resource.
   // Immutable.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupResource resource = 1;
 }
 
@@ -77,6 +78,7 @@ message StorageVersionMigrationStatus {
   // ResourceVersion to compare with the GC cache for performing the migration.
   // This is the current resource version of given group, version and resource when
   // kube-controller-manager first observes this StorageVersionMigration resource.
+  // +optional
   optional string resourceVersion = 2;
 }
 
