@@ -665,6 +665,13 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"cpu-limit": {lowOOMScoreAdj: 999, highOOMScoreAdj: 999},
 			},
 		},
+		"cpu-limit-zero-memory-capacity": {
+			pod:            &cpuLimit,
+			memoryCapacity: 0,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"cpu-limit": {lowOOMScoreAdj: 999, highOOMScoreAdj: 999},
+			},
+		},
 		"memory-limit-cpu-request": {
 			pod:            &memoryLimitCPURequest,
 			memoryCapacity: 8000000000,
