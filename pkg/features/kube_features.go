@@ -2627,3 +2627,5 @@ func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddDependencies(defaultKubernetesFeatureGateDependencies))
 	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
+
+PodNetworkHealth featuregate.Feature = "PodNetworkHealth"
