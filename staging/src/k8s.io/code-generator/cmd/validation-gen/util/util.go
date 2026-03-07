@@ -137,3 +137,19 @@ func ParseInt(val string) (int, error) {
 
 	return intVal, nil
 }
+
+// ParseBool strictly parses a bool from a string input,
+// ensuring that when converted back to a string via strconv.FormatBool,
+// the resulting string and the input string match.
+// Only the canonical forms "true" and "false" are accepted.
+func ParseBool(val string) (bool, error) {
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		return false, fmt.Errorf("parsing %q as bool: %w", val, err)
+	}
+	// Reject non-canonical forms: FormatBool(true)=="true", FormatBool(false)=="false"
+	if strconv.FormatBool(b) != val {
+		return false, fmt.Errorf("parsing %q as bool: only canonical forms %q and %q are accepted", val, "true", "false")
+	}
+	return b, nil
+}
