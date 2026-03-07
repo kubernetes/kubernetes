@@ -1721,6 +1721,15 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
+
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for this allocated device.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	//
+	// +optional
+	// +featureGate=DRANodePreparation
+	RequiresNodePreparation *bool `json:"requiresNodePreparation,omitempty" protobuf:"varint,11,opt,name=requiresNodePreparation"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1849,6 +1858,19 @@ type DeviceClassSpec struct {
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
+
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for allocations using this
+	// class.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	//
+	// This field is copied into each DeviceRequestAllocationResult by the
+	// built-in structured allocator.
+	//
+	// +optional
+	// +featureGate=DRANodePreparation
+	RequiresNodePreparation *bool `json:"requiresNodePreparation,omitempty" protobuf:"varint,5,opt,name=requiresNodePreparation"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

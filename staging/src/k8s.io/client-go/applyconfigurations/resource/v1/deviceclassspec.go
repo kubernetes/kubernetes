@@ -43,6 +43,15 @@ type DeviceClassSpecApplyConfiguration struct {
 	//
 	// This is a beta field.
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty"`
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for allocations using this
+	// class.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	//
+	// This field is copied into each DeviceRequestAllocationResult by the
+	// built-in structured allocator.
+	RequiresNodePreparation *bool `json:"requiresNodePreparation,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -82,5 +91,13 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 // If called multiple times, the ExtendedResourceName field is set to the value of the last call.
 func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceName(value string) *DeviceClassSpecApplyConfiguration {
 	b.ExtendedResourceName = &value
+	return b
+}
+
+// WithRequiresNodePreparation sets the RequiresNodePreparation field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequiresNodePreparation field is set to the value of the last call.
+func (b *DeviceClassSpecApplyConfiguration) WithRequiresNodePreparation(value bool) *DeviceClassSpecApplyConfiguration {
+	b.RequiresNodePreparation = &value
 	return b
 }

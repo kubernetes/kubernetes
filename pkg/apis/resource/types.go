@@ -1597,6 +1597,15 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity
+
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for this allocated device.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	//
+	// +optional
+	// +featureGate=DRANodePreparation
+	RequiresNodePreparation *bool
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1705,6 +1714,19 @@ type DeviceClassSpec struct {
 	// +optional
 	// +featureGate=DRAExtendedResource
 	ExtendedResourceName *string
+
+	// RequiresNodePreparation indicates whether kubelet must invoke
+	// NodePrepareResources and NodeUnprepareResources for allocations using this
+	// class.
+	//
+	// If unset, kubelet treats this as true for backward compatibility.
+	//
+	// This field is copied into each DeviceRequestAllocationResult by the
+	// built-in structured allocator.
+	//
+	// +optional
+	// +featureGate=DRANodePreparation
+	RequiresNodePreparation *bool
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

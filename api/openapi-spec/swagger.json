@@ -16027,6 +16027,10 @@
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
         },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+          "type": "boolean"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -16151,6 +16155,10 @@
         "request": {
           "description": "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
           "type": "string"
+        },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+          "type": "boolean"
         },
         "shareID": {
           "description": "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
@@ -17374,6 +17382,10 @@
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
         },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+          "type": "boolean"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -17531,6 +17543,10 @@
         "request": {
           "description": "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
           "type": "string"
+        },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+          "type": "boolean"
         },
         "shareID": {
           "description": "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
@@ -18547,6 +18563,10 @@
           "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
           "type": "string"
         },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for allocations using this class.\n\nIf unset, kubelet treats this as true for backward compatibility.\n\nThis field is copied into each DeviceRequestAllocationResult by the built-in structured allocator.",
+          "type": "boolean"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -18671,6 +18691,10 @@
         "request": {
           "description": "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
           "type": "string"
+        },
+        "requiresNodePreparation": {
+          "description": "RequiresNodePreparation indicates whether kubelet must invoke NodePrepareResources and NodeUnprepareResources for this allocated device.\n\nIf unset, kubelet treats this as true for backward compatibility.",
+          "type": "boolean"
         },
         "shareID": {
           "description": "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
