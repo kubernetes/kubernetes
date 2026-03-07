@@ -171,6 +171,65 @@ func TestMaxItems(t *testing.T) {
 	}
 }
 
+func TestMinItems(t *testing.T) {
+	cases := []struct {
+		name  string
+		items int
+		min   int
+		err   string // regex
+	}{
+		{
+			name:  "0 items, min 0",
+			items: 0,
+			min:   0,
+		},
+		{
+			name:  "1 item, min 0",
+			items: 1,
+			min:   0,
+		},
+		{
+			name:  "1 item, min 1",
+			items: 1,
+			min:   1,
+		},
+		{
+			name:  "2 items, min 1",
+			items: 2,
+			min:   1,
+		},
+		{
+			name:  "0 items, min -1",
+			items: 0,
+			min:   -1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := make([]bool, tc.items)
+			result := MinItems(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.min)
+			if len(result) > 0 && tc.err == "" {
+				t.Errorf("unexpected failure: %v", fmtErrs(result))
+				return
+			}
+			if len(result) == 0 && tc.err != "" {
+				t.Errorf("unexpected success: expected %q", tc.err)
+				return
+			}
+			if len(result) > 0 {
+				if len(result) > 1 {
+					t.Errorf("unexepected multi-error: %v", fmtErrs(result))
+					return
+				}
+				if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
+					t.Errorf("wrong error\nexpected: %q\n     got: %v", tc.err, fmtErrs(result))
+				}
+			}
+		})
+	}
+}
+
 func TestMinimum(t *testing.T) {
 	testMinimumPositive[int](t)
 	testMinimumNegative[int](t)

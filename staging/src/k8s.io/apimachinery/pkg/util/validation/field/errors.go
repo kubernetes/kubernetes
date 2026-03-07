@@ -112,7 +112,7 @@ func (e *Error) ErrorBody() string {
 	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
 		s = e.Type.String()
 	case ErrorTypeInvalid, ErrorTypeTypeInvalid, ErrorTypeNotSupported,
-		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany:
+		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany, ErrorTypeTooFew:
 		if e.BadValue == omitValue {
 			s = e.Type.String()
 			break
@@ -201,6 +201,9 @@ const (
 	// report that a given list has too many items. This is similar to FieldValueTooLong,
 	// but the error indicates quantity instead of length.
 	ErrorTypeTooMany ErrorType = "FieldValueTooMany"
+	// ErrorTypeTooFew is used to report "too few". This is used to
+	// report that a given list has too few items. This is similar to FieldValueTooMany.
+	ErrorTypeTooFew ErrorType = "FieldValueTooFew"
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
@@ -227,6 +230,8 @@ func (t ErrorType) String() string {
 		return "Too long"
 	case ErrorTypeTooMany:
 		return "Too many"
+	case ErrorTypeTooFew:
+		return "Too few"
 	case ErrorTypeInternal:
 		return "Internal error"
 	case ErrorTypeTypeInvalid:
@@ -400,6 +405,36 @@ func TooMany(field *Path, actualQuantity, maxQuantity int) *Error {
 
 	return &Error{
 		Type:     ErrorTypeTooMany,
+		Field:    field.String(),
+		BadValue: actual,
+		Detail:   msg,
+	}
+}
+
+// TooFew returns a *Error indicating "too few". This is used to
+// report that a given list has too few items. This is similar to TooMany.
+func TooFew(field *Path, actualQuantity, minQuantity int) *Error {
+	var msg string
+
+	if minQuantity >= 0 {
+		is := "items"
+		if minQuantity == 1 {
+			is = "item"
+		}
+		msg = fmt.Sprintf("must have at least %d %s", minQuantity, is)
+	} else {
+		msg = "has too few items"
+	}
+
+	var actual interface{}
+	if actualQuantity >= 0 {
+		actual = actualQuantity
+	} else {
+		actual = omitValue
+	}
+
+	return &Error{
+		Type:     ErrorTypeTooFew,
 		Field:    field.String(),
 		BadValue: actual,
 		Detail:   msg,

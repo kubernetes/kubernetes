@@ -1,0 +1,79 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package sliceofstruct
+
+import (
+	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+)
+
+func Test(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Since defaults are nil/empty slices (len 0), Min10Field and Min10TypedefField should fail
+	st.Value(&Struct{
+		// All zero values
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.TooFew(field.NewPath("min10Field"), 0, 10),
+		field.TooFew(field.NewPath("min10TypedefField"), 0, 10),
+	})
+
+	st.Value(&Struct{
+		Min0Field:         make([]OtherStruct, 0),
+		Min10Field:        make([]OtherStruct, 0),
+		Min0TypedefField:  make([]OtherTypedefStruct, 0),
+		Min10TypedefField: make([]OtherTypedefStruct, 0),
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.TooFew(field.NewPath("min10Field"), 0, 10),
+		field.TooFew(field.NewPath("min10TypedefField"), 0, 10),
+	})
+
+	st.Value(&Struct{
+		Min10Field:        make([]OtherStruct, 1),
+		Min10TypedefField: make([]OtherTypedefStruct, 1),
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.TooFew(field.NewPath("min10Field"), 1, 10),
+		field.TooFew(field.NewPath("min10TypedefField"), 1, 10),
+	})
+
+	st.Value(&Struct{
+		Min10Field:        make([]OtherStruct, 9),
+		Min10TypedefField: make([]OtherTypedefStruct, 9),
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.TooFew(field.NewPath("min10Field"), 9, 10),
+		field.TooFew(field.NewPath("min10TypedefField"), 9, 10),
+	})
+
+	st.Value(&Struct{
+		Min10Field:        make([]OtherStruct, 10),
+		Min10TypedefField: make([]OtherTypedefStruct, 10),
+	}).ExpectValid()
+
+	// Test validation ratcheting
+	st.Value(&Struct{
+		Min0Field:         make([]OtherStruct, 1),
+		Min10Field:        make([]OtherStruct, 1),
+		Min0TypedefField:  make([]OtherTypedefStruct, 1),
+		Min10TypedefField: make([]OtherTypedefStruct, 1),
+	}).OldValue(&Struct{
+		Min0Field:         make([]OtherStruct, 1),
+		Min10Field:        make([]OtherStruct, 1),
+		Min0TypedefField:  make([]OtherTypedefStruct, 1),
+		Min10TypedefField: make([]OtherTypedefStruct, 1),
+	}).ExpectValid()
+}
