@@ -371,6 +371,16 @@ type SecureServingInfo struct {
 
 	// DisableHTTP2 indicates that http2 should not be enabled.
 	DisableHTTP2 bool
+
+	// HTTP2ReadIdleTimeout is the timeout after which a health check using a ping
+	// frame will be carried out if no frame is received on the connection.
+	// If zero, no health check is performed.
+	HTTP2ReadIdleTimeout time.Duration
+
+	// HTTP2PingTimeout is the timeout after which the connection will be closed
+	// if a response to a ping is not received.
+	// If zero, a default of 15 seconds is used.
+	HTTP2PingTimeout time.Duration
 }
 
 type AuthenticationInfo struct {
