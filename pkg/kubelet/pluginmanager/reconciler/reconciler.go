@@ -44,6 +44,9 @@ type Reconciler interface {
 	// AddHandler adds the given plugin handler for a specific plugin type,
 	// which will be added to the actual state of world cache.
 	AddHandler(pluginType string, pluginHandler cache.PluginHandler)
+
+	// Stopped returns a channel that is closed when the reconciler has stopped.
+	Stopped() <-chan struct{}
 }
 
 // NewReconciler returns a new instance of Reconciler.
@@ -69,6 +72,7 @@ func NewReconciler(
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
 		handlers:            make(map[string]cache.PluginHandler),
+		stopped:             make(chan struct{}),
 	}
 }
 
@@ -78,12 +82,14 @@ type reconciler struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
 	handlers            map[string]cache.PluginHandler
+	stopped             chan struct{}
 	sync.RWMutex
 }
 
 var _ Reconciler = &reconciler{}
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
+	defer close(rc.stopped)
 	// Use context.TODO() because we currently do not have a proper context to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 	ctx := context.TODO()
@@ -93,6 +99,10 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	},
 		rc.loopSleepDuration,
 		stopCh)
+}
+
+func (rc *reconciler) Stopped() <-chan struct{} {
+	return rc.stopped
 }
 
 func (rc *reconciler) AddHandler(pluginType string, pluginHandler cache.PluginHandler) {

@@ -31,6 +31,8 @@ import (
 
 func TestKubeletDirs(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	// Set pluginManagerStopCh to nil to avoid timeout in Cleanup() since Run() is not called
+	testKubelet.pluginManagerStopCh = nil
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
