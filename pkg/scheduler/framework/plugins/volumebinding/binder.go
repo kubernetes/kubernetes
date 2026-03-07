@@ -68,6 +68,8 @@ const (
 	ErrReasonNotEnoughSpace = "node(s) did not have enough free storage"
 	// ErrReasonPVNotExist is used when a pod has one or more PVC(s) bound to non-existent persistent volume(s)"
 	ErrReasonPVNotExist = "node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)"
+	// ErrReasonClassConflict is used when a storage class AllowedTopologies does not match the node labels.
+	ErrReasonClassConflict = "node(s) didn't match storage class allowed topologies"
 )
 
 // BindingInfo holds a binding between PV and PVC.
@@ -291,8 +293,8 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 	// returns without an error.
 	unboundVolumesSatisfied := true
 	boundVolumesSatisfied := true
-	sufficientStorage := true
 	boundPVsFound := true
+	var provisionReason ConflictReason
 	defer func() {
 		if err != nil {
 			return
@@ -303,11 +305,11 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 		if !unboundVolumesSatisfied {
 			reasons = append(reasons, ErrReasonBindConflict)
 		}
-		if !sufficientStorage {
-			reasons = append(reasons, ErrReasonNotEnoughSpace)
-		}
 		if !boundPVsFound {
 			reasons = append(reasons, ErrReasonPVNotExist)
+		}
+		if provisionReason != "" {
+			reasons = append(reasons, provisionReason)
 		}
 	}()
 
@@ -376,9 +378,12 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 		// Check for claims to provision. This is the first time where we potentially
 		// find out that storage is not sufficient for the node.
 		if len(claimsToProvision) > 0 {
-			unboundVolumesSatisfied, sufficientStorage, dynamicProvisions, err = b.checkVolumeProvisions(logger, pod, claimsToProvision, node)
+			provisionReason, dynamicProvisions, err = b.checkVolumeProvisions(logger, pod, claimsToProvision, node)
 			if err != nil {
 				return
+			}
+			if dynamicProvisions != nil {
+				unboundVolumesSatisfied = true
 			}
 		}
 	}
@@ -911,7 +916,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 // checkVolumeProvisions checks given unbound claims (the claims have gone through func
 // findMatchingVolumes, and do not have matching volumes for binding), and return true
 // if all of the claims are eligible for dynamic provision.
-func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node) (provisionSatisfied, sufficientStorage bool, dynamicProvisions []*DynamicProvision, err error) {
+func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node) (reason ConflictReason, dynamicProvisions []*DynamicProvision, err error) {
 	dynamicProvisions = []*DynamicProvision{}
 
 	// We return early with provisionedClaims == nil if a check
@@ -920,33 +925,33 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 		pvcName := getPVCName(claim)
 		className := volume.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
-			return false, false, nil, fmt.Errorf("no class for claim %q", pvcName)
+			return "", nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
 
 		class, err := b.classLister.Get(className)
 		if err != nil {
-			return false, false, nil, fmt.Errorf("failed to find storage class %q", className)
+			return "", nil, fmt.Errorf("failed to find storage class %q", className)
 		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == volume.NotSupportedProvisioner {
 			logger.V(5).Info("Storage class of claim does not support dynamic provisioning", "storageClassName", className, "PVC", klog.KObj(claim))
-			return false, true, nil, nil
+			return "", nil, nil
 		}
 
 		// Check if the node can satisfy the topology requirement in the class
 		if !v1helper.MatchTopologySelectorTerms(class.AllowedTopologies, labels.Set(node.Labels)) {
 			logger.V(5).Info("Node cannot satisfy provisioning topology requirements of claim", "node", klog.KObj(node), "PVC", klog.KObj(claim))
-			return false, true, nil, nil
+			return ErrReasonClassConflict, nil, nil
 		}
 
 		// Check storage capacity.
 		sufficient, capacity, err := b.hasEnoughCapacity(logger, provisioner, claim, class, node)
 		if err != nil {
-			return false, false, nil, err
+			return "", nil, err
 		}
 		if !sufficient {
 			// hasEnoughCapacity logs an explanation.
-			return true, false, nil, nil
+			return ErrReasonNotEnoughSpace, nil, nil
 		}
 
 		dynamicProvisions = append(dynamicProvisions, &DynamicProvision{
@@ -956,7 +961,7 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 	}
 	logger.V(5).Info("Provisioning for claims of pod that has no matching volumes...", "claimCount", len(claimsToProvision), "pod", klog.KObj(pod), "node", klog.KObj(node))
 
-	return true, true, dynamicProvisions, nil
+	return "", dynamicProvisions, nil
 }
 
 func (b *volumeBinder) revertAssumedPVs(bindings []*BindingInfo) {
