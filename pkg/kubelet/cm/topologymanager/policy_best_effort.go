@@ -16,7 +16,10 @@ limitations under the License.
 
 package topologymanager
 
-import "k8s.io/klog/v2"
+import (
+	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+)
 
 type bestEffortPolicy struct {
 	// numaInfo represents list of NUMA Nodes available on the underlying machine and distances between them
@@ -26,16 +29,13 @@ type bestEffortPolicy struct {
 
 var _ Policy = &bestEffortPolicy{}
 
-// PolicyBestEffort policy name.
-const PolicyBestEffort string = "best-effort"
-
 // NewBestEffortPolicy returns best-effort policy.
 func NewBestEffortPolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
 	return &bestEffortPolicy{numaInfo: numaInfo, opts: opts}
 }
 
-func (p *bestEffortPolicy) Name() string {
-	return PolicyBestEffort
+func (p *bestEffortPolicy) Name() kubeletconfig.TopologyManagerPolicy {
+	return kubeletconfig.BestEffortTopologyManagerPolicy
 }
 
 func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {

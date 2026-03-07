@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -133,13 +134,12 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+func NewManager(topology []cadvisorapi.Node, topologyPolicyName kubeletconfig.TopologyManagerPolicy, topologyScopeName kubeletconfig.TopologyManagerScope, topologyPolicyOptions map[string]string) (Manager, error) {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
-
 	// When policy is none, the scope is not relevant, so we can short circuit here.
-	if topologyPolicyName == PolicyNone {
+	if topologyPolicyName == kubeletconfig.NoneTopologyManagerPolicy {
 		logger.Info("Creating topology manager with none policy")
 		return &manager{scope: NewNoneScope()}, nil
 	}
@@ -156,37 +156,31 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
 
-	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > opts.MaxAllowableNUMANodes {
+	if len(numaInfo.Nodes) > opts.MaxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", opts.MaxAllowableNUMANodes)
 	}
 
 	var policy Policy
 	switch topologyPolicyName {
 
-	case PolicyBestEffort:
+	case kubeletconfig.BestEffortTopologyManagerPolicy:
 		policy = NewBestEffortPolicy(numaInfo, opts)
 
-	case PolicyRestricted:
+	case kubeletconfig.RestrictedTopologyManagerPolicy:
 		policy = NewRestrictedPolicy(numaInfo, opts)
 
-	case PolicySingleNumaNode:
+	case kubeletconfig.SingleNumaNodeTopologyManagerPolicy:
 		policy = NewSingleNumaNodePolicy(numaInfo, opts)
-
-	default:
-		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
 
 	var scope Scope
 	switch topologyScopeName {
 
-	case containerTopologyScope:
+	case kubeletconfig.ContainerTopologyManagerScope:
 		scope = NewContainerScope(policy)
 
-	case podTopologyScope:
+	case kubeletconfig.PodTopologyManagerScope:
 		scope = NewPodScope(policy)
-
-	default:
-		return nil, fmt.Errorf("unknown scope: \"%s\"", topologyScopeName)
 	}
 
 	manager := &manager{

@@ -16,22 +16,22 @@ limitations under the License.
 
 package topologymanager
 
-import "k8s.io/klog/v2"
+import (
+	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+)
 
 type nonePolicy struct{}
 
 var _ Policy = &nonePolicy{}
-
-// PolicyNone policy name.
-const PolicyNone string = "none"
 
 // NewNonePolicy returns none policy.
 func NewNonePolicy() Policy {
 	return &nonePolicy{}
 }
 
-func (p *nonePolicy) Name() string {
-	return PolicyNone
+func (p *nonePolicy) Name() kubeletconfig.TopologyManagerPolicy {
+	return kubeletconfig.NoneTopologyManagerPolicy
 }
 
 func (p *nonePolicy) canAdmitPodResult(hint *TopologyHint) bool {

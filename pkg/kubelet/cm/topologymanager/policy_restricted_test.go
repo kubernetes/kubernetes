@@ -20,25 +20,6 @@ import (
 	"testing"
 )
 
-func TestPolicyRestrictedName(t *testing.T) {
-	tcases := []struct {
-		name     string
-		expected string
-	}{
-		{
-			name:     "New Restricted Policy",
-			expected: "restricted",
-		},
-	}
-	numaInfo := commonNUMAInfoTwoNodes()
-	for _, tc := range tcases {
-		policy := &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: PolicyOptions{}}}
-		if policy.Name() != tc.expected {
-			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
-		}
-	}
-}
-
 func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string

@@ -16,7 +16,10 @@ limitations under the License.
 
 package topologymanager
 
-import "k8s.io/klog/v2"
+import (
+	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+)
 
 type restrictedPolicy struct {
 	bestEffortPolicy
@@ -24,16 +27,13 @@ type restrictedPolicy struct {
 
 var _ Policy = &restrictedPolicy{}
 
-// PolicyRestricted policy name.
-const PolicyRestricted string = "restricted"
-
 // NewRestrictedPolicy returns restricted policy.
 func NewRestrictedPolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
 	return &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: opts}}
 }
 
-func (p *restrictedPolicy) Name() string {
-	return PolicyRestricted
+func (p *restrictedPolicy) Name() kubeletconfig.TopologyManagerPolicy {
+	return kubeletconfig.RestrictedTopologyManagerPolicy
 }
 
 func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {

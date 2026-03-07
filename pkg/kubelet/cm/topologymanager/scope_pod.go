@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -38,7 +39,7 @@ var _ Scope = &podScope{}
 func NewPodScope(policy Policy) Scope {
 	return &podScope{
 		scope{
-			name:             podTopologyScope,
+			name:             kubeletconfig.PodTopologyManagerScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
 			podMap:           containermap.NewContainerMap(),

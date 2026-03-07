@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -175,8 +176,8 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
 	if opts.AlignBySocket {
 		// Not compatible with topology manager single-numa-node policy option.
-		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
-			return fmt.Errorf("Topolgy manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
+		if topologyManager.GetPolicy().Name() == kubeletconfig.SingleNumaNodeTopologyManagerPolicy {
+			return fmt.Errorf("TopologyManager %s policy is incompatible with CPUManager %s policy option", kubeletconfig.SingleNumaNodeTopologyManagerPolicy, AlignBySocketOption)
 		}
 		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
 		if topology.NumSockets > topology.NumNUMANodes {

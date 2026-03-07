@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -53,8 +52,8 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 
 			_, _, _, cpusNumPerNUMA = hostCheck()
 
-			policy := topologymanager.PolicySingleNumaNode
-			scope := podScopeTopology
+			policy := kubeletconfig.SingleNumaNodeTopologyManagerPolicy
+			scope := kubeletconfig.PodTopologyManagerScope
 
 			newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, nil, nil, 0)
 			updateKubeletConfig(ctx, f, newCfg, true)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -154,56 +155,56 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 		description   string
 		policyOption  map[string]string
 		topology      *topology.CPUTopology
-		topoMgrPolicy string
+		topoMgrPolicy kubeletconfig.TopologyManagerPolicy
 		expectedErr   bool
 	}{
 		{
 			description:   "Align by socket not enabled",
 			policyOption:  map[string]string{FullPCPUsOnlyOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
+			topoMgrPolicy: kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 			expectedErr:   false,
 		},
 		{
 			description:   "Align by socket enabled with topology manager single numa node",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
+			topoMgrPolicy: kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 			expectedErr:   true,
 		},
 		{
 			description:   "Align by socket enabled with num_sockets > num_numa",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      fakeTopoMultiSocketDualSocketPerNumaHT,
-			topoMgrPolicy: topologymanager.PolicyNone,
+			topoMgrPolicy: kubeletconfig.NoneTopologyManagerPolicy,
 			expectedErr:   true,
 		},
 		{
 			description:   "Align by socket enabled: with topology manager None policy",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicyNone,
+			topoMgrPolicy: kubeletconfig.NoneTopologyManagerPolicy,
 			expectedErr:   false,
 		},
 		{
 			description:   "Align by socket enabled: with topology manager best-effort policy",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicyBestEffort,
+			topoMgrPolicy: kubeletconfig.BestEffortTopologyManagerPolicy,
 			expectedErr:   false,
 		},
 		{
 			description:   "Align by socket enabled: with topology manager restricted policy",
 			policyOption:  map[string]string{AlignBySocketOption: "true"},
 			topology:      topoDualSocketMultiNumaPerSocketHT,
-			topoMgrPolicy: topologymanager.PolicyRestricted,
+			topoMgrPolicy: kubeletconfig.RestrictedTopologyManagerPolicy,
 			expectedErr:   false,
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			topoMgrPolicy := topologymanager.NewNonePolicy()
-			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
+			if testCase.topoMgrPolicy == kubeletconfig.SingleNumaNodeTopologyManagerPolicy {
 				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
 			}
 			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)

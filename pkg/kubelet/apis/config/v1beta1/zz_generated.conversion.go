@@ -639,12 +639,12 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.MemoryManagerPolicy = in.MemoryManagerPolicy
-	out.TopologyManagerPolicy = in.TopologyManagerPolicy
-	out.TopologyManagerScope = in.TopologyManagerScope
+	out.TopologyManagerPolicy = config.TopologyManagerPolicy(in.TopologyManagerPolicy)
+	out.TopologyManagerScope = config.TopologyManagerScope(in.TopologyManagerScope)
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.HairpinMode = in.HairpinMode
+	out.HairpinMode = config.HairpinMode(in.HairpinMode)
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
 	if err := v1.Convert_Pointer_int64_To_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
@@ -847,12 +847,12 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.MemoryManagerPolicy = in.MemoryManagerPolicy
-	out.TopologyManagerPolicy = in.TopologyManagerPolicy
-	out.TopologyManagerScope = in.TopologyManagerScope
+	out.TopologyManagerPolicy = configv1beta1.TopologyManagerPolicy(in.TopologyManagerPolicy)
+	out.TopologyManagerScope = configv1beta1.TopologyManagerScope(in.TopologyManagerScope)
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.HairpinMode = in.HairpinMode
+	out.HairpinMode = configv1beta1.HairpinMode(in.HairpinMode)
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {

@@ -96,7 +96,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContentType = "application/vnd.kubernetes.protobuf"
 			obj.KubeAPIQPS = 50
 			obj.KubeAPIBurst = 100
-			obj.HairpinMode = v1beta1.PromiscuousBridge
+			obj.HairpinMode = kubeletconfig.PromiscuousBridge
 			obj.EvictionHard = eviction.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 			obj.MergeDefaultEvictionSettings = false

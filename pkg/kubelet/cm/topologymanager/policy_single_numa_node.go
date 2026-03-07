@@ -16,7 +16,10 @@ limitations under the License.
 
 package topologymanager
 
-import "k8s.io/klog/v2"
+import (
+	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+)
 
 type singleNumaNodePolicy struct {
 	// numaInfo represents list of NUMA Nodes available on the underlying machine and distances between them
@@ -26,16 +29,13 @@ type singleNumaNodePolicy struct {
 
 var _ Policy = &singleNumaNodePolicy{}
 
-// PolicySingleNumaNode policy name.
-const PolicySingleNumaNode string = "single-numa-node"
-
 // NewSingleNumaNodePolicy returns single-numa-node policy.
 func NewSingleNumaNodePolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
 	return &singleNumaNodePolicy{numaInfo: numaInfo, opts: opts}
 }
 
-func (p *singleNumaNodePolicy) Name() string {
-	return PolicySingleNumaNode
+func (p *singleNumaNodePolicy) Name() kubeletconfig.TopologyManagerPolicy {
+	return kubeletconfig.SingleNumaNodeTopologyManagerPolicy
 }
 
 func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -1557,7 +1558,7 @@ func TestCompareHintsNarrowest(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.description, func(t *testing.T) {
 			numaInfo := &NUMAInfo{}
-			merger := NewHintMerger(numaInfo, [][]TopologyHint{}, PolicyBestEffort, PolicyOptions{})
+			merger := NewHintMerger(numaInfo, [][]TopologyHint{}, kubeletconfig.BestEffortTopologyManagerPolicy, PolicyOptions{})
 			merger.BestNonPreferredAffinityCount = tc.bestNonPreferredAffinityCount
 
 			result := merger.compare(tc.current, tc.candidate)

@@ -22,24 +22,6 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func TestPolicyNoneName(t *testing.T) {
-	tcases := []struct {
-		name     string
-		expected string
-	}{
-		{
-			name:     "New None Policy",
-			expected: "none",
-		},
-	}
-	for _, tc := range tcases {
-		policy := NewNonePolicy()
-		if policy.Name() != tc.expected {
-			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
-		}
-	}
-}
-
 func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
