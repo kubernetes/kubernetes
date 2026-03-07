@@ -836,3 +836,274 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeInfoCache(t *testing.T) {
+	// Create test node
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-node",
+			ResourceVersion: "1000",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(4*1024*1024*1024, resource.BinarySI),
+			},
+		},
+	}
+
+	// Create test pods
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             "pod1",
+			Name:            "pod1",
+			Namespace:       "default",
+			ResourceVersion: "100",
+			Generation:      1,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(512*1024*1024, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             "pod2",
+			Name:            "pod2",
+			Namespace:       "default",
+			ResourceVersion: "101",
+			Generation:      1,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(256*1024*1024, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	t.Run("cache starts empty and requires update", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		if !cache.needsUpdate(pods, node) {
+			t.Error("Expected cache to need update when empty")
+		}
+	})
+
+	t.Run("cache returns same NodeInfo after update", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		cached := cache.get()
+		if cached == nil {
+			t.Fatal("Expected cached NodeInfo to be non-nil")
+		}
+		if cached != nodeInfo {
+			t.Error("Expected cache to return the same NodeInfo object")
+		}
+	})
+
+	t.Run("cache does not need update when pods haven't changed", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		if cache.needsUpdate(pods, node) {
+			t.Error("Expected cache to not need update when pods haven't changed")
+		}
+	})
+
+	t.Run("cache needs update when pod is added", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		podsWithNew := []*v1.Pod{pod1, pod2}
+		if !cache.needsUpdate(podsWithNew, node) {
+			t.Error("Expected cache to need update when pod is added")
+		}
+	})
+
+	t.Run("cache needs update when pod is removed", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		podsAfterRemoval := []*v1.Pod{pod1}
+		if !cache.needsUpdate(podsAfterRemoval, node) {
+			t.Error("Expected cache to need update when pod is removed")
+		}
+	})
+
+	t.Run("cache needs update when pod generation changes", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		// Change pod generation (simulating resize)
+		pod1Updated := pod1.DeepCopy()
+		pod1Updated.Generation = 2
+		podsWithUpdate := []*v1.Pod{pod1Updated, pod2}
+		
+		if !cache.needsUpdate(podsWithUpdate, node) {
+			t.Error("Expected cache to need update when pod generation changes")
+		}
+	})
+
+	t.Run("cache needs update when pod resources change", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		// Change pod resources
+		pod1Updated := pod1.DeepCopy()
+		pod1Updated.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(1000, resource.DecimalSI)
+		podsWithUpdate := []*v1.Pod{pod1Updated, pod2}
+		
+		if !cache.needsUpdate(podsWithUpdate, node) {
+			t.Error("Expected cache to need update when pod resources change")
+		}
+	})
+
+	t.Run("cache needs update when pod resize status changes", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		// Change pod resize status
+		pod1Updated := pod1.DeepCopy()
+		pod1Updated.Status.Resize = v1.PodResizeStatusInProgress
+		podsWithUpdate := []*v1.Pod{pod1Updated, pod2}
+		
+		if !cache.needsUpdate(podsWithUpdate, node) {
+			t.Error("Expected cache to need update when pod resize status changes")
+		}
+	})
+
+	t.Run("cache needs update when node resource version changes", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		// Change node resource version
+		nodeUpdated := node.DeepCopy()
+		nodeUpdated.ResourceVersion = "2000"
+		
+		if !cache.needsUpdate(pods, nodeUpdated) {
+			t.Error("Expected cache to need update when node resource version changes")
+		}
+	})
+
+	t.Run("invalidate clears the cache", func(t *testing.T) {
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{pod1, pod2}
+		
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+		
+		cache.invalidate()
+		
+		if cache.get() != nil {
+			t.Error("Expected cache to be nil after invalidation")
+		}
+		if !cache.needsUpdate(pods, node) {
+			t.Error("Expected cache to need update after invalidation")
+		}
+	})
+
+	t.Run("cache needs update when extended resources change", func(t *testing.T) {
+		// Create a pod with extended resources (e.g., GPU)
+		podWithGPU := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:             "pod-gpu",
+				Name:            "pod-gpu",
+				Namespace:       "default",
+				ResourceVersion: "200",
+				Generation:      1,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "gpu-container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(512*1024*1024, resource.BinarySI),
+								extendedResourceA: *resource.NewQuantity(2, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+		}
+
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{podWithGPU}
+
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+
+		// Change extended resource quantity
+		podWithGPUUpdated := podWithGPU.DeepCopy()
+		podWithGPUUpdated.Spec.Containers[0].Resources.Requests[extendedResourceA] = *resource.NewQuantity(4, resource.DecimalSI)
+		podsWithUpdate := []*v1.Pod{podWithGPUUpdated}
+
+		if !cache.needsUpdate(podsWithUpdate, node) {
+			t.Error("Expected cache to need update when extended resources change")
+		}
+	})
+}

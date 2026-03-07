@@ -161,6 +161,10 @@ const (
 	// Metrics to track kubelet admission rejections.
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
 
+	// Metrics to track kubelet admission NodeInfo cache performance.
+	AdmissionNodeInfoCacheHitsTotalKey   = "admission_nodeinfo_cache_hits_total"
+	AdmissionNodeInfoCacheMissesTotalKey = "admission_nodeinfo_cache_misses_total"
+
 	// Image Volume metrics
 	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
 	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
@@ -1098,6 +1102,26 @@ var (
 		[]string{"reason"},
 	)
 
+	// AdmissionNodeInfoCacheHitsTotal tracks the number of times NodeInfo was retrieved from cache during admission.
+	AdmissionNodeInfoCacheHitsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           AdmissionNodeInfoCacheHitsTotalKey,
+			Help:           "Number of cache hits for NodeInfo during pod admission.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// AdmissionNodeInfoCacheMissesTotal tracks the number of times NodeInfo had to be reconstructed during admission.
+	AdmissionNodeInfoCacheMissesTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           AdmissionNodeInfoCacheMissesTotalKey,
+			Help:           "Number of cache misses for NodeInfo during pod admission (requiring reconstruction).",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// ImageVolumeRequestedTotal tracks the number of requested image volumes.
 	ImageVolumeRequestedTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -1296,6 +1320,8 @@ func Register() {
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
+		legacyregistry.MustRegister(AdmissionNodeInfoCacheHitsTotal)
+		legacyregistry.MustRegister(AdmissionNodeInfoCacheMissesTotal)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
