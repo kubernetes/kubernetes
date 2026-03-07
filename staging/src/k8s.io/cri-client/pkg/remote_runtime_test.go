@@ -33,7 +33,6 @@ import (
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/cri-client/pkg/util"
-	"k8s.io/klog/v2"
 )
 
 const defaultConnectionTimeout = 15 * time.Second
@@ -51,18 +50,16 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 	return fakeRuntime, endpoint
 }
 
-func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
+func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing.T) internalapi.RuntimeService {
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider())
 
 	require.NoError(t, err)
 
 	return runtimeService
 }
 
-func createRemoteRuntimeServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, tp, &logger)
+func createRemoteRuntimeServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, tp)
 	require.NoError(t, err)
 
 	return runtimeService
@@ -84,7 +81,7 @@ func TestGetSpans(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	rtSvc := createRemoteRuntimeServiceWithTracerProvider(endpoint, tp, t)
+	rtSvc := createRemoteRuntimeServiceWithTracerProvider(ctx, endpoint, tp, t)
 	_, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
 	err = tp.ForceFlush(ctx)
@@ -105,7 +102,7 @@ func TestVersion(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	rtSvc := createRemoteRuntimeService(endpoint, t)
+	rtSvc := createRemoteRuntimeService(ctx, endpoint, t)
 	version, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
 	assert.Equal(t, apitest.FakeVersion, version.Version)

@@ -44,9 +44,9 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 	f := framework.NewDefaultFramework("image-garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var is internalapi.ImageManagerService
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
-		_, is, err = getCRIClient()
+		_, is, err = getCRIClient(ctx)
 		framework.ExpectNoError(err)
 	})
 	ginkgo.AfterEach(func(ctx context.Context) {

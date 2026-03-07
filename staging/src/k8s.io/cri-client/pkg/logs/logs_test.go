@@ -197,7 +197,7 @@ func TestReadLogs(t *testing.T) {
 			opts := NewLogOptions(&tc.podLogOptions, time.Now())
 			stdoutBuf := bytes.NewBuffer(nil)
 			stderrBuf := bytes.NewBuffer(nil)
-			err = ReadLogs(context.TODO(), nil, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+			err = ReadLogs(context.TODO(), file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 
 			if err != nil {
 				t.Fatal(err.Error())
@@ -239,7 +239,7 @@ func TestReadRotatedLog(t *testing.T) {
 			Follow: true,
 		}
 		opts := NewLogOptions(&podLogOptions, time.Now())
-		_ = ReadLogs(ctx, nil, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		_ = ReadLogs(ctx, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
@@ -521,7 +521,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	var buf bytes.Buffer
 	w := io.MultiWriter(&buf)
 
-	err = ReadLogs(context.Background(), nil, tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
+	err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
 	assert.NoError(t, err)
 
 	lineCount := 0

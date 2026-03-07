@@ -280,12 +280,11 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 }
 
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
-func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
-	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -295,7 +294,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -489,7 +488,7 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 // a pristine environment. The only way known so far to do that is to introduce this wait.
 // Worth noting, however, that this makes the test runtime much bigger.
 func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
-	rs, _, err := getCRIClient()
+	rs, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
@@ -612,7 +611,7 @@ func deletePods(ctx context.Context, f *framework.Framework, podNames []string) 
 }
 
 func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
-	rs, _, err := getCRIClient()
+	rs, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{

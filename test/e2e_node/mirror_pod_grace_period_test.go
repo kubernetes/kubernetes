@@ -209,7 +209,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 				ginkgo.By("waiting for the container runtime to be stopped")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					_, _, err := getCRIClient()
+					_, _, err := getCRIClient(ctx)
 					return err
 				}, 2*time.Minute, time.Second*5).ShouldNot(gomega.Succeed())
 
@@ -256,7 +256,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				framework.ExpectNoError(err, "expected no error starting the container runtime")
 				ginkgo.By("waiting for the container runtime to start")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					r, _, err := getCRIClient()
+					r, _, err := getCRIClient(ctx)
 					if err != nil {
 						return fmt.Errorf("error getting CRI client: %w", err)
 					}
@@ -318,7 +318,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				framework.ExpectNoError(err, "expected no error starting the container runtime")
 				ginkgo.By("waiting for the container runtime to start")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					_, _, err := getCRIClient()
+					_, _, err := getCRIClient(ctx)
 					if err != nil {
 						return fmt.Errorf("error getting cri client: %v", err)
 					}

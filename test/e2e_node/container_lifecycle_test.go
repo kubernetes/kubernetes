@@ -1723,7 +1723,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Getting the current pod sandbox ID")
-			rs, _, err := getCRIClient()
+			rs, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
@@ -1905,7 +1905,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
-				rs, _, err := getCRIClient()
+				rs, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err)
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -2072,7 +2072,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
-				rs, _, err := getCRIClient()
+				rs, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err)
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -6087,7 +6087,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Getting the current pod sandbox ID")
-			rs, _, err := getCRIClient()
+			rs, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
@@ -6233,7 +6233,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Getting the current pod sandbox ID")
-				rs, _, err := getCRIClient()
+				rs, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err)
 
 				sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{

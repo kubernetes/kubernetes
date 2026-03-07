@@ -29,8 +29,8 @@ type defaultImpl struct{}
 
 // Impl is an interface for the container runtime implementation.
 type Impl interface {
-	NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (criapi.RuntimeService, error)
-	NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error)
+	NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTimeout time.Duration) (criapi.RuntimeService, error)
+	NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error)
 	RuntimeConfig(ctx context.Context, runtimeService criapi.RuntimeService) (*runtimeapi.RuntimeConfigResponse, error)
 	Status(ctx context.Context, runtimeService criapi.RuntimeService, verbose bool) (*runtimeapi.StatusResponse, error)
 	ListPodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
@@ -40,12 +40,12 @@ type Impl interface {
 	ImageStatus(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error)
 }
 
-func (*defaultImpl) NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (criapi.RuntimeService, error) {
-	return criclient.NewRemoteRuntimeService(endpoint, defaultTimeout, nil, nil)
+func (*defaultImpl) NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTimeout time.Duration) (criapi.RuntimeService, error) {
+	return criclient.NewRemoteRuntimeService(ctx, endpoint, defaultTimeout, nil)
 }
 
-func (*defaultImpl) NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error) {
-	return criclient.NewRemoteImageService(endpoint, connectionTimeout, nil, nil)
+func (*defaultImpl) NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error) {
+	return criclient.NewRemoteImageService(ctx, endpoint, connectionTimeout, nil)
 }
 
 func (*defaultImpl) RuntimeConfig(ctx context.Context, runtimeService criapi.RuntimeService) (*runtimeapi.RuntimeConfigResponse, error) {

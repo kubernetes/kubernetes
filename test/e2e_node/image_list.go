@@ -131,8 +131,8 @@ func (rp *remotePuller) Remove(ctx context.Context, image string) error {
 	return rp.imageService.RemoveImage(ctx, &runtimeapi.ImageSpec{Image: image})
 }
 
-func getPuller() (puller, error) {
-	_, is, err := getCRIClient()
+func getPuller(ctx context.Context) (puller, error) {
+	_, is, err := getCRIClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func getPuller() (puller, error) {
 
 // PrePullAllImages pre-fetches all images tests depend on so that we don't fail in an actual test.
 func PrePullAllImages(ctx context.Context) error {
-	puller, err := getPuller()
+	puller, err := getPuller(ctx)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func PrePullAllImages(ctx context.Context) error {
 }
 
 func RemoveImage(ctx context.Context, image string) error {
-	puller, err := getPuller()
+	puller, err := getPuller(ctx)
 	if err != nil {
 		return err
 	}

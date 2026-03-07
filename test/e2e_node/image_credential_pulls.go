@@ -52,7 +52,7 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
-			_, is, err = getCRIClient()
+			_, is, err = getCRIClient(ctx)
 			framework.ExpectNoError(err)
 
 			registryAddress, registryNodeNames, err := e2eregistry.SetupRegistry(ctx, f, true)

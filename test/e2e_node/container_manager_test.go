@@ -78,7 +78,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 }
 
 func dumpRunningContainer(ctx context.Context) error {
-	runtime, _, err := getCRIClient()
+	runtime, _, err := getCRIClient(ctx)
 	if err != nil {
 		return err
 	}

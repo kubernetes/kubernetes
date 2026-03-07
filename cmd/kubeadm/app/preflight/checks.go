@@ -19,6 +19,7 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -94,7 +95,7 @@ func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close()
+	defer containerRuntime.Close(context.Background())
 
 	if err := containerRuntime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
@@ -125,7 +126,7 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close()
+	defer containerRuntime.Close(context.Background())
 
 	ok, err := containerRuntime.IsRuntimeConfigImplemented()
 	if err != nil {
@@ -883,7 +884,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close()
+	defer containerRuntime.Close(context.Background())
 
 	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy

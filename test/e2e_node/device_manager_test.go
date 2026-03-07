@@ -197,7 +197,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("stopping all the local containers - using CRI")
-			rs, _, err := getCRIClient()
+			rs, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
 			framework.ExpectNoError(err)
