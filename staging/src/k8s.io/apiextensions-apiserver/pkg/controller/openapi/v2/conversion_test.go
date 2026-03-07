@@ -632,7 +632,6 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				WithExternalDocs(testStr, testStr2),
-			expectDiff: true,
 		},
 		{
 			name: "example",
