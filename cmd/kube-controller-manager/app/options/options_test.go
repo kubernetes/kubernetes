@@ -270,6 +270,7 @@ func TestAddFlags(t *testing.T) {
 		DaemonSetController: &DaemonSetControllerOptions{
 			&daemonconfig.DaemonSetControllerConfiguration{
 				ConcurrentDaemonSetSyncs: 10,
+				BurstReplicas:            250,
 			},
 		},
 		DeploymentController: &DeploymentControllerOptions{
