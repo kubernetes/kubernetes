@@ -5132,6 +5132,8 @@ type ServiceSpec struct {
 
 	// ExternalIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
+	//
+	// Deprecated: ExternalIPs is deprecated and may be removed in a future version.
 	// +optional
 	ExternalIPs []string
 
