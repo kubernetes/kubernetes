@@ -100,6 +100,7 @@ const (
 	StartedPodsTotalKey             = "started_pods_total"
 	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
 	StartedContainersTotalKey       = "started_containers_total"
+	TerminatedContainersTotalKey    = "terminated_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
 
 	// Metrics to track HostProcess container usage by this kubelet
@@ -729,6 +730,16 @@ var (
 		},
 		[]string{"container_type"},
 	)
+	// TerminatedContainersTotal is a counter that tracks the number of container terminations
+	TerminatedContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TerminatedContainersTotalKey,
+			Help:           "Cumulative number of container terminations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "exit_code", "reason"},
+	)
 	// StartedContainersTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1258,6 +1269,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)

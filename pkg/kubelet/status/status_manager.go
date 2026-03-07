@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -878,6 +879,33 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		sort.Strings(containers)
 		loggerV.Info("updateStatusInternal", "version", cachedStatus.version+1, "podIsFinished", podIsFinished, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
 	}
+
+	// Increment container termination metric for newly terminated containers.
+	// We only want to count terminations once per container per pod.
+	// By comparing the new status to the old status before we apply it to the cache,
+	// we can detect exactly when a container in this pod transitions to the
+	// Terminated state and record the metric.
+	checkAndRecordTerminations := func(oldStatuses, newStatuses []v1.ContainerStatus, containerType string) {
+		for _, newCStat := range newStatuses {
+			if newCStat.State.Terminated != nil {
+				// Find the old status for this container.
+				var oldCStat *v1.ContainerStatus
+				for i := range oldStatuses {
+					if oldStatuses[i].Name == newCStat.Name {
+						oldCStat = &oldStatuses[i]
+						break
+					}
+				}
+				// If it wasn't terminated before (or is brand new and already terminated), record it.
+				if oldCStat == nil || oldCStat.State.Terminated == nil {
+					metrics.TerminatedContainersTotal.WithLabelValues(containerType, strconv.Itoa(int(newCStat.State.Terminated.ExitCode)), newCStat.State.Terminated.Reason).Inc()
+				}
+			}
+		}
+	}
+	checkAndRecordTerminations(oldStatus.InitContainerStatuses, status.InitContainerStatuses, metrics.InitContainer)
+	checkAndRecordTerminations(oldStatus.ContainerStatuses, status.ContainerStatuses, metrics.Container)
+	checkAndRecordTerminations(oldStatus.EphemeralContainerStatuses, status.EphemeralContainerStatuses, metrics.EphemeralContainer)
 
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
