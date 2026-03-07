@@ -23,8 +23,6 @@ import v1 "k8s.io/api/core/v1"
 type PodAdmitAttributes struct {
 	// the pod to evaluate for admission
 	Pod *v1.Pod
-	// all pods bound to the kubelet excluding the pod being evaluated
-	OtherPods []*v1.Pod
 	// the operation being performed; either "add" or "resize"
 	Operation Operation
 }
