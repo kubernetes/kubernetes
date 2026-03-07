@@ -19,7 +19,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -28,7 +28,7 @@
               }
             ],
             "default": {},
-            "description": "Specification of the migration."
+            "description": "spec is the specification of the migration."
           },
           "status": {
             "allOf": [
@@ -37,7 +37,7 @@
               }
             ],
             "default": {},
-            "description": "Status of the migration."
+            "description": "status is the status of the migration."
           }
         },
         "type": "object",
@@ -57,7 +57,7 @@
             "type": "string"
           },
           "items": {
-            "description": "Items is the list of StorageVersionMigration",
+            "description": "items is the list of StorageVersionMigration.",
             "items": {
               "allOf": [
                 {
@@ -79,7 +79,7 @@
               }
             ],
             "default": {},
-            "description": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           }
         },
         "required": [
@@ -104,7 +104,7 @@
               }
             ],
             "default": {},
-            "description": "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable."
+            "description": "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable."
           }
         },
         "required": [
@@ -116,7 +116,7 @@
         "description": "Status of the storage version migration.",
         "properties": {
           "conditions": {
-            "description": "The latest available observations of the migration's current state.",
+            "description": "conditions is the latest available observations of the migration's current state.",
             "items": {
               "allOf": [
                 {
@@ -134,7 +134,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "resourceVersion": {
-            "description": "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+            "description": "resourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
             "type": "string"
           }
         },

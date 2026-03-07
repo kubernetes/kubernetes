@@ -34,12 +34,12 @@ import (
 // storage version.
 type StorageVersionMigrationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata.
+	// metadata is standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the migration.
+	// spec is the specification of the migration.
 	Spec *StorageVersionMigrationSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status of the migration.
+	// status is the status of the migration.
 	Status *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
