@@ -23,6 +23,12 @@ clean:
 test:
 	./hack/test.sh
 
+test-integration:
+	./hack/test-integration.sh
+
+benchmark:
+	./hack/benchmark.sh
+
 update:
 	./hack/update.sh
 
