@@ -323,7 +323,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	processor.listenersRCond = sync.NewCond(processor.listenersLock.RLocker())
 
 	return &sharedIndexInformer{
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
+		indexer:                         NewIndexerWithMetric(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, options.Identifier, options.FIFOMetricsProvider),
 		processor:                       processor,
 		synced:                          make(chan struct{}),
 		listerWatcher:                   lw,
@@ -358,7 +358,7 @@ type SharedIndexInformerOptions struct {
 
 	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
-	FIFOMetricsProvider FIFOMetricsProvider
+	FIFOMetricsProvider InformerMetricsProvider
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -631,7 +631,7 @@ type sharedIndexInformer struct {
 	identifier InformerNameAndResource
 
 	// fifoMetricsProvider is the metrics provider for the FIFO queue.
-	fifoMetricsProvider FIFOMetricsProvider
+	fifoMetricsProvider InformerMetricsProvider
 
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
