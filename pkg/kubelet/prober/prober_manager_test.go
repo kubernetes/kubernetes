@@ -555,6 +555,123 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 	}
 }
 
+// TestUpdatePodStatusContainerRestartResetsReady verifies that when a container
+// restarts and startup probe hasn't succeeded yet (started=false), the ready
+// field is correctly set to false. This tests the fix for issue #136047.
+func TestUpdatePodStatusContainerRestartResetsReady(t *testing.T) {
+	ctx := ktesting.Init(t)
+
+	// Container that was previously ready but has now restarted
+	// and startup probe hasn't run yet
+	restartedContainer := v1.ContainerStatus{
+		Name:        "restarted_container",
+		ContainerID: "test://restarted_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+		// Simulating that this container was previously ready before restart
+		Ready: true,
+	}
+
+	podStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			restartedContainer,
+		},
+	}
+
+	m := newTestManager()
+	// no cleanup: using fake workers.
+
+	// Setup a startup probe worker for this container (simulating container restart)
+	// The startup probe hasn't succeeded yet, so started should be false
+	m.workers = map[probeKey]*worker{
+		{testPodUID, restartedContainer.Name, startup}: {},
+	}
+	// NOTE: We do NOT set startupManager result for this container,
+	// which simulates that startup probe hasn't run/succeeded after restart
+
+	m.UpdatePodStatus(ctx, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: testPodUID,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: restartedContainer.Name},
+			},
+		},
+	}, &podStatus)
+
+	// Verify that started is false (startup probe hasn't succeeded)
+	if podStatus.ContainerStatuses[0].Started == nil || *podStatus.ContainerStatuses[0].Started {
+		t.Errorf("Expected started=false for container with pending startup probe, got %v",
+			podStatus.ContainerStatuses[0].Started)
+	}
+
+	// Verify that ready is also false (the fix for issue #136047)
+	if podStatus.ContainerStatuses[0].Ready {
+		t.Errorf("Expected ready=false when started=false, but got ready=true. " +
+			"This is the bug that issue #136047 describes.")
+	}
+}
+
+// TestUpdatePodStatusInitContainerRestartResetsReady verifies the same behavior
+// for restartable init containers - ready should be false when started is false.
+func TestUpdatePodStatusInitContainerRestartResetsReady(t *testing.T) {
+	ctx := ktesting.Init(t)
+
+	restartedInitContainer := v1.ContainerStatus{
+		Name:        "restarted_init_container",
+		ContainerID: "test://restarted_init_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+		Ready: true, // Was previously ready before restart
+	}
+
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+
+	podStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		InitContainerStatuses: []v1.ContainerStatus{
+			restartedInitContainer,
+		},
+	}
+
+	m := newTestManager()
+	// no cleanup: using fake workers.
+
+	// Setup startup probe worker (simulating that startup probe needs to run again)
+	m.workers = map[probeKey]*worker{
+		{testPodUID, restartedInitContainer.Name, startup}: {},
+	}
+
+	m.UpdatePodStatus(ctx, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: testPodUID,
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:          restartedInitContainer.Name,
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+		},
+	}, &podStatus)
+
+	// Verify started is false
+	if podStatus.InitContainerStatuses[0].Started == nil || *podStatus.InitContainerStatuses[0].Started {
+		t.Errorf("Expected started=false for init container with pending startup probe, got %v",
+			podStatus.InitContainerStatuses[0].Started)
+	}
+
+	// Verify ready is also false (the fix for issue #136047)
+	if podStatus.InitContainerStatuses[0].Ready {
+		t.Errorf("Expected ready=false when started=false for init container, but got ready=true")
+	}
+}
+
 func (m *manager) extractedReadinessHandling(logger klog.Logger) {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
