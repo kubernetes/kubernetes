@@ -1114,6 +1114,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
 	resourceName3 := "domain2.com/resource3"
+	resourceName4 := "domain2.com/resource4"
 	as := require.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
@@ -1157,6 +1158,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	// hasn't been registered.
 	testManager.healthyDevices[resourceName1] = sets.New[string]()
 	testManager.healthyDevices[resourceName3] = sets.New[string]()
+	testManager.healthyDevices[resourceName4] = sets.New[string]()
 	// dev5 is no longer in the list of healthy devices
 	testManager.healthyDevices[resourceName3].Insert("dev7")
 	testManager.healthyDevices[resourceName3].Insert("dev8")
@@ -1200,6 +1202,16 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 			reusableDevices:          sets.New[string](),
 			expectedAllocatedDevices: nil,
 			expErr:                   fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resourceName3),
+		},
+		{
+			description:              "Admission in case resource request is zero",
+			podUID:                   "pod4",
+			contName:                 "con4",
+			resource:                 resourceName4,
+			required:                 0,
+			reusableDevices:          sets.New[string](),
+			expectedAllocatedDevices: nil,
+			expErr:                   nil,
 		},
 	}
 
