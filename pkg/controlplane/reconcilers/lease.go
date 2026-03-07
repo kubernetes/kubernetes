@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -81,9 +82,32 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 	}
 
 	ipList := make([]string, 0, len(ipInfoList.Items))
-	for _, ip := range ipInfoList.Items {
-		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
-			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+	for _, ipInfo := range ipInfoList.Items {
+		if len(ipInfo.Subsets) > 0 && len(ipInfo.Subsets[0].Addresses) > 0 && len(ipInfo.Subsets[0].Addresses[0].IP) > 0 {
+			ip := ipInfo.Subsets[0].Addresses[0].IP
+			if isValidEndpointIP(ip) {
+				ipList = append(ipList, ip)
+			} else {
+				klog.Warningf("Discarding invalid master IP %q from storage", ip)
+			}
+		}
+	}
+
+	if len(ipList) > 0 {
+		loopbacks := make([]string, 0)
+		globals := make([]string, 0)
+		for _, ipStr := range ipList {
+			ip := netutils.ParseIPSloppy(ipStr)
+			if ip != nil && ip.IsLoopback() {
+				loopbacks = append(loopbacks, ipStr)
+			} else {
+				globals = append(globals, ipStr)
+			}
+		}
+		if len(globals) > 0 {
+			ipList = globals
+		} else {
+			ipList = loopbacks
 		}
 	}
 
@@ -95,6 +119,9 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 // UpdateLease resets the TTL on a master IP in storage
 // UpdateLease will create a new key if it doesn't exist.
 func (s *storageLeases) UpdateLease(ip string) error {
+	if !isValidEndpointIP(ip) {
+		return fmt.Errorf("cannot update lease for invalid master IP %q", ip)
+	}
 	key := path.Join(s.baseKey, ip)
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
@@ -136,7 +163,7 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 	// can be left blank unless the storage.Watch method is used
 	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, baseKey)
 	if err != nil {
-		return nil, fmt.Errorf("error creating storage factory: %v", err)
+		return nil, fmt.Errorf("error creating storage factory: %w", err)
 	}
 	var once sync.Once
 	return &storageLeases{
@@ -344,4 +371,15 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 
 func (r *leaseEndpointReconciler) Destroy() {
 	r.masterLeases.Destroy()
+}
+
+func isValidEndpointIP(ipAddress string) bool {
+	ip := netutils.ParseIPSloppy(ipAddress)
+	if ip == nil {
+		return false
+	}
+	if ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return false
+	}
+	return true
 }
