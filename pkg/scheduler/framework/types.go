@@ -40,7 +40,7 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var generation int64
+var generation atomic.Int64
 
 var (
 	// basicActionTypes is a list of basic ActionTypes.
@@ -494,7 +494,7 @@ func (n *NodeInfo) RemoveNode() {
 // Collision of the generation numbers would be particularly problematic if a node was deleted and
 // added back with the same name. See issue#63262.
 func nextGeneration() int64 {
-	return atomic.AddInt64(&generation, 1)
+	return generation.Add(1)
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to

@@ -1190,25 +1190,25 @@ func delayTerminalCondition() bool {
 // Returns number of successfully deleted ready pods and total number of successfully deleted pods.
 func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods []*v1.Pod) (int32, int32, error) {
 	errCh := make(chan error, len(pods))
-	successfulDeletes := int32(len(pods))
-	var deletedReady int32 = 0
-	wg := sync.WaitGroup{}
+	var successfulDeletes, deletedReady atomic.Int32
+	successfulDeletes.Store(int32(len(pods)))
+	var wg sync.WaitGroup
 	wg.Add(len(pods))
 	for i := range pods {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
-				atomic.AddInt32(&successfulDeletes, -1)
+				successfulDeletes.Add(-1)
 				errCh <- err
 				utilruntime.HandleError(err)
 			}
 			if podutil.IsPodReady(pod) {
-				atomic.AddInt32(&deletedReady, 1)
+				deletedReady.Add(1)
 			}
 		}(pods[i])
 	}
 	wg.Wait()
-	return deletedReady, successfulDeletes, errorFromChannel(errCh)
+	return deletedReady.Load(), successfulDeletes.Load(), errorFromChannel(errCh)
 }
 
 func nonIgnoredFailedPodsCount(jobCtx *syncJobCtx, failedPods []*v1.Pod) int {
@@ -1228,8 +1228,9 @@ func nonIgnoredFailedPodsCount(jobCtx *syncJobCtx, failedPods []*v1.Pod) int {
 // and any error.
 func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey string, pods []*v1.Pod) (int32, int32, error) {
 	errCh := make(chan error, len(pods))
-	successfulDeletes := int32(len(pods))
-	var deletedReady int32 = 0
+	var successfulDeletes, deletedReady atomic.Int32
+	successfulDeletes.Store(int32(len(pods)))
+
 	logger := klog.FromContext(ctx)
 
 	failDelete := func(pod *v1.Pod, err error) {
@@ -1237,7 +1238,7 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 		jm.expectations.DeletionObserved(logger, jobKey)
 		if !apierrors.IsNotFound(err) {
 			logger.V(2).Info("Failed to delete Pod", "job", klog.KObj(job), "pod", klog.KObj(pod), "err", err)
-			atomic.AddInt32(&successfulDeletes, -1)
+			successfulDeletes.Add(-1)
 			errCh <- err
 			utilruntime.HandleError(err)
 		}
@@ -1258,12 +1259,12 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 				failDelete(pod, err)
 			}
 			if podutil.IsPodReady(pod) {
-				atomic.AddInt32(&deletedReady, 1)
+				deletedReady.Add(1)
 			}
 		}(pods[i])
 	}
 	wg.Wait()
-	return deletedReady, successfulDeletes, errorFromChannel(errCh)
+	return deletedReady.Load(), successfulDeletes.Load(), errorFromChannel(errCh)
 }
 
 // trackJobStatusAndRemoveFinalizers does:
@@ -1721,7 +1722,8 @@ func jobSuspended(job *batch.Job) bool {
 // Does NOT modify <activePods>.
 func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syncJobCtx) (int32, string, error) {
 	logger := klog.FromContext(ctx)
-	active := int32(len(jobCtx.activePods))
+	var active atomic.Int32
+	active.Store(int32(len(jobCtx.activePods)))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
@@ -1731,15 +1733,15 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 	if jobSuspended(job) {
 		logger.V(4).Info("Deleting all active pods in suspended job", "job", klog.KObj(job), "active", active)
-		podsToDelete := activePodsForRemoval(job, jobCtx.activePods, int(active))
+		podsToDelete := activePodsForRemoval(job, jobCtx.activePods, int(active.Load()))
 		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		removedReady, removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
-		active -= removed
+		active.Add(-removed)
 		if trackTerminatingPods(job) {
 			*jobCtx.terminating += removed
 		}
 		jobCtx.ready -= removedReady
-		return active, metrics.JobSyncActionPodsDeleted, err
+		return active.Load(), metrics.JobSyncActionPodsDeleted, err
 	}
 
 	wantActive := int32(0)
@@ -1748,7 +1750,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		// should be equal to parallelism, unless the job has seen at least
 		// once success, in which leave whatever is running, running.
 		if jobCtx.succeeded > 0 {
-			wantActive = active
+			wantActive = active.Load()
 		} else {
 			wantActive = parallelism
 		}
@@ -1764,10 +1766,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 	}
 
-	rmAtLeast := active - wantActive
-	if rmAtLeast < 0 {
-		rmAtLeast = 0
-	}
+	rmAtLeast := max(active.Load() - wantActive, 0)
 	podsToDelete := activePodsForRemoval(job, jobCtx.activePods, int(rmAtLeast))
 	if len(podsToDelete) > MaxPodCreateDeletePerSync {
 		podsToDelete = podsToDelete[:MaxPodCreateDeletePerSync]
@@ -1776,7 +1775,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		logger.V(4).Info("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", wantActive)
 		removedReady, removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
-		active -= removed
+		active.Add(-removed)
 		if trackTerminatingPods(job) {
 			*jobCtx.terminating += removed
 		}
@@ -1785,7 +1784,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		// deletions at the same time (e.g. indexed Jobs with repeated indexes), we
 		// restrict ourselves to either just pod deletion or pod creation in any
 		// given sync cycle. Of these two, pod deletion takes precedence.
-		return active, metrics.JobSyncActionPodsDeleted, err
+		return active.Load(), metrics.JobSyncActionPodsDeleted, err
 	}
 
 	var terminating int32 = 0
@@ -1794,7 +1793,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		// and so we can use the value.
 		terminating = *jobCtx.terminating
 	}
-	if diff := wantActive - terminating - active; diff > 0 {
+	if diff := wantActive - terminating - active.Load(); diff > 0 {
 		var remainingTime time.Duration
 		if !hasBackoffLimitPerIndex(job) {
 			// we compute the global remaining time for pod creation when backoffLimitPerIndex is not used
@@ -1827,7 +1826,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 		wait := sync.WaitGroup{}
 
-		active += diff
+		active.Add(diff)
 
 		podTemplate := job.Spec.Template.DeepCopy()
 		if isIndexedJob(job) {
@@ -1836,7 +1835,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
-		var creationsSucceeded, creationsFailed int32 = 0, 0
+		var creationsSucceeded, creationsFailed atomic.Int32
 
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
@@ -1882,11 +1881,11 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						// Decrement the expected number of creates because the informer won't observe this pod
 						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
 						jm.expectations.CreationObserved(logger, jobKey)
-						atomic.AddInt32(&active, -1)
+						active.Add(-1)
 						errCh <- err
-						atomic.AddInt32(&creationsFailed, 1)
+						creationsFailed.Add(1)
 					}
-					atomic.AddInt32(&creationsSucceeded, 1)
+					creationsSucceeded.Add(1)
 				}()
 			}
 			wait.Wait()
@@ -1894,7 +1893,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			skippedPods := diff - batchSize
 			if errorCount < len(errCh) && skippedPods > 0 {
 				logger.V(2).Info("Slow-start failure. Skipping creating pods, decrementing expectations", "skippedCount", skippedPods, "job", klog.KObj(job))
-				active -= skippedPods
+				active.Add(-skippedPods)
 				for i := int32(0); i < skippedPods; i++ {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					jm.expectations.CreationObserved(logger, jobKey)
@@ -1905,11 +1904,11 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			}
 			diff -= batchSize
 		}
-		recordJobPodsCreationTotal(job, jobCtx, creationsSucceeded, creationsFailed)
-		return active, metrics.JobSyncActionPodsCreated, errorFromChannel(errCh)
+		recordJobPodsCreationTotal(job, jobCtx, creationsSucceeded.Load(), creationsFailed.Load())
+		return active.Load(), metrics.JobSyncActionPodsCreated, errorFromChannel(errCh)
 	}
 
-	return active, metrics.JobSyncActionTracking, nil
+	return active.Load(), metrics.JobSyncActionTracking, nil
 }
 
 // getPodCreationInfoForIndependentIndexes returns a sub-list of all indexes
