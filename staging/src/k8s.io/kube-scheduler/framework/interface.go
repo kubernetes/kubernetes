@@ -801,8 +801,8 @@ type Handle interface {
 	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
 
-	// WorkloadManager can be used to provide workload-aware scheduling.
-	WorkloadManager() WorkloadManager
+	// PodGroupManager can be used to provide workload-aware scheduling.
+	PodGroupManager() PodGroupManager
 
 	// Sign a pod.
 	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) PodSignature

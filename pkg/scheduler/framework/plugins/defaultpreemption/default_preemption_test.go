@@ -1923,13 +1923,13 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		},
 		{
 			name:     "Pod with WorkloadRef with TAS disabled",
-			pod:      st.MakePod().Name("p_with_podgroup").WorkloadRef(&v1.WorkloadReference{Name: "foo"}).Obj(),
+			pod:      st.MakePod().Name("p_with_podgroup").PodGroupName("foo").Obj(),
 			features: feature.Features{EnableTopologyAwareWorkloadScheduling: false},
 			expected: true,
 		},
 		{
 			name:     "Pod with WorkloadRef with TAS enabled",
-			pod:      st.MakePod().Name("p_with_podgroup").WorkloadRef(&v1.WorkloadReference{Name: "foo"}).Obj(),
+			pod:      st.MakePod().Name("p_with_podgroup").PodGroupName("foo").Obj(),
 			features: feature.Features{EnableTopologyAwareWorkloadScheduling: true},
 			expected: false,
 		},

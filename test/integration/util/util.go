@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -523,7 +523,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					schedulingapiv1alpha1.SchemeGroupVersion.String(): "true",
+					schedulingapiv1alpha2.SchemeGroupVersion.String(): "true",
 				}
 			}
 		},
