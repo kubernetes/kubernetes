@@ -1421,48 +1421,41 @@ func BenchmarkAuthorization(b *testing.B) {
 	b.ResetTimer()
 	for _, testWriteContention := range []bool{false, true} {
 
-		shouldWrite := int32(1)
-		writes := int64(0)
-		_1ms := int64(0)
-		_10ms := int64(0)
-		_25ms := int64(0)
-		_50ms := int64(0)
-		_100ms := int64(0)
-		_250ms := int64(0)
-		_500ms := int64(0)
-		_1000ms := int64(0)
-		_1s := int64(0)
+		var shouldWrite atomic.Int32
+		shouldWrite.Store(1)
+
+		var writes, _1ms, _10ms, _25ms, _50ms, _100ms, _250ms, _500ms, _1000ms, _1s atomic.Int64
 
 		contentionPrefix := ""
 		if testWriteContention {
 			contentionPrefix = "contentious "
 			// Start a writer pushing graph modifications 100x a second
 			go func() {
-				for shouldWrite == 1 {
+				for shouldWrite.Load() == 1 {
 					go func() {
 						start := time.Now()
 						authz.graph.AddPod(podToAdd)
 						diff := time.Since(start)
-						atomic.AddInt64(&writes, 1)
+						writes.Add(1)
 						switch {
 						case diff < time.Millisecond:
-							atomic.AddInt64(&_1ms, 1)
+							_1ms.Add(1)
 						case diff < 10*time.Millisecond:
-							atomic.AddInt64(&_10ms, 1)
+							_10ms.Add(1)
 						case diff < 25*time.Millisecond:
-							atomic.AddInt64(&_25ms, 1)
+							_25ms.Add(1)
 						case diff < 50*time.Millisecond:
-							atomic.AddInt64(&_50ms, 1)
+							_50ms.Add(1)
 						case diff < 100*time.Millisecond:
-							atomic.AddInt64(&_100ms, 1)
+							_100ms.Add(1)
 						case diff < 250*time.Millisecond:
-							atomic.AddInt64(&_250ms, 1)
+							_250ms.Add(1)
 						case diff < 500*time.Millisecond:
-							atomic.AddInt64(&_500ms, 1)
+							_500ms.Add(1)
 						case diff < 1000*time.Millisecond:
-							atomic.AddInt64(&_1000ms, 1)
+							_1000ms.Add(1)
 						default:
-							atomic.AddInt64(&_1s, 1)
+							_1s.Add(1)
 						}
 					}()
 					time.Sleep(10 * time.Millisecond)
@@ -1490,17 +1483,17 @@ func BenchmarkAuthorization(b *testing.B) {
 			})
 		}
 
-		atomic.StoreInt32(&shouldWrite, 0)
+		shouldWrite.Store(0)
 		if testWriteContention {
-			b.Logf("graph modifications during contention test: %d", writes)
-			b.Logf("<1ms=%d, <10ms=%d, <25ms=%d, <50ms=%d, <100ms=%d, <250ms=%d, <500ms=%d, <1000ms=%d, >1000ms=%d", _1ms, _10ms, _25ms, _50ms, _100ms, _250ms, _500ms, _1000ms, _1s)
+			b.Logf("graph modifications during contention test: %d", writes.Load())
+			b.Logf("<1ms=%d, <10ms=%d, <25ms=%d, <50ms=%d, <100ms=%d, <250ms=%d, <500ms=%d, <1000ms=%d, >1000ms=%d", _1ms.Load(), _10ms.Load(), _25ms.Load(), _50ms.Load(), _100ms.Load(), _250ms.Load(), _500ms.Load(), _1000ms.Load(), _1s.Load())
 		} else {
-			b.Logf("graph modifications during non-contention test: %d", writes)
+			b.Logf("graph modifications during non-contention test: %d", writes.Load())
 		}
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest) {
+func populate(graph *Graph, _ []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
