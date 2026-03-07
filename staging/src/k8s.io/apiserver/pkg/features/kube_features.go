@@ -218,6 +218,14 @@ const (
 	// This prevents watch cache from being starved by other watches.
 	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
 
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/5866
+	//
+	// Enables the shard selector parameter on List/Watch requests,
+	// allowing clients to receive a filtered subset of objects based
+	// on hash ranges of metadata fields (e.g. UID).
+	ShardedListandWatch featuregate.Feature = "ShardedListandWatch"
+
 	// owner: @serathius
 	//
 	// Enables APF to use size of objects for estimating request cost.
@@ -449,6 +457,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.36"), Default: false, LockToDefault: true, PreRelease: featuregate.Deprecated},
+	},
+
+	ShardedListandWatch: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SizeBasedListCostEstimate: {

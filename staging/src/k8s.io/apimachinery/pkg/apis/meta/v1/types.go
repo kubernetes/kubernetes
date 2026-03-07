@@ -92,6 +92,22 @@ type ListMeta struct {
 	// should not rely on the remainingItemCount to be set or to be exact.
 	// +optional
 	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
+
+	// shardInfo is set when the list is a filtered subset of the full collection,
+	// as selected by a shard selector on the request. It echoes back the selector
+	// so clients can verify which shard they received and merge sharded responses.
+	// Clients should not cache sharded list responses as a full representation
+	// of the collection.
+	// +optional
+	ShardInfo *ShardInfo `json:"shardInfo,omitempty" protobuf:"bytes,5,opt,name=shardInfo"`
+}
+
+// ShardInfo describes the shard selector that was applied to produce a list response.
+// Its presence on a list response indicates the list is a filtered subset.
+type ShardInfo struct {
+	// selector is the shard selector string from the request, echoed back so clients
+	// can verify which shard they received and merge responses from multiple shards.
+	Selector string `json:"selector" protobuf:"bytes,1,opt,name=selector"`
 }
 
 // Field path constants that are specific to the internal API
@@ -430,6 +446,35 @@ type ListOptions struct {
 	// compatibility reasons) and to false otherwise.
 	// +optional
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
+
+	// selector is a shard selector that restricts the list of returned objects using a
+	// functional grammar. The format is a comma-separated list of requirements, where each
+	// requirement is: shardRange(fieldPath,hexStart,hexEnd).
+	//
+	// Field paths use CEL-style object-rooted syntax (e.g. "object.metadata.uid"),
+	// NOT the fieldSelector format ("metadata.uid"). Currently supported paths:
+	//   - object.metadata.uid
+	//   - object.metadata.namespace
+	//
+	// hexStart and hexEnd are required lowercase hex strings defining the inclusive lower
+	// and exclusive upper bounds. Values are compared over the 64-bit FNV-1a hash space,
+	// where each object's field value is hashed with hash/fnv.New64a(). The full hash
+	// range is [0000000000000000, 10000000000000000) — note the exclusive upper bound
+	// is 2^64, a 17-character hex value.
+	//
+	// Examples:
+	//   2-shard split:
+	//     shard 0: shardRange(object.metadata.uid,0x0000000000000000,0x8000000000000000)
+	//     shard 1: shardRange(object.metadata.uid,0x8000000000000000,0x10000000000000000)
+	//   4-shard split:
+	//     shard 0: shardRange(object.metadata.uid,0x0000000000000000,0x4000000000000000)
+	//     shard 1: shardRange(object.metadata.uid,0x4000000000000000,0x8000000000000000)
+	//     shard 2: shardRange(object.metadata.uid,0x8000000000000000,0xc000000000000000)
+	//     shard 3: shardRange(object.metadata.uid,0xc000000000000000,0x10000000000000000)
+	//
+	// Requires the ShardedListandWatch feature gate to be enabled.
+	// +optional
+	Selector string `json:"selector,omitempty" protobuf:"bytes,15,opt,name=selector"`
 }
 
 const (

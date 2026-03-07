@@ -247,7 +247,7 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 	return expiredWatchers
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, obj runtime.Object) bool
 
 type indexedTriggerFunc struct {
 	indexName   string
@@ -672,6 +672,17 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newImmediateCloseWatcher(), nil
 	}
 
+	// Track sharded watch metrics
+	isSharded := pred.ShardSelector != nil && !pred.ShardSelector.Empty()
+	if isSharded {
+		metrics.RecordShardedWatchStarted(c.groupResource)
+		originalForget := watcher.forget
+		watcher.forget = func(drainWatcher bool) {
+			metrics.RecordShardedWatchStopped(c.groupResource)
+			originalForget(drainWatcher)
+		}
+	}
+
 	go watcher.processInterval(ctx, cacheInterval, requiredResourceVersion)
 	return watcher, nil
 }
@@ -790,7 +801,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if !ok {
 			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
-		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		if shardMatch, _ := opts.Predicate.MatchesSharding(elem.Object); shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
@@ -819,6 +830,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 
 		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
 			return err
+		}
+	}
+	if opts.Predicate.ShardSelector != nil && !opts.Predicate.ShardSelector.Empty() {
+		if setter, ok := listObj.(metav1.ShardedListInterface); ok {
+			setter.SetShardInfo(&metav1.ShardInfo{Selector: opts.Predicate.ShardSelector.String()})
 		}
 	}
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
@@ -1200,8 +1216,11 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 }
 
 func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
+			return false
+		}
+		if matches, _ := p.MatchesSharding(obj); !matches {
 			return false
 		}
 		return p.MatchesObjectAttributes(label, field)

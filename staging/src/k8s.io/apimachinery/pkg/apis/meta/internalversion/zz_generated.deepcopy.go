@@ -80,6 +80,9 @@ func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ShardSelector != nil {
+		out.ShardSelector = in.ShardSelector.DeepCopySelector()
+	}
 	return
 }
 

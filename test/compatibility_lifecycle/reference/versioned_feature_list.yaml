@@ -1745,6 +1745,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: ShardedListandWatch
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: SidecarContainers
   versionedSpecs:
   - default: false

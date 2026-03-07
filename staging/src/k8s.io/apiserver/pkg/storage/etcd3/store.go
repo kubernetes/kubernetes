@@ -36,6 +36,7 @@ import (
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -895,7 +896,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if err != nil {
 		return err
 	}
-	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
+	if err := s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount); err != nil {
+		return err
+	}
+	if opts.Predicate.ShardSelector != nil && !opts.Predicate.ShardSelector.Empty() {
+		if setter, ok := listObj.(metav1.ShardedListInterface); ok {
+			setter.SetShardInfo(&metav1.ShardInfo{Selector: opts.Predicate.ShardSelector.String()})
+		}
+	}
+	return nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
