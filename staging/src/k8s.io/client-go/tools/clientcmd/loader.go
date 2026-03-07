@@ -641,7 +641,7 @@ func RelativizePathWithNoBacksteps(refs []*string, base string) error {
 			}
 
 			// if we have a backstep, don't mess with the path
-			if strings.HasPrefix(rel, "../") {
+			if strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 				if filepath.IsAbs(*ref) {
 					continue
 				}
