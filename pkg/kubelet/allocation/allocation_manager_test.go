@@ -1370,7 +1370,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					Type:               v1.PodResizePending,
 					Status:             "True",
 					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Message:            "Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000; memory, requested: 4718592000, capacity: 4294967296",
 					ObservedGeneration: 2,
 				},
 				{
@@ -1379,7 +1379,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					ObservedGeneration: 1,
 				},
 			},
-			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296"}`,
+			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000; memory, requested: 4718592000, capacity: 4294967296"}`,
 		},
 		{
 			name:       "same as previous case to ensure no new event is generated",
@@ -1391,7 +1391,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					Type:               v1.PodResizePending,
 					Status:             "True",
 					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Message:            "Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000; memory, requested: 4718592000, capacity: 4294967296",
 					ObservedGeneration: 2,
 				},
 				{

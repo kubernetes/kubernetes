@@ -18,6 +18,7 @@ package allocation
 
 import (
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -62,10 +63,10 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
-	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
-		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
+		metrics.PodInfeasibleResizes.WithLabelValues("feature_gate_off").Inc()
+		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: "InPlacePodVerticalScaling is disabled"}
 	}
 	if resizeNotAllowed, msg := disallowResizeForSwappableContainers(h.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
@@ -73,10 +74,10 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 	}
 	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, allocatedPod.Spec.Resources) {
-		if resizable, msg, reason := IsInPlacePodLevelResourcesVerticalScalingAllowed(pod); !resizable {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 			// If there is a pending pod-level resources resize but the resize is not allowed, always use the allocated resources.
-			metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
-			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
+			metrics.PodInfeasibleResizes.WithLabelValues("plr_feature_gate_off").Inc()
+			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: "InPlacePodLevelResourcesVerticalScaling is disabled"}
 		}
 	}
 
@@ -100,19 +101,19 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 	}
 
 	allocatable := h.containerManager.GetNodeAllocatableAbsolute()
-	cpuAvailable := allocatable.Cpu().MilliValue()
-	memAvailable := allocatable.Memory().Value()
+	cpuAllocatable := allocatable.Cpu().MilliValue()
+	memAllocatable := allocatable.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
-
-	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		var msg string
-		if memRequests > memAvailable {
-			msg = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAvailable)
-		} else {
-			msg = fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAvailable)
-		}
-		msg = "Node didn't have enough capacity: " + msg
+	var msgs []string
+	if cpuRequests > cpuAllocatable {
+		msgs = append(msgs, fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAllocatable))
+	}
+	if memRequests > memAllocatable {
+		msgs = append(msgs, fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAllocatable))
+	}
+	if len(msgs) > 0 {
+		msg := fmt.Sprintf("Node didn't have enough capacity: %s", strings.Join(msgs, "; "))
 		h.logger.V(3).Info(msg, "pod", klog.KObj(pod))
 		metrics.PodInfeasibleResizes.WithLabelValues("insufficient_node_allocatable").Inc()
 		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}

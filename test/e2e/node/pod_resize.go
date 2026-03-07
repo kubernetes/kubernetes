@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -674,13 +675,17 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' to exceed the node capacity", testPod1.Name))
-		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
+		_, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeAllocatable), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
-		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(4))
-		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod1.Namespace, testPod1.Name, "display pod resize status as infeasible", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
-			return helpers.IsPodResizeInfeasible(pod), nil
-		}))
+
+		gomega.Expect(p1Err).To(gomega.HaveOccurred(), "expected patching pod to fail due to exceeding node allocatable")
+
+		statusErr, ok := p1Err.(*apierrors.StatusError)
+		gomega.Expect(ok).To(gomega.BeTrue(), "Expected error to be a StatusError")
+
+		gomega.Expect(statusErr.ErrStatus.Reason).To(gomega.Equal(metav1.StatusReasonForbidden))
+		gomega.Expect(statusErr.Error()).To(gomega.ContainSubstring("Node didn't have enough allocatable resources"))
+		gomega.Expect(statusErr.ErrStatus.Details.Causes[0].Type).To(gomega.Equal(metav1.CauseType("NodeCapacity")))
 
 		ginkgo.By("deleting pod 1")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
