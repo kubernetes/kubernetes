@@ -265,7 +265,20 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	switch {
 	case ed.medium == v1.StorageMediumDefault:
-		err = ed.setupDir(dir)
+		if err = ed.setupDir(dir); err != nil {
+			break
+		}
+		if ed.mounter != nil {
+			notMnt, mountErr := ed.mounter.IsLikelyNotMountPoint(dir)
+			if mountErr != nil {
+				err = mountErr
+				break
+			}
+			if notMnt {
+				klog.V(3).Infof("pod %v: bind-mounting default emptyDir at %v with noexec", ed.pod.UID, dir)
+				err = ed.mounter.MountSensitiveWithoutSystemd(dir, dir, "", []string{"bind", "noexec"}, nil)
+			}
+		}
 	case ed.medium == v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
 	case v1helper.IsHugePageMedium(ed.medium):
@@ -536,6 +549,15 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
 		}
 	}
+	// If we applied a self-bind mount in default emptyDir, dir is a mount point; unmount first.
+	if ed.mounter != nil {
+		notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
+		if err == nil && !notMnt {
+			if err := ed.mounter.Unmount(dir); err != nil {
+				return err
+			}
+		}
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
 	return os.RemoveAll(dir)
@@ -580,5 +602,6 @@ func (ed *emptyDir) generateTmpfsMountOptions(noswapSupported bool) (options []s
 		options = append(options, swap.TmpfsNoswapOption)
 	}
 
+	options = append(options, "noexec")
 	return options
 }
