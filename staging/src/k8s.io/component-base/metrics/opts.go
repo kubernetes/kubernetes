@@ -23,6 +23,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	internalmetrics "k8s.io/component-base/metrics/internal"
 	promext "k8s.io/component-base/metrics/prometheusextension"
 )
 
@@ -195,7 +196,7 @@ func (o *HistogramOpts) annotateStabilityLevel() {
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
 func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
-	return prometheus.HistogramOpts{
+	opts := prometheus.HistogramOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
@@ -203,6 +204,16 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 		ConstLabels: o.ConstLabels,
 		Buckets:     o.Buckets,
 	}
+
+	// When native histograms are enabled, configure exponential bucket options
+	// to expose metrics in both classic and native histogram formats.
+	if internalmetrics.NativeHistogramsEnabled() {
+		nativeOpts := internalmetrics.NativeHistogramConfig()
+		opts.NativeHistogramBucketFactor = nativeOpts.BucketFactor
+		opts.NativeHistogramMaxBucketNumber = nativeOpts.MaxBucketNumber
+	}
+
+	return opts
 }
 
 // TimingHistogramOpts bundles the options for creating a TimingHistogram metric. It is
