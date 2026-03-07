@@ -196,6 +196,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
+		defaultPodLimits(obj)
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
@@ -473,6 +474,55 @@ func defaultPodRequests(obj *v1.Pod) {
 	// contains entries after collecting container-level requests and pod-level limits.
 	if len(podReqs) > 0 {
 		obj.Spec.Resources.Requests = podReqs
+	}
+}
+
+// defaultPodLimits defaults pod-level CPU/memory limits from container limits when
+// pod-level requests are set and all containers specify a limit for the resource.
+func defaultPodLimits(obj *v1.Pod) {
+	if resourcehelper.IsPodLevelLimitsSet(obj) {
+		return
+	}
+
+	if !resourcehelper.IsPodLevelRequestsSet(obj) {
+		return
+	}
+
+	var podLimits v1.ResourceList
+	if obj.Spec.Resources != nil {
+		podLimits = obj.Spec.Resources.Limits
+	}
+	if podLimits == nil {
+		podLimits = make(v1.ResourceList)
+		if obj.Spec.Resources == nil {
+			obj.Spec.Resources = &v1.ResourceRequirements{}
+		}
+	}
+
+	aggrCtrLimits := resourcehelper.AggregateContainerLimits(obj, resourcehelper.PodResourcesOptions{})
+
+	for key, aggrCtrLim := range aggrCtrLimits {
+		if _, exists := podLimits[key]; exists {
+			continue
+		}
+
+		if !resourcehelper.IsSupportedPodLevelResource(key) {
+			continue
+		}
+
+		if !corev1helper.IsOvercommitAllowed(key) {
+			continue
+		}
+
+		if !resourcehelper.AllContainersHaveLimitForResource(obj, key) {
+			continue
+		}
+
+		podLimits[key] = aggrCtrLim.DeepCopy()
+	}
+
+	if len(podLimits) > 0 {
+		obj.Spec.Resources.Limits = podLimits
 	}
 }
 
