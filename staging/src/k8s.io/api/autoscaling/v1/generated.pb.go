@@ -295,6 +295,25 @@ func (m *ExternalMetricStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.FirstFailureTime != nil {
+		{
+			size, err := m.FirstFailureTime.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
+	if m.MetricFetchStatus != nil {
+		i -= len(*m.MetricFetchStatus)
+		copy(dAtA[i:], *m.MetricFetchStatus)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.MetricFetchStatus)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.CurrentAverageValue != nil {
 		{
 			size, err := m.CurrentAverageValue.MarshalToSizedBuffer(dAtA[:i])
@@ -1310,6 +1329,14 @@ func (m *ExternalMetricStatus) Size() (n int) {
 		l = m.CurrentAverageValue.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.MetricFetchStatus != nil {
+		l = len(*m.MetricFetchStatus)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.FirstFailureTime != nil {
+		l = m.FirstFailureTime.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1682,6 +1709,8 @@ func (this *ExternalMetricStatus) String() string {
 		`MetricSelector:` + strings.Replace(fmt.Sprintf("%v", this.MetricSelector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`CurrentValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
 		`CurrentAverageValue:` + strings.Replace(fmt.Sprintf("%v", this.CurrentAverageValue), "Quantity", "resource.Quantity", 1) + `,`,
+		`MetricFetchStatus:` + valueToStringGenerated(this.MetricFetchStatus) + `,`,
+		`FirstFailureTime:` + strings.Replace(fmt.Sprintf("%v", this.FirstFailureTime), "Time", "v1.Time", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2738,6 +2767,75 @@ func (m *ExternalMetricStatus) Unmarshal(dAtA []byte) error {
 				m.CurrentAverageValue = &resource.Quantity{}
 			}
 			if err := m.CurrentAverageValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MetricFetchStatus", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := MetricFetchStatusType(dAtA[iNdEx:postIndex])
+			m.MetricFetchStatus = &s
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FirstFailureTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FirstFailureTime == nil {
+				m.FirstFailureTime = &v1.Time{}
+			}
+			if err := m.FirstFailureTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

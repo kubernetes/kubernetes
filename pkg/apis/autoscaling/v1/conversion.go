@@ -137,6 +137,13 @@ func Convert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *aut
 	if in.Current.AverageValue != nil {
 		out.CurrentAverageValue = in.Current.AverageValue
 	}
+	if in.FirstFailureTime != nil {
+		out.FirstFailureTime = in.FirstFailureTime
+	}
+	if in.MetricFetchStatus != nil {
+		out.MetricFetchStatus = (*autoscalingv1.MetricFetchStatusType)(in.MetricFetchStatus)
+	}
+
 	out.MetricSelector = in.Metric.Selector
 	return nil
 }
@@ -152,6 +159,14 @@ func Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *aut
 		Name:     in.MetricName,
 		Selector: in.MetricSelector,
 	}
+
+	if in.FirstFailureTime != nil {
+		out.FirstFailureTime = in.FirstFailureTime
+	}
+	if in.MetricFetchStatus != nil {
+		out.MetricFetchStatus = (*autoscaling.MetricFetchStatusType)(in.MetricFetchStatus)
+	}
+
 	return nil
 }
 
@@ -369,6 +384,36 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation] = string(currentConditionsEnc)
 	}
 
+	// Store external metrics fallback configuration in annotation
+	// Map from metric name+selector to fallback config
+	fallbackMap := make(map[string]*autoscaling.ExternalMetricFallback)
+	for _, metric := range in.Spec.Metrics {
+		if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil && metric.External.Fallback != nil {
+			// Create a unique key from metric name and selector
+			key := metric.External.Metric.Name
+			if metric.External.Metric.Selector != nil {
+				selectorBytes, err := json.Marshal(metric.External.Metric.Selector)
+				if err != nil {
+					return err
+				}
+				key = key + ":" + string(selectorBytes)
+			}
+			fallbackMap[key] = metric.External.Fallback
+		}
+	}
+
+	if len(fallbackMap) > 0 {
+		fallbackEnc, err := json.Marshal(fallbackMap)
+		if err != nil {
+			return err
+		}
+		// copy before mutating
+		if !copiedAnnotations {
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.FallbackExternalMetricsAnnotation] = string(fallbackEnc)
+	}
+
 	return nil
 }
 
@@ -441,6 +486,31 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 			for i, currentCondition := range currentConditions {
 				if err := Convert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(&currentCondition, &out.Status.Conditions[i], s); err != nil {
 					return err
+				}
+			}
+		}
+	}
+
+	// Restore external metrics fallback configuration from annotation
+	if fallbackEnc, hasFallbacks := out.Annotations[autoscaling.FallbackExternalMetricsAnnotation]; hasFallbacks {
+		fallbackMap := make(map[string]*autoscaling.ExternalMetricFallback)
+		if err := json.Unmarshal([]byte(fallbackEnc), &fallbackMap); err == nil {
+			// Apply fallbacks to matching external metrics
+			for i := range out.Spec.Metrics {
+				metric := &out.Spec.Metrics[i]
+				if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+					// Create the same key used during encoding
+					key := metric.External.Metric.Name
+					if metric.External.Metric.Selector != nil {
+						selectorBytes, err := json.Marshal(metric.External.Metric.Selector)
+						if err != nil {
+							return err
+						}
+						key = key + ":" + string(selectorBytes)
+					}
+					if fallback, ok := fallbackMap[key]; ok {
+						metric.External.Fallback = fallback
+					}
 				}
 			}
 		}

@@ -135,6 +135,15 @@ func (in *ExternalMetricStatus) DeepCopyInto(out *ExternalMetricStatus) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.MetricFetchStatus != nil {
+		in, out := &in.MetricFetchStatus, &out.MetricFetchStatus
+		*out = new(MetricFetchStatusType)
+		**out = **in
+	}
+	if in.FirstFailureTime != nil {
+		in, out := &in.FirstFailureTime, &out.FirstFailureTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

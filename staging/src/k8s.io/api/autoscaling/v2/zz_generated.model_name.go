@@ -37,6 +37,11 @@ func (in CrossVersionObjectReference) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ExternalMetricFallback) OpenAPIModelName() string {
+	return "io.k8s.api.autoscaling.v2.ExternalMetricFallback"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ExternalMetricSource) OpenAPIModelName() string {
 	return "io.k8s.api.autoscaling.v2.ExternalMetricSource"
 }

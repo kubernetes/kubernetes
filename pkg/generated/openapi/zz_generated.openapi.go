@@ -392,6 +392,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		autoscalingv2.ContainerResourceMetricSource{}.OpenAPIModelName():                                                schema_k8sio_api_autoscaling_v2_ContainerResourceMetricSource(ref),
 		autoscalingv2.ContainerResourceMetricStatus{}.OpenAPIModelName():                                                schema_k8sio_api_autoscaling_v2_ContainerResourceMetricStatus(ref),
 		autoscalingv2.CrossVersionObjectReference{}.OpenAPIModelName():                                                  schema_k8sio_api_autoscaling_v2_CrossVersionObjectReference(ref),
+		autoscalingv2.ExternalMetricFallback{}.OpenAPIModelName():                                                       schema_k8sio_api_autoscaling_v2_ExternalMetricFallback(ref),
 		autoscalingv2.ExternalMetricSource{}.OpenAPIModelName():                                                         schema_k8sio_api_autoscaling_v2_ExternalMetricSource(ref),
 		autoscalingv2.ExternalMetricStatus{}.OpenAPIModelName():                                                         schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref),
 		autoscalingv2.HPAScalingPolicy{}.OpenAPIModelName():                                                             schema_k8sio_api_autoscaling_v2_HPAScalingPolicy(ref),
@@ -14748,12 +14749,25 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"metricFetchStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"firstFailureTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -15577,6 +15591,35 @@ func schema_k8sio_api_autoscaling_v2_CrossVersionObjectReference(ref common.Refe
 	}
 }
 
+func schema_k8sio_api_autoscaling_v2_ExternalMetricFallback(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExternalMetricFallback defines fallback behavior when an external metric cannot be retrieved",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"failureDurationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "failureDurationSeconds is the duration in seconds for which the external metric must be continuously failing before the fallback value is used. The duration is measured from the first consecutive failure. Must be greater than 0. default=180 min=180",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "replicas is the desired replica count to use when the external metric cannot be retrieved. This value is treated as the desired replica count from this metric. When multiple metrics are configured, the HPA controller uses the maximum of all desired replica counts (standard HPA multi-metric behavior). Must be greater than 0.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"replicas"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_autoscaling_v2_ExternalMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -15598,12 +15641,18 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricSource(ref common.ReferenceCa
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
+					"fallback": {
+						SchemaProps: spec.SchemaProps{
+							Description: "fallback defines the behavior when this external metric cannot be retrieved. If not set, the HPA will not scale based on this metric when it's unavailable.",
+							Ref:         ref(autoscalingv2.ExternalMetricFallback{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"metric", "target"},
 			},
 		},
 		Dependencies: []string{
-			autoscalingv2.MetricIdentifier{}.OpenAPIModelName(), autoscalingv2.MetricTarget{}.OpenAPIModelName()},
+			autoscalingv2.ExternalMetricFallback{}.OpenAPIModelName(), autoscalingv2.MetricIdentifier{}.OpenAPIModelName(), autoscalingv2.MetricTarget{}.OpenAPIModelName()},
 	}
 }
 
@@ -15628,12 +15677,25 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref common.ReferenceCa
 							Ref:         ref(autoscalingv2.MetricValueStatus{}.OpenAPIModelName()),
 						},
 					},
+					"metricFetchStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"firstFailureTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"metric", "current"},
 			},
 		},
 		Dependencies: []string{
-			autoscalingv2.MetricIdentifier{}.OpenAPIModelName(), autoscalingv2.MetricValueStatus{}.OpenAPIModelName()},
+			autoscalingv2.MetricIdentifier{}.OpenAPIModelName(), autoscalingv2.MetricValueStatus{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 

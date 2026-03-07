@@ -85,9 +85,37 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.autoscaling.v2.ExternalMetricFallback": {
+        "description": "ExternalMetricFallback defines fallback behavior when an external metric cannot be retrieved",
+        "properties": {
+          "failureDurationSeconds": {
+            "description": "failureDurationSeconds is the duration in seconds for which the external metric must be continuously failing before the fallback value is used. The duration is measured from the first consecutive failure. Must be greater than 0. default=180 min=180",
+            "format": "int64",
+            "type": "integer"
+          },
+          "replicas": {
+            "default": 0,
+            "description": "replicas is the desired replica count to use when the external metric cannot be retrieved. This value is treated as the desired replica count from this metric. When multiple metrics are configured, the HPA controller uses the maximum of all desired replica counts (standard HPA multi-metric behavior). Must be greater than 0.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "replicas"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.autoscaling.v2.ExternalMetricSource": {
         "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
         "properties": {
+          "fallback": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2.ExternalMetricFallback"
+              }
+            ],
+            "description": "fallback defines the behavior when this external metric cannot be retrieved. If not set, the HPA will not scale based on this metric when it's unavailable."
+          },
           "metric": {
             "allOf": [
               {
@@ -125,6 +153,14 @@
             "default": {},
             "description": "current contains the current value for the given metric"
           },
+          "firstFailureTime": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "firstFailureTime is the timestamp of the first consecutive failure retrieving this metric. Reset to nil on successful retrieval. Used to calculate if failureDurationSeconds has been exceeded."
+          },
           "metric": {
             "allOf": [
               {
@@ -133,6 +169,10 @@
             ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
+          },
+          "metricFetchStatus": {
+            "description": "metricFetchStatus indicates whether this metric is operating normally, failing, or in fallback mode.",
+            "type": "string"
           }
         },
         "required": [
