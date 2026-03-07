@@ -87,7 +87,7 @@ type store struct {
 	watcher            *watcher
 	leaseManager       *leaseManager
 	decoder            Decoder
-	listErrAggrFactory func() ListErrorAggregator
+	listErrAggrFactory func() storage.ListItemErrors
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
@@ -113,36 +113,21 @@ type objState struct {
 	stale bool
 }
 
-// ListErrorAggregator aggregates the error(s) that the LIST operation
-// encounters while retrieving object(s) from the storage
-type ListErrorAggregator interface {
-	// Aggregate aggregates the given error from list operation
-	// key: it identifies the given object in the storage.
-	// err: it represents the error the list operation encountered while
-	// retrieving the given object from the storage.
-	// done: true if the aggregation is done and the list operation should
-	// abort, otherwise the list operation will continue
-	Aggregate(key string, err error) bool
-
-	// Err returns the aggregated error
-	Err() error
-}
-
 // defaultListErrorAggregatorFactory returns the default list error
 // aggregator that maintains backward compatibility, which is abort
 // the list operation as soon as it encounters the first error
-func defaultListErrorAggregatorFactory() ListErrorAggregator { return &abortOnFirstError{} }
+func defaultListErrorAggregatorFactory() storage.ListItemErrors { return &abortOnFirstError{} }
 
 // LIST aborts on the first error it encounters (backward compatible)
 type abortOnFirstError struct {
 	err error
 }
 
-func (a *abortOnFirstError) Aggregate(key string, err error) bool {
+func (a *abortOnFirstError) Append(key string, err error) bool {
 	a.err = err
 	return true
 }
-func (a *abortOnFirstError) Err() error { return a.err }
+func (a *abortOnFirstError) Aggregate() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
 func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
@@ -828,8 +813,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-					return aggregator.Err()
+				if done := aggregator.Append(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+					return aggregator.Aggregate()
 				}
 				continue
 			}
@@ -845,8 +830,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 			if err != nil {
 				recordDecodeError(s.groupResource, string(kv.Key))
-				if done := aggregator.Aggregate(string(kv.Key), err); done {
-					return aggregator.Err()
+				if done := aggregator.Append(string(kv.Key), err); done {
+					return aggregator.Aggregate()
 				}
 				continue
 			}
@@ -882,7 +867,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	if err := aggregator.Err(); err != nil {
+	if err := aggregator.Aggregate(); err != nil {
 		return err
 	}
 
