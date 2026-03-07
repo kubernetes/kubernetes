@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	cpnames "k8s.io/cloud-provider/names"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
@@ -221,8 +220,8 @@ func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.TaintEvictionController,
 		constructor: newTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.SeparateTaintEvictionController,
+		requiredFeatureGates: []string{
+			string(features.SeparateTaintEvictionController),
 		},
 	}
 }
@@ -252,10 +251,10 @@ func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.DeviceTaintEvictionController,
 		constructor: newDeviceTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
+		requiredFeatureGates: []string{
 			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
-			features.DynamicResourceAllocation,
-			features.DRADeviceTaints,
+			string(features.DynamicResourceAllocation),
+			string(features.DRADeviceTaints),
 		},
 	}
 }
@@ -465,8 +464,8 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 		name:        names.ResourceClaimController,
 		aliases:     []string{"resource-claim-controller"},
 		constructor: newResourceClaimController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
+		requiredFeatureGates: []string{
+			string(features.DynamicResourceAllocation), // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
 		},
 	}
 }
@@ -877,8 +876,8 @@ func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescrip
 	return &ControllerDescriptor{
 		name:        names.VolumeAttributesClassProtectionController,
 		constructor: newVolumeAttributesClassProtectionController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.VolumeAttributesClass,
+		requiredFeatureGates: []string{
+			string(features.VolumeAttributesClass),
 		},
 	}
 }
@@ -1083,9 +1082,9 @@ func newStorageVersionGarbageCollectorControllerDescriptor() *ControllerDescript
 		name:        names.StorageVersionGarbageCollectorController,
 		aliases:     []string{"storage-version-gc"},
 		constructor: newStorageVersionGarbageCollectorController,
-		requiredFeatureGates: []featuregate.Feature{
-			genericfeatures.APIServerIdentity,
-			genericfeatures.StorageVersionAPI,
+		requiredFeatureGates: []string{
+			string(genericfeatures.APIServerIdentity),
+			string(genericfeatures.StorageVersionAPI),
 		},
 	}
 }
@@ -1110,8 +1109,8 @@ func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
 		name:                names.SELinuxWarningController,
 		constructor:         newSELinuxWarningController,
 		isDisabledByDefault: true,
-		requiredFeatureGates: []featuregate.Feature{
-			features.SELinuxChangePolicy,
+		requiredFeatureGates: []string{
+			string(features.SELinuxChangePolicy),
 		},
 	}
 }
