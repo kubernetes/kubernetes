@@ -26,6 +26,7 @@ import (
 	fmt "fmt"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -38,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type ControllerRevision
+	scheme.AddValidationFunc((*appsv1beta2.ControllerRevision)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ControllerRevision(ctx, op, nil /* fldPath */, obj.(*appsv1beta2.ControllerRevision), safe.Cast[*appsv1beta2.ControllerRevision](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Scale
 	scheme.AddValidationFunc((*appsv1beta2.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -47,6 +56,35 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_ControllerRevision validates an instance of ControllerRevision according
+// to declarative validation rules in the API schema.
+func Validate_ControllerRevision(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta2.ControllerRevision) (errs field.ErrorList) {
+	// field appsv1beta2.ControllerRevision.TypeMeta has no validation
+	// field appsv1beta2.ControllerRevision.ObjectMeta has no validation
+
+	// field appsv1beta2.ControllerRevision.Data
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *runtime.RawExtension, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("data"), &obj.Data, safe.Field(oldObj, func(oldObj *appsv1beta2.ControllerRevision) *runtime.RawExtension { return &oldObj.Data }), oldObj != nil)...)
+
+	// field appsv1beta2.ControllerRevision.Revision has no validation
+	return errs
 }
 
 // Validate_Scale validates an instance of Scale according

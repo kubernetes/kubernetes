@@ -682,6 +682,7 @@ type ControllerRevision struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// data is the serialized representation of the state.
+	// +k8s:immutable
 	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
 
 	// revision indicates the revision of the state represented by Data.
