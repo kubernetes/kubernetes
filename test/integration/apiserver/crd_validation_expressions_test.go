@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -711,15 +713,24 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Make an unrelated update to the previous persisted CR instance to make sure CRD handler doesn't panic
-	oldCR, err := crClient.Get(context.TODO(), name1, metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
-	_, err = crClient.Update(context.TODO(), oldCR, metav1.UpdateOptions{})
-	if err == nil || !strings.Contains(err.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
-		t.Fatalf("expect error to contain \rule compiler initialization error: failed to convert to declType for CEL validation rules\" but get: %v", err)
+
+	// Keep trying to update the CR until we get the expected error,
+	// which indicates the new schema is active.
+	var updateErr error
+	pollErr := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		oldCR, getErr := crClient.Get(ctx, name1, metav1.GetOptions{})
+		if getErr != nil {
+			return false, getErr
+		}
+		oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
+		_, updateErr = crClient.Update(ctx, oldCR, metav1.UpdateOptions{})
+		if updateErr != nil && strings.Contains(updateErr.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
+			return true, nil
+		}
+		return false, nil
+	})
+	if pollErr != nil {
+		t.Fatalf("timed out waiting for CRD schema update: %v (last error: %v)", pollErr, updateErr)
 	}
 	// Create another CR instance with an array and be rejected
 	name2 := names.SimpleNameGenerator.GenerateName("cr-2")
