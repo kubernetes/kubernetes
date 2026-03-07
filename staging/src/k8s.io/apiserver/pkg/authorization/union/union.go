@@ -68,6 +68,16 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (authzHandler unionAuthzHandler) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(authzHandler.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (unionAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 // unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver
 type unionAuthzRulesHandler []authorizer.RuleResolver
 

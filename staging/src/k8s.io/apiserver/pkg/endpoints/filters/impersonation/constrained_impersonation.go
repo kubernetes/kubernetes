@@ -275,6 +275,16 @@ type metricsAuthorizer struct {
 	recordAuthorizationCall func(mode, decision string, duration time.Duration)
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (m *metricsAuthorizer) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(m.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*metricsAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 func (m *metricsAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	start := time.Now()
 	decision, reason, err := m.delegate.Authorize(ctx, attributes)

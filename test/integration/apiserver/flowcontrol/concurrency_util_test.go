@@ -132,6 +132,16 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 	return d.Authorizer.Authorize(ctx, a)
 }
 
+// AuthorizeConditionsAware is not conditions-aware, converts the Authorize decision.
+func (d *noxuDelayingAuthorizer) AuthorizeConditionsAware(ctx context.Context, a authorizer.Attributes, _ authorizer.ConditionsEncodingPreference) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(d.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*noxuDelayingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData, _ authorizer.BuiltinConditionsMapEvaluators) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionDeny("", authorizer.ErrorConditionEvaluationNotSupported)
+}
+
 // TestConcurrencyIsolation tests the concurrency isolation between priority levels.
 // The test defines two priority levels for this purpose, and corresponding flow schemas.
 // To one priority level, this test sends many more concurrent requests than the configuration

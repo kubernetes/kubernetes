@@ -103,6 +103,14 @@ const (
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
 
+	// owner: @luxas
+	// kep: https://kep.k8s.io/5681
+	//
+	// Enables conditional authorization, where authorizers can return conditions
+	// (residual expressions) that depend on the request/stored object. These
+	// conditions are enforced during the validating admission phase.
+	ConditionalAuthorization featuregate.Feature = "ConditionalAuthorization"
+
 	// owner: @serathius
 	// kep: http://kep.k8s.io/2340
 	//
@@ -372,6 +380,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	ConditionalAuthorization: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ConsistentListFromCache: {
