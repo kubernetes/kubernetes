@@ -1333,7 +1333,7 @@ done`}
 			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 
-	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithFeature("ContainerRestartRules"), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
+	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
 		parallelism := int32(1)
 		completions := int32(1)
 		backoffLimit := int32(1)
