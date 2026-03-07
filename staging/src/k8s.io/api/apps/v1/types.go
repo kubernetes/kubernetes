@@ -319,6 +319,12 @@ type StatefulSetStatus struct {
 
 type StatefulSetConditionType string
 
+const (
+	// StatefulSetAvailable means at least the minimum available replicas required
+	// are up and running for at least minReadySeconds.
+	StatefulSetAvailable StatefulSetConditionType = "Available"
+)
+
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
 	// Type of statefulset condition.
