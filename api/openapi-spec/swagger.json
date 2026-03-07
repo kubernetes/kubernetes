@@ -6126,9 +6126,6 @@
           "description": "The target object that you want to bind to the standard object."
         }
       },
-      "required": [
-        "target"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -7741,10 +7738,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "metadata",
-        "involvedObject"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -8418,6 +8411,9 @@
           "description": "Spec defines the limits enforced. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -9612,9 +9608,6 @@
           "description": "The specification for the PersistentVolumeClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a PersistentVolumeClaim are also valid here."
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource": {
@@ -9874,6 +9867,9 @@
           "description": "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -10746,6 +10742,9 @@
           "description": "Template defines the pods that will be created from this pod template. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "template"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -10802,6 +10801,9 @@
           "description": "Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.PortStatus": {
@@ -10862,8 +10864,7 @@
         }
       },
       "required": [
-        "weight",
-        "preference"
+        "weight"
       ],
       "type": "object"
     },
@@ -12537,10 +12538,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "kind",
-        "name"
-      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.Volume": {
