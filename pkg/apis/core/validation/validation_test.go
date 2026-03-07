@@ -25105,6 +25105,78 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	}
 }
 
+func TestUsePreferredMatchLabelKeysValidation(t *testing.T) {
+	testCases := []struct {
+		name string
+		opts PodValidationOptions
+		want bool
+	}{
+		{
+			name: "feature disabled",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              false,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+				OldPodViolatesMatchLabelKeysValidation:              false,
+			},
+			want: false,
+		},
+		{
+			name: "selector merge enabled and old pod does not violate preferred validation",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              true,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+				OldPodViolatesMatchLabelKeysValidation:              false,
+			},
+			want: true,
+		},
+		{
+			name: "selector merge enabled and old pod violates preferred validation",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              true,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+				OldPodViolatesMatchLabelKeysValidation:              true,
+			},
+			want: false,
+		},
+		{
+			name: "selector merge disabled and old pod does not violate legacy validation",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              true,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+				OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+			},
+			want: false,
+		},
+		{
+			name: "selector merge disabled and old pod violates legacy validation",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              true,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+				OldPodViolatesLegacyMatchLabelKeysValidation:        true,
+			},
+			want: true,
+		},
+		{
+			name: "selector merge disabled ignores old preferred-validation flag",
+			opts: PodValidationOptions{
+				AllowMatchLabelKeysInPodTopologySpread:              true,
+				AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+				OldPodViolatesMatchLabelKeysValidation:              true,
+				OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := usePreferredMatchLabelKeysValidation(tc.opts); got != tc.want {
+				t.Fatalf("unexpected result, want: %t, got: %t", tc.want, got)
+			}
+		})
+	}
+}
+
 func TestValidateOverhead(t *testing.T) {
 	successCase := []struct {
 		Name     string
