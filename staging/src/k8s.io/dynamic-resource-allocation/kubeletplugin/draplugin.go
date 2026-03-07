@@ -31,9 +31,11 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -203,6 +205,46 @@ type Device struct {
 	// ShareID identifes the device share.
 	// May be empty.
 	ShareID *types.UID
+
+	// Metadata contains driver-specific device attributes and network data
+	// to expose to workloads via CDI bind-mounted JSON files.
+	//
+	// When the metadata feature is enabled (via [EnableDeviceMetadata]),
+	// the framework writes a metadata file for each configured API version
+	// containing claim and device information (claim name, namespace,
+	// generation, request name, device name, driver, pool). If Metadata is
+	// set, the attributes and network data are included immediately. If nil,
+	// the driver can populate them later via [Helper.UpdateRequestMetadata]
+	// before the pod starts (e.g., from an NRI hook after CNI).
+	Metadata *DeviceMetadata
+}
+
+// DeviceMetadata contains device attributes and network data to expose to
+// workloads via the metadata file (see [EnableDeviceMetadata]).
+//
+// As a best practice, drivers should include all attributes that are published
+// in the ResourceSlice for the device, so that the same information is
+// available to workloads at runtime. This includes but is not limited to PCI
+// bus IDs, mdev UUIDs, hardware model names, and firmware versions. Drivers
+// may also include additional attributes that are only relevant at runtime and
+// not published in the ResourceSlice. For network devices, populate
+// NetworkData with interface names, IP addresses, and hardware addresses
+// assigned after CNI runs.
+type DeviceMetadata struct {
+	// Attributes contains device attributes in the same format as
+	// [resourceapi.Device.Attributes] in a ResourceSlice. Keys follow the
+	// [resourceapi.QualifiedName] conventions: unqualified names (e.g.,
+	// "model") are assumed to belong to the driver's domain, while
+	// third-party or well-known attributes use a domain prefix (e.g.,
+	// "resource.kubernetes.io/pciBusID"). Each value must have exactly one
+	// field set (StringValue, IntValue, BoolValue, or VersionValue).
+	Attributes map[string]resourceapi.DeviceAttribute
+
+	// NetworkData contains network-specific device information such as
+	// interface name, IP addresses, and hardware address. Typically
+	// populated by network DRA plugins (e.g., SR-IOV, DPDK) from an NRI
+	// hook after CNI assigns the network configuration.
+	NetworkData *resourceapi.NetworkDeviceData
 }
 
 // Option implements the functional options pattern for Start.
@@ -473,6 +515,70 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// EnableDeviceMetadata enables the device metadata feature. When enabled,
+// the framework writes a metadata file per request under the plugin data
+// directory and a CDI spec per request under the CDI directory (see
+// [CDIDirectory]) that bind-mounts the metadata file read-only into containers
+// at /var/run/dra-device-attributes/{claimName}/{requestName}/metadata.json.
+//
+// Each metadata file is a JSON stream: the same data encoded once per
+// configured API version (newest first). A consumer reads through the stream
+// and uses the first object whose apiVersion it understands, similar to how
+// clients negotiate API versions with the API server.
+//
+// By default, metadata is encoded for all API versions registered in the
+// metadata scheme (currently v1alpha1). Use [MetadataVersions] to restrict
+// which versions are included.
+func EnableDeviceMetadata(enabled bool) Option {
+	return func(o *options) error {
+		o.enableDeviceMetadata = enabled
+		return nil
+	}
+}
+
+// MetadataVersions restricts which API versions are written when the device
+// metadata feature is enabled. If not called, the framework defaults to all
+// versions registered in the metadata scheme (currently v1alpha1).
+//
+// Drivers can expose this as a CLI flag to let operators control which
+// versions are written during a version transition:
+//
+//	helper, err := kubeletplugin.Start(ctx, driver,
+//	    kubeletplugin.EnableDeviceMetadata(true),
+//	    kubeletplugin.MetadataVersions(v1alpha1.SchemeGroupVersion),
+//	)
+//
+// This has no effect unless [EnableDeviceMetadata] is also set to true.
+func MetadataVersions(versions ...schema.GroupVersion) Option {
+	return func(o *options) error {
+		o.metadataVersions = versions
+		return nil
+	}
+}
+
+// CDIDirectory sets the directory where the framework writes CDI spec files
+// for the device metadata feature. Each file is named
+// {driverName}-metadata-{claimUID}-{requestName}.json and contains a CDI
+// spec that bind-mounts the corresponding metadata JSON file into containers.
+// The container runtime must be configured to discover CDI specs from this
+// directory.
+//
+// The default is /var/run/cdi. This option has no effect unless
+// [EnableDeviceMetadata] is also set to true.
+func CDIDirectory(path string) Option {
+	return func(o *options) error {
+		o.cdiDir = path
+		return nil
+	}
+}
+
+// defaultMetadataVersions returns all external API versions registered in the
+// metadata scheme. When new versions are added to the scheme in the future,
+// they are automatically included here.
+func defaultMetadataVersions() []schema.GroupVersion {
+	return []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -494,6 +600,9 @@ type options struct {
 	registrationService        bool
 	draService                 bool
 	healthService              *bool
+	enableDeviceMetadata       bool
+	metadataVersions           []schema.GroupVersion
+	cdiDir                     string
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -515,6 +624,7 @@ type Helper struct {
 	serialize        bool
 	grpcMutex        sync.Mutex
 	grpcLockFilePath string
+	metadataWriter   *metadataWriter
 
 	// Information about resource publishing changes concurrently and thus
 	// must be protected by the mutex. The controller gets started only
@@ -593,6 +703,17 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		}
 		// Enable file locking, required for concurrently running pods.
 		d.grpcLockFilePath = path.Join(dir, "serialize.lock")
+	}
+	if o.enableDeviceMetadata {
+		cdiDir := o.cdiDir
+		if cdiDir == "" {
+			cdiDir = DefaultCDIDir
+		}
+		versions := o.metadataVersions
+		if len(versions) == 0 {
+			versions = defaultMetadataVersions()
+		}
+		d.metadataWriter = newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir, versions)
 	}
 
 	// Stop calls cancel and therefore both cancellation
@@ -872,9 +993,36 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 		return nil, fmt.Errorf("prepare resource claims: %w", err)
 	}
 
+	// Write device metadata files and collect CDI device IDs to inject.
+	// metadataCDIIDs[claimUID][requestName] = cdiDeviceID
+	var metadataCDIIDs map[types.UID]map[string]string
+	if d.metadataWriter != nil {
+		metadataCDIIDs = make(map[types.UID]map[string]string)
+		claimsByUID := make(map[types.UID]*resourceapi.ResourceClaim, len(claims))
+		for _, c := range claims {
+			claimsByUID[c.UID] = c
+		}
+		for uid, claimResult := range result {
+			if claimResult.Err != nil {
+				continue
+			}
+			claim := claimsByUID[uid]
+			if claim == nil {
+				continue
+			}
+			ids, err := d.metadataWriter.processPreparedClaim(claim, claimResult.Devices)
+			if err != nil {
+				klog.FromContext(ctx).Error(err, "Failed to write device metadata", "claim", klog.KObj(claim))
+				continue
+			}
+			metadataCDIIDs[uid] = ids
+		}
+	}
+
 	resp := &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{}}
 	for uid, claimResult := range result {
 		var devices []*drapbv1.Device
+		injectedRequests := make(map[string]bool)
 		for _, result := range claimResult.Devices {
 			device := &drapbv1.Device{
 				RequestNames: stripSubrequestNames(result.Requests),
@@ -882,6 +1030,17 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 				DeviceName:   result.DeviceName,
 				CdiDeviceIds: result.CDIDeviceIDs,
 				ShareId:      (*string)(result.ShareID),
+			}
+			// Inject metadata CDI device IDs into the first device
+			// per request so the container runtime bind-mounts the
+			// metadata file.
+			if ids, ok := metadataCDIIDs[uid]; ok {
+				for _, reqName := range device.RequestNames {
+					if cdiID, exists := ids[reqName]; exists && !injectedRequests[reqName] {
+						device.CdiDeviceIds = append(device.CdiDeviceIds, cdiID)
+						injectedRequests[reqName] = true
+					}
+				}
 			}
 			devices = append(devices, device)
 		}
@@ -941,6 +1100,23 @@ func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, r
 	result, err := d.plugin.UnprepareResourceClaims(ctx, claims)
 	if err != nil {
 		return nil, fmt.Errorf("unprepare resource claims: %w", err)
+	}
+
+	// Clean up metadata files for successfully unprepared claims.
+	if d.metadataWriter != nil {
+		claimsByUID := make(map[types.UID]NamespacedObject, len(claims))
+		for _, c := range claims {
+			claimsByUID[c.UID] = c
+		}
+		for uid, claimErr := range result {
+			if claimErr != nil {
+				continue
+			}
+			c := claimsByUID[uid]
+			if err := d.metadataWriter.cleanupClaim(c.Namespace, c.Name, uid); err != nil {
+				result[uid] = fmt.Errorf("clean up device metadata: %w", err)
+			}
+		}
 	}
 
 	resp := &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{}}

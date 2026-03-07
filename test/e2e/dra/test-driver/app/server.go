@@ -186,6 +186,8 @@ func NewCommand() *cobra.Command {
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
 	numDevices := fs.Int("num-devices", 4, "number of devices to simulate per node")
+	enableDeviceMetadata := fs.Bool("enable-device-metadata", false,
+		"Enable the device metadata feature.")
 	fs = kubeletPlugin.Flags()
 	for _, f := range kubeletPluginFlagSets.FlagSets {
 		fs.AddFlagSet(f)
@@ -226,6 +228,7 @@ func NewCommand() *cobra.Command {
 			Options{EnableHealthService: true},
 			kubeletplugin.PluginDataDirectoryPath(datadir),
 			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
+			kubeletplugin.EnableDeviceMetadata(*enableDeviceMetadata),
 		)
 		if err != nil {
 			return fmt.Errorf("start example plugin: %w", err)

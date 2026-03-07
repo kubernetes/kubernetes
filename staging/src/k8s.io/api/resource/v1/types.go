@@ -35,6 +35,10 @@ const (
 	// special ResourceClaim. Its single valid value is "true".
 	// This is used only inside the scheduler.
 	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// PodResourceClaimAnnotation is the annotation set on template-generated
+	// ResourceClaims by the ResourceClaim controller. Its value is the
+	// pod.spec.resourceClaims[].name for which the claim was generated.
+	PodResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 	// Resource device class prefix is for generating implicit extended resource
 	// name for a device class when its ExtendedResourceName field is not
 	// specified. The generated name is this prefix + the device class name.
