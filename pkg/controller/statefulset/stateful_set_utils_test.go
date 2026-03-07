@@ -1834,3 +1834,26 @@ func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 		})
 	}
 }
+
+func TestCompleteRollingUpdateWithRecreateStrategy(t *testing.T) {
+	set := newStatefulSet(3)
+	set.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+	set.Status = apps.StatefulSetStatus{
+		UpdatedReplicas: 3,
+		ReadyReplicas:   3,
+		Replicas:        3,
+		CurrentReplicas: 0,
+		CurrentRevision: "old-revision",
+		UpdateRevision:  "new-revision",
+	}
+
+	completeRollingUpdate(set, &set.Status)
+
+	if set.Status.CurrentRevision != set.Status.UpdateRevision {
+		t.Errorf("Expected currentRevision to match updatedRevision %s got %s", set.Status.UpdateRevision, set.Status.CurrentRevision)
+	}
+
+	if set.Status.CurrentReplicas != set.Status.UpdatedReplicas {
+		t.Errorf("Expected currentReplicas to match updatedReplicas %d got %d", set.Status.UpdatedReplicas, set.Status.CurrentReplicas)
+	}
+}

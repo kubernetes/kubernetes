@@ -110,6 +110,11 @@ const (
 	// operation is performed with this strategy,specification version indicated
 	// by the StatefulSet's currentRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
+	// RecreateStatefulSetStrategyType indicates that all existing pods will be
+	// deleted and fully terminated before any new-revision pods are created.
+	// This ensures that no two pods with different revisions exist at the same
+	// time. PersistentVolumeClaims are preserved across the recreate.
+	RecreateStatefulSetStrategyType StatefulSetUpdateStrategyType = "Recreate"
 )
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
@@ -318,6 +323,13 @@ type StatefulSetStatus struct {
 }
 
 type StatefulSetConditionType string
+
+const (
+	// Progressing means the StatefulSet is progressing through a Recreate update.
+	// This condition is set when old-revision pods are being deleted, when
+	// new-revision pods are being created, or when the recreate has completed.
+	StatefulSetProgressing StatefulSetConditionType = "Progressing"
+)
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {

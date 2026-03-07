@@ -233,6 +233,51 @@ func waitForMaxUnavailableRollingUpdate(ctx context.Context, c clientset.Interfa
 	return set, pods
 }
 
+// waitForRecreateUpdate waits for all Pods in the set to exist and have the update revision.
+// At every observation point all pods must belong to the same revision. set must have a RecreateStatefulSetStrategyType.
+func waitForRecreateUpdate(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	if set.Spec.UpdateStrategy.Type != appsv1.RecreateStatefulSetStrategyType {
+		framework.Failf("StatefulSet %s/%s attempt to wait for recreate update with updateStrategy %s",
+			set.Namespace,
+			set.Name,
+			set.Spec.UpdateStrategy.Type)
+	}
+	e2estatefulset.WaitForState(ctx, c, set, 1*time.Second, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+		set = set2
+		pods = pods2
+
+		// making sure that no two pods will have different revisions
+		revisions := map[string]bool{}
+		for i := range pods.Items {
+			rev := pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]
+			if rev != "" {
+				revisions[rev] = true
+			}
+		}
+		if len(revisions) > 1 {
+			framework.Failf("StatefulSet %s/%s recreate update has mixed revisions among pods: %v",
+				set.Namespace, set.Name, revisions)
+		}
+
+		if set.Status.UpdateRevision != set.Status.CurrentRevision {
+			framework.Logf("Waiting for StatefulSet %s/%s to complete recreate update (%d/%d pods ready)",
+				set.Namespace,
+				set.Name,
+				set.Status.ReadyReplicas,
+				*set.Spec.Replicas,
+			)
+			return false, nil
+		}
+
+		if len(pods.Items) < int(*set.Spec.Replicas) {
+			return false, nil
+		}
+		return true, nil
+	})
+	return set, pods
+}
+
 // waitForRunningAndNotReady waits for numStatefulPods in ss to be Running and not Ready.
 func waitForRunningAndNotReady(ctx context.Context, c clientset.Interface, numStatefulPods int32, ss *appsv1.StatefulSet) {
 	e2estatefulset.WaitForRunning(ctx, c, numStatefulPods, 0, ss)

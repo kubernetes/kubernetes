@@ -967,6 +967,14 @@ const (
 	// prior to running a reconcile on the same object.
 	StaleControllerConsistencyStatefulSet featuregate.Feature = "StaleControllerConsistencyStatefulSet"
 
+	// owner: @helayoty @galal-hussein
+	// kep: http://kep.k8s.io/3541
+	//
+	// A new Recreate update strategy to StatefulSets, mirroring the behavior of
+	// Deployments' Recreate strategy. This strategy deletes all pods, waits for full
+	// termination, then creates new pods according to podManagementPolicy.
+	StatefulSetRecreateStrategy featuregate.Feature = "StatefulSetRecreateStrategy"
+
 	// owner: @liggitt
 	//
 	// Mitigates spurious statefulset rollouts due to controller revision comparison mismatches
@@ -1840,6 +1848,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	StatefulSetRecreateStrategy: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	StatefulSetSemanticRevisionComparison: {
 		// This is a mitigation for a 1.34 regression due to serialization differences that cannot be feature-gated,
 		// so this mitigation should not auto-disable even if emulating versions prior to 1.34 with --emulation-version.
@@ -2474,6 +2486,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	StaleControllerConsistencyReplicaSet: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
 	StaleControllerConsistencyStatefulSet: {featuregate.Feature(clientfeatures.AtomicFIFO)},
+
+	StatefulSetRecreateStrategy: {},
 
 	StatefulSetSemanticRevisionComparison: {},
 

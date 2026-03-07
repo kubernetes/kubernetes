@@ -421,6 +421,35 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 		},
 		{
+			name: "Recreate update strategy does not populate RollingUpdate",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RecreateStatefulSetStrategyType,
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RecreateStatefulSetStrategyType,
+					},
+					RevisionHistoryLimit: ptr.To[int32](10),
+				},
+			},
+		},
+		{
 			name: "MaxUnavailable disabled, with maxUnavailable not specified",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
