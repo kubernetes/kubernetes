@@ -19,6 +19,7 @@ package devicemanager
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -276,4 +277,122 @@ func TestGetPodAndContainerForDevice(t *testing.T) {
 	// dev1 is a exist device
 	podUID, _ = podDevices.getPodAndContainerForDevice("dev1")
 	assert.Equal(t, "pod1", podUID)
+}
+
+func TestPodDevices(t *testing.T) {
+	// Test the core fix: podDevices() correctly aggregates devices from multiple containers
+	// without causing double-locking deadlock. This is the scenario that triggered the bug.
+	pdev := newPodDevices()
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		newContainerAllocateResponse(),
+	)
+	pdev.insert("pod1", "cont2", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		newContainerAllocateResponse(),
+	)
+
+	result := pdev.podDevices("pod1", "resource1")
+
+	assert.Equal(t, 4, result.Len())
+	assert.True(t, result.Has("dev1"))
+	assert.True(t, result.Has("dev2"))
+	assert.True(t, result.Has("dev3"))
+	assert.True(t, result.Has("dev4"))
+}
+
+func TestContainerDevices(t *testing.T) {
+	// Test basic functionality: containerDevices() returns correct device set
+	pdev := newPodDevices()
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}, 1: []string{"dev3"}},
+		newContainerAllocateResponse(),
+	)
+
+	result := pdev.containerDevices("pod1", "cont1", "resource1")
+
+	assert.NotNil(t, result)
+	assert.Equal(t, 3, result.Len())
+	assert.True(t, result.Has("dev1"))
+	assert.True(t, result.Has("dev2"))
+	assert.True(t, result.Has("dev3"))
+}
+
+func TestPodDevicesConcurrentAccess(t *testing.T) {
+	// Test concurrent read-write access to verify deadlock fix.
+	// Run with -race flag to detect data races: go test -race ./...
+	//
+	// Before the fix: podDevices() held RLock() and called containerDevices()
+	// which also tried to acquire RLock(). This could cause issues when a writer
+	// was waiting for the lock.
+	//
+	// The fix: containerDevicesLocked() assumes caller already holds the lock.
+	// Before the fix, when podDevices() held RLock() and called containerDevices()
+	// which also tried to acquire RLock(), a waiting writer could cause issues.
+	//
+	// The fix: containerDevicesLocked() assumes caller already holds the lock.
+	pdev := newPodDevices()
+
+	// Setup: pod with multiple containers using same resource
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		newContainerAllocateResponse(),
+	)
+	pdev.insert("pod1", "cont2", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		newContainerAllocateResponse(),
+	)
+
+	const numReaders = 10
+	const numWriters = 5
+	readerDone := make(chan bool, numReaders)
+	writerDone := make(chan bool, numWriters)
+
+	// Start multiple readers calling podDevices() which triggers the fixed code path
+	for i := 0; i < numReaders; i++ {
+		go func() {
+			defer func() { readerDone <- true }()
+			for j := 0; j < 100; j++ {
+				pdev.podDevices("pod1", "resource1")
+			}
+		}()
+	}
+
+	// Start writers that need write lock (competing with readers)
+	for i := 0; i < numWriters; i++ {
+		go func(idx int) {
+			defer func() { writerDone <- true }()
+			for j := 0; j < 50; j++ {
+				pdev.insert("pod2", "cont3", "resource2",
+					checkpoint.DevicesPerNUMA{0: []string{"dev5"}},
+					newContainerAllocateResponse(),
+				)
+				pdev.delete([]string{"pod2"})
+			}
+		}(i)
+	}
+
+	// Wait for all readers with timeout
+	for i := 0; i < numReaders; i++ {
+		select {
+		case <-readerDone:
+			// Reader completed successfully
+		case <-time.After(10 * time.Second):
+			t.Fatalf("reader %d deadlocked", i)
+		}
+	}
+
+	// Wait for all writers with timeout
+	for i := 0; i < numWriters; i++ {
+		select {
+		case <-writerDone:
+			// Writer completed successfully
+		case <-time.After(10 * time.Second):
+			t.Fatalf("writer %d deadlocked", i)
+		}
+	}
+
+	// Verify final state is consistent
+	result := pdev.podDevices("pod1", "resource1")
+	assert.Equal(t, 4, result.Len())
 }
