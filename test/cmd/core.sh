@@ -1270,8 +1270,8 @@ run_rc_tests() {
   kubectl delete rc frontend "${kube_flags[@]}"
 
   ### Scale multiple replication controllers
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/test-master-controller.yaml "${kube_flags[@]}"
+  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/test-slave-controller.yaml "${kube_flags[@]}"
   # Command dry-run client
   output_message=$(kubectl scale rc/redis-master rc/redis-slave --replicas=4 --dry-run=client "${kube_flags[@]}")
   # Post-condition dry-run client: 1 replicas each
@@ -1413,7 +1413,7 @@ run_rc_tests() {
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/test-slave-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
