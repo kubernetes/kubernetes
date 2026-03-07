@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	webhookgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 )
@@ -174,6 +175,8 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 				hook.ParamScope,
 				bindingAccessor.GetParamRef(),
 				a.GetNamespace(),
+				hook.DynamicClient,
+				hook.RESTMapper,
 			)
 			if err != nil {
 				// There was an error collecting params for this binding.
@@ -264,12 +267,17 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 // Returns params to use to evaluate a policy-binding with given param
 // configuration. If the policy-binding has no param configuration, it
 // returns a single-element list with a nil param.
+//
+// The dynamicClient and restMapper parameters enable direct API fallback when
+// the informer cache hasn't received the watch event for a newly created param yet.
 func CollectParams(
 	paramKind *v1.ParamKind,
 	paramInformer informers.GenericInformer,
 	paramScope meta.RESTScope,
 	paramRef *v1.ParamRef,
 	namespace string,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
 ) ([]runtime.Object, error) {
 	// If definition has paramKind, paramRef is required in binding.
 	// If definition has no paramKind, paramRef set in binding will be ignored.
@@ -331,7 +339,20 @@ func CollectParams(
 			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
 		}
 
-		switch param, err := paramStore.Get(paramRef.Name); {
+		// First attempt: try to get the param from the informer cache (fast path)
+		param, err := paramStore.Get(paramRef.Name)
+
+		// If cache returns NotFound and we have a client, try direct API call as fallback.
+		// This handles the race condition where resources (ConfigMap, Policy, Binding, and Param)
+		// are created in quick succession. The informer cache may have completed its initial
+		// sync (checked by WaitForCacheSync above), but newly created params might not have
+		// propagated to the cache yet. The direct API call ensures we get the correct answer
+		// without timing-dependent retry logic.
+		if apierrors.IsNotFound(err) && dynamicClient != nil && restMapper != nil && paramKind != nil {
+			param, err = getParamDirectly(dynamicClient, restMapper, paramKind, paramRef, namespace, paramScope)
+		}
+
+		switch {
 		case err == nil:
 			params = []runtime.Object{param}
 		case apierrors.IsNotFound(err):
@@ -379,6 +400,53 @@ func CollectParams(
 	}
 
 	return params, nil
+}
+
+// getParamDirectly performs a direct API call to retrieve a param when the informer
+// cache doesn't have it yet. This handles the race condition where a param resource
+// is created but the watch event hasn't propagated to the informer cache.
+func getParamDirectly(
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	paramKind *v1.ParamKind,
+	paramRef *v1.ParamRef,
+	namespace string,
+	paramScope meta.RESTScope,
+) (runtime.Object, error) {
+	// Convert GVK to GVR using the RESTMapper
+	gv, err := schema.ParseGroupVersion(paramKind.APIVersion)
+	if err != nil {
+		return nil, fmt.Errorf("invalid paramKind APIVersion %q: %w", paramKind.APIVersion, err)
+	}
+	gvk := gv.WithKind(paramKind.Kind)
+
+	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find REST mapping for %v: %w", gvk, err)
+	}
+
+	// Determine the namespace for the Get request
+	var targetNamespace string
+	if paramScope.Name() == meta.RESTScopeNameNamespace {
+		if len(paramRef.Namespace) > 0 {
+			targetNamespace = paramRef.Namespace
+		} else {
+			targetNamespace = namespace
+		}
+	}
+
+	// Perform the direct API call with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	var resourceClient dynamic.ResourceInterface
+	if targetNamespace != "" {
+		resourceClient = dynamicClient.Resource(mapping.Resource).Namespace(targetNamespace)
+	} else {
+		resourceClient = dynamicClient.Resource(mapping.Resource)
+	}
+
+	return resourceClient.Get(ctx, paramRef.Name, metav1.GetOptions{})
 }
 
 var _ webhookgeneric.VersionedAttributeAccessor = &versionedAttributeAccessor{}
