@@ -17,13 +17,10 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
@@ -33,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Pod, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, string, error) {
+func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) (*volume.Spec, string, error) {
 	claimName := ""
 	readOnly := false
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
@@ -84,33 +81,12 @@ func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Po
 	return volumeSpec, claimName, nil
 }
 
-func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
-	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, vpm, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, pvcLister, pvLister)
 	if err != nil {
 		return nil, err
 	}
-	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"error performing CSI migration checks and translation for PVC %q/%q: %w",
-			pod.Namespace,
-			claimName,
-			err)
-	}
-	return volumeSpec, nil
-}
-
-// CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
-// specified volume. It dereference any PVC to get PV objects, if needed.
-// A volume.Spec that refers to an in-tree plugin spec is translated to refer
-// to a migrated CSI plugin spec if all conditions for CSI migration on a node
-// for the in-tree plugin is satisfied.
-func CreateVolumeSpecWithNodeMigration(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
-	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, vpm, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
-	if err != nil {
-		return nil, err
-	}
-	volumeSpec, err = translateInTreeSpecToCSIOnNodeIfNeeded(logger, volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
+	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, csiMigratedPluginManager, csiTranslator, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error performing CSI migration checks and translation for PVC %q/%q: %w",
@@ -214,7 +190,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := CreateVolumeSpecWithNodeMigration(logger, podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+		volumeSpec, err := CreateVolumeSpec(logger, podVolume, pod, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
 			logger.V(10).Info("Error processing volume for pod", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
@@ -250,30 +226,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 	}
 }
 
-func translateInTreeSpecToCSIOnNodeIfNeeded(logger klog.Logger, spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
-	translatedSpec := spec
-	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
-	if err != nil {
-		return nil, err
-	}
-	if !migratable {
-		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
-		return spec, nil
-	}
-	migrationSupportedOnNode, err := isCSIMigrationSupportedOnNode(nodeName, spec, vpm, csiMigratedPluginManager)
-	if err != nil {
-		return nil, err
-	}
-	if migratable && migrationSupportedOnNode {
-		translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(logger, spec, podNamespace, csiTranslator)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return translatedSpec, nil
-}
-
-func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
+func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
 	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
 	if err != nil {
 		return nil, err
@@ -287,66 +240,4 @@ func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, vpm
 		return nil, err
 	}
 	return translatedSpec, nil
-}
-
-func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
-	pluginName, err := csiMigratedPluginManager.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
-	if err != nil {
-		return false, err
-	}
-
-	if len(pluginName) == 0 {
-		// Could not find a plugin name from translation directory, assume not translated
-		return false, nil
-	}
-
-	if csiMigratedPluginManager.IsMigrationCompleteForPlugin(pluginName) {
-		// All nodes are expected to have migrated CSI plugin installed and
-		// configured when CSI Migration Complete flag is enabled for a plugin.
-		// CSI migration is supported even if there is version skew between
-		// managers and node.
-		return true, nil
-	}
-
-	if len(nodeName) == 0 {
-		return false, errors.New("nodeName is empty")
-	}
-
-	kubeClient := vpm.Host.GetKubeClient()
-	if kubeClient == nil {
-		// Don't handle the controller/kubelet version skew check and fallback
-		// to just checking the feature gates. This can happen if
-		// we are in a standalone (headless) Kubelet
-		return true, nil
-	}
-
-	adcHost, ok := vpm.Host.(volume.AttachDetachVolumeHost)
-	if !ok {
-		// Don't handle the controller/kubelet version skew check and fallback
-		// to just checking the feature gates. This can happen if
-		// "enableControllerAttachDetach" is set to true on kubelet
-		return true, nil
-	}
-
-	if adcHost.CSINodeLister() == nil {
-		return false, errors.New("could not find CSINodeLister in attachDetachController")
-	}
-
-	csiNode, err := adcHost.CSINodeLister().Get(string(nodeName))
-	if err != nil {
-		return false, err
-	}
-
-	ann := csiNode.GetAnnotations()
-	if ann == nil {
-		return false, nil
-	}
-
-	mpa := ann[v1.MigratedPluginsAnnotationKey]
-	tok := strings.Split(mpa, ",")
-	mpaSet := sets.NewString(tok...)
-
-	isMigratedOnNode := mpaSet.Has(pluginName)
-
-	return isMigratedOnNode, nil
 }

@@ -24,7 +24,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 
 	"time"
@@ -61,10 +60,10 @@ var (
 // nodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINode objects.
 type nodeInfoManager struct {
-	nodeName        types.NodeName
-	nodeID          types.UID
-	volumeHost      volume.VolumeHost
-	migratedPlugins map[string](func() bool)
+	nodeName   types.NodeName
+	nodeID     types.UID
+	volumeHost volume.VolumeHost
+
 	// lock protects changes to node.
 	lock sync.Mutex
 }
@@ -74,10 +73,8 @@ type nodeUpdateFunc func(*v1.Node) (newNode *v1.Node, updated bool, err error)
 
 // Interface implements an interface for managing labels of a node
 type Interface interface {
-	CreateCSINode() (*storagev1.CSINode, error)
-
-	// Updates or Creates the CSINode object with annotations for CSI Migration
-	InitializeCSINodeWithAnnotation() error
+	// Updates or Creates the CSINode object
+	InitializeCSINode() error
 
 	// Record in the cluster the given node information from the CSI driver with the given name.
 	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
@@ -94,14 +91,10 @@ type Interface interface {
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
-func NewNodeInfoManager(
-	nodeName types.NodeName,
-	volumeHost volume.VolumeHost,
-	migratedPlugins map[string](func() bool)) Interface {
+func NewNodeInfoManager(nodeName types.NodeName, volumeHost volume.VolumeHost) Interface {
 	return &nodeInfoManager{
-		nodeName:        nodeName,
-		volumeHost:      volumeHost,
-		migratedPlugins: migratedPlugins,
+		nodeName:   nodeName,
+		volumeHost: volumeHost,
 	}
 }
 
@@ -394,7 +387,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 
 	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
-		nodeInfo, err = nim.CreateCSINode()
+		nodeInfo, err = nim.createCSINode()
 	}
 	if err != nil {
 		return err
@@ -407,7 +400,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	return nim.installDriverToCSINode(nodeInfo, driverName, driverNodeID, maxAttachLimit, topology)
 }
 
-func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
+func (nim *nodeInfoManager) InitializeCSINode() error {
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return goerrors.New("error getting CSI client")
@@ -415,7 +408,7 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 
 	var lastErr error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if lastErr = nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); lastErr != nil {
+		if lastErr = nim.tryInitializeCSINode(csiKubeClient); lastErr != nil {
 			klog.V(2).Infof("Failed to publish CSINode: %v", lastErr)
 			return false, nil
 		}
@@ -428,7 +421,7 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 	return nil
 }
 
-func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient clientset.Interface) error {
+func (nim *nodeInfoManager) tryInitializeCSINode(csiKubeClient clientset.Interface) error {
 	nim.lock.Lock()
 	defer nim.lock.Unlock()
 
@@ -440,23 +433,27 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 
 	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
-		// CreateCSINode will set the annotation
-		_, err = nim.CreateCSINode()
+		_, err = nim.createCSINode()
 		return err
 	} else if err != nil {
 		return err
+	}
+
+	// Remove migrated plugins annotation if it exists.
+	// TODO: remove this after one release
+	if _, ok := nodeInfo.ObjectMeta.Annotations[v1.DeprecatedMigratedPluginsAnnotationKey]; ok {
+		delete(nodeInfo.ObjectMeta.Annotations, v1.DeprecatedMigratedPluginsAnnotationKey)
+		_, err = csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
 		return err
 	}
 
-	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
-
-	if annotationModified {
-		_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
-		return err
-	}
 	return nil
 
 }
@@ -499,7 +496,7 @@ func (nim *nodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) (bool, 
 	return found, csiNodeOwnerID
 }
 
-func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
+func (nim *nodeInfoManager) createCSINode() (*storagev1.CSINode, error) {
 
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
@@ -523,8 +520,6 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 		},
 	}
 
-	setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
-
 	return csiKubeClient.StorageV1().CSINodes().Create(context.TODO(), nodeInfo, metav1.CreateOptions{})
 }
 
@@ -536,47 +531,6 @@ func (nim *nodeInfoManager) DeleteCSINode() error {
 	}
 
 	return csiKubeClient.StorageV1().CSINodes().Delete(context.TODO(), string(nim.nodeName), metav1.DeleteOptions{})
-}
-
-func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storagev1.CSINode) (modified bool) {
-	if migratedPlugins == nil {
-		return false
-	}
-
-	nodeInfoAnnotations := nodeInfo.GetAnnotations()
-	if nodeInfoAnnotations == nil {
-		nodeInfoAnnotations = map[string]string{}
-	}
-
-	var oldAnnotationSet sets.Set[string]
-	mpa := nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey]
-	tok := strings.Split(mpa, ",")
-	if len(mpa) == 0 {
-		oldAnnotationSet = sets.New[string]()
-	} else {
-		oldAnnotationSet = sets.New[string](tok...)
-	}
-
-	newAnnotationSet := sets.New[string]()
-	for pluginName, migratedFunc := range migratedPlugins {
-		if migratedFunc() {
-			newAnnotationSet.Insert(pluginName)
-		}
-	}
-
-	if oldAnnotationSet.Equal(newAnnotationSet) {
-		return false
-	}
-
-	nas := strings.Join(sets.List[string](newAnnotationSet), ",")
-	if len(nas) != 0 {
-		nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
-	} else {
-		delete(nodeInfoAnnotations, v1.MigratedPluginsAnnotationKey)
-	}
-
-	nodeInfo.Annotations = nodeInfoAnnotations
-	return true
 }
 
 // Returns true if and only if new maxAttachLimit doesn't require CSINode update
@@ -618,9 +572,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		}
 	}
 
-	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
-
-	if !specModified && !annotationModified {
+	if !specModified {
 		return nil
 	}
 
