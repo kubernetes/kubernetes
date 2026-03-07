@@ -409,6 +409,110 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 	return nil
 }
 
+func (p *staticPolicy) deleteCPUsInCpusToReuse(pod *v1.Pod, cpus cpuset.CPUSet) {
+	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cpus)
+}
+
+// getPodAssignedCPUs returns assigned cpus of given pod `podUID`.
+func getPodAssignedCPUs(s state.State, podUID string) cpuset.CPUSet {
+	assignments := s.GetCPUAssignments()
+	cset := cpuset.New()
+	for _, cpus := range assignments[podUID] {
+		cset = cset.Union(cpus)
+	}
+	return cset
+}
+
+// getPodNonUsedReusableCPUs returns the CPUs that assigned to the non-restartable InitContainers, but not assigned to the app/sideCar containers.
+func getPodNonUsedReusableCPUs(s state.State, pod *v1.Pod) cpuset.CPUSet {
+	podUID := string(pod.UID)
+	assignments := s.GetCPUAssignments()
+	initContainerCset := cpuset.New()
+	sideCarContainerCset := cpuset.New()
+	appContainerCset := cpuset.New()
+	for _, initContainer := range pod.Spec.InitContainers {
+		if podutil.IsRestartableInitContainer(&initContainer) {
+			sideCarContainerCset = sideCarContainerCset.Union(assignments[podUID][initContainer.Name])
+		}
+		initContainerCset = initContainerCset.Union(assignments[podUID][initContainer.Name])
+	}
+	for _, container := range pod.Spec.Containers {
+		appContainerCset = appContainerCset.Union(assignments[podUID][container.Name])
+	}
+	nonUsedReusableCPUs := initContainerCset.Difference(appContainerCset.Union(sideCarContainerCset))
+	return nonUsedReusableCPUs
+}
+
+// If the pod assigned CPU number is greater than the pod max request CPU number, there are leaked CPUs.
+// The leaked CPU number equal to pod assigned CPU number - pod max request CPU number.
+// Get and release these leaked CPUs into the default CPUSet.
+func (p *staticPolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod *v1.Pod) cpuset.CPUSet {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID)
+	leakedCPUs := cpuset.New()
+	// Get Max request CPU number of the pod
+	podCPUsNumber := p.podGuaranteedCPUs(logger, pod)
+	// Get all allocated CPUs of the pod
+	podCPUSet := getPodAssignedCPUs(s, string(pod.UID))
+	// If the number of pod allocated CPUs greater than the max request CPU number of the pod, it means have leaked CPUs.
+	if podCPUSet.Size() > podCPUsNumber {
+		// Calculate the leaked CPUs number
+		leakedCPUsNumber := podCPUSet.Size() - podCPUsNumber
+		unallocatedReusableCPUs := getPodNonUsedReusableCPUs(s, pod)
+		if unallocatedReusableCPUs.Size() < leakedCPUsNumber {
+			leakedCPUsNumber = unallocatedReusableCPUs.Size()
+		}
+		// Get the keeped CPUs in unallocatedReusableCPUs
+		keepCPUs, err := p.takeByTopology(logger, unallocatedReusableCPUs, unallocatedReusableCPUs.Size()-leakedCPUsNumber)
+		if err != nil {
+			return leakedCPUs
+		}
+		// Get the leaked CPUs
+		leakedCPUs = unallocatedReusableCPUs.Difference(keepCPUs)
+		// Release leaked CPUs into DefaultCPUSet
+		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(leakedCPUs))
+		p.deleteCPUsInCpusToReuse(pod, leakedCPUs)
+		p.updateMetricsOnRelease(logger, s, leakedCPUs)
+		logger.Info("Static policy: ReleaseLeakedCPUs, release leaked CPUs to DefaultCPUSet", "leakedCPUsNumber", leakedCPUsNumber, "leakedCPUs", leakedCPUs)
+	}
+	return leakedCPUs
+}
+
+// Check whether the assigned CPUs of the InitContainer are released into the default cpuset,
+// if yes, reallocate the CPUs (which assigned to the pod) to the InitContainer
+func (p *staticPolicy) UpdateCPUsForInitC(logger logr.Logger, s state.State, pod *v1.Pod, containerName string, leakedCPUs cpuset.CPUSet) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName)
+	podCPUSet := getPodAssignedCPUs(s, string(pod.UID))
+	if cset, ok := s.GetCPUSet(string(pod.UID), containerName); ok {
+		replacedCPUs := cset.Intersection(leakedCPUs)
+		if replacedCPUs.Size() == 0 {
+			return
+		}
+		sidecarCPUsBeforeInit := p.getSidecarCPUsBeforeInit(s, pod, containerName)
+		allocatedCPUs, err := p.takeByTopology(logger, podCPUSet.Difference(leakedCPUs).Difference(sidecarCPUsBeforeInit), cset.Size())
+		if err != nil {
+			return
+		}
+		s.SetCPUSet(string(pod.UID), containerName, allocatedCPUs)
+		logger.Info("Static policy: ReplaceLeakedCPUs", "cset before update", cset, "cset after update", allocatedCPUs)
+	}
+}
+
+// Get the assigned CPU of the side-car container which running before this InitContainer. These CPUs can not be used by this InitContainer.
+func (p *staticPolicy) getSidecarCPUsBeforeInit(s state.State, pod *v1.Pod, containerName string) cpuset.CPUSet {
+	sidecarCPUs := cpuset.New()
+
+	for _, initContainer := range pod.Spec.InitContainers {
+		if containerName == initContainer.Name {
+			break
+		}
+		if podutil.IsRestartableInitContainer(&initContainer) {
+			cset, _ := s.GetCPUSet(string(pod.UID), initContainer.Name)
+			sidecarCPUs = sidecarCPUs.Union(cset)
+		}
+	}
+	return sidecarCPUs
+}
+
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
 	assignments := s.GetCPUAssignments()
