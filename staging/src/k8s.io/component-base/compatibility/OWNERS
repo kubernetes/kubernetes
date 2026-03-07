@@ -4,10 +4,13 @@
 # an interface to the version definition in "k8s.io/apiserver/pkg/util/compatibility".
 
 approvers:
-  - sig-api-machinery-api-approvers
+  - deads2k
   - jpbetz
+  - sttts
 reviewers:
-  - sig-api-machinery-api-reviewers
+  - deads2k
+  - jpbetz
+  - sttts
   - siyuanfoundation
   - jefftree
 labels:

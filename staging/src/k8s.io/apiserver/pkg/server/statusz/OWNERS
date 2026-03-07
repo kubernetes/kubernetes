@@ -1,6 +1,8 @@
 approvers:
   - sig-instrumentation-approvers
-  - sig-api-machinery-approvers
+  - deads2k
+  - jpbetz
+  - sttts
 reviewers:
   - sig-instrumentation-reviewers
 labels:
