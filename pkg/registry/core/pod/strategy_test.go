@@ -3716,6 +3716,68 @@ func TestEphemeralContainersPrepareForUpdate(t *testing.T) {
 	}
 }
 
+func TestSchedulingGroupEnablement(t *testing.T) {
+	var (
+		ctx    = genericapirequest.NewDefaultContext()
+		pgName = "pg"
+		pod    = podtest.MakePod("pod",
+			podtest.SetSchedulingGroup(&api.PodSchedulingGroup{
+				PodGroupName: ptr.To(pgName),
+			}),
+		)
+	)
+
+	// Enable the Feature Gate during the Pod creation.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	errs := Strategy.Validate(ctx, pod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	createdPod := pod.DeepCopy()
+	Strategy.PrepareForCreate(ctx, createdPod)
+
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup created with unexpected result")
+	}
+
+	// Disable the Feature Gate and check that the SchedulingGroup field still exists after updating.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, false)
+
+	updatedPod := createdPod.DeepCopy()
+	updatedPod.Labels = map[string]string{"foo": "bar"}
+	updatedPod.ResourceVersion = "2"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod, createdPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod, createdPod)
+
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup updated with unexpected result")
+	}
+
+	// Enable the Feature Gate again to check that the SchedulingGroup field still exist after updating.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	updatedPod2 := updatedPod.DeepCopy()
+	updatedPod2.Labels = map[string]string{"foo": "baz"}
+	updatedPod2.ResourceVersion = "3"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod2, updatedPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod2, updatedPod)
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup updated with unexpected result")
+	}
+}
+
 func TestStatusPrepareForUpdate(t *testing.T) {
 	testCases := []struct {
 		description string

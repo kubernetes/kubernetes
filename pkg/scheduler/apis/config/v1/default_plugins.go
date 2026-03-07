@@ -67,6 +67,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		applyGangScheduling(config)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -110,6 +113,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.PreBind = mergePluginSet(logger, defaultPlugins.PreBind, customPlugins.PreBind)
 	defaultPlugins.Bind = mergePluginSet(logger, defaultPlugins.Bind, customPlugins.Bind)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
+	defaultPlugins.PlacementGenerate = mergePluginSet(logger, defaultPlugins.PlacementGenerate, customPlugins.PlacementGenerate)
 	return defaultPlugins
 }
 

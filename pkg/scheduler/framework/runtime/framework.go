@@ -55,25 +55,26 @@ const (
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry             Registry
-	snapshotSharedLister fwk.SharedLister
-	waitingPods          *waitingPodsMap
-	podsInPreBind        *podsInPreBindMap
-	scorePluginWeight    map[string]int
-	preEnqueuePlugins    []fwk.PreEnqueuePlugin
-	enqueueExtensions    []fwk.EnqueueExtensions
-	queueSortPlugins     []fwk.QueueSortPlugin
-	preFilterPlugins     []fwk.PreFilterPlugin
-	filterPlugins        []fwk.FilterPlugin
-	postFilterPlugins    []fwk.PostFilterPlugin
-	preScorePlugins      []fwk.PreScorePlugin
-	scorePlugins         []fwk.ScorePlugin
-	reservePlugins       []fwk.ReservePlugin
-	preBindPlugins       []fwk.PreBindPlugin
-	bindPlugins          []fwk.BindPlugin
-	postBindPlugins      []fwk.PostBindPlugin
-	permitPlugins        []fwk.PermitPlugin
-	batchablePlugins     []fwk.SignPlugin
+	registry                 Registry
+	snapshotSharedLister     fwk.SharedLister
+	waitingPods              *waitingPodsMap
+	podsInPreBind            *podsInPreBindMap
+	scorePluginWeight        map[string]int
+	preEnqueuePlugins        []fwk.PreEnqueuePlugin
+	enqueueExtensions        []fwk.EnqueueExtensions
+	queueSortPlugins         []fwk.QueueSortPlugin
+	preFilterPlugins         []fwk.PreFilterPlugin
+	filterPlugins            []fwk.FilterPlugin
+	postFilterPlugins        []fwk.PostFilterPlugin
+	preScorePlugins          []fwk.PreScorePlugin
+	scorePlugins             []fwk.ScorePlugin
+	reservePlugins           []fwk.ReservePlugin
+	preBindPlugins           []fwk.PreBindPlugin
+	bindPlugins              []fwk.BindPlugin
+	postBindPlugins          []fwk.PostBindPlugin
+	permitPlugins            []fwk.PermitPlugin
+	batchablePlugins         []fwk.SignPlugin
+	placementGeneratePlugins []fwk.PlacementGeneratePlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -83,7 +84,7 @@ type frameworkImpl struct {
 	eventRecorder    events.EventRecorder
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
-	workloadManager  fwk.WorkloadManager
+	podGroupManager  fwk.PodGroupManager
 	logger           klog.Logger
 
 	sharedCSIManager fwk.CSIManager
@@ -130,6 +131,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
 	}
 }
 
@@ -156,7 +158,7 @@ type frameworkOptions struct {
 	waitingPods            *waitingPodsMap
 	podsInPreBind          *podsInPreBindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
-	workloadManager        fwk.WorkloadManager
+	podGroupManager        fwk.PodGroupManager
 	logger                 *klog.Logger
 }
 
@@ -256,10 +258,10 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	}
 }
 
-// WithWorkloadManager sets Workload manager for the scheduling frameworkImpl.
-func WithWorkloadManager(workloadManager fwk.WorkloadManager) Option {
+// WithPodGroupManager sets Pod group manager for the scheduling frameworkImpl.
+func WithPodGroupManager(podGroupManager fwk.PodGroupManager) Option {
 	return func(o *frameworkOptions) {
-		o.workloadManager = workloadManager
+		o.podGroupManager = podGroupManager
 	}
 }
 
@@ -343,7 +345,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
 		apiDispatcher:        options.apiDispatcher,
-		workloadManager:      options.workloadManager,
+		podGroupManager:      options.podGroupManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -430,6 +432,9 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
+	}
+	if len(f.placementGeneratePlugins) > 1 {
+		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
 	}
 
 	if err := getScoreWeights(f, append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...)); err != nil {
@@ -1830,6 +1835,46 @@ func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]ti
 	f.waitingPods.add(waitingPod)
 }
 
+// RunPlacementGeneratePlugins runs the set of configured PlacementGeneratePlugins and returns the generated placements.
+// If no plugins are defined, the input placement is returned instead.
+func (f *frameworkImpl) RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) (placements []*fwk.Placement, status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementGenerate, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	placement := &fwk.Placement{
+		Nodes: nodes,
+	}
+
+	if len(f.placementGeneratePlugins) == 0 {
+		return []*fwk.Placement{placement}, nil
+	}
+
+	plugin := f.placementGeneratePlugins[0]
+
+	result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
+	if !status.IsSuccess() {
+		return nil, status.WithPlugin(plugin.Name())
+	}
+
+	if len(result.Placements) == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+	}
+
+	return result.Placements, nil
+}
+
+func (f *frameworkImpl) runPlacementGeneratePlugin(ctx context.Context, pl fwk.PlacementGeneratePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.GeneratePlacements(ctx, state, podGroup, parentPlacement)
+	}
+	startTime := time.Now()
+	placements, status := pl.GeneratePlacements(ctx, state, podGroup, parentPlacement)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementGenerate, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return placements, status
+}
+
 func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {
 	return f.waitingPods.get(pod.UID) != nil
 }
@@ -1979,9 +2024,9 @@ func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
 	return f.sharedCSIManager
 }
 
-// WorkloadManager returns the WorkloadManager of the framework.
-func (f *frameworkImpl) WorkloadManager() fwk.WorkloadManager {
-	return f.workloadManager
+// PodGroupManager returns the PodGroupManager of the framework.
+func (f *frameworkImpl) PodGroupManager() fwk.PodGroupManager {
+	return f.podGroupManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

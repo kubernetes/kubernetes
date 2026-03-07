@@ -170,7 +170,7 @@ const (
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-	Workload              EventResource = "scheduling.k8s.io/Workload"
+	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -635,6 +635,21 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	if len(*protocol) == 0 {
 		*protocol = string(v1.ProtocolTCP)
 	}
+}
+
+// PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
+// Typically used as an input to pod group scheduling cycle plugins.
+type PodGroupInfo interface {
+	// GetUnscheduledPods returns pods that are currently being considered for scheduling.
+	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	// This structure only contains the pods considered for scheduling in the pod group scheduling cycle.
+	GetUnscheduledPods() []*v1.Pod
+
+	// GetName returns the PodGroup name.
+	GetName() string
+
+	// GetNamespace returns the namespace the pod group belongs to.
+	GetNamespace() string
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.

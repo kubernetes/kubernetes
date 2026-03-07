@@ -38,4 +38,5 @@ const (
 	VolumeBinding                   = "VolumeBinding"
 	VolumeRestrictions              = "VolumeRestrictions"
 	VolumeZone                      = "VolumeZone"
+	TopologyPlacementGenerator      = "TopologyPlacementGenerator"
 )
