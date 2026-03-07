@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -57,6 +58,8 @@ type corruptObjectDeleter struct {
 }
 
 // Delete performs an unsafe deletion of the given resource from the storage.
+// On successful deletion, the returned object is nil because the object was
+// corrupt and could not be decoded from storage.
 //
 // NOTE: This function should NEVER be used for any normal deletion
 // flow, it is exclusively used when the user enables
@@ -88,6 +91,12 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 			field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is exclusively used to delete corrupt object(s), try again by removing this option"),
 		}
 		return nil, false, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
+	}
+
+	if dryrun.IsDryRun(opts.DryRun) {
+		// The object is confirmed corrupt above, simulate successful
+		// force-delete. We return nil because the object can't be decoded.
+		return nil, true, nil
 	}
 
 	// try normal deletion anyway, it is expected to fail
