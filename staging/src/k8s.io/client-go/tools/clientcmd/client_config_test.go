@@ -963,6 +963,10 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 
 		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
 			expectedServer = overridenServer
+			// When server is overridden, TLS settings are cleared unless also overridden
+			if len(tc.overrides.ClusterInfo.CertificateAuthority) == 0 {
+				expectedCAFile = ""
+			}
 		}
 		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
 			expectedToken = tc.overrides.AuthInfo.Token
@@ -984,6 +988,418 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
 		}
+	}
+}
+
+// TestInClusterWithCommandLineOverrides verifies that in-cluster configuration
+// correctly handles command-line overrides (like --request-timeout and --server)
+// without reverting the server URL to localhost:8080 when other settings are overridden.
+func TestInClusterWithCommandLineOverrides(t *testing.T) {
+	tests := []struct {
+		name                   string
+		overrides              *ConfigOverrides
+		expectServer           string
+		expectTimeout          string
+		expectNamespace        string
+		expectCAFile           string
+		expectToken            string
+		expectTokenFile        string
+		expectInsecure         bool
+		expectTLSServer        string
+		expectProxyURL         string
+		expectDisableComp      bool
+		expectImpersonateAs    string
+		expectImpersonateUID   string
+		expectImpersonateGrp   []string
+		expectImpersonateExtra map[string][]string
+		expectAuthProvider     bool
+		expectExecProvider     bool
+	}{
+		{
+			name: "in-cluster config with only timeout override preserves server",
+			overrides: &ConfigOverrides{
+				Timeout: "30s",
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectTimeout:   "30s",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with namespace override preserves server",
+			overrides: &ConfigOverrides{
+				Context: clientcmdapi.Context{
+					Namespace: "custom-namespace",
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectNamespace: "custom-namespace",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with timeout and namespace overrides preserves server",
+			overrides: &ConfigOverrides{
+				Timeout: "45s",
+				Context: clientcmdapi.Context{
+					Namespace: "test-namespace",
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectTimeout:   "45s",
+			expectNamespace: "test-namespace",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with explicit server override replaces server and clears TLS",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server: "https://custom-api-server:6443",
+				},
+			},
+			expectServer:    "https://custom-api-server:6443",
+			expectCAFile:    "", // TLS settings cleared when server overridden
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with server and timeout overrides clears TLS",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server: "https://external-api:8443",
+				},
+				Timeout: "60s",
+			},
+			expectServer:    "https://external-api:8443",
+			expectTimeout:   "60s",
+			expectCAFile:    "", // TLS settings cleared when server overridden
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with CA override",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					CertificateAuthority: "/custom/ca.crt",
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectCAFile:    "/custom/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with insecure skip TLS verify",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					InsecureSkipTLSVerify: true,
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectInsecure:  true,
+			expectCAFile:    "", // CA should be cleared when insecure is set
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with TLS server name",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					TLSServerName: "custom.example.com",
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectTLSServer: "custom.example.com",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with proxy URL",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					ProxyURL: "http://proxy.example.com:8080",
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectProxyURL:  "http://proxy.example.com:8080",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with disable compression",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					DisableCompression: true,
+				},
+			},
+			expectServer:      "https://kubernetes.default.svc",
+			expectDisableComp: true,
+			expectCAFile:      "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:       "",
+			expectTokenFile:   "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		{
+			name: "in-cluster config with impersonate user (--as) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate: "admin-user",
+				},
+			},
+			expectServer:        "https://kubernetes.default.svc",
+			expectCAFile:        "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:         "",
+			expectTokenFile:     "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateAs: "admin-user",
+		},
+		{
+			name: "in-cluster config with impersonate UID (--as-uid) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					ImpersonateUID: "1234",
+				},
+			},
+			expectServer:         "https://kubernetes.default.svc",
+			expectCAFile:         "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:          "",
+			expectTokenFile:      "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateUID: "1234",
+		},
+		{
+			name: "in-cluster config with impersonate groups (--as-group) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					ImpersonateGroups: []string{"system:masters", "developers"},
+				},
+			},
+			expectServer:         "https://kubernetes.default.svc",
+			expectCAFile:         "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:          "",
+			expectTokenFile:      "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateGrp: []string{"system:masters", "developers"},
+		},
+		{
+			name: "in-cluster config with full impersonation (--as, --as-uid, --as-group) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate:       "admin-user",
+					ImpersonateUID:    "5678",
+					ImpersonateGroups: []string{"admins"},
+				},
+			},
+			expectServer:         "https://kubernetes.default.svc",
+			expectCAFile:         "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:          "",
+			expectTokenFile:      "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateAs:  "admin-user",
+			expectImpersonateUID: "5678",
+			expectImpersonateGrp: []string{"admins"},
+		},
+		{
+			name: "in-cluster config with impersonate user extra (--as-user-extra) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					ImpersonateUserExtra: map[string][]string{
+						"scopes":      {"view", "develop"},
+						"environment": {"production"},
+					},
+				},
+			},
+			expectServer:    "https://kubernetes.default.svc",
+			expectCAFile:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:     "",
+			expectTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateExtra: map[string][]string{
+				"scopes":      {"view", "develop"},
+				"environment": {"production"},
+			},
+		},
+		{
+			name: "in-cluster config with impersonation and timeout preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate:       "test-user",
+					ImpersonateGroups: []string{"testers"},
+				},
+				Timeout: "120s",
+			},
+			expectServer:         "https://kubernetes.default.svc",
+			expectTimeout:        "120s",
+			expectCAFile:         "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:          "",
+			expectTokenFile:      "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectImpersonateAs:  "test-user",
+			expectImpersonateGrp: []string{"testers"},
+		},
+		{
+			name: "in-cluster config with auth provider (e.g., gcp, azure) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					AuthProvider: &clientcmdapi.AuthProviderConfig{
+						Name: "gcp",
+						Config: map[string]string{
+							"cmd-path": "gcloud",
+						},
+					},
+				},
+			},
+			expectServer:       "https://kubernetes.default.svc",
+			expectCAFile:       "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:        "",
+			expectTokenFile:    "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectAuthProvider: true,
+		},
+		{
+			name: "in-cluster config with exec provider (e.g., aws-iam-authenticator) preserves server",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Exec: &clientcmdapi.ExecConfig{
+						Command:    "aws-iam-authenticator",
+						Args:       []string{"token", "-i", "my-cluster"},
+						APIVersion: "client.authentication.k8s.io/v1beta1",
+					},
+				},
+			},
+			expectServer:       "https://kubernetes.default.svc",
+			expectCAFile:       "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:        "",
+			expectTokenFile:    "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectExecProvider: true,
+		},
+		{
+			name:              "in-cluster config with no overrides preserves all settings",
+			overrides:         &ConfigOverrides{},
+			expectServer:      "https://kubernetes.default.svc",
+			expectCAFile:      "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			expectToken:       "",
+			expectTokenFile:   "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			expectDisableComp: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create an in-cluster config with typical in-cluster values
+			icc := &inClusterClientConfig{
+				inClusterConfigProvider: func() (*restclient.Config, error) {
+					return &restclient.Config{
+						Host: "https://kubernetes.default.svc",
+						TLSClientConfig: restclient.TLSClientConfig{
+							CAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+						},
+						BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					}, nil
+				},
+				overrides: tc.overrides,
+			}
+
+			clientConfig, err := icc.ClientConfig()
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Verify server URL
+			if clientConfig.Host != tc.expectServer {
+				t.Errorf("Server mismatch: expected %q, got %q", tc.expectServer, clientConfig.Host)
+			}
+
+			// Verify timeout if specified
+			if tc.expectTimeout != "" {
+				expectedTimeout, _ := ParseTimeout(tc.expectTimeout)
+				if clientConfig.Timeout != expectedTimeout {
+					t.Errorf("Timeout mismatch: expected %v, got %v", expectedTimeout, clientConfig.Timeout)
+				}
+			}
+
+			// Verify CA file
+			if clientConfig.TLSClientConfig.CAFile != tc.expectCAFile {
+				t.Errorf("CA File mismatch: expected %q, got %q", tc.expectCAFile, clientConfig.TLSClientConfig.CAFile)
+			}
+
+			// Verify bearer token
+			if clientConfig.BearerToken != tc.expectToken {
+				t.Errorf("Bearer Token mismatch: expected %q, got %q", tc.expectToken, clientConfig.BearerToken)
+			}
+
+			// Verify bearer token file
+			if clientConfig.BearerTokenFile != tc.expectTokenFile {
+				t.Errorf("Bearer Token File mismatch: expected %q, got %q", tc.expectTokenFile, clientConfig.BearerTokenFile)
+			}
+
+			// Verify insecure skip TLS verify
+			if clientConfig.Insecure != tc.expectInsecure {
+				t.Errorf("Insecure mismatch: expected %v, got %v", tc.expectInsecure, clientConfig.Insecure)
+			}
+
+			// Verify TLS server name
+			if clientConfig.ServerName != tc.expectTLSServer {
+				t.Errorf("TLS Server Name mismatch: expected %q, got %q", tc.expectTLSServer, clientConfig.ServerName)
+			}
+
+			// Verify proxy URL
+			if tc.expectProxyURL != "" {
+				if clientConfig.Proxy == nil {
+					t.Errorf("Proxy mismatch: expected proxy to be set, got nil")
+				}
+			}
+
+			// Verify disable compression
+			if clientConfig.DisableCompression != tc.expectDisableComp {
+				t.Errorf("DisableCompression mismatch: expected %v, got %v", tc.expectDisableComp, clientConfig.DisableCompression)
+			}
+
+			// Verify impersonation user (--as)
+			if clientConfig.Impersonate.UserName != tc.expectImpersonateAs {
+				t.Errorf("Impersonate UserName mismatch: expected %q, got %q", tc.expectImpersonateAs, clientConfig.Impersonate.UserName)
+			}
+
+			// Verify impersonation UID (--as-uid)
+			if clientConfig.Impersonate.UID != tc.expectImpersonateUID {
+				t.Errorf("Impersonate UID mismatch: expected %q, got %q", tc.expectImpersonateUID, clientConfig.Impersonate.UID)
+			}
+
+			// Verify impersonation groups (--as-group)
+			if !reflect.DeepEqual(clientConfig.Impersonate.Groups, tc.expectImpersonateGrp) {
+				t.Errorf("Impersonate Groups mismatch: expected %v, got %v", tc.expectImpersonateGrp, clientConfig.Impersonate.Groups)
+			}
+
+			// Verify impersonation user extra (--as-user-extra)
+			if !reflect.DeepEqual(clientConfig.Impersonate.Extra, tc.expectImpersonateExtra) {
+				t.Errorf("Impersonate Extra mismatch: expected %v, got %v", tc.expectImpersonateExtra, clientConfig.Impersonate.Extra)
+			}
+
+			// Verify auth provider (e.g., gcp, azure, oidc)
+			if tc.expectAuthProvider {
+				if clientConfig.AuthProvider == nil {
+					t.Errorf("AuthProvider mismatch: expected auth provider to be set, got nil")
+				}
+			} else {
+				if clientConfig.AuthProvider != nil {
+					t.Errorf("AuthProvider mismatch: expected nil, got %+v", clientConfig.AuthProvider)
+				}
+			}
+
+			// Verify exec provider (e.g., aws-iam-authenticator, credential plugins)
+			if tc.expectExecProvider {
+				if clientConfig.ExecProvider == nil {
+					t.Errorf("ExecProvider mismatch: expected exec provider to be set, got nil")
+				}
+			} else {
+				if clientConfig.ExecProvider != nil {
+					t.Errorf("ExecProvider mismatch: expected nil, got %+v", clientConfig.ExecProvider)
+				}
+			}
+
+			// Critical check: Ensure we never get localhost:8080 unless explicitly set
+			if clientConfig.Host == "http://localhost:8080" && tc.expectServer != "http://localhost:8080" {
+				t.Errorf("CRITICAL BUG: Server was incorrectly set to localhost:8080 instead of %q", tc.expectServer)
+			}
+		})
 	}
 }
 
