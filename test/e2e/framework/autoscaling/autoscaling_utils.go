@@ -34,6 +34,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -303,14 +304,17 @@ func CleanupExternalMetricsServer(ctx context.Context, c clientset.Interface, ns
 
 	// Delete the APIService
 	config, err := framework.LoadConfig()
-	if err == nil {
-		aggClient, err := aggregatorclient.NewForConfig(config)
-		if err == nil {
-			err = aggClient.ApiregistrationV1().APIServices().Delete(ctx, "v1beta1.external.metrics.k8s.io", metav1.DeleteOptions{})
-			if err != nil {
-				framework.Logf("Error deleting APIService: %v", err)
-			}
-		}
+	if err != nil {
+		framework.Failf("%s", err)
+	}
+	aggClient, err := aggregatorclient.NewForConfig(config)
+	if err != nil {
+		framework.Failf("could not create aggregator client: %v", err)
+	}
+
+	err = aggClient.ApiregistrationV1().APIServices().Delete(ctx, "v1beta1.external.metrics.k8s.io", metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Error deleting APIService: %v", err)
 	}
 
 	// Delete the deployment
@@ -803,7 +807,37 @@ func createAPIService(ctx context.Context, port int32, targetService *v1.Service
 			VersionPriority:       100,
 		},
 	}
-	return aggClient.ApiregistrationV1().APIServices().Create(ctx, apiService, metav1.CreateOptions{})
+	// Try to create the APIService. If it already exists (left over from a previous
+	// run that failed without cleanup), update it so the Service reference points to the
+	// current test's namespace.
+	created, err := aggClient.ApiregistrationV1().APIServices().Create(ctx, apiService, metav1.CreateOptions{})
+	if err == nil {
+		return created, nil
+	}
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+	const maxUpdateRetries = 5
+	for i := 0; i < maxUpdateRetries; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		existing, err := aggClient.ApiregistrationV1().APIServices().Get(ctx, apiService.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		apiService.ResourceVersion = existing.ResourceVersion
+		updated, err := aggClient.ApiregistrationV1().APIServices().Update(ctx, apiService, metav1.UpdateOptions{})
+		if err == nil {
+			return updated, nil
+		}
+		if !apierrors.IsConflict(err) {
+			return nil, err
+		}
+		// 409 Conflict: resourceVersion changed between Get and Update; retry.
+		framework.Logf("Retrying APIService update after conflict (%d/%d): %v", i+1, maxUpdateRetries, err)
+	}
+	return nil, fmt.Errorf("failed to update APIService after %d attempts", maxUpdateRetries)
 }
 
 func runServiceAndApiregistrationForExternalMetricsServer(ctx context.Context, c clientset.Interface, ns, name string, serviceAnnotations map[string]string) {
@@ -1091,24 +1125,28 @@ func CreateCPUHorizontalPodAutoscalerWithBehavior(ctx context.Context, rc *Resou
 	return hpa
 }
 
-// CreateMultiMetricHorizontalPodAutoscaler creates an HPA with multiple metrics
+// CreateMultiMetricHorizontalPodAutoscaler creates an HPA with multiple metrics.
 func CreateMultiMetricHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, metrics []autoscalingv2.MetricSpec, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
-	targetRef := autoscalingv2.CrossVersionObjectReference{
-		APIVersion: rc.kind.GroupVersion().String(),
-		Kind:       rc.kind.Kind,
-		Name:       rc.name,
-	}
+	return CreateMultiMetricHPAWithBehavior(ctx, rc, metrics, minReplicas, maxReplicas, nil)
+}
 
+// CreateMultiMetricHPAWithBehavior creates an HPA with multiple MetricSpecs and optional custom behavior.
+func CreateMultiMetricHPAWithBehavior(ctx context.Context, rc *ResourceConsumer, metrics []autoscalingv2.MetricSpec, minReplicas, maxReplicas int32, behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.nsName,
 		},
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: targetRef,
-			MinReplicas:    &minReplicas,
-			MaxReplicas:    maxReplicas,
-			Metrics:        metrics,
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				APIVersion: rc.kind.GroupVersion().String(),
+				Kind:       rc.kind.Kind,
+				Name:       rc.name,
+			},
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxReplicas,
+			Metrics:     metrics,
+			Behavior:    behavior,
 		},
 	}
 
