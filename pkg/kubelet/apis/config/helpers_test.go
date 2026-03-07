@@ -199,6 +199,7 @@ var (
 		"EnableSystemLogHandler",
 		"EnforceNodeAllocatable[*]",
 		"EventBurst",
+		"EventSpamBurst",
 		"EventRecordQPS",
 		"EvictionHard[*]",
 		"EvictionMaxPodGracePeriod",
