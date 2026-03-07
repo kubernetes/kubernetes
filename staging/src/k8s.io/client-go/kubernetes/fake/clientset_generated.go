@@ -112,6 +112,8 @@ import (
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
 	resourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 	fakeresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1/fake"
+	resourcev1alpha1 "k8s.io/client-go/kubernetes/typed/resource/v1alpha1"
+	fakeresourcev1alpha1 "k8s.io/client-go/kubernetes/typed/resource/v1alpha1/fake"
 	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	fakeresourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3/fake"
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
@@ -468,6 +470,11 @@ func (c *Clientset) ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface {
 // ResourceV1alpha3 retrieves the ResourceV1alpha3Client
 func (c *Clientset) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface {
 	return &fakeresourcev1alpha3.FakeResourceV1alpha3{Fake: &c.Fake}
+}
+
+// ResourceV1alpha1 retrieves the ResourceV1alpha1Client
+func (c *Clientset) ResourceV1alpha1() resourcev1alpha1.ResourceV1alpha1Interface {
+	return &fakeresourcev1alpha1.FakeResourceV1alpha1{Fake: &c.Fake}
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client

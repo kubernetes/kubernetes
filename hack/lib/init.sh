@@ -89,6 +89,7 @@ resource.k8s.io/v1 \
 resource.k8s.io/v1beta2 \
 resource.k8s.io/v1beta1 \
 resource.k8s.io/v1alpha3 \
+resource.k8s.io/v1alpha1 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
