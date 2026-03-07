@@ -720,9 +720,7 @@ func Test_InFlightPods(t *testing.T) {
 				{podPopped: pod2},
 				// Simulate a bug, putting pod into activeQ, while pod is being scheduled.
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					q.activeQ.underLock(func(unlocked unlockedActiveQueuer) {
-						unlocked.add(logger, newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
-					})
+					q.activeQ.add(logger, newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
 				}},
 				// At this point, in the activeQ, we have pod1 and pod3 in this order.
 				{podCreated: pod3},
@@ -1482,9 +1480,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 
 			if tt.qPodInInFlightPod != nil {
 				// Put -> Pop the Pod to make it registered in inFlightPods.
-				q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-					unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
-				})
+				q.activeQ.add(logger, newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
 				p, err := q.activeQ.pop(logger)
 				if err != nil {
 					t.Fatalf("Pop failed: %v", err)
@@ -3285,9 +3281,7 @@ var (
 		queue.Add(logger, pInfo.Pod)
 	}
 	addPodActiveQDirectly = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		queue.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-			unlockedActiveQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
-		})
+		queue.activeQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 	}
 	addPodUnschedulablePods = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		if !pInfo.Gated() {
@@ -4650,9 +4644,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 
 	logger, ctx := ktesting.NewTestContext(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
-	q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
-	})
+	q.activeQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label())
 	q.unschedulablePods.addOrUpdate(newQueuedPodInfoForLookup(unschedPod), false, framework.EventUnscheduledPodAdd.Label())
 
@@ -4898,4 +4890,61 @@ func TestUnschedulablePodsMetric(t *testing.T) {
 
 		})
 	}
+}
+
+func TestConcurrentUpdateAndPop(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+
+	podName := "test-pod"
+	// Create a pod with high priority to ensure it's at the front
+	pod := st.MakePod().Name(podName).Namespace("default").UID("uid-1").Priority(100).Obj()
+	q.Add(logger, pod)
+
+	var wg sync.WaitGroup
+	start := time.Now()
+	testDuration := 3 * time.Second
+
+	// Goroutine 1: Continuously Pop and re-Add
+	wg.Go(func() {
+		for time.Since(start) < testDuration {
+			// Pop blocks if empty, but we verify we don't block forever or panic
+			pInfo, err := q.Pop(logger)
+			if err != nil {
+				return
+			}
+			if pInfo == nil {
+				return
+			}
+			if pInfo.Pod.UID != pod.UID {
+				t.Errorf("Expected pod UID %v, got %v", pod.UID, pInfo.Pod.UID)
+			}
+			// Simulate some work to widen the race window
+			time.Sleep(100 * time.Microsecond)
+			q.Done(pInfo.Pod.UID)
+			// Re-add to queue to keep the cycle going
+			q.Add(logger, pInfo.Pod)
+		}
+	})
+
+	// Goroutine 2: Continuously Update the pod
+	wg.Go(func() {
+		iter := 0
+		currentPod := pod
+		for time.Since(start) < testDuration {
+			iter++
+			newPod := currentPod.DeepCopy()
+			newPod.Annotations = map[string]string{"ver": fmt.Sprintf("%d", iter)}
+			// Update is atomic
+			q.Update(logger, currentPod, newPod)
+			currentPod = newPod
+			time.Sleep(50 * time.Microsecond)
+		}
+	})
+
+	wg.Wait()
+	q.Close()
 }
