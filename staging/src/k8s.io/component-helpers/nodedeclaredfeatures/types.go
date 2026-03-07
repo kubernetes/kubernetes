@@ -43,6 +43,9 @@ type Feature interface {
 	// Discover checks if a node provides the feature based on its configuration.
 	Discover(cfg *NodeConfiguration) bool
 
+	// Requirements returns the feature's feature gate and static config dependencies.
+	Requirements() *FeatureRequirements
+
 	// InferForScheduling checks if pod scheduling requires the feature.
 	InferForScheduling(podInfo *PodInfo) bool
 
@@ -56,23 +59,22 @@ type Feature interface {
 	MaxVersion() *version.Version
 }
 
+// FeatureRequirements lists the potential dependencies of a feature.
+type FeatureRequirements struct {
+	// EnabledFeatureGates lists feature gate strings that the feature depends on.
+	EnabledFeatureGates []string
+}
+
 // FeatureGate is an interface that abstracts feature gate checking.
 type FeatureGate interface {
 	// Enabled returns true if the named feature gate is enabled.
 	Enabled(key string) bool
 }
 
-// StaticConfiguration provides a view of a node's static configuration required for feature discovery.
-type StaticConfiguration struct {
-	// Add configuration fields here as required by registered features.
-}
-
 // NodeConfiguration provides a generic view of a node's static configuration.
 type NodeConfiguration struct {
 	// FeatureGates holds an implementation of the FeatureGate interface.
 	FeatureGates FeatureGate
-	// StaticConfig holds node static configuration.
-	StaticConfig StaticConfiguration
 	// Version holds the current node version. This is used for full semantic version comparisons
 	// with Feature.MaxVersion() to determine if a feature needs to be reported.
 	Version *version.Version

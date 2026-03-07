@@ -63,6 +63,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
+						// NodeDeclaredFeatures not added as we set emmulation version in the test to 1.34 when DRA is disabled.
 					},
 				},
 			},
@@ -94,6 +95,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
+						{Name: names.NodeDeclaredFeatures},
 					},
 				},
 			},
@@ -189,6 +191,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
+						{Name: names.NodeDeclaredFeatures},
 						{Name: names.GangScheduling},
 					},
 				},

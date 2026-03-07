@@ -57,6 +57,7 @@ type MockFeature struct {
 	inferForScheduling func(podInfo *nodedeclaredfeatures.PodInfo) bool
 	inferForUpdate     func(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool
 	maxVersion         **version.Version
+	requirements       **nodedeclaredfeatures.FeatureRequirements
 }
 
 func (m *MockFeature) Name() string {
@@ -108,6 +109,16 @@ func (m *MockFeature) MaxVersion() *version.Version {
 }
 func (m *MockFeature) SetMaxVersion(maxVersion *version.Version) {
 	m.maxVersion = &maxVersion
+}
+func (m *MockFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	if m.requirements == nil {
+		m.t.Errorf("unexpected call to Requirements")
+		return nil
+	}
+	return *m.requirements
+}
+func (m *MockFeature) SetRequirements(req *nodedeclaredfeatures.FeatureRequirements) {
+	m.requirements = &req
 }
 
 func NewMockFeature(t *testing.T) *MockFeature {

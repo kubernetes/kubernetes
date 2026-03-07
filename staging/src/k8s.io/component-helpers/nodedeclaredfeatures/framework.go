@@ -156,3 +156,13 @@ func MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeatures FeatureSet) (
 	}
 	return &MatchResult{IsMatch: true}, nil
 }
+
+// GetFeatureRequirements returns the feature gates that a feature depends on.
+func (f *Framework) GetFeatureRequirements(name string) (*FeatureRequirements, error) {
+	for _, r := range f.registry {
+		if r.Name() == name {
+			return r.Requirements(), nil
+		}
+	}
+	return nil, fmt.Errorf("feature '%s' not registered", name)
+}

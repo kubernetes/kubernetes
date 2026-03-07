@@ -25,6 +25,17 @@ import (
 	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
 
+func TestPodLevelResourcesResizeFeature_Requirements(t *testing.T) {
+	feature := &podLevelResourcesResizeFeature{}
+	reqs := feature.Requirements()
+	if reqs == nil {
+		t.Fatalf("Feature %s returned nil Requirements", feature.Name())
+	}
+	if reqs.EnabledFeatureGates == nil || len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != IPPRPodLevelResourcesFeatureGate {
+		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), IPPRPodLevelResourcesFeatureGate)
+	}
+}
+
 func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 	tests := []struct {
 		name        string

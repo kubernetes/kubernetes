@@ -36,6 +36,7 @@ type mockFeature struct {
 	inferForScheduling func(podInfo *PodInfo) bool
 	inferForUpdate     func(oldPodInfo, newPodInfo *PodInfo) bool
 	maxVersion         *version.Version
+	requirements       func() *FeatureRequirements
 }
 
 func (f *mockFeature) Name() string                             { return f.name }
@@ -44,7 +45,8 @@ func (f *mockFeature) InferForScheduling(podInfo *PodInfo) bool { return f.infer
 func (f *mockFeature) InferForUpdate(oldPodInfo, newPodInfo *PodInfo) bool {
 	return f.inferForUpdate(oldPodInfo, newPodInfo)
 }
-func (f *mockFeature) MaxVersion() *version.Version { return f.maxVersion }
+func (f *mockFeature) MaxVersion() *version.Version       { return f.maxVersion }
+func (f *mockFeature) Requirements() *FeatureRequirements { return f.requirements() }
 
 type mockFeatureGate struct {
 	features map[string]bool
@@ -81,12 +83,22 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			discover: func(cfg *NodeConfiguration) bool {
 				return cfg.FeatureGates.Enabled("feature-a")
 			},
+			requirements: func() *FeatureRequirements {
+				return &FeatureRequirements{
+					EnabledFeatureGates: []string{"feature-a"},
+				}
+			},
 			maxVersion: featureMaxVersion,
 		},
 		&mockFeature{
 			name: "FeatureB",
 			discover: func(cfg *NodeConfiguration) bool {
 				return cfg.FeatureGates.Enabled("feature-b")
+			},
+			requirements: func() *FeatureRequirements {
+				return &FeatureRequirements{
+					EnabledFeatureGates: []string{"feature-b"},
+				}
 			},
 			maxVersion: featureMaxVersion,
 		},
@@ -103,7 +115,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "Feature Enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 			},
 			expected: []string{"FeatureA"},
 		},
@@ -131,7 +142,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "feature past max version",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 				Version:      featureMaxVersion.AddMinor(1),
 			},
 			expected: []string{}, // Not published
@@ -140,7 +150,6 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			name: "feature past max version - pre-release version",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{string("feature-a"): true}),
-				StaticConfig: StaticConfiguration{},
 				Version:      version.MustParse("1.39.0-alpha.2.39+049eafd34dfbd2"),
 			},
 			expected: []string{}, // Not published
@@ -176,6 +185,13 @@ func TestInferForPodScheduling(t *testing.T) {
 		Spec:       v1.PodSpec{},
 	}
 
+	// defaultMockRequirements is a helper to provide default requirements with a dummy gate.
+	defaultMockRequirements := func() *FeatureRequirements {
+		return &FeatureRequirements{
+			EnabledFeatureGates: []string{"pod-level-resources"},
+		}
+	}
+
 	testCases := []struct {
 		name          string
 		registry      []Feature
@@ -191,6 +207,7 @@ func TestInferForPodScheduling(t *testing.T) {
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
+					requirements:       defaultMockRequirements,
 				},
 			},
 			newPod:        podWithPodLevelResources,
@@ -204,6 +221,7 @@ func TestInferForPodScheduling(t *testing.T) {
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
+					requirements:       defaultMockRequirements,
 				},
 			},
 			newPod:        podWithoutPodLevelResources,
@@ -218,6 +236,7 @@ func TestInferForPodScheduling(t *testing.T) {
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
 					maxVersion:         version.MustParse("1.30.0"),
+					requirements:       defaultMockRequirements,
 				},
 			},
 			newPod:        podWithPodLevelResources,
@@ -232,6 +251,7 @@ func TestInferForPodScheduling(t *testing.T) {
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
 					maxVersion:         version.MustParse("1.30.0"),
+					requirements:       defaultMockRequirements,
 				},
 			},
 			newPod:        podWithPodLevelResources,
@@ -245,6 +265,7 @@ func TestInferForPodScheduling(t *testing.T) {
 				&mockFeature{
 					name:               "PodLevelResources",
 					inferForScheduling: inferPodlevelResources,
+					requirements:       defaultMockRequirements,
 				},
 			},
 			newPod:        podWithPodLevelResources,
@@ -306,6 +327,13 @@ func TestInferForPodUpdate(t *testing.T) {
 	podWith1CPU := basePod("1")
 	podWith2CPU := basePod("2")
 
+	// defaultMockRequirements is a helper to provide default requirements with a dummy gate.
+	defaultMockRequirements := func() *FeatureRequirements {
+		return &FeatureRequirements{
+			EnabledFeatureGates: []string{"inplace-pod-resize"},
+		}
+	}
+
 	testCases := []struct {
 		name          string
 		registry      []Feature
@@ -322,6 +350,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
+					requirements:   defaultMockRequirements,
 				},
 			},
 			oldPod:        podWith1CPU,
@@ -336,6 +365,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
+					requirements:   defaultMockRequirements,
 				},
 			},
 			oldPod:        podWith1CPU,
@@ -350,6 +380,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
+					requirements:   defaultMockRequirements,
 				},
 			},
 			oldPod:        podWith1CPU,
@@ -365,6 +396,7 @@ func TestInferForPodUpdate(t *testing.T) {
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
 					maxVersion:     version.MustParse("1.30.0"),
+					requirements:   defaultMockRequirements,
 				},
 			},
 			oldPod:        podWith1CPU,
@@ -379,6 +411,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				&mockFeature{
 					name:           "InPlacePodResize",
 					inferForUpdate: inferResize,
+					requirements:   defaultMockRequirements,
 				},
 			},
 			oldPod:        podWith1CPU,
