@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/watch"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -604,7 +605,109 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 		},
 		{
-			desc: "list nodes",
+			desc: "WatchList nodes",
+			apiCall: func(ctx context.Context) error {
+				sendInitialEvents := true
+				w, err := clientSet.CoreV1().Nodes().Watch(ctx, metav1.ListOptions{SendInitialEvents: &sendInitialEvents, AllowWatchBookmarks: true, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan})
+				if err != nil {
+					return err
+				}
+				defer w.Stop()
+				for e := range w.ResultChan() {
+					switch e.Type {
+					case watch.Bookmark:
+						return nil
+					case watch.Error:
+						return fmt.Errorf("watch error: %v", e.Object)
+					}
+				}
+				return nil
+			},
+			expectedTrace: []*spanExpectation{
+				{
+					name: "GET /api/v1/nodes",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"url.path": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"http.request.method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+					},
+				},
+				{
+					name: "WatchList",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{},
+				},
+				{
+					name: "cacher.Watch",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+					},
+				},
+				{
+					name: "WatchServer.HandleHTTP",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf;stream=watch"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"raw-protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{},
+				},
+			},
+		},
+		{
+			desc: "List nodes",
 			apiCall: func(ctx context.Context) error {
 				_, err = clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				return err
@@ -649,10 +752,24 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "HTTP/2.0"
 						},
 					},
+					events: []string{},
+				},
+				{
+					name: "cacher.GetList",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
 					events: []string{
-						"About to List from storage",
-						"Listing from storage done",
-						"Writing http response done",
+						"Ready",
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+						"Listed items from cache",
+						"Filtered items",
 					},
 				},
 				{
