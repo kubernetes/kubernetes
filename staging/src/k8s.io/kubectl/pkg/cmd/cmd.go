@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/drain"
 	"k8s.io/kubectl/pkg/cmd/edit"
 	"k8s.io/kubectl/pkg/cmd/events"
+	"k8s.io/kubectl/pkg/cmd/example"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
@@ -267,6 +268,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
 				explain.NewCmdExplain("kubectl", f, o.IOStreams),
+				example.NewCmdExample("kubectl", f, o.IOStreams),
 				getCmd,
 				edit.NewCmdEdit(f, o.IOStreams),
 				delete.NewCmdDelete(f, o.IOStreams),
