@@ -892,6 +892,13 @@ const (
 	// which benefits to reduce the useless requeueing.
 	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
 
+	// owner: @KunWuLuan
+	//
+	// Enables batch processing of MoveAllToActiveOrBackoffQueue events.
+	// Instead of immediately moving unschedulable pods, events are buffered
+	// and processed in batch every 1 second to reduce lock contention.
+	SchedulerBatchMoveUnschedulablePods featuregate.Feature = "SchedulerBatchMoveUnschedulablePods"
+
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
@@ -1782,6 +1789,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	SchedulerBatchMoveUnschedulablePods: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SeparateTaintEvictionController: {

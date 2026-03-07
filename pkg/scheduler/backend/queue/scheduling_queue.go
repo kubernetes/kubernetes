@@ -210,8 +210,18 @@ type PriorityQueue struct {
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+
 	// isGenericWorkloadEnabled indicates whether the feature gate GenericWorkload is enabled.
 	isGenericWorkloadEnabled bool
+
+	// isBatchMoveUnschedulablePodsEnabled indicates whether the feature gate
+	// SchedulerBatchMoveUnschedulablePods is enabled.
+	isBatchMoveUnschedulablePodsEnabled bool
+
+	// pendingMoveEvents buffers events from MoveAllToActiveOrBackoffQueue calls.
+	// These events are processed in batch by flushPendingMoveEvents every 1 second.
+	pendingMoveEventsLock sync.Mutex
+	pendingMoveEvents     []pendingMoveEvent
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -227,6 +237,15 @@ type clusterEvent struct {
 	oldObj interface{}
 	// newObj is the object that involved this event.
 	newObj interface{}
+}
+
+// pendingMoveEvent stores a buffered MoveAllToActiveOrBackoffQueue event
+// for batch processing.
+type pendingMoveEvent struct {
+	event    fwk.ClusterEvent
+	oldObj   interface{}
+	newObj   interface{}
+	preCheck PreEnqueueCheck
 }
 
 type priorityQueueOptions struct {
@@ -358,25 +377,27 @@ func NewPriorityQueue(
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
 	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
+	isBatchMoveUnschedulablePodsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerBatchMoveUnschedulablePods)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
 	pq := &PriorityQueue{
-		clock:                             options.clock,
-		stop:                              make(chan struct{}),
-		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
-		backoffQ:                          backoffQ,
-		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		preEnqueuePluginMap:               options.preEnqueuePluginMap,
-		queueingHintMap:                   options.queueingHintMap,
-		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
-		metricsRecorder:                   options.metricsRecorder,
-		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
-		moveRequestCycle:                  -1,
-		apiDispatcher:                     options.apiDispatcher,
-		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
-		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
-		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
+		clock:                               options.clock,
+		stop:                                make(chan struct{}),
+		podMaxInUnschedulablePodsDuration:   options.podMaxInUnschedulablePodsDuration,
+		backoffQ:                            backoffQ,
+		unschedulablePods:                   newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
+		preEnqueuePluginMap:                 options.preEnqueuePluginMap,
+		queueingHintMap:                     options.queueingHintMap,
+		pluginToEventsMap:                   buildEventMap(options.queueingHintMap),
+		metricsRecorder:                     options.metricsRecorder,
+		pluginMetricsSamplePercent:          options.pluginMetricsSamplePercent,
+		moveRequestCycle:                    -1,
+		apiDispatcher:                       options.apiDispatcher,
+		isSchedulingQueueHintEnabled:        isSchedulingQueueHintEnabled,
+		isGenericWorkloadEnabled:            isGenericWorkloadEnabled,
+		isPopFromBackoffQEnabled:            isPopFromBackoffQEnabled,
+		isBatchMoveUnschedulablePodsEnabled: isBatchMoveUnschedulablePodsEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -418,6 +439,13 @@ func (p *PriorityQueue) Run(logger klog.Logger) {
 	go wait.Until(func() {
 		p.flushUnschedulablePodsLeftover(logger)
 	}, 30*time.Second, p.stop)
+	// Flush buffered MoveAllToActiveOrBackoffQueue events every 1 second.
+	// Only when the feature gate is enabled.
+	if p.isBatchMoveUnschedulablePodsEnabled {
+		go wait.Until(func() {
+			p.flushPendingMoveEvents(logger)
+		}, 1*time.Second, p.stop)
+	}
 }
 
 // queueingStrategy indicates how the scheduling queue should enqueue the Pod from unschedulable pod pool.
@@ -973,6 +1001,74 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	}
 }
 
+// flushPendingMoveEvents drains the buffered events and processes all unschedulable pods.
+// For each pod, if it matches ANY buffered event, it is moved to activeQ or backoffQ.
+// This is called every 1 second by a background goroutine.
+func (p *PriorityQueue) flushPendingMoveEvents(logger klog.Logger) {
+	// Drain pending events atomically
+	p.pendingMoveEventsLock.Lock()
+	if len(p.pendingMoveEvents) == 0 {
+		p.pendingMoveEventsLock.Unlock()
+		return
+	}
+	events := p.pendingMoveEvents
+	p.pendingMoveEvents = nil
+	p.pendingMoveEventsLock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	// Filter to only events that some plugins are interested in
+	var interestingEvents []pendingMoveEvent
+	for _, e := range events {
+		if p.isEventOfInterest(logger, e.event) {
+			interestingEvents = append(interestingEvents, e)
+		}
+	}
+	if len(interestingEvents) == 0 {
+		return
+	}
+	// Build candidate list from unschedulable pods (to avoid modifying map during iteration)
+	candidates := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
+	for _, pInfo := range p.unschedulablePods.podInfoMap {
+		candidates = append(candidates, pInfo)
+	}
+	activated := false
+	for _, pInfo := range candidates {
+		bestStrategy := queueSkip
+		var bestEventLabel string
+		for _, e := range interestingEvents {
+			// Apply preCheck filter
+			if e.preCheck != nil && !e.preCheck(pInfo.Pod) {
+				continue
+			}
+			// Check gating
+			if pInfo.Gated() && !framework.MatchAnyClusterEvent(e.event, pInfo.GatingPluginEvents) {
+				continue
+			}
+			hint := p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj)
+			if hint == queueImmediately {
+				bestStrategy = queueImmediately
+				bestEventLabel = e.event.Label()
+				break // can't do better than immediate
+			}
+			if hint == queueAfterBackoff && bestStrategy == queueSkip {
+				bestStrategy = queueAfterBackoff
+				bestEventLabel = e.event.Label()
+			}
+		}
+		if bestStrategy != queueSkip {
+			p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())
+			queue := p.requeuePodWithQueueingStrategy(logger, pInfo, bestStrategy, bestEventLabel)
+			logger.V(5).Info("Pod moved to an internal scheduling queue during batch flush", "pod", klog.KObj(pInfo.Pod), "event", bestEventLabel, "queue", queue)
+			if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+				activated = true
+			}
+		}
+	}
+	if activated {
+		p.activeQ.broadcast()
+	}
+}
+
 // Pop removes the head of the active queue and returns it. It blocks if the
 // activeQ is empty and waits until a new item is added to the queue. It
 // increments scheduling cycle when a pod is popped.
@@ -1225,10 +1321,8 @@ func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v
 }
 
 // NOTE: this function assumes a lock has been acquired in the caller.
-// moveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
-// This function adds all pods and then signals the condition variable to ensure that
-// if Pop() is waiting for an item, it receives the signal after all the pods are in the
-// queue and the head is the highest priority pod.
+// moveAllToActiveOrBackoffQueue buffers the event for batch processing if the feature gate is enabled.
+// The actual pod moves are performed by flushPendingMoveEvents every 1 second.
 func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
@@ -1236,23 +1330,71 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		return
 	}
 
-	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if preCheck == nil || preCheck(pInfo.Pod) {
-			unschedulablePods = append(unschedulablePods, pInfo)
+	// If batch move is disabled, use the old behavior
+	if !p.isBatchMoveUnschedulablePodsEnabled {
+		unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
+		for _, pInfo := range p.unschedulablePods.podInfoMap {
+			if preCheck == nil || preCheck(pInfo.Pod) {
+				unschedulablePods = append(unschedulablePods, pInfo)
+			}
+		}
+		p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
+		return
+	}
+
+	// Buffer the event for batch processing of unschedulable pods
+	p.pendingMoveEventsLock.Lock()
+	p.pendingMoveEvents = append(p.pendingMoveEvents, pendingMoveEvent{
+		event:    event,
+		oldObj:   oldObj,
+		newObj:   newObj,
+		preCheck: preCheck,
+	})
+	p.pendingMoveEventsLock.Unlock()
+
+	// Still update moveRequestCycle and register in-flight events immediately for correctness
+	p.moveRequestCycle = p.activeQ.schedulingCycle()
+	if p.isSchedulingQueueHintEnabled {
+		if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+			logger.V(5).Info("Event received while pods are in flight", "event", event.Label())
 		}
 	}
-	p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
 }
 
-// MoveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
-// This function adds all pods and then signals the condition variable to ensure that
-// if Pop() is waiting for an item, it receives the signal after all the pods are in the
-// queue and the head is the highest priority pod.
+// MoveAllToActiveOrBackoffQueue buffers the event for batch processing if the feature gate is enabled.
+// The actual pod moves are performed by flushPendingMoveEvents every 1 second.
+// A pod that matches ANY buffered event will be moved to activeQ or backoffQ.
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+	// If batch move is disabled, use the old behavior
+	if !p.isBatchMoveUnschedulablePodsEnabled {
+		p.lock.Lock()
+		defer p.lock.Unlock()
+		p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
+		return
+	}
+
+	// Buffer the event for batch processing of unschedulable pods
+	p.pendingMoveEventsLock.Lock()
+	p.pendingMoveEvents = append(p.pendingMoveEvents, pendingMoveEvent{
+		event:    event,
+		oldObj:   oldObj,
+		newObj:   newObj,
+		preCheck: preCheck,
+	})
+	p.pendingMoveEventsLock.Unlock()
+
+	// Still update moveRequestCycle and register in-flight events immediately for correctness,
+	// but only if the event is of interest to any plugin (matching original behavior).
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
+	if p.isEventOfInterest(logger, event) {
+		p.moveRequestCycle = p.activeQ.schedulingCycle()
+		if p.isSchedulingQueueHintEnabled {
+			if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+				logger.V(5).Info("Event received while pods are in flight", "event", event.Label())
+			}
+		}
+	}
 }
 
 // requeuePodWithQueueingStrategy tries to requeue Pod to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
