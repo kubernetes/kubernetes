@@ -41,8 +41,8 @@ func New(schedulingQueue internalqueue.SchedulingQueue, cache internalcache.Cach
 // PatchPodStatus sends a patch request for a Pod's status through a scheduling queue.
 // The patch could be first applied to the cached Pod object and then the API call is executed asynchronously.
 // It returns a channel that can be used to wait for the call's completion.
-func (c *APICache) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
-	return c.schedulingQueue.PatchPodStatus(pod, condition, nominatingInfo)
+func (c *APICache) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+	return c.schedulingQueue.PatchPodStatus(pod, conditions, nominatingInfo)
 }
 
 // BindPod sends a binding request through a cache. The binding could be first applied to the cached Pod object
