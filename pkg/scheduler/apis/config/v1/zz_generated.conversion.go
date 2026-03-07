@@ -611,6 +611,7 @@ func autoConvert_v1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *conf
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	out.ScoringStrategy = (*config.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
+	out.PlacementScoringStrategy = (*config.ScoringStrategy)(unsafe.Pointer(in.PlacementScoringStrategy))
 	return nil
 }
 
@@ -623,6 +624,7 @@ func autoConvert_config_NodeResourcesFitArgs_To_v1_NodeResourcesFitArgs(in *conf
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	out.ScoringStrategy = (*configv1.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
+	out.PlacementScoringStrategy = (*configv1.ScoringStrategy)(unsafe.Pointer(in.PlacementScoringStrategy))
 	return nil
 }
 
@@ -785,6 +787,9 @@ func autoConvert_v1_Plugins_To_config_Plugins(in *configv1.Plugins, out *config.
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.MultiPoint, &out.MultiPoint, s); err != nil {
 		return err
 	}
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -831,6 +836,9 @@ func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *configv1.
 		return err
 	}
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.MultiPoint, &out.MultiPoint, s); err != nil {
+		return err
+	}
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
 		return err
 	}
 	return nil

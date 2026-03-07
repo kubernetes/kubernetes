@@ -345,6 +345,11 @@ func (in *NodeResourcesFitArgs) DeepCopyInto(out *NodeResourcesFitArgs) {
 		*out = new(ScoringStrategy)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PlacementScoringStrategy != nil {
+		in, out := &in.PlacementScoringStrategy, &out.PlacementScoringStrategy
+		*out = new(ScoringStrategy)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -443,6 +448,7 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 	in.Bind.DeepCopyInto(&out.Bind)
 	in.PostBind.DeepCopyInto(&out.PostBind)
 	in.MultiPoint.DeepCopyInto(&out.MultiPoint)
+	in.PlacementScore.DeepCopyInto(&out.PlacementScore)
 	return
 }
 

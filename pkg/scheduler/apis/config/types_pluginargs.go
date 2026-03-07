@@ -77,6 +77,9 @@ type NodeResourcesFitArgs struct {
 
 	// ScoringStrategy selects the node resource scoring strategy.
 	ScoringStrategy *ScoringStrategy
+
+	// PlacementScoringStrategy selects the placement scoring strategy for pod group scheduling.
+	PlacementScoringStrategy *ScoringStrategy
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints

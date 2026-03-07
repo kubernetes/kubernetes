@@ -78,6 +78,10 @@ type NodeResourcesFitArgs struct {
 	// ScoringStrategy selects the node resource scoring strategy.
 	// The default strategy is LeastAllocated with an equal "cpu" and "memory" weight.
 	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
+
+	// PlacementScoringStrategy selects the placement scoring strategy in pod group scheduling.
+	// The default strategy is MostAllocated with an equal "cpu" and "memory" weight.
+	PlacementScoringStrategy *ScoringStrategy `json:"placementScoringStrategy,omitempty"`
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints

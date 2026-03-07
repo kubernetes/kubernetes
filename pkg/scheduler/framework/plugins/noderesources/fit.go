@@ -47,6 +47,7 @@ var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
+var _ fwk.PlacementScorePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -62,27 +63,27 @@ const (
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
-	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.LeastAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.LeastAllocated),
 			scorer:    leastResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.MostAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.MostAllocated),
 			scorer:    mostResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.RequestedToCapacityRatio: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.RequestedToCapacityRatio),
-			scorer:    requestedToCapacityRatioScorer(resources, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			scorer:    requestedToCapacityRatioScorer(resources, strategy.RequestedToCapacityRatio.Shape),
 			resources: resources,
 		}
 	},
@@ -100,6 +101,7 @@ type Fit struct {
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	handle                                        fwk.Handle
 	*resourceAllocationScorer
+	placementScorer *resourceAllocationScorer
 }
 
 // ScoreExtensions of the Score plugin.
@@ -194,27 +196,31 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
+func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+	if strategy == nil {
+		return nil, fmt.Errorf("scoring strategy not specified")
+	}
+	scorerFactory, exists := nodeResourceStrategyTypeMap[strategy.Type]
+	if !exists {
+		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
+	}
+	return scorerFactory(strategy), nil
+}
+
 // NewFit initializes a new plugin and returns it.
 func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
 	}
-	if err := validation.ValidateNodeResourcesFitArgs(nil, args); err != nil {
+	if err := validation.ValidateNodeResourcesFitArgs(nil, args, fts); err != nil {
 		return nil, err
 	}
 
-	if args.ScoringStrategy == nil {
-		return nil, fmt.Errorf("scoring strategy not specified")
+	scorer, err := getScorer(args.ScoringStrategy)
+	if err != nil {
+		return nil, err
 	}
-
-	strategy := args.ScoringStrategy.Type
-	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
-	if !exists {
-		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
-	}
-
-	scorer := scorePlugin(args)
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -224,7 +230,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		scorer.DRACaches.celCache = cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableDRAConsumableCapacity})
 	}
 
-	return &Fit{
+	pl := &Fit{
 		ignoredResources:                              sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
@@ -235,7 +241,17 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		enableDRAExtendedResource:                     fts.EnableDRAExtendedResource,
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 		resourceAllocationScorer:                      scorer,
-	}, nil
+	}
+
+	if fts.EnableTopologyAwareWorkloadScheduling {
+		placementScorer, err := getScorer(args.PlacementScoringStrategy)
+		if err != nil {
+			return nil, err
+		}
+		pl.placementScorer = placementScorer
+	}
+
+	return pl, nil
 }
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
@@ -759,4 +775,14 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 	}
 
 	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+}
+
+// PlacementScoreExtensions is not used by this plugin.
+func (f *Fit) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+// ScorePlacement scores capacity ratio on all nodes in the placement including all assigned pod group pods' resource requests.
+func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	return f.placementScorer.scorePlacement(ctx, podGroup, placement)
 }

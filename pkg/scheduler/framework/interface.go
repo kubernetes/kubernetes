@@ -257,6 +257,12 @@ type Framework interface {
 	// code=5("skip") status.
 	RunBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPlacementScorePlugins runs the set of configured placement scoring plugins.
+	// It returns a list that stores scores from each plugin and total score for each Placement.
+	// It also returns *Status, which is set to non-success if any of the plugins returns
+	// a non-success status.
+	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments) (ns []fwk.PlacementPluginScores, status *fwk.Status)
+
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
 
