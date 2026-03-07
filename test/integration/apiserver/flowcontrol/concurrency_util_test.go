@@ -18,20 +18,15 @@ package flowcontrol
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"math"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -307,48 +302,35 @@ func TestConcurrencyIsolation(t *testing.T) {
 }
 
 func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
-
 	resp, err := getMetrics(c)
 	if err != nil {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.NewFormat(expfmt.TypeTextPlain))
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
+	m := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(resp, &m); err != nil {
+		return nil, err
 	}
 
 	snapshot := metricSnapshot{}
-
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return snapshot, nil
-			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
-		}
-		for _, metric := range v {
-			plLabel := string(metric.Metric[labelPriorityLevel])
-			entry := plMetrics{}
-			if v, ok := snapshot[plLabel]; ok {
-				entry = v
-			}
-			switch name := string(metric.Metric[model.MetricNameLabel]); name {
+	for metricName, samples := range m {
+		for _, sample := range samples {
+			plLabel := string(sample.Metric[testutil.LabelName(labelPriorityLevel)])
+			entry := snapshot[plLabel]
+			switch metricName {
 			case requestExecutionSecondsSumName:
-				entry.execSeconds.Sum = float64(metric.Value)
+				entry.execSeconds.Sum = float64(sample.Value)
 			case requestExecutionSecondsCountName:
-				entry.execSeconds.Count = int(metric.Value)
+				entry.execSeconds.Count = int(sample.Value)
 			case priorityLevelSeatUtilSumName:
-				entry.seatUtil.Sum = float64(metric.Value)
+				entry.seatUtil.Sum = float64(sample.Value)
 			case priorityLevelSeatUtilCountName:
-				entry.seatUtil.Count = int(metric.Value)
+				entry.seatUtil.Count = int(sample.Value)
 			case nominalConcurrencyLimitMetricsName:
-				entry.availableSeats = int(metric.Value)
+				entry.availableSeats = int(sample.Value)
 			}
 			snapshot[plLabel] = entry
 		}
 	}
+	return snapshot, nil
 }
