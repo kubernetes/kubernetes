@@ -263,15 +263,16 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		}
 	}
 
-	switch {
-	case ed.medium == v1.StorageMediumDefault:
-		err = ed.setupDir(dir)
-	case ed.medium == v1.StorageMediumMemory:
-		err = ed.setupTmpfs(dir)
-	case v1helper.IsHugePageMedium(ed.medium):
-		err = ed.setupHugepages(dir)
-	default:
-		err = fmt.Errorf("unknown storage medium %q", ed.medium)
+	err = ed.setupDir(dir)
+	if err == nil {
+		switch {
+		case ed.medium == v1.StorageMediumMemory:
+			err = ed.setupTmpfs(dir)
+		case v1helper.IsHugePageMedium(ed.medium):
+			err = ed.setupHugepages(dir)
+		case ed.medium != v1.StorageMediumDefault:
+			err = fmt.Errorf("unknown storage medium %q", ed.medium)
+		}
 	}
 
 	ownershipChanger := volume.NewVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
@@ -315,12 +316,13 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory.
+// Precondition: setupDir must have been called on dir beforehand.
 func (ed *emptyDir) setupTmpfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.setupDir(dir); err != nil {
-		return err
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return fmt.Errorf("directory %q does not exist: setupDir must be called before setupTmpfs", dir)
 	}
 	// Make SetUp idempotent.
 	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
@@ -340,12 +342,13 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 }
 
 // setupHugepages creates a hugepage mount at the specified directory.
+// Precondition: setupDir must have been called on dir beforehand.
 func (ed *emptyDir) setupHugepages(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.setupDir(dir); err != nil {
-		return err
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return fmt.Errorf("directory %q does not exist: setupDir must be called before setupHugepages", dir)
 	}
 	// Make SetUp idempotent.
 	medium, isMnt, mountPageSize, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
