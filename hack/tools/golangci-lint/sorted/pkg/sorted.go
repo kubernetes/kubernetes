@@ -104,9 +104,82 @@ func run(pass *analysis.Pass, config Config) (interface{}, error) {
 			if genDecl.Tok == token.VAR {
 				checkFeatureGateMaps(pass, genDecl)
 			}
+
+			// Check struct types for alphabetical member
+			if genDecl.Tok == token.TYPE {
+				checkStructMembers(pass, genDecl)
+			}
 		}
 	}
 	return nil, nil
+}
+
+// checkStructMembers checks if structure member names are sorted aphabetically
+func checkStructMembers(pass *analysis.Pass, genDecl *ast.GenDecl) {
+	for _, spec := range genDecl.Specs {
+		typeSpec, ok := spec.(*ast.TypeSpec)
+		if !ok || typeSpec.Type == nil {
+			continue
+		}
+
+		// Check to see if it's a struct with fields
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok || structType.Fields == nil || len(structType.Fields.List) == 0 {
+			continue
+		}
+
+		var features []Feature
+		for _, field := range structType.Fields.List {
+			if !ok || len(field.Names) == 0 {
+				continue
+			}
+			// Get the name of the field
+			name := field.Names[0].Name
+
+			// Check pointer expression members
+			if starExpr, ok := field.Type.(*ast.StarExpr); ok {
+				// ... from a different package
+				if selectorExpr, ok := starExpr.X.(*ast.SelectorExpr); ok {
+					name = fmt.Sprintf("%s *%s.%s", name, selectorExpr.X, selectorExpr.Sel.Name)
+				}
+				// ... from the same package
+				if ident, ok := starExpr.X.(*ast.Ident); ok {
+					name = fmt.Sprintf("%s *%s", name, ident.Name)
+				}
+			}
+			// Check members using type from a different packages
+			if selectorExpr, ok := field.Type.(*ast.SelectorExpr); ok {
+				name = fmt.Sprintf("%s %s.%s", name, selectorExpr.X, selectorExpr.Sel.Name)
+			}
+			// Check members using type from the same package
+			if ident, ok := field.Type.(*ast.Ident); ok {
+				name = fmt.Sprintf("%s %s", name, ident.Name)
+			}
+
+			// Get comments for this field
+			var featureComments []string
+			// Check for doc comments directly on the field
+			if field.Doc != nil {
+				for _, comment := range field.Doc.List {
+					featureComments = append(featureComments, comment.Text)
+				}
+			}
+			features = append(features, Feature{
+				Name:     name,
+				Comments: featureComments,
+			})
+		}
+		// Sort features
+		sortedFeatures := sortFeatures(features)
+
+		// Check if the order has changed
+		orderChanged := hasOrderChanged(features, sortedFeatures)
+
+		if orderChanged {
+			// Generate a diff to show what's wrong
+			reportStructSortingIssue(pass, genDecl, typeSpec.Name.Name, features, sortedFeatures)
+		}
+	}
 }
 
 // checkFeatureGateMaps checks if maps with feature gates as keys have their keys sorted alphabetically
@@ -317,6 +390,33 @@ func stripHeader(input string, n int) string {
 	return strings.TrimSuffix(result.String(), "\n")
 }
 
+// reportStructSortingIssue reports a linting issue for unsorted struct members
+func reportStructSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, structName string, current, sorted []Feature) {
+	// Generate the original source code
+	originalSource := generateStructSourceCode(structName, current)
+
+	// Generate the sorted source code
+	sortedSource := generateStructSourceCode(structName, sorted)
+
+	// Create a unified diff between the original and sorted source
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(originalSource),
+		B:        difflib.SplitLines(sortedSource),
+		FromFile: "Current Struct Members",
+		ToFile:   "Expected Struct Members",
+		Context:  3,
+	}
+
+	diffText, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		pass.Reportf(decl.Pos(), "struct '%s' members not sorted alphabetically (error creating diff: %v)", structName, err)
+		return
+	}
+
+	// Report the issue with the diff
+	pass.Reportf(decl.Pos(), "struct '%s' members not sorted alphabetically (-got, +want):\n%s\n", structName, stripHeader(diffText, 3))
+}
+
 // reportMapSortingIssue reports a linting issue for unsorted map keys
 func reportMapSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, mapName string, current, sorted []Feature) {
 	// Generate the original source code
@@ -342,6 +442,33 @@ func reportMapSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, mapName strin
 
 	// Report the issue with the diff
 	pass.Reportf(decl.Pos(), "map '%s' keys not sorted alphabetically (-got, +want):\n%s\n", mapName, stripHeader(diffText, 3))
+}
+
+// generateStructSourceCode recreates the source code for struct members
+func generateStructSourceCode(structName string, features []Feature) string {
+	var sb strings.Builder
+
+	sb.WriteString("type ")
+	sb.WriteString(structName)
+	sb.WriteString(" struct {\n")
+
+	for _, feature := range features {
+		// Add comments
+		for _, comment := range feature.Comments {
+			sb.WriteString("\t")
+			sb.WriteString(comment)
+			sb.WriteString("\n")
+		}
+
+		// Add the member declaration
+		sb.WriteString("\t")
+		sb.WriteString(feature.Name)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("}")
+
+	return sb.String()
 }
 
 // generateMapSourceCode recreates the source code for map keys
