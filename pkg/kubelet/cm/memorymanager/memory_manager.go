@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -464,6 +465,58 @@ func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatab
 	}
 
 	return reservedMemoryConverted, nil
+}
+
+// GetReservedMemoryNUMANodes returns NUMA nodes whose memory resources are fully reserved.
+//
+// A NUMA node is considered fully reserved if all allocatable memory resources
+// on that node (regular memory and hugepages) are reserved through
+// --reserved-memory and therefore not available for workloads.
+func GetReservedMemoryNUMANodes(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation) ([]int, error) {
+	systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
+	if err != nil {
+		return nil, err
+	}
+
+	var reservedNUMANodes []int
+	for _, node := range machineInfo.Topology {
+		if isNodeMemoryFullyReserved(node, systemReserved) {
+			reservedNUMANodes = append(reservedNUMANodes, node.Id)
+		}
+	}
+	sort.Ints(reservedNUMANodes)
+
+	return reservedNUMANodes, nil
+}
+
+func isNodeMemoryFullyReserved(node cadvisorapi.Node, systemReserved systemReservedMemory) bool {
+	var hugepagesCapacity uint64
+	for _, hugepage := range node.HugePages {
+		hugepageSize := hugepage.NumPages * hugepage.PageSize * 1024
+		hugepagesCapacity += hugepageSize
+
+		hugepageQuantity := resource.NewQuantity(int64(hugepage.PageSize)*1024, resource.BinarySI)
+		resourceName := corev1helper.HugePageResourceName(*hugepageQuantity)
+		if getResourceSystemReserved(systemReserved, node.Id, resourceName) < hugepageSize {
+			return false
+		}
+	}
+
+	allocatableMemory := node.Memory
+	if allocatableMemory > hugepagesCapacity {
+		allocatableMemory -= hugepagesCapacity
+	} else {
+		allocatableMemory = 0
+	}
+
+	return getResourceSystemReserved(systemReserved, node.Id, v1.ResourceMemory) >= allocatableMemory
+}
+
+func getResourceSystemReserved(systemReserved systemReservedMemory, nodeID int, resourceName v1.ResourceName) uint64 {
+	if nodeSystemReserved, ok := systemReserved[nodeID]; ok {
+		return nodeSystemReserved[resourceName]
+	}
+	return 0
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node

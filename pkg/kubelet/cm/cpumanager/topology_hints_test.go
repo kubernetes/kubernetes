@@ -45,6 +45,22 @@ type testCase struct {
 	podLevelResourcesEnabled bool
 }
 
+type topologyStoreMock struct {
+	numaNodes []int
+}
+
+func (m *topologyStoreMock) GetAffinity(string, string) topologymanager.TopologyHint {
+	return topologymanager.TopologyHint{}
+}
+
+func (m *topologyStoreMock) GetPolicy() topologymanager.Policy {
+	return nil
+}
+
+func (m *topologyStoreMock) GetNUMANodeIDs() []int {
+	return m.numaNodes
+}
+
 func returnMachineInfo() cadvisorapi.MachineInfo {
 	return cadvisorapi.MachineInfo{
 		NumCores: 12,
@@ -259,6 +275,35 @@ func TestGetTopologyHints(t *testing.T) {
 		if !reflect.DeepEqual(tc.expectedHints, hints) {
 			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, hints)
 		}
+	}
+}
+
+func TestGenerateCPUTopologyHintsHonorsTopologyManagerNUMANodes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	machineInfo := returnMachineInfo()
+	topo, err := topology.Discover(logger, &machineInfo)
+	if err != nil {
+		t.Fatalf("expected no error from Discover, got %v", err)
+	}
+
+	policy := staticPolicy{
+		topology: topo,
+		affinity: &topologyStoreMock{
+			numaNodes: []int{1},
+		},
+	}
+
+	hints := policy.generateCPUTopologyHints(topo.CPUDetails.CPUs(), cpuset.New(), 2)
+	expectedMask, _ := bitmask.NewBitMask(1)
+	expectedHints := []topologymanager.TopologyHint{
+		{
+			NUMANodeAffinity: expectedMask,
+			Preferred:        true,
+		},
+	}
+
+	if !reflect.DeepEqual(expectedHints, hints) {
+		t.Fatalf("expected topology hints %v, got %v", expectedHints, hints)
 	}
 }
 

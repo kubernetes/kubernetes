@@ -76,6 +76,10 @@ func (m *fakeManager) GetPolicy() Policy {
 	return m.policy
 }
 
+func (m *fakeManager) GetNUMANodeIDs() []int {
+	return nil
+}
+
 func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }

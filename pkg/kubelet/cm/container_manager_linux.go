@@ -293,8 +293,20 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		qosContainerManager: qosContainerManager,
 	}
 
+	topology := machineInfo.Topology
+	if nodeConfig.MemoryManagerPolicy != "None" {
+		reservedNUMANodes, err := memorymanager.GetReservedMemoryNUMANodes(machineInfo, cm.GetNodeAllocatableReservation(), nodeConfig.MemoryManagerReservedMemory)
+		if err != nil {
+			return nil, err
+		}
+		if len(reservedNUMANodes) > 0 {
+			logger.Info("Excluding fully reserved NUMA nodes from topology hints", "numaNodes", reservedNUMANodes)
+			topology = filterNUMATopology(topology, reservedNUMANodes)
+		}
+	}
+
 	cm.topologyManager, err = topologymanager.NewManager(
-		machineInfo.Topology,
+		topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
 		nodeConfig.TopologyManagerPolicyOptions,
@@ -305,7 +317,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(topology, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}

@@ -176,6 +176,71 @@ func newNUMAAffinity(bits ...int) bitmask.BitMask {
 	return affinity
 }
 
+type fakeNUMANodeStore struct {
+	numaNodeIDs []int
+}
+
+func (f *fakeNUMANodeStore) GetAffinity(string, string) topologymanager.TopologyHint {
+	return topologymanager.TopologyHint{}
+}
+
+func (f *fakeNUMANodeStore) GetPolicy() topologymanager.Policy {
+	return nil
+}
+
+func (f *fakeNUMANodeStore) GetNUMANodeIDs() []int {
+	if f.numaNodeIDs == nil {
+		return nil
+	}
+	return append([]int{}, f.numaNodeIDs...)
+}
+
+func TestStaticPolicyGetNUMANodesForTopologyHints(t *testing.T) {
+	machineState := state.NUMANodeMap{
+		0: &state.NUMANodeState{},
+		1: &state.NUMANodeState{},
+		3: &state.NUMANodeState{},
+		5: &state.NUMANodeState{},
+	}
+
+	testCases := []struct {
+		description string
+		affinity    topologymanager.Store
+		expected    []int
+	}{
+		{
+			description: "returns all NUMA nodes when affinity store is nil",
+			affinity:    nil,
+			expected:    []int{0, 1, 3, 5},
+		},
+		{
+			description: "returns all NUMA nodes when affinity does not expose a node filter",
+			affinity:    &fakeNUMANodeStore{numaNodeIDs: nil},
+			expected:    []int{0, 1, 3, 5},
+		},
+		{
+			description: "returns only NUMA nodes exposed by topology manager",
+			affinity:    &fakeNUMANodeStore{numaNodeIDs: []int{0, 1}},
+			expected:    []int{0, 1},
+		},
+		{
+			description: "ignores NUMA nodes not present in machine state",
+			affinity:    &fakeNUMANodeStore{numaNodeIDs: []int{1, 2, 3}},
+			expected:    []int{1, 3},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p := &staticPolicy{affinity: testCase.affinity}
+			numaNodes := p.getNUMANodesForTopologyHints(machineState)
+			if !reflect.DeepEqual(numaNodes, testCase.expected) {
+				t.Fatalf("unexpected NUMA nodes: got %v, want %v", numaNodes, testCase.expected)
+			}
+		})
+	}
+}
+
 func TestStaticPolicyNew(t *testing.T) {
 	testCases := []testStaticPolicy{
 		{
