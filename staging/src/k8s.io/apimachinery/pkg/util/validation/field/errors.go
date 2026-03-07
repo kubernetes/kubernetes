@@ -109,7 +109,7 @@ var omitValue = OmitValueType{}
 func (e *Error) ErrorBody() string {
 	var s string
 	switch e.Type {
-	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeTooShort, ErrorTypeInternal:
 		s = e.Type.String()
 	case ErrorTypeInvalid, ErrorTypeTypeInvalid, ErrorTypeNotSupported,
 		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany:
@@ -206,6 +206,9 @@ const (
 	ErrorTypeInternal ErrorType = "InternalError"
 	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
 	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
+	// ErrorTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid. See TooShort().
+	ErrorTypeTooShort ErrorType = "FieldValueTooShort"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -231,6 +234,8 @@ func (t ErrorType) String() string {
 		return "Internal error"
 	case ErrorTypeTypeInvalid:
 		return "Invalid value"
+	case ErrorTypeTooShort:
+		return "Too short"
 	default:
 		return fmt.Sprintf("<unknown error %q>", string(t))
 	}
@@ -353,9 +358,9 @@ func TooLong(field *Path, _ interface{}, maxLength int) *Error {
 func TooLongCharacters[T ~string](field *Path, _ T, maxLength int) *Error {
 	var msg string
 	if maxLength >= 0 {
-		bs := "chars"
+		bs := "characters"
 		if maxLength == 1 {
-			bs = "char"
+			bs = "character"
 		}
 		msg = fmt.Sprintf("may not be more than %d %s", maxLength, bs)
 	} else {
@@ -415,6 +420,28 @@ func InternalError(field *Path, err error) *Error {
 		Field:    field.String(),
 		BadValue: err,
 		Detail:   err.Error(),
+	}
+}
+
+// TooShort returns a *Error indicating "too short".  This is used to report that
+// the given value is too short in characters. This is similar to Invalid.
+// If minLength is non-negative, it will  be included in the message.
+func TooShort[T ~string](field *Path, value T, minLength int) *Error {
+	var msg string
+	if minLength >= 0 {
+		bs := "characters"
+		if minLength == 1 {
+			bs = "character"
+		}
+		msg = fmt.Sprintf("must be at least %d %s", minLength, bs)
+	} else {
+		msg = "value is too short"
+	}
+	return &Error{
+		Type:     ErrorTypeTooShort,
+		Field:    field.String(),
+		BadValue: value,
+		Detail:   msg,
 	}
 }
 

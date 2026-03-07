@@ -338,3 +338,96 @@ func TestMaxBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestMinLength(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    string
+		min      int
+		wantErrs field.ErrorList // regex
+	}{{
+		name:     "empty string allowed",
+		value:    "",
+		min:      0,
+		wantErrs: nil,
+	}, {
+		name:  "minimum length of one, empty string",
+		value: "",
+		min:   1,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), "", 1).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "minimum length of one, non-empty string",
+		value:    "test",
+		min:      1,
+		wantErrs: nil,
+	}, {
+		name:  "minimum length of 10, 9 character string",
+		value: "012345678",
+		min:   10,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), "012345678", 10).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "minimum length of 10, 10 character string",
+		value:    "0123456789",
+		min:      10,
+		wantErrs: nil,
+	}, {
+		name:     "negative minimum value",
+		value:    "",
+		min:      -1,
+		wantErrs: nil,
+	}, {
+		name:  "ascii-only characters, less characters than min (n-1)",
+		value: "abcdefghi",
+		min:   10,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), "abcdefghi", 10).WithOrigin("minLength"),
+		},
+	}, {
+		name:  "multi-byte characters, less characters than min (n-1)",
+		value: "©®©®©®©®©",
+		min:   10,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), "©®©®©®©®©", 10).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "ascii-only characters, more characters than min (n+1)",
+		value:    "abcdefghijkl",
+		min:      10,
+		wantErrs: nil,
+	}, {
+		name:     "multi-byte characters, more characters than min (n+1)",
+		value:    "©®©®©®©®©®©",
+		min:      10,
+		wantErrs: nil,
+	}, {
+		name:  "mixture of characters, maximum size in bytes of input is greater than min, rune count less than min",
+		value: "©®©®©®", // 12 bytes, but 6 characters
+		min:   10,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), "©®©®©®", 10).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "multi-byte characters, exact characters as min (n)",
+		value:    "©®©®©®©®©®",
+		min:      10,
+		wantErrs: nil,
+	}, {
+		name:     "ascii-only characters, exact characters as min (n)",
+		value:    "abcdefghij",
+		min:      10,
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := tc.value
+			gotErrs := MinLength(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.min)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}

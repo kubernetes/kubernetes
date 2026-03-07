@@ -88,3 +88,34 @@ func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	}
 	return nil
 }
+
+// MinLength verifies that the specified value is at least min characters, if non-nil.
+func MinLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	byteLength := len(*value)
+
+	// because runes are up to 4 byte characters, if we assume all characters
+	// in the input are 4 byte runes, the minimum number of characters that
+	// are specified is len(value)/4. If the minimum multi-byte
+	// character count is greater than or equal to our enforced minimum, we
+	// can confidently say that the value is valid without having
+	// to actually perform the more expensive rune counting step
+	if int(math.Ceil(float64(byteLength)/4.0)) >= min {
+		return nil
+	}
+
+	// if the length of the value in bytes is less
+	// than the minimum size then we can confidently
+	// say that this value is not within the bounds
+	// enforced by the maximum value regardless
+	// of the actual makeup of characters in the value.
+	// Otherwise, perform a rune count to determine if the
+	// number of characters is less than the minimum.
+	if byteLength < min || utf8.RuneCountInString(string(*value)) < min {
+		return field.ErrorList{field.TooShort(fldPath, *value, min).WithOrigin("minLength")}
+	}
+	return nil
+}

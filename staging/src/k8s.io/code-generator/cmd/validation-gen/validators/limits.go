@@ -31,6 +31,7 @@ const (
 	minimumTagName   = "k8s:minimum"
 	maxLengthTagName = "k8s:maxLength"
 	maxBytesTagName  = "k8s:maxBytes"
+	minLengthTagName = "k8s:minLength"
 )
 
 func init() {
@@ -38,6 +39,7 @@ func init() {
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maxLengthTagValidator{})
 	RegisterTagValidator(maxBytesTagValidator{})
+	RegisterTagValidator(minLengthTagValidator{})
 }
 
 type maxLengthTagValidator struct{}
@@ -244,6 +246,65 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type minLengthTagValidator struct{}
+
+func (minLengthTagValidator) Init(_ Config) {}
+
+func (minLengthTagValidator) TagName() string {
+	return minLengthTagName
+}
+
+var minLengthTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
+
+func (minLengthTagValidator) ValidScopes() sets.Set[Scope] {
+	return minLengthTagValidScopes
+}
+
+var minLengthValidator = types.Name{Package: libValidationPkg, Name: "MinLength"}
+
+func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
+		return result, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+
+	// Usage of `+k8s:minLength=0` is useful as a semantic representation of the fact that
+	// the minimum valid length of the field was considered and that it intentionally doesn't
+	// have a minimum length constraint.
+	// Because a minimum length of `0` is semantically equivalent to not performing
+	// any validation, we only add a validation function to the result if the
+	// minimum length constraint is > 0.
+	if intVal > 0 {
+		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal))
+	}
+	return result, nil
+}
+
+func (mltv minLengthTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mltv.TagName(),
+		StabilityLevel: TagStabilityLevelAlpha,
+		Scopes:         sets.List(mltv.ValidScopes()),
+		Description: `Indicates that a string field has a minimum length for its value in characters.
+		This means that the minimum size in bytes is a range from X to 4X if multi-byte characters are allowed.
+		`,
+		Payloads: []TagPayloadDoc{{
+			Description: "<integer>",
+			Docs:        "This field must be no more than X characters long.",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
