@@ -28,7 +28,7 @@ var localSchemeBuilder = testscheme.New()
 type StrictUnion struct {
 	TypeMeta int
 
-	// +k8s:discriminator
+	// +k8s:discriminator(exclusive:true)
 	D1 string `json:"d1"`
 
 	// +k8s:member("A")=+k8s:required
@@ -41,7 +41,7 @@ type StrictUnion struct {
 type SharedField struct {
 	TypeMeta int
 
-	// +k8s:discriminator
+	// +k8s:discriminator(exclusive:true)
 	D1 string `json:"d1"`
 
 	// Valid in A and B, implicitly forbidden in C.
@@ -53,7 +53,7 @@ type SharedField struct {
 type ChainedValidation struct {
 	TypeMeta int
 
-	// +k8s:discriminator
+	// +k8s:discriminator(exclusive:true)
 	D1 string `json:"d1"`
 
 	// In mode A, it is required AND must have maxLength 5.
@@ -65,7 +65,7 @@ type ChainedValidation struct {
 type ImplicitForbidden struct {
 	TypeMeta int
 
-	// +k8s:discriminator
+	// +k8s:discriminator(exclusive:true)
 	D1 string `json:"d1"`
 
 	// Field is only mentioned for mode A. Mode B should implicitly forbid it.
@@ -76,13 +76,13 @@ type ImplicitForbidden struct {
 type NonStringDiscriminator struct {
 	TypeMeta int
 
-	// +k8s:discriminator(name:"Bool")
+	// +k8s:discriminator(name:"Bool", exclusive:true)
 	D1 bool `json:"d1"`
 
 	// +k8s:member(discriminator:"Bool", value:"true")=+k8s:required
 	FieldA *string `json:"fieldA,omitempty"`
 
-	// +k8s:discriminator(name:"Int")
+	// +k8s:discriminator(name:"Int", exclusive:true)
 	D2 int `json:"d2"`
 
 	// +k8s:member(discriminator:"Int", value:"1")=+k8s:required
@@ -92,10 +92,10 @@ type NonStringDiscriminator struct {
 type MultipleDiscriminators struct {
 	TypeMeta int
 
-	// +k8s:discriminator(name:"D1")
+	// +k8s:discriminator(name:"D1", exclusive:true)
 	D1 string `json:"d1"`
 
-	// +k8s:discriminator(name:"D2")
+	// +k8s:discriminator(name:"D2", exclusive:true)
 	D2 string `json:"d2"`
 
 	// +k8s:member(discriminator:"D1", value:"A")=+k8s:required
@@ -108,7 +108,7 @@ type MultipleDiscriminators struct {
 type Collections struct {
 	TypeMeta int
 
-	// +k8s:discriminator
+	// +k8s:discriminator(exclusive:true)
 	D1 string `json:"d1"`
 
 	// +k8s:member("A")=+k8s:optional
@@ -116,6 +116,17 @@ type Collections struct {
 
 	// +k8s:member("A")=+k8s:optional
 	MapField map[string]string `json:"mapField,omitempty"`
+}
+
+type AdditiveValidation struct {
+	TypeMeta int
+
+	// +k8s:discriminator
+	D1 string `json:"d1"`
+
+	// Field is only required for mode A. Mode B should ignore it.
+	// +k8s:member("A")=+k8s:required
+	FieldA *string `json:"fieldA,omitempty"`
 }
 
 type TypeMeta int

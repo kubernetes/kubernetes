@@ -431,6 +431,8 @@ const (
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha=+k8s:discriminator
 	Type DeploymentStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DeploymentStrategyType"`
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
@@ -439,6 +441,9 @@ type DeploymentStrategy struct {
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha=+k8s:member("RollingUpdate")=+k8s:required
+	// +k8s:alpha=+k8s:member("Recreate")=+k8s:forbidden
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 

@@ -37,6 +37,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type AdditiveValidation
+	scheme.AddValidationFunc((*AdditiveValidation)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_AdditiveValidation(ctx, op, nil /* fldPath */, obj.(*AdditiveValidation), safe.Cast[*AdditiveValidation](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ChainedValidation
 	scheme.AddValidationFunc((*ChainedValidation)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -94,6 +102,31 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_AdditiveValidation validates an instance of AdditiveValidation according
+// to declarative validation rules in the API schema.
+func Validate_AdditiveValidation(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AdditiveValidation) (errs field.ErrorList) {
+	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *AdditiveValidation) *string { return obj.FieldA }, func(obj *AdditiveValidation) string { return obj.D1 }, validate.DirectEqualPtr, nil, []validate.DiscriminatedRule[*string, string]{
+		{
+			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+				errs := field.ErrorList{}
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return errs
+				}
+				return errs
+			}},
+	})...)
+
+	// field AdditiveValidation.TypeMeta has no validation
+	// field AdditiveValidation.D1 has no validation
+	// field AdditiveValidation.FieldA has no validation
+	return errs
 }
 
 // Validate_ChainedValidation validates an instance of ChainedValidation according

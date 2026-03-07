@@ -35,6 +35,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
+		{Group: "apps", Version: "v1"},
+		{Group: "apps", Version: "v1beta1"},
+		{Group: "apps", Version: "v1beta2"},
+		{Group: "extensions", Version: "v1beta1"},
 		{Group: "batch", Version: "v1"},
 		{Group: "batch", Version: "v1beta1"},
 		{Group: "certificates.k8s.io", Version: "v1"},
@@ -72,6 +76,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
 	subresourceOnly := map[schema.GroupVersionKind]string{
 		{Group: "autoscaling", Version: "v1", Kind: "Scale"}:      "scale",
+		{Group: "apps", Version: "v1", Kind: "Scale"}:             "scale",
+		{Group: "apps", Version: "v1beta1", Kind: "Scale"}:        "scale",
+		{Group: "apps", Version: "v1beta2", Kind: "Scale"}:        "scale",
+		{Group: "extensions", Version: "v1beta1", Kind: "Scale"}:  "scale",
 		{Group: "autoscaling", Version: "v1beta1", Kind: "Scale"}: "scale",
 		{Group: "autoscaling", Version: "v1beta2", Kind: "Scale"}: "scale",
 		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",

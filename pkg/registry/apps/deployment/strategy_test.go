@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -60,7 +61,7 @@ func TestStatusUpdates(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deploymentStatusStrategy{}.PrepareForUpdate(genericapirequest.NewContext(), test.obj, test.old)
+		deploymentStatusStrategy{}.PrepareForUpdate(ctxWithRequestInfo(), test.obj, test.old)
 		if !reflect.DeepEqual(test.expected, test.obj) {
 			t.Errorf("Unexpected object mismatch! Expected:\n%#v\ngot:\n%#v", test.expected, test.obj)
 		}
@@ -180,7 +181,8 @@ func TestSelectorImmutability(t *testing.T) {
 						MatchLabels:      map[string]string{"c": "v1"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
 					},
-					Detail: "field is immutable",
+					Detail:         "field is immutable",
+					FromImperative: true,
 				},
 			},
 		},
@@ -200,7 +202,8 @@ func TestSelectorImmutability(t *testing.T) {
 						MatchLabels:      map[string]string{"c": "d"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
 					},
-					Detail: "field is immutable",
+					Detail:         "field is immutable",
+					FromImperative: true,
 				},
 			},
 		},
@@ -209,7 +212,7 @@ func TestSelectorImmutability(t *testing.T) {
 	for _, test := range tests {
 		oldDeployment := newDeploymentWithSelectorLabels(test.oldSelectorLabels)
 		newDeployment := newDeploymentWithSelectorLabels(test.newSelectorLabels)
-		context := genericapirequest.NewContext()
+		context := ctxWithRequestInfo()
 		context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
 		errorList := deploymentStrategy{}.ValidateUpdate(context, newDeployment, oldDeployment)
 		if len(test.expectedErrorList) == 0 && len(errorList) == 0 {
@@ -306,7 +309,7 @@ func TestDeploymentStrategyValidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.deployment); len(errs) == 0 {
+			if errs := Strategy.Validate(ctxWithRequestInfo(), tc.deployment); len(errs) == 0 {
 				t.Error("expected failure")
 			}
 		})
@@ -328,7 +331,7 @@ func TestDeploymentStrategyValidateUpdate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newDeployment, tc.oldDeployment); len(errs) != 0 {
+			if errs := Strategy.ValidateUpdate(ctxWithRequestInfo(), tc.newDeployment, tc.oldDeployment); len(errs) != 0 {
 				t.Errorf("unexpected error:%v", errs)
 			}
 		})
@@ -348,9 +351,17 @@ func TestDeploymentStrategyValidateUpdate(t *testing.T) {
 
 	for _, tc := range errTests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newDeployment, tc.oldDeployment); len(errs) == 0 {
+			if errs := Strategy.ValidateUpdate(ctxWithRequestInfo(), tc.newDeployment, tc.oldDeployment); len(errs) == 0 {
 				t.Error("expected failure")
 			}
 		})
 	}
+}
+
+func ctxWithRequestInfo() context.Context {
+	return genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "apps",
+		APIVersion: "v1",
+		Resource:   "deployments",
+	})
 }
