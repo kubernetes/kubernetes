@@ -270,7 +270,7 @@ func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obj
 	newObj.Spec = oldObj.Spec
 
 	// Status updates are for only for updating status, not objectmeta.
-	metav1.ResetObjectMetaForStatus(&newObj.ObjectMeta, &newObj.ObjectMeta)
+	metav1.ResetObjectMetaForStatus(&newObj.ObjectMeta, &oldObj.ObjectMeta)
 }
 
 func (statusStrategy) AllowCreateOnUpdate() bool {
