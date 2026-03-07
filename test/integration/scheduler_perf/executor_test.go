@@ -629,7 +629,7 @@ func TestMetricThreshold(t *testing.T) {
 				return []testDataCollector{&mockDataCollector{dataItems: tc.dataItems}}
 			}
 
-			workload := &workload{
+			workload := &Workload{
 				Name: "some/workload",
 				Threshold: thresholds{
 					valuesByTopic: map[string]float64{"example": tc.thresholdValue},

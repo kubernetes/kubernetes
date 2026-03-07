@@ -261,7 +261,7 @@ type testCase struct {
 	// be executed serially one after another.
 	WorkloadTemplate []op
 	// List of workloads to run under this testCase.
-	Workloads []*workload
+	Workloads []*Workload
 	// SchedulerConfigPath is the path of scheduler configuration
 	// Optional
 	SchedulerConfigPath string
@@ -298,10 +298,10 @@ func (tc *testCase) workloadNamesUnique() error {
 	return nil
 }
 
-// workload is a subtest under a testCase that tests the scheduler performance
+// Workload is a subtest under a testCase that tests the scheduler performance
 // for a certain ordering of ops. The set of nodes created and pods scheduled
-// in a workload may be heterogeneous.
-type workload struct {
+// in a Workload may be heterogeneous.
+type Workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
@@ -331,7 +331,12 @@ type workload struct {
 	FeatureGates map[featuregate.Feature]bool
 }
 
-func (w *workload) isValid(mcc *metricsCollectorConfig) error {
+// GetParam retrieves a parameter from the Workload's parameters as an integer.
+func (w *Workload) GetParam(key string) (int, error) {
+	return w.Params.get(key)
+}
+
+func (w *Workload) isValid(mcc *metricsCollectorConfig) error {
 	if w.Threshold.value < 0 {
 		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold.value)
 	}
@@ -344,7 +349,7 @@ func (w *workload) isValid(mcc *metricsCollectorConfig) error {
 	return w.ThresholdMetricSelector.isValid(mcc)
 }
 
-func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
+func (w *Workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
 	if w.ThresholdMetricSelector != nil {
 		return
 	}
@@ -484,7 +489,7 @@ func getParam[T float64 | string | bool](p params, key string) (T, error) {
 }
 
 // unusedParams returns the names of unusedParams
-func (w workload) unusedParams() []string {
+func (w Workload) unusedParams() []string {
 	var ret []string
 	for name := range w.Params.params {
 		if !w.Params.isUsed[name] {
@@ -559,7 +564,7 @@ type realOp interface {
 	// type, even though calls will be made from with a *realOp. This is because
 	// callers don't want the receiver to inadvertently modify the realOp
 	// (instead, it's returned as a return value).
-	patchParams(w *workload) (realOp, error)
+	patchParams(w *Workload) (realOp, error)
 }
 
 // runnableOp is an interface implemented by some operations. It makes it possible
@@ -805,6 +810,15 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			fixJSONOutput(b)
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
+					if opts.preInitFn != nil {
+						cleanup, err := opts.preInitFn(b, w)
+						if err != nil {
+							b.Fatalf("failed to run preInitFn for workload %s: %v", w.Name, err)
+						}
+						if cleanup != nil {
+							b.Cleanup(cleanup)
+						}
+					}
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						b.Skipf("disabled by label filter %q", PerfSchedulingLabelFilter)
 					}
@@ -825,7 +839,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 						}
 					}
 
-					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory)
+					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory, opts)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -932,6 +946,15 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
+					if opts.preInitFn != nil {
+						cleanup, err := opts.preInitFn(t, w)
+						if err != nil {
+							t.Fatalf("failed to run preInitFn for workload %s: %v", w.Name, err)
+						}
+						if cleanup != nil {
+							t.Cleanup(cleanup)
+						}
+					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, opts)
 					err := w.isValid(tc.MetricsCollectorConfig)
@@ -939,7 +962,7 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
 					}
 
-					_, err = runWorkload(tCtx, tc, w, "" /* topic name not relevant */, scheduler, informerFactory)
+					_, err = runWorkload(tCtx, tc, w, "" /* topic name not relevant */, scheduler, informerFactory, opts)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -976,7 +999,7 @@ func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
-func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
+func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
 	var unrolled []op
 	for opIndex, o := range wt {
 		realOp, err := o.realOp.patchParams(w)
@@ -1075,7 +1098,7 @@ func checkEmptyInFlightEvents() error {
 	return nil
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName string, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory, opts *schedulerPerfOptions) ([]DataItem, error) {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1115,6 +1138,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 		testCase:                     tc,
 		workload:                     w,
 		topicName:                    topicName,
+		opts:                         opts,
 	}
 
 	tCtx.TB().Cleanup(func() {

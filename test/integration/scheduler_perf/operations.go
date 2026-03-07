@@ -71,7 +71,7 @@ func (c *createAny) collectsMetrics() bool {
 	return false
 }
 
-func (c createAny) patchParams(w *workload) (realOp, error) {
+func (c createAny) patchParams(w *Workload) (realOp, error) {
 	if c.CountParam != "" {
 		count, err := w.Params.get(c.CountParam[1:])
 		if err != nil {
@@ -215,7 +215,7 @@ func (*createNodesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
+func (cno createNodesOp) patchParams(w *Workload) (realOp, error) {
 	if cno.CountParam != "" {
 		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
@@ -253,7 +253,7 @@ func (*createNamespacesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
+func (cmo createNamespacesOp) patchParams(w *Workload) (realOp, error) {
 	if cmo.CountParam != "" {
 		var err error
 		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
@@ -342,7 +342,7 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 	return cpo.CollectMetrics
 }
 
-func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
+func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 	if cpo.CountParam != "" {
 		var err error
 		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
@@ -395,7 +395,7 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 	return cpso.CreatePodsOp.CollectMetrics
 }
 
-func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
+func (cpso createPodSetsOp) patchParams(w *Workload) (realOp, error) {
 	if cpso.CountParam != "" {
 		var err error
 		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
@@ -442,7 +442,7 @@ func (dpo *deletePodsOp) collectsMetrics() bool {
 	return false
 }
 
-func (dpo deletePodsOp) patchParams(w *workload) (realOp, error) {
+func (dpo deletePodsOp) patchParams(w *Workload) (realOp, error) {
 	return &dpo, nil
 }
 
@@ -489,7 +489,7 @@ func (*churnOp) collectsMetrics() bool {
 	return false
 }
 
-func (co churnOp) patchParams(w *workload) (realOp, error) {
+func (co churnOp) patchParams(w *Workload) (realOp, error) {
 	return &co, nil
 }
 
@@ -530,7 +530,7 @@ func (*barrierOp) collectsMetrics() bool {
 	return false
 }
 
-func (bo barrierOp) patchParams(w *workload) (realOp, error) {
+func (bo barrierOp) patchParams(w *Workload) (realOp, error) {
 	if bo.StageRequirement == "" {
 		bo.StageRequirement = Scheduled
 	}
@@ -556,7 +556,7 @@ func (so *sleepOp) collectsMetrics() bool {
 	return false
 }
 
-func (so sleepOp) patchParams(w *workload) (realOp, error) {
+func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	if so.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, so.DurationParam[1:])
 		if err != nil {
@@ -595,7 +595,7 @@ func (*startCollectingMetricsOp) collectsMetrics() bool {
 	return false
 }
 
-func (scm startCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm startCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
@@ -615,7 +615,7 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 	return true
 }
 
-func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
