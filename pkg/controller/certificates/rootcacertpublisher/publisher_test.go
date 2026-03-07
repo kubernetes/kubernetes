@@ -18,13 +18,16 @@ package rootcacertpublisher
 
 import (
 	"context"
+	"crypto/x509"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -32,6 +35,46 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
 )
+
+// fakeCAContent is a mutable CAContentProvider that notifies its listeners
+// when setContent is called.
+type fakeCAContent struct {
+	mu        sync.Mutex
+	content   []byte
+	listeners []dynamiccertificates.Listener
+}
+
+func newFakeCAContent(content []byte) *fakeCAContent {
+	return &fakeCAContent{content: content}
+}
+
+func (f *fakeCAContent) Name() string { return "fake" }
+
+func (f *fakeCAContent) CurrentCABundleContent() []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.content
+}
+
+func (f *fakeCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
+	return x509.VerifyOptions{}, false
+}
+
+func (f *fakeCAContent) AddListener(l dynamiccertificates.Listener) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.listeners = append(f.listeners, l)
+}
+
+func (f *fakeCAContent) setContent(content []byte) {
+	f.mu.Lock()
+	f.content = content
+	ls := append([]dynamiccertificates.Listener(nil), f.listeners...)
+	f.mu.Unlock()
+	for _, l := range ls {
+		l.Enqueue()
+	}
+}
 
 func TestConfigMapCreation(t *testing.T) {
 	ns := metav1.NamespaceDefault
@@ -126,7 +169,7 @@ func TestConfigMapCreation(t *testing.T) {
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
 			nsInformer := informers.Core().V1().Namespaces()
-			controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA)
+			controller, err := NewPublisher(cmInformer, nsInformer, client, newFakeCAContent(fakeRootCA))
 			if err != nil {
 				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}
@@ -259,7 +302,7 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 			// Publisher manages certificate ConfigMap objects inside Namespaces
 			controller := Publisher{
 				client:         client,
-				rootCA:         []byte("fake"),
+				ca:             newFakeCAContent([]byte("fake")),
 				cmLister:       corev1listers.NewConfigMapLister(configMapIndexer),
 				cmListerSynced: func() bool { return true },
 				nsListerSynced: func() bool { return true },
@@ -271,5 +314,76 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 			}
 			tc.ExpectActions(t, client.Actions())
 		})
+	}
+}
+
+func TestConfigMapRepublishOnCAChange(t *testing.T) {
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: metav1.NamespaceDefault},
+		Status:     v1.NamespaceStatus{Phase: v1.NamespaceActive},
+	}
+
+	ca := newFakeCAContent([]byte("ca-v1"))
+	client := fake.NewSimpleClientset(ns)
+	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
+	cmInformer := informerFactory.Core().V1().ConfigMaps()
+	nsInformer := informerFactory.Core().V1().Namespaces()
+
+	pub, err := NewPublisher(cmInformer, nsInformer, client, ca)
+	if err != nil {
+		t.Fatalf("error creating publisher: %v", err)
+	}
+	if len(ca.listeners) != 1 {
+		t.Fatalf("publisher did not register as listener: got %d listeners", len(ca.listeners))
+	}
+
+	nsInformer.Informer().GetStore().Add(ns)
+	cmStore := cmInformer.Informer().GetStore()
+	ctx := context.TODO()
+
+	// Initial publish: create kube-root-ca.crt with ca-v1.
+	if err := pub.syncNamespace(ctx, ns.Name); err != nil {
+		t.Fatal(err)
+	}
+	actions := client.Actions()
+	if len(actions) != 1 || actions[0].GetVerb() != "create" {
+		t.Fatalf("expected 1 create action, got %v", actions)
+	}
+	created := actions[0].(clienttesting.CreateAction).GetObject().(*v1.ConfigMap)
+	if got := created.Data["ca.crt"]; got != "ca-v1" {
+		t.Fatalf("expected ca-v1, got %q", got)
+	}
+	// Reflect the created object in the lister so the next sync takes the
+	// update path. Set Namespace explicitly: Create infers it from the
+	// request path and does not populate ObjectMeta.
+	cached := created.DeepCopy()
+	cached.Namespace = ns.Name
+	cmStore.Add(cached)
+	client.ClearActions()
+
+	// Sync again with unchanged CA: no-op.
+	if err := pub.syncNamespace(ctx, ns.Name); err != nil {
+		t.Fatal(err)
+	}
+	if actions := client.Actions(); len(actions) != 0 {
+		t.Fatalf("expected no actions on unchanged CA, got %v", actions)
+	}
+
+	// Change the CA: listener should re-queue the namespace.
+	ca.setContent([]byte("ca-v2"))
+	if pub.queue.Len() != 1 {
+		t.Fatalf("expected 1 queued namespace after CA change, got %d", pub.queue.Len())
+	}
+	for pub.queue.Len() != 0 {
+		pub.processNextWorkItem(ctx)
+	}
+
+	actions = client.Actions()
+	if len(actions) != 1 || actions[0].GetVerb() != "update" {
+		t.Fatalf("expected 1 update action after CA change, got %v", actions)
+	}
+	updated := actions[0].(clienttesting.UpdateAction).GetObject().(*v1.ConfigMap)
+	if got := updated.Data["ca.crt"]; got != "ca-v2" {
+		t.Fatalf("expected ca-v2 after reload, got %q", got)
 	}
 }

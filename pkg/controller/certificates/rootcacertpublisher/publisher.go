@@ -26,8 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -52,10 +54,14 @@ func init() {
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+//
+// The CA bundle is read from ca on every sync. The Publisher registers
+// itself as a listener on ca and re-queues all namespaces when the bundle
+// changes.
+func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, ca dynamiccertificates.CAContentProvider) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
-		rootCA: rootCA,
+		ca:     ca,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -75,9 +81,12 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	})
+	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
 	e.syncHandler = e.syncNamespace
+
+	ca.AddListener(e)
 
 	return e, nil
 
@@ -86,7 +95,7 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 // Publisher manages certificate ConfigMap objects inside Namespaces
 type Publisher struct {
 	client clientset.Interface
-	rootCA []byte
+	ca     dynamiccertificates.CAContentProvider
 
 	// To allow injection for testing.
 	syncHandler func(ctx context.Context, key string) error
@@ -94,6 +103,7 @@ type Publisher struct {
 	cmLister       corelisters.ConfigMapLister
 	cmListerSynced cache.InformerSynced
 
+	nsLister       corelisters.NamespaceLister
 	nsListerSynced cache.InformerSynced
 
 	queue workqueue.TypedRateLimitingInterface[string]
@@ -113,7 +123,7 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.cmListerSynced, c.nsListerSynced) {
 		return
 	}
 
@@ -162,6 +172,21 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	c.queue.Add(newNamespace.Name)
 }
 
+// Enqueue implements dynamiccertificates.Listener. It re-queues every
+// namespace so each kube-root-ca.crt ConfigMap is reconciled against the
+// current CA bundle.
+func (c *Publisher) Enqueue() {
+	namespaces, err := c.nsLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("root-ca-cert-publisher: listing namespaces after CA change: %w", err))
+		return
+	}
+	klog.V(2).InfoS("Root CA bundle changed, re-queueing all namespaces", "count", len(namespaces))
+	for _, ns := range namespaces {
+		c.queue.Add(ns.Name)
+	}
+}
+
 func (c *Publisher) runWorker(ctx context.Context) {
 	for c.processNextWorkItem(ctx) {
 	}
@@ -193,6 +218,7 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 		klog.FromContext(ctx).V(4).Info("Finished syncing namespace", "namespace", ns, "elapsedTime", time.Since(startTime))
 	}()
 
+	rootCA := c.ca.CurrentCABundleContent()
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
 	case apierrors.IsNotFound(err):
@@ -202,7 +228,7 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 				Annotations: map[string]string{DescriptionAnnotation: Description},
 			},
 			Data: map[string]string{
-				"ca.crt": string(c.rootCA),
+				"ca.crt": string(rootCA),
 			},
 		}, metav1.CreateOptions{})
 		// don't retry a create if the namespace doesn't exist or is terminating
@@ -215,7 +241,7 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 	}
 
 	data := map[string]string{
-		"ca.crt": string(c.rootCA),
+		"ca.crt": string(rootCA),
 	}
 
 	// ensure the data and the one annotation describing usage of this configmap match.
