@@ -1904,7 +1904,9 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 
 		go kl.fastStatusUpdateOnce()
 
-		// start syncing lease
+		// Keep renewing the node lease until the kubelet exits.
+		// This intentionally does not use the kubelet context so lease renewal can
+		// continue during graceful shutdown.
 		go kl.nodeLeaseController.Run(context.Background())
 
 		// Mirror pods for static pods may not be created immediately during node startup
