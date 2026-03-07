@@ -738,6 +738,214 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 	}
 }
 
+func TestUnmountSubmounts(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emptydir-submount-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	volDir := filepath.Join(tmpDir, "vol")
+	if err := os.MkdirAll(volDir, 0755); err != nil {
+		t.Fatalf("Failed to create volume dir: %v", err)
+	}
+
+	testCases := map[string]struct {
+		mountPoints          []mount.MountPoint
+		expectedUnmounts     int
+		expectedUnmountPaths []string
+	}{
+		"no submounts": {
+			mountPoints:      []mount.MountPoint{},
+			expectedUnmounts: 0,
+		},
+		"submounts outside the volume dir are not unmounted": {
+			mountPoints: []mount.MountPoint{
+				{Path: "/other/path/file.txt", Device: "/dev/sda"},
+				{Path: tmpDir, Device: "/dev/sdb"},
+			},
+			expectedUnmounts: 0,
+		},
+		"the volume dir itself is not unmounted": {
+			mountPoints: []mount.MountPoint{
+				{Path: volDir, Device: "/dev/sda"},
+			},
+			expectedUnmounts: 0,
+		},
+		"single submount is unmounted": {
+			mountPoints: []mount.MountPoint{
+				{Path: filepath.Join(volDir, "log.txt"), Device: "/host/containers/abc123"},
+			},
+			expectedUnmounts:     1,
+			expectedUnmountPaths: []string{filepath.Join(volDir, "log.txt")},
+		},
+		"multiple submounts are unmounted deepest first": {
+			mountPoints: []mount.MountPoint{
+				{Path: filepath.Join(volDir, "a"), Device: "/dev/a"},
+				{Path: filepath.Join(volDir, "a", "b", "c"), Device: "/dev/c"},
+				{Path: filepath.Join(volDir, "a", "b"), Device: "/dev/b"},
+			},
+			expectedUnmounts: 3,
+			// Reverse lexicographic order ensures deepest paths first
+			expectedUnmountPaths: []string{
+				filepath.Join(volDir, "a", "b", "c"),
+				filepath.Join(volDir, "a", "b"),
+				filepath.Join(volDir, "a"),
+			},
+		},
+		"mix of submounts inside and outside the volume": {
+			mountPoints: []mount.MountPoint{
+				{Path: "/other/path", Device: "/dev/other"},
+				{Path: filepath.Join(volDir, "inside.txt"), Device: "/host/containers/xyz"},
+				{Path: volDir, Device: "tmpfs"},
+			},
+			expectedUnmounts:     1,
+			expectedUnmountPaths: []string{filepath.Join(volDir, "inside.txt")},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fakeMounter := mount.NewFakeMounter(tc.mountPoints)
+			ed := &emptyDir{
+				mounter: fakeMounter,
+			}
+
+			err := ed.unmountSubmounts(volDir)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			log := fakeMounter.GetLog()
+			unmountCount := 0
+			for _, action := range log {
+				if action.Action == mount.FakeActionUnmount {
+					unmountCount++
+				}
+			}
+			if unmountCount != tc.expectedUnmounts {
+				t.Errorf("Expected %d unmount calls, got %d (log: %+v)", tc.expectedUnmounts, unmountCount, log)
+			}
+
+			if tc.expectedUnmountPaths != nil {
+				unmountIdx := 0
+				for _, action := range log {
+					if action.Action == mount.FakeActionUnmount {
+						if unmountIdx >= len(tc.expectedUnmountPaths) {
+							t.Errorf("More unmounts than expected")
+							break
+						}
+						if action.Target != tc.expectedUnmountPaths[unmountIdx] {
+							t.Errorf("Unmount %d: expected path %s, got %s", unmountIdx, tc.expectedUnmountPaths[unmountIdx], action.Target)
+						}
+						unmountIdx++
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestUnmountSubmountsNilMounter(t *testing.T) {
+	ed := &emptyDir{
+		mounter: nil,
+	}
+	err := ed.unmountSubmounts("/some/dir")
+	if err != nil {
+		t.Errorf("Expected nil error with nil mounter, got: %v", err)
+	}
+}
+
+func TestUnmountSubmountsUnmountError(t *testing.T) {
+	volDir := "/var/lib/kubelet/pods/uid/volumes/kubernetes.io~empty-dir/cache-volume"
+	submountPath := volDir + "/log.txt"
+
+	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{
+		{Path: submountPath, Device: "/host/containers/abc123"},
+	})
+	fakeMounter.UnmountFunc = func(path string) error {
+		return fmt.Errorf("unmount failed: device busy")
+	}
+
+	ed := &emptyDir{
+		mounter: fakeMounter,
+	}
+
+	err := ed.unmountSubmounts(volDir)
+	if err == nil {
+		t.Fatal("Expected error when unmount fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "unmount failed") {
+		t.Errorf("Expected error to contain 'unmount failed', got: %v", err)
+	}
+}
+
+func TestTeardownDefaultWithSubmounts(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emptydir-teardown-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	basePath := filepath.Join(tmpDir, "base")
+	if err := os.MkdirAll(basePath, 0755); err != nil {
+		t.Fatalf("Failed to create base dir: %v", err)
+	}
+
+	volumePath := filepath.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/cache-volume")
+	metadataDir := filepath.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/cache-volume")
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+
+	// Create the volume directory and a file inside (simulating the termination log)
+	if err := os.MkdirAll(volumePath, 0755); err != nil {
+		t.Fatalf("Failed to create volume path: %v", err)
+	}
+	logFilePath := filepath.Join(volumePath, "log.txt")
+	if err := os.WriteFile(logFilePath, []byte("termination message"), 0666); err != nil {
+		t.Fatalf("Failed to create log file: %v", err)
+	}
+
+	// Create the metadata/ready dir
+	volumeutil.SetReady(metadataDir)
+
+	// Set up a fake mounter with a submount inside the volume dir
+	// (simulating bidirectional mount propagation of terminationMessagePath)
+	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{
+		{Path: logFilePath, Device: "/var/lib/kubelet/pods/poduid/containers/test-container/abc123"},
+	})
+
+	unmounterMountDetector := &fakeMountDetector{medium: v1.StorageMediumDefault, isMount: false}
+	unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(
+		"cache-volume", types.UID("poduid"), fakeMounter, unmounterMountDetector)
+	if err != nil {
+		t.Fatalf("Failed to create unmounter: %v", err)
+	}
+
+	// Tear down - should succeed because unmountSubmounts clears the stale mount
+	if err := unmounter.TearDown(); err != nil {
+		t.Fatalf("TearDown failed: %v", err)
+	}
+
+	// Verify the submount was unmounted
+	log := fakeMounter.GetLog()
+	unmountFound := false
+	for _, action := range log {
+		if action.Action == mount.FakeActionUnmount && action.Target == logFilePath {
+			unmountFound = true
+			break
+		}
+	}
+	if !unmountFound {
+		t.Errorf("Expected unmount of %s, but it was not found in log: %+v", logFilePath, log)
+	}
+
+	// Verify the volume directory was removed
+	if _, err := os.Stat(volumePath); !os.IsNotExist(err) {
+		t.Errorf("Volume directory should have been removed, but still exists")
+	}
+}
+
 type testMountDetector struct {
 	pageSize *resource.Quantity
 	isMnt    bool

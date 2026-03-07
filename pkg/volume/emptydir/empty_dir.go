@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
@@ -536,6 +537,13 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
 		}
 	}
+	// Unmount any submounts that may have been propagated into this directory
+	// via Bidirectional mount propagation (e.g. terminationMessagePath bind
+	// mounts). Without this, os.RemoveAll will fail with EBUSY on the
+	// propagated mount point files/directories.
+	if err := ed.unmountSubmounts(dir); err != nil {
+		klog.Warningf("Warning: Failed to unmount submounts in %s: %v", dir, err)
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
 	return os.RemoveAll(dir)
@@ -545,11 +553,56 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
+	// Unmount any submounts that may have been propagated into this directory
+	// via Bidirectional mount propagation before unmounting the tmpfs/hugetlbfs
+	// itself. Stale submounts would cause the parent unmount to fail with EBUSY.
+	if err := ed.unmountSubmounts(dir); err != nil {
+		klog.Warningf("Warning: Failed to unmount submounts in %s: %v", dir, err)
+	}
 	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(dir); err != nil {
 		return err
+	}
+	return nil
+}
+
+// unmountSubmounts lists all mount points and unmounts any that are under the
+// given directory. This handles mounts that were propagated into the volume
+// directory via Bidirectional mount propagation (e.g. when terminationMessagePath
+// points to a file inside a Bidirectional-mounted volume, the bind mount
+// propagates back to the host and prevents volume cleanup).
+// Mount points are unmounted in reverse lexicographic order (deepest paths
+// first) to handle nested mounts correctly.
+func (ed *emptyDir) unmountSubmounts(dir string) error {
+	if ed.mounter == nil {
+		return nil
+	}
+	mountPoints, err := ed.mounter.List()
+	if err != nil {
+		return fmt.Errorf("failed to list mount points: %w", err)
+	}
+	var submounts []string
+	for _, mp := range mountPoints {
+		if mp.Path != dir && mount.PathWithinBase(mp.Path, dir) {
+			submounts = append(submounts, mp.Path)
+		}
+	}
+	if len(submounts) == 0 {
+		return nil
+	}
+	// Sort in reverse order so deepest paths are unmounted first.
+	sort.Sort(sort.Reverse(sort.StringSlice(submounts)))
+	var errs []error
+	for _, mp := range submounts {
+		klog.V(4).Infof("Unmounting submount %s under emptyDir volume %s", mp, dir)
+		if err := ed.mounter.Unmount(mp); err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmount %s: %w", mp, err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("errors unmounting submounts: %v", errs)
 	}
 	return nil
 }
