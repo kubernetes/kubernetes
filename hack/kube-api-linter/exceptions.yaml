@@ -122,3 +122,8 @@
 # Validation makes this require at least one of the fields within to be set.
 - text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields."
   path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"
+
+# NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
+# staging/src/k8s.io/api/core/v1/types.go has several fields (SerializedReference.Reference & ImageVolumeSource.Reference) that reference other objects, and use the Reference/References suffix. These fields should be renamed to use the Ref/Refs suffix, but this would be a breaking change, so we will allowlist these for now and fix them in the future.
+- text: 'noreferences: naming convention "reference-to-ref"'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
