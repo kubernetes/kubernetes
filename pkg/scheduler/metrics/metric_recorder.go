@@ -123,6 +123,7 @@ type MetricAsyncRecorder struct {
 	IsStoppedCh chan struct{}
 }
 
+// NewMetricsAsyncRecorder creates a MetricAsyncRecorder that asynchronously records histogram metrics at the given interval.
 func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
 	recorder := &MetricAsyncRecorder{
 		bufferCh:                      make(chan *histogramVecMetric, bufferSize),
