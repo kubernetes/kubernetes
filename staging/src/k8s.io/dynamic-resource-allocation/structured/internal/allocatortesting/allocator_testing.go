@@ -975,6 +975,30 @@ func TestAllocator(t *testing.T,
 	}{
 
 		"empty": {},
+		// Verify that when a CEL selector on a request does not match any
+		// available device, the error message includes the claim name and
+		// the failing expression so users can diagnose the mismatch.
+		"cel-selector-no-match": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				request(req0, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						// This expression checks for boolAttribute==true, but the
+						// device has boolAttribute==false, so it compiles but evaluates to false.
+						Expression: fmt.Sprintf(`device.attributes["%s"].boolAttribute == true`, driverA),
+					},
+				}),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("boolAttribute"): {BoolValue: ptr.To(false)},
+				}),
+			)),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring(claim0)),
+		},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
