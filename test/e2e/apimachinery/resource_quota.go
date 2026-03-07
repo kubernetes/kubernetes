@@ -1614,7 +1614,17 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a terminating pod")
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
+		// Retry creating the pod as the admission controller's view of the quota usage may lag behind the ResourceQuota status.
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
+			if err != nil {
+				if apierrors.IsForbidden(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with terminating scope captures the pod usage")
