@@ -133,7 +133,7 @@ type FlowSchema struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `spec` is the specification of the desired behavior of a FlowSchema.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec FlowSchemaSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// `status` is the current status of a FlowSchema.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -162,6 +162,7 @@ type FlowSchemaSpec struct {
 	// `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
 	// be resolved, the FlowSchema will be ignored and marked as invalid in its status.
 	// Required.
+	// +required
 	PriorityLevelConfiguration PriorityLevelConfigurationReference `json:"priorityLevelConfiguration" protobuf:"bytes,1,opt,name=priorityLevelConfiguration"`
 	// `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
 	// FlowSchema is among those with the numerically lowest (which we take to be logically highest)
@@ -203,6 +204,7 @@ type FlowDistinguisherMethod struct {
 	// `type` is the type of flow distinguisher method
 	// The supported types are "ByUser" and "ByNamespace".
 	// Required.
+	// +required
 	Type FlowDistinguisherMethodType `json:"type" protobuf:"bytes,1,opt,name=type"`
 }
 
@@ -210,6 +212,7 @@ type FlowDistinguisherMethod struct {
 type PriorityLevelConfigurationReference struct {
 	// `name` is the name of the priority level configuration being referenced
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -223,6 +226,7 @@ type PolicyRulesWithSubjects struct {
 	// A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
 	// +listType=atomic
 	// Required.
+	// +required
 	Subjects []Subject `json:"subjects" protobuf:"bytes,1,rep,name=subjects"`
 	// `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
@@ -243,6 +247,7 @@ type PolicyRulesWithSubjects struct {
 type Subject struct {
 	// `kind` indicates which one of the other fields is non-empty.
 	// Required
+	// +required
 	// +unionDiscriminator
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// `user` matches based on username.
@@ -270,6 +275,7 @@ const (
 type UserSubject struct {
 	// `name` is the username that matches, or "*" to match all usernames.
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -279,6 +285,7 @@ type GroupSubject struct {
 	// See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
 	// well-known group names.
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -286,9 +293,11 @@ type GroupSubject struct {
 type ServiceAccountSubject struct {
 	// `namespace` is the namespace of matching ServiceAccount objects.
 	// Required.
+	// +required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 }
 
@@ -306,12 +315,14 @@ type ResourcePolicyRule struct {
 	// "*" matches all verbs and, if present, must be the only entry.
 	// +listType=set
 	// Required.
+	// +required
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// `apiGroups` is a list of matching API groups and may not be empty.
 	// "*" matches all API groups and, if present, must be the only entry.
 	// +listType=set
 	// Required.
+	// +required
 	APIGroups []string `json:"apiGroups" protobuf:"bytes,2,rep,name=apiGroups"`
 
 	// `resources` is a list of matching resources (i.e., lowercase
@@ -320,6 +331,7 @@ type ResourcePolicyRule struct {
 	// "*" matches all resources and, if present, must be the only entry.
 	// Required.
 	// +listType=set
+	// +required
 	Resources []string `json:"resources" protobuf:"bytes,3,rep,name=resources"`
 
 	// `clusterScope` indicates whether to match requests that do not
@@ -351,6 +363,7 @@ type NonResourcePolicyRule struct {
 	// "*" matches all verbs. If it is present, it must be the only entry.
 	// +listType=set
 	// Required.
+	// +required
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 	// `nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty.
 	// For example:
@@ -362,6 +375,7 @@ type NonResourcePolicyRule struct {
 	// "*" matches all non-resource urls. if it is present, it must be the only entry.
 	// +listType=set
 	// Required.
+	// +required
 	NonResourceURLs []string `json:"nonResourceURLs" protobuf:"bytes,6,rep,name=nonResourceURLs"`
 }
 
@@ -380,16 +394,21 @@ type FlowSchemaStatus struct {
 type FlowSchemaCondition struct {
 	// `type` is the type of the condition.
 	// Required.
+	// +required
 	Type FlowSchemaConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 	// `status` is the status of the condition.
 	// Can be True, False, Unknown.
 	// Required.
+	// +optional
 	Status ConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// `message` is a human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
@@ -411,7 +430,7 @@ type PriorityLevelConfiguration struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `spec` is the specification of the desired behavior of a "request-priority".
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec PriorityLevelConfigurationSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// `status` is the current status of a "request-priority".
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -446,6 +465,7 @@ type PriorityLevelConfigurationSpec struct {
 	// _are_ subject to limits and (b) some of the server's limited
 	// capacity is made available exclusively to this priority level.
 	// Required.
+	// +required
 	// +unionDiscriminator
 	Type PriorityLevelEnablement `json:"type" protobuf:"bytes,1,opt,name=type"`
 
@@ -499,6 +519,7 @@ type LimitedPriorityLevelConfiguration struct {
 	NominalConcurrencyShares int32 `json:"nominalConcurrencyShares" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
+	// +required
 	LimitResponse LimitResponse `json:"limitResponse,omitempty" protobuf:"bytes,2,opt,name=limitResponse"`
 
 	// `lendablePercent` prescribes the fraction of the level's NominalCL that
@@ -578,6 +599,7 @@ type LimitResponse struct {
 	// "Reject" means that requests that can not be executed upon arrival
 	// are rejected.
 	// Required.
+	// +required
 	// +unionDiscriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
@@ -650,16 +672,21 @@ type PriorityLevelConfigurationStatus struct {
 type PriorityLevelConfigurationCondition struct {
 	// `type` is the type of the condition.
 	// Required.
+	// +required
 	Type PriorityLevelConfigurationConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 	// `status` is the status of the condition.
 	// Can be True, False, Unknown.
 	// Required.
+	// +optional
 	Status ConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// `message` is a human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 

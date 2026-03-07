@@ -67,6 +67,7 @@ message FlowDistinguisherMethod {
   // `type` is the type of flow distinguisher method
   // The supported types are "ByUser" and "ByNamespace".
   // Required.
+  // +required
   optional string type = 1;
 }
 
@@ -80,7 +81,7 @@ message FlowSchema {
 
   // `spec` is the specification of the desired behavior of a FlowSchema.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional FlowSchemaSpec spec = 2;
 
   // `status` is the current status of a FlowSchema.
@@ -93,20 +94,25 @@ message FlowSchema {
 message FlowSchemaCondition {
   // `type` is the type of the condition.
   // Required.
+  // +required
   optional string type = 1;
 
   // `status` is the status of the condition.
   // Can be True, False, Unknown.
   // Required.
+  // +optional
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // `message` is a human-readable message indicating details about last transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -126,6 +132,7 @@ message FlowSchemaSpec {
   // `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
   // be resolved, the FlowSchema will be ignored and marked as invalid in its status.
   // Required.
+  // +required
   optional PriorityLevelConfigurationReference priorityLevelConfiguration = 1;
 
   // `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
@@ -165,6 +172,7 @@ message GroupSubject {
   // See https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go for some
   // well-known group names.
   // Required.
+  // +required
   optional string name = 1;
 }
 
@@ -178,6 +186,7 @@ message LimitResponse {
   // "Reject" means that requests that can not be executed upon arrival
   // are rejected.
   // Required.
+  // +required
   // +unionDiscriminator
   optional string type = 1;
 
@@ -216,6 +225,7 @@ message LimitedPriorityLevelConfiguration {
   optional int32 nominalConcurrencyShares = 1;
 
   // `limitResponse` indicates what to do with requests that can not be executed right now
+  // +required
   optional LimitResponse limitResponse = 2;
 
   // `lendablePercent` prescribes the fraction of the level's NominalCL that
@@ -256,6 +266,7 @@ message NonResourcePolicyRule {
   // "*" matches all verbs. If it is present, it must be the only entry.
   // +listType=set
   // Required.
+  // +required
   repeated string verbs = 1;
 
   // `nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty.
@@ -268,6 +279,7 @@ message NonResourcePolicyRule {
   // "*" matches all non-resource urls. if it is present, it must be the only entry.
   // +listType=set
   // Required.
+  // +required
   repeated string nonResourceURLs = 6;
 }
 
@@ -281,6 +293,7 @@ message PolicyRulesWithSubjects {
   // A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
   // +listType=atomic
   // Required.
+  // +required
   repeated Subject subjects = 1;
 
   // `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
@@ -306,7 +319,7 @@ message PriorityLevelConfiguration {
 
   // `spec` is the specification of the desired behavior of a "request-priority".
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PriorityLevelConfigurationSpec spec = 2;
 
   // `status` is the current status of a "request-priority".
@@ -319,20 +332,25 @@ message PriorityLevelConfiguration {
 message PriorityLevelConfigurationCondition {
   // `type` is the type of the condition.
   // Required.
+  // +required
   optional string type = 1;
 
   // `status` is the status of the condition.
   // Can be True, False, Unknown.
   // Required.
+  // +optional
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // `message` is a human-readable message indicating details about last transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -351,6 +369,7 @@ message PriorityLevelConfigurationList {
 message PriorityLevelConfigurationReference {
   // `name` is the name of the priority level configuration being referenced
   // Required.
+  // +required
   optional string name = 1;
 }
 
@@ -366,6 +385,7 @@ message PriorityLevelConfigurationSpec {
   // _are_ subject to limits and (b) some of the server's limited
   // capacity is made available exclusively to this priority level.
   // Required.
+  // +required
   // +unionDiscriminator
   optional string type = 1;
 
@@ -441,12 +461,14 @@ message ResourcePolicyRule {
   // "*" matches all verbs and, if present, must be the only entry.
   // +listType=set
   // Required.
+  // +required
   repeated string verbs = 1;
 
   // `apiGroups` is a list of matching API groups and may not be empty.
   // "*" matches all API groups and, if present, must be the only entry.
   // +listType=set
   // Required.
+  // +required
   repeated string apiGroups = 2;
 
   // `resources` is a list of matching resources (i.e., lowercase
@@ -455,6 +477,7 @@ message ResourcePolicyRule {
   // "*" matches all resources and, if present, must be the only entry.
   // Required.
   // +listType=set
+  // +required
   repeated string resources = 3;
 
   // `clusterScope` indicates whether to match requests that do not
@@ -482,10 +505,12 @@ message ResourcePolicyRule {
 message ServiceAccountSubject {
   // `namespace` is the namespace of matching ServiceAccount objects.
   // Required.
+  // +required
   optional string namespace = 1;
 
   // `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
   // Required.
+  // +required
   optional string name = 2;
 }
 
@@ -495,6 +520,7 @@ message ServiceAccountSubject {
 message Subject {
   // `kind` indicates which one of the other fields is non-empty.
   // Required
+  // +required
   // +unionDiscriminator
   optional string kind = 1;
 
@@ -515,6 +541,7 @@ message Subject {
 message UserSubject {
   // `name` is the username that matches, or "*" to match all usernames.
   // Required.
+  // +required
   optional string name = 1;
 }
 

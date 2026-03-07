@@ -36848,6 +36848,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchema(ref common.ReferenceCallback) co
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -36897,6 +36898,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaCondition(ref common.ReferenceCal
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -37150,6 +37152,7 @@ func schema_k8sio_api_flowcontrol_v1_LimitedPriorityLevelConfiguration(ref commo
 						},
 					},
 				},
+				Required: []string{"limitResponse"},
 			},
 		},
 		Dependencies: []string{
@@ -37327,6 +37330,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfiguration(ref common.Refer
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -37376,6 +37380,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationCondition(ref com
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -37882,6 +37887,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchema(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -37931,6 +37937,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaCondition(ref common.Referen
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -38183,6 +38190,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 						},
 					},
 				},
+				Required: []string{"limitResponse"},
 			},
 		},
 		Dependencies: []string{
@@ -38360,6 +38368,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfiguration(ref common.
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -38409,6 +38418,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationCondition(re
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -38913,6 +38923,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchema(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -38962,6 +38973,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaCondition(ref common.Referen
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -39214,6 +39226,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 						},
 					},
 				},
+				Required: []string{"limitResponse"},
 			},
 		},
 		Dependencies: []string{
@@ -39391,6 +39404,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfiguration(ref common.
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -39440,6 +39454,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationCondition(re
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -39944,6 +39959,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchema(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -39993,6 +40009,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaCondition(ref common.Referen
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -40247,6 +40264,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 						},
 					},
 				},
+				Required: []string{"limitResponse"},
 			},
 		},
 		Dependencies: []string{
@@ -40424,6 +40442,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfiguration(ref common.
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -40473,6 +40492,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationCondition(re
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
