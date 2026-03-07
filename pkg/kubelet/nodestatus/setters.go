@@ -447,9 +447,6 @@ func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
 // RuntimeHandlers returns a Setter that sets RuntimeHandlers on the node.
 func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-			return nil
-		}
 		handlers := fn()
 		node.Status.RuntimeHandlers = make([]v1.NodeRuntimeHandler, len(handlers))
 		for i, h := range handlers {

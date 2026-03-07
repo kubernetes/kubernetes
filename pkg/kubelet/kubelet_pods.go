@@ -137,10 +137,6 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	// Then we cast it back to 32 bits, as this what the function returns.
 	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return defaultFirstID, defaultLen, nil
-	}
-
 	// We NEED to check for the user because getsubids can be configured to gather the response
 	// with a remote call and we can't distinguish between the remote endpoint not being reachable
 	// and the remote endpoint is reachable but no entry is present for the user.
