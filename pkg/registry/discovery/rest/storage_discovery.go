@@ -28,10 +28,12 @@ import (
 )
 
 // StorageProvider is a REST storage provider for discovery.k8s.io.
-type StorageProvider struct{}
+type StorageProvider struct {
+	endpointSliceLister rest.Lister
+}
 
 // NewRESTStorage returns a new storage provider.
-func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+func (p *StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(discovery.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -45,7 +47,7 @@ func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	return apiGroupInfo, nil
 }
 
-func (p StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+func (p *StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
 	if resource := "endpointslices"; apiResourceConfigSource.ResourceEnabled(discoveryv1.SchemeGroupVersion.WithResource(resource)) {
@@ -54,12 +56,19 @@ func (p StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIReso
 			return storage, err
 		}
 		storage[resource] = endpointSliceStorage
+		p.endpointSliceLister = endpointSliceStorage
 	}
 
 	return storage, nil
 }
 
 // GroupName is the group name for the storage provider.
-func (p StorageProvider) GroupName() string {
+func (p *StorageProvider) GroupName() string {
 	return discovery.GroupName
+}
+
+// EndpointSliceLister returns a rest.Lister for EndpointSlices (or nil if NewRESTStorage
+// has not yet been called).
+func (p *StorageProvider) EndpointSliceLister() rest.Lister {
+	return p.endpointSliceLister
 }

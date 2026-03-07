@@ -385,6 +385,8 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 }
 
 func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]controlplaneapiserver.RESTStorageProvider, error) {
+	discoveryRESTStorageProvider := &discoveryrest.StorageProvider{}
+
 	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
 		GenericConfig: *c.ControlPlane.NewCoreGenericConfig(),
 		Proxy: corerest.ProxyConfig{
@@ -396,6 +398,9 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			SecondaryClusterIPRange: c.Extra.SecondaryServiceIPRange,
 			NodePortRange:           c.Extra.ServiceNodePortRange,
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
+		},
+		OtherProviders: corerest.OtherProviders{
+			EndpointSliceListerProvider: discoveryRESTStorageProvider,
 		},
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
@@ -418,7 +423,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
-		discoveryrest.StorageProvider{},
+		discoveryRESTStorageProvider,
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
