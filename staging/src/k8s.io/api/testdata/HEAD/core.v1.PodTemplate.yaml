@@ -888,6 +888,7 @@ template:
     - conditionType: conditionTypeValue
     resourceClaims:
     - name: nameValue
+      podGroupResourceClaim: podGroupResourceClaimValue
       resourceClaimName: resourceClaimNameValue
       resourceClaimTemplateName: resourceClaimTemplateNameValue
     resources:
@@ -903,6 +904,8 @@ template:
     schedulerName: schedulerNameValue
     schedulingGates:
     - name: nameValue
+    schedulingGroup:
+      podGroupName: podGroupNameValue
     securityContext:
       appArmorProfile:
         localhostProfile: localhostProfileValue
@@ -1258,7 +1261,3 @@ template:
         storagePolicyID: storagePolicyIDValue
         storagePolicyName: storagePolicyNameValue
         volumePath: volumePathValue
-    workloadRef:
-      name: nameValue
-      podGroup: podGroupValue
-      podGroupReplicaKey: podGroupReplicaKeyValue

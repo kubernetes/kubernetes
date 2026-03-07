@@ -42,18 +42,20 @@ func init() {
 // ClaimInfo test cases
 
 const (
-	namespace     = "test-namespace"
-	className     = "test-class"
-	driverName    = "test-driver"
-	deviceName    = "test-device"                      // name inside ResourceSlice
-	cdiDeviceName = "cdi-test-device"                  // name inside CDI spec
-	cdiID         = "test-driver/test=cdi-test-device" // CDI device ID
-	poolName      = "test-pool"
-	requestName   = "test-request"
-	requestName2  = "test-request-2"
-	claimName     = "test-claim"
-	claimUID      = types.UID(claimName + "-uid")
-	podUID        = "test-pod-uid"
+	namespace         = "test-namespace"
+	className         = "test-class"
+	driverName        = "test-driver"
+	deviceName        = "test-device"                      // name inside ResourceSlice
+	cdiDeviceName     = "cdi-test-device"                  // name inside CDI spec
+	cdiID             = "test-driver/test=cdi-test-device" // CDI device ID
+	poolName          = "test-pool"
+	requestName       = "test-request"
+	requestName2      = "test-request-2"
+	claimName         = "test-claim"
+	podGroupClaimName = "test-podgroup-claim"
+	claimUID          = types.UID(claimName + "-uid")
+	podUID            = "test-pod-uid"
+	podGroupUID       = "test-podgroup-uid"
 )
 
 var (

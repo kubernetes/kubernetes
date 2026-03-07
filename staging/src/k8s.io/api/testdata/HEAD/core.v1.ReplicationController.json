@@ -1820,7 +1820,8 @@
           {
             "name": "nameValue",
             "resourceClaimName": "resourceClaimNameValue",
-            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+            "resourceClaimTemplateName": "resourceClaimTemplateNameValue",
+            "podGroupResourceClaim": "podGroupResourceClaimValue"
           }
         ],
         "resources": {
@@ -1838,10 +1839,8 @@
           ]
         },
         "hostnameOverride": "hostnameOverrideValue",
-        "workloadRef": {
-          "name": "nameValue",
-          "podGroup": "podGroupValue",
-          "podGroupReplicaKey": "podGroupReplicaKeyValue"
+        "schedulingGroup": {
+          "podGroupName": "podGroupNameValue"
         }
       }
     }

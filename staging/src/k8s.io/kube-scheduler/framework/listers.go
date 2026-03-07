@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -127,6 +128,12 @@ type DeviceClassResolver interface {
 	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
 }
 
+// PodGroupLister can be used to obtain PodGroups.
+type PodGroupLister interface {
+	// Get returns the PodGroup with the given podGroupName.
+	Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error)
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -136,6 +143,7 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 	DeviceClassResolver() DeviceClassResolver
+	PodGroups() PodGroupLister
 }
 
 // CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
@@ -146,11 +154,11 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// WorkloadManager provides an interface for scheduling plugins to provide workload-aware scheduling.
-// It acts as the central source of truth for runtime information about workloads.
-type WorkloadManager interface {
-	// PodGroupState retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
-	PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+// PodGroupManager provides an interface for scheduling plugins to provide workload-aware scheduling.
+// It acts as the central source of truth for runtime information about pod groups.
+type PodGroupManager interface {
+	// PodGroupState retrieves the runtime state for a specific pod group, identified by pod group's name and namespace.
+	PodGroupState(namespace string, schedulingGroup *v1.PodSchedulingGroup) (PodGroupState, error)
 }
 
 // PodGroupState provides an interface to view and modify the state of a single pod group.

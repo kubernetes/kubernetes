@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -237,6 +238,13 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
 
+	if pl.fts.EnableDRAWorkloadResourceClaims {
+		events = append(events,
+			// Adding the ResourceClaim name to the podgroup status makes pods waiting for their ResourceClaim schedulable.
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.UpdatePodGroupGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterPodGroupChange},
+		)
+	}
+
 	return events, nil
 }
 
@@ -266,7 +274,7 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	usesClaim := false
-	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourceapi.ResourceClaim) {
+	if err := pl.foreachPodResourceClaim(pod, func(_ v1.PodResourceClaim, claim *resourceapi.ResourceClaim) {
 		if claim.UID == modifiedClaim.UID {
 			usesClaim = true
 		}
@@ -346,10 +354,40 @@ func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	return fwk.Queue, nil
 }
 
+// isSchedulableAfterPodGroupChange is invoked for update PodGroup events reported by
+// an informer. It checks whether that change adds the ResourceClaim(s) that the
+// pod in a group has been waiting for.
+func (pl *DynamicResources) isSchedulableAfterPodGroupChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPodGroup, err := schedutil.As[*schedulingapi.PodGroup](nil, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterPodGroupChange: %w", err)
+	}
+
+	if pod.Spec.SchedulingGroup == nil ||
+		pod.Spec.SchedulingGroup.PodGroupName == nil ||
+		pod.Namespace != modifiedPodGroup.Namespace ||
+		*pod.Spec.SchedulingGroup.PodGroupName != modifiedPodGroup.Name {
+		logger.V(7).Info("Pod is not schedulable after change in other PodGroup", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+		return fwk.QueueSkip, nil
+	}
+
+	if err := pl.foreachPodGroupResourceClaim(modifiedPodGroup, nil); err != nil {
+		// This is not an unexpected error: we know that
+		// foreachPodGroupResourceClaim only returns errors for "not
+		// schedulable".
+		logger.V(6).Info("Pod is not schedulable after PodGroup was updated", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+		return fwk.QueueSkip, nil
+	}
+
+	logger.V(5).Info("PodGroup got updated and Pod is schedulable", "pod", klog.KObj(pod), "modifiedPodGroup", klog.KObj(modifiedPodGroup))
+	return fwk.Queue, nil
+}
+
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *DynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.ResourceClaim, error) {
 	claims := make([]*resourceapi.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
-	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourceapi.ResourceClaim) {
+	if err := pl.foreachPodResourceClaim(pod, func(_ v1.PodResourceClaim, claim *resourceapi.ResourceClaim) {
 		// We store the pointer as returned by the lister. The
 		// assumption is that if a claim gets modified while our code
 		// runs, the cache will store a new pointer, not mutate the
@@ -361,11 +399,36 @@ func (pl *DynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.Resou
 	return claims, nil
 }
 
+func (pl *DynamicResources) podResourceClaimBindings(pod *v1.Pod) ([]resourceapi.ResourceClaimConsumerReference, error) {
+	if !pl.fts.EnableDRAWorkloadResourceClaims {
+		return nil, nil
+	}
+
+	bindings := make([]resourceapi.ResourceClaimConsumerReference, 0, len(pod.Spec.ResourceClaims))
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return nil, err
+	}
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		bindTo, err := resourceclaim.BindTo(pod, podGroup, &podClaim)
+		if err != nil {
+			return nil, err
+		}
+		bindings = append(bindings, bindTo)
+	}
+	return bindings, nil
+}
+
 // foreachPodResourceClaim checks that each ResourceClaim for the pod exists.
 // It calls an optional handler for those claims that it finds.
-func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourceapi.ResourceClaim)) error {
+func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podClaim v1.PodResourceClaim, claim *resourceapi.ResourceClaim)) error {
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return err
+	}
+
 	for _, resource := range pod.Spec.ResourceClaims {
-		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podGroup, &resource)
 		if err != nil {
 			return err
 		}
@@ -385,12 +448,47 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 		}
 
 		if mustCheckOwner {
-			if err := resourceclaim.IsForPod(pod, claim); err != nil {
+			if err := resourceclaim.IsForPod(pod, podGroup, claim); err != nil {
 				return err
 			}
 		}
 		if cb != nil {
-			cb(resource.Name, claim)
+			cb(resource, claim)
+		}
+	}
+	return nil
+}
+
+// foreachPodGroupResourceClaim checks that each ResourceClaim for the PodGroup exists.
+// It calls an optional handler for those claims that it finds.
+func (pl *DynamicResources) foreachPodGroupResourceClaim(podGroup *schedulingapi.PodGroup, cb func(podClaim schedulingapi.PodGroupResourceClaim, claim *resourceapi.ResourceClaim)) error {
+	for _, resource := range podGroup.Spec.ResourceClaims {
+		claimName, mustCheckOwner, err := resourceclaim.NameFromPodGroup(podGroup, &resource)
+		if err != nil {
+			return err
+		}
+		// The claim name might be nil if no underlying resource claim
+		// was generated for the referenced claim. There are valid use
+		// cases when this might happen, so we simply skip it.
+		if claimName == nil {
+			continue
+		}
+		claim, err := pl.draManager.ResourceClaims().Get(podGroup.Namespace, *claimName)
+		if err != nil {
+			return err
+		}
+
+		if claim.DeletionTimestamp != nil {
+			return fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
+		}
+
+		if mustCheckOwner {
+			if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
+				return err
+			}
+		}
+		if cb != nil {
+			cb(resource, claim)
 		}
 	}
 	return nil
@@ -412,6 +510,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	s := &stateData{}
 	state.Write(stateKey, s)
 
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return nil, statusUnschedulable(logger, err.Error())
+	}
+
 	userClaims, err := pl.podResourceClaims(pod)
 	if err != nil {
 		return nil, statusUnschedulable(logger, err.Error())
@@ -421,7 +524,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	if status != nil {
 		return nil, status
 	}
-	claims := newClaimStore(userClaims, extendedResourceClaim)
+	claimBindings, err := pl.podResourceClaimBindings(pod)
+	if err != nil {
+		return nil, statusUnschedulable(logger, err.Error())
+	}
+	claims := newClaimStore(userClaims, extendedResourceClaim, claimBindings)
 
 	// This check covers user and extended ResourceClaim.
 	if claims.empty() {
@@ -434,7 +541,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	for index, claim := range claims.all() {
 		if claim.Status.Allocation != nil &&
 			!resourceclaim.CanBeReserved(claim) &&
-			!resourceclaim.IsReservedForPod(pod, claim) {
+			!resourceclaim.IsReservedForPod(pod, podGroup, claim) {
 			// Resource is in use. The pod has to wait.
 			return nil, statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
@@ -1017,8 +1124,14 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 
 	logger := klog.FromContext(ctx)
 
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		logger.Error(err, "unreserve", "pod", klog.KObj(pod))
+		return
+	}
+
 	// we process user claims here first, extendedResourceClaim if any is handled below.
-	for _, claim := range state.claims.allUserClaims() {
+	for claimIndex, claim := range state.claims.allUserClaims() {
 		// If allocation was in-flight, then it's not anymore and we need to revert the
 		// claim object in the assume cache to what it was before.
 		if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(claim.UID); deleted {
@@ -1027,15 +1140,34 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		}
 
 		if claim.Status.Allocation != nil &&
-			resourceclaim.IsReservedForPod(pod, claim) {
+			resourceclaim.IsReservedForPod(pod, podGroup, claim) {
+			// When the claim is reserved for the Pod, we can simply remove the
+			// Pod from reservedFor. When the claim is reserved for the Pod's
+			// PodGroup, the PodGroup is only removed from reservedFor when this
+			// Pod is its last.
+			reservedFor := state.claims.getBinding(claimIndex, pod)
+			if reservedFor.APIGroup == schedulingapi.GroupName && reservedFor.Resource == "podgroups" {
+				podGroupState, err := pl.fh.PodGroupManager().PodGroupState(pod.Namespace, pod.Spec.SchedulingGroup)
+				if err == nil {
+					assigned := podGroupState.AssignedPods()
+					assumed := podGroupState.AssumedPods()
+					active := assigned.Union(assumed).Delete(pod.UID)
+					if active.Len() > 0 {
+						if loggerV := logger.V(6); loggerV.Enabled() {
+							loggerV.Info("other Pods in the group still need the claim, keeping claim reserved for PodGroup", "claim", klog.KObj(claim), "uid", claim.UID, "podgroup", klog.KObj(podGroup), "pods", active.UnsortedList())
+						}
+						continue
+					}
+				}
+			}
 			// Remove pod from ReservedFor. A strategic-merge-patch is used
 			// because that allows removing an individual entry without having
 			// the latest ResourceClaim.
 			patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
 				claim.UID,
-				pod.UID,
+				reservedFor.UID,
 			)
-			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
+			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup))
 			claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
 			if err != nil {
 				// We will get here again when pod scheduling is retried.
@@ -1068,8 +1200,13 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	logger := klog.FromContext(ctx)
 
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return statusUnschedulable(logger, err.Error())
+	}
+
 	for index, claim := range state.claims.all() {
-		if !resourceclaim.IsReservedForPod(pod, claim) {
+		if !resourceclaim.IsReservedForPod(pod, podGroup, claim) {
 			claim, err := pl.bindClaim(ctx, state, index, pod, nodeName)
 			if err != nil {
 				return statusError(logger, err)
@@ -1137,6 +1274,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
+	binding := state.claims.getBinding(index, pod)
 	allocation := state.informationsForClaim[index].allocation
 	isExtendedResourceClaim := false
 	if claim == state.claims.extendedResourceClaim() {
@@ -1243,7 +1381,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// We can simply try to add the pod here without checking
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
+		claim.Status.ReservedFor = append(claim.Status.ReservedFor, binding)
 		if pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus && claim.Status.Allocation.AllocationTimestamp == nil {
 			claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
 		}
@@ -1360,6 +1498,14 @@ func (pl *DynamicResources) isPodReadyForBinding(state *stateData) (bool, error)
 		}
 	}
 	return true, nil
+}
+
+func (pl *DynamicResources) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
+	if !pl.fts.EnableDRAWorkloadResourceClaims ||
+		pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+		return nil, nil
+	}
+	return pl.draManager.PodGroups().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 }
 
 // hasBindingConditions checks whether any of the claims in the state

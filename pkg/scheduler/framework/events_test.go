@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -541,6 +542,56 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPodGroupSchedulingPropertiesChange(t *testing.T) {
+	claimStatusA := schedulingapi.PodGroupResourceClaimStatus{
+		Name:              "my-claim",
+		ResourceClaimName: new("claim"),
+	}
+	claimStatusB := schedulingapi.PodGroupResourceClaimStatus{
+		Name:              "my-claim-2",
+		ResourceClaimName: new("claim-2"),
+	}
+	tests := []struct {
+		name                              string
+		newPodGroup                       *schedulingapi.PodGroup
+		oldPodGroup                       *schedulingapi.PodGroup
+		draWorkloadResourceClaimsDisabled bool
+		want                              []fwk.ClusterEvent
+	}{
+		{
+			name:                              "PodGroup claim statuses change, feature disabled",
+			draWorkloadResourceClaimsDisabled: true,
+			newPodGroup:                       st.MakePodGroup().ResourceClaimStatuses(claimStatusA).Obj(),
+			oldPodGroup:                       st.MakePodGroup().Obj(),
+			want:                              []fwk.ClusterEvent{{Resource: fwk.PodGroup, ActionType: fwk.Update}},
+		},
+		{
+			name:        "PodGroup claim statuses change, feature enabled",
+			newPodGroup: st.MakePodGroup().ResourceClaimStatuses(claimStatusA).Obj(),
+			oldPodGroup: st.MakePodGroup().Obj(),
+			want:        []fwk.ClusterEvent{{Resource: fwk.PodGroup, ActionType: fwk.UpdatePodGroupGeneratedResourceClaim}},
+		},
+		{
+			name:        "PodGroup claim statuses swapped",
+			newPodGroup: st.MakePodGroup().ResourceClaimStatuses(claimStatusB).Obj(),
+			oldPodGroup: st.MakePodGroup().ResourceClaimStatuses(claimStatusA).Obj(),
+			want:        []fwk.ClusterEvent{{Resource: fwk.PodGroup, ActionType: fwk.UpdatePodGroupGeneratedResourceClaim}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:           !tt.draWorkloadResourceClaimsDisabled,
+				features.DRAWorkloadResourceClaims: !tt.draWorkloadResourceClaimsDisabled,
+			})
+			got := PodGroupSchedulingPropertiesChange(tt.newPodGroup, tt.oldPodGroup)
+			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
+				t.Errorf("unexpected event is returned from PodGroupSchedulingPropertiesChange (-want, +got):\n%s", diff)
 			}
 		})
 	}

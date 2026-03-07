@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -37,6 +38,14 @@ func TestResourceClaimIsForPod(t *testing.T) {
 	}
 	isController := true
 
+	podWithPodGroup := func(pod *v1.Pod, podGroupName string) *v1.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		}
+		return pod
+	}
+
 	podNotOwner := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
@@ -44,10 +53,24 @@ func TestResourceClaimIsForPod(t *testing.T) {
 			UID:       newUID(),
 		},
 	}
+	podGroupNotOwner := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podGroupNotOwner",
+			UID:       newUID(),
+		},
+	}
 	podOwner := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "podOwner",
+			UID:       newUID(),
+		},
+	}
+	podGroupOwner := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podGroupOwner",
 			UID:       newUID(),
 		},
 	}
@@ -61,11 +84,24 @@ func TestResourceClaimIsForPod(t *testing.T) {
 	claimWithOwner := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
-			Name:      "claimNoOwner",
+			Name:      "claimWithOwner",
 			UID:       newUID(),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					UID:        podOwner.UID,
+					Controller: &isController,
+				},
+			},
+		},
+	}
+	claimWithPodGroupOwner := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithPodGroupOwner",
+			UID:       newUID(),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					UID:        podGroupOwner.UID,
 					Controller: &isController,
 				},
 			},
@@ -84,9 +120,23 @@ func TestResourceClaimIsForPod(t *testing.T) {
 			},
 		},
 	}
+	userClaimWithPodGroupOwner := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "user-namespace",
+			Name:      "userClaimWithPodGroupOwner",
+			UID:       newUID(),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					UID:        podGroupOwner.UID,
+					Controller: &isController,
+				},
+			},
+		},
+	}
 
 	testcases := map[string]struct {
 		pod           *v1.Pod
+		podGroup      *schedulingapi.PodGroup
 		claim         *resourceapi.ResourceClaim
 		expectedError string
 	}{
@@ -97,23 +147,46 @@ func TestResourceClaimIsForPod(t *testing.T) {
 		"other-pod": {
 			pod:           podNotOwner,
 			claim:         claimWithOwner,
-			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for pod kube-system/podNotOwner (pod is not owner)`,
+			expectedError: `ResourceClaim kube-system/claimWithOwner was not created for Pod kube-system/podNotOwner (Pod is not owner)`,
 		},
 		"no-owner": {
 			pod:           podOwner,
 			claim:         claimNoOwner,
-			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for pod kube-system/podOwner (pod is not owner)`,
+			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
 		},
 		"different-namespace": {
 			pod:           podOwner,
 			claim:         userClaimWithOwner,
-			expectedError: `ResourceClaim user-namespace/userClaimWithOwner was not created for pod kube-system/podOwner (pod is not owner)`,
+			expectedError: `ResourceClaim user-namespace/userClaimWithOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
+		},
+		"owned-by-podgroup": {
+			pod:      podWithPodGroup(podOwner, podGroupOwner.Name),
+			podGroup: podGroupOwner,
+			claim:    claimWithPodGroupOwner,
+		},
+		"other-podgroup": {
+			pod:           podWithPodGroup(podOwner, podGroupNotOwner.Name),
+			podGroup:      podGroupNotOwner,
+			claim:         claimWithPodGroupOwner,
+			expectedError: `ResourceClaim kube-system/claimWithPodGroupOwner was not created for PodGroup kube-system/podGroupNotOwner (PodGroup is not owner)`,
+		},
+		"no-podgroup-owner": {
+			pod:           podWithPodGroup(podOwner, podGroupOwner.Name),
+			podGroup:      podGroupOwner,
+			claim:         claimNoOwner,
+			expectedError: `ResourceClaim kube-system/claimNoOwner was not created for PodGroup kube-system/podGroupOwner (PodGroup is not owner)`,
+		},
+		"different-podgroup-namespace": {
+			pod:           podWithPodGroup(podOwner, podGroupOwner.Name),
+			podGroup:      podGroupOwner,
+			claim:         userClaimWithPodGroupOwner,
+			expectedError: `ResourceClaim user-namespace/userClaimWithPodGroupOwner was not created for PodGroup kube-system/podGroupOwner (PodGroup is not owner)`,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			err := IsForPod(tc.pod, tc.claim)
+			err := IsForPod(tc.pod, tc.podGroup, tc.claim)
 			if tc.expectedError == "" {
 				require.NoError(t, err)
 			} else {
@@ -138,6 +211,13 @@ func TestIsReservedForPod(t *testing.T) {
 			UID:       newUID(),
 		},
 	}
+	podGroupNotReserved := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podGroupNotReserved",
+			UID:       newUID(),
+		},
+	}
 	podReserved := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
@@ -145,10 +225,24 @@ func TestIsReservedForPod(t *testing.T) {
 			UID:       newUID(),
 		},
 	}
+	podGroupReserved := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podGroupReserved",
+			UID:       newUID(),
+		},
+	}
 	podOtherReserved := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "podOtherReserved",
+			UID:       newUID(),
+		},
+	}
+	podGroupOtherReserved := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podGroupOtherReserved",
 			UID:       newUID(),
 		},
 	}
@@ -177,6 +271,29 @@ func TestIsReservedForPod(t *testing.T) {
 		},
 	}
 
+	podWithPodGroup := func(pod *v1.Pod, podGroupName string) *v1.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		}
+		return pod
+	}
+
+	claimWithPodGroupReservation := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithPodGroupReservation",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					UID: podGroupReserved.UID,
+				},
+			},
+		},
+	}
+
 	claimWithMultipleReservations := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
@@ -195,8 +312,45 @@ func TestIsReservedForPod(t *testing.T) {
 		},
 	}
 
+	claimWithMultiplePodGroupReservations := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithMultiplePodGroupReservations",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					UID: podGroupReserved.UID,
+				},
+				{
+					UID: podGroupOtherReserved.UID,
+				},
+			},
+		},
+	}
+
+	claimWithReservationsForPodAndPodGroup := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithReservationsForPodAndPodGroup",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					UID: podReserved.UID,
+				},
+				{
+					UID: podGroupReserved.UID,
+				},
+			},
+		},
+	}
+
 	testcases := map[string]struct {
 		pod            *v1.Pod
+		podGroup       *schedulingapi.PodGroup
 		claim          *resourceapi.ResourceClaim
 		expectedResult bool
 	}{
@@ -225,11 +379,41 @@ func TestIsReservedForPod(t *testing.T) {
 			claim:          claimWithMultipleReservations,
 			expectedResult: false,
 		},
+		"reserved-for-podgroup": {
+			pod:            podWithPodGroup(podNotReserved, podGroupReserved.Name),
+			podGroup:       podGroupReserved,
+			claim:          claimWithPodGroupReservation,
+			expectedResult: true,
+		},
+		"reserved-for-pod-and-podgroup": {
+			pod:            podWithPodGroup(podReserved, podGroupReserved.Name),
+			podGroup:       podGroupReserved,
+			claim:          claimWithReservationsForPodAndPodGroup,
+			expectedResult: true,
+		},
+		"reserved-for-other-podgroup": {
+			pod:            podWithPodGroup(podNotReserved, podGroupNotReserved.Name),
+			podGroup:       podGroupNotReserved,
+			claim:          claimWithReservation,
+			expectedResult: false,
+		},
+		"multiple-reservations-including-podgroup": {
+			pod:            podWithPodGroup(podNotReserved, podGroupReserved.Name),
+			podGroup:       podGroupReserved,
+			claim:          claimWithMultiplePodGroupReservations,
+			expectedResult: true,
+		},
+		"multiple-reservations-excluding-podgroup": {
+			pod:            podWithPodGroup(podNotReserved, podGroupNotReserved.Name),
+			podGroup:       podGroupNotReserved,
+			claim:          claimWithMultiplePodGroupReservations,
+			expectedResult: false,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			result := IsReservedForPod(tc.pod, tc.claim)
+			result := IsReservedForPod(tc.pod, tc.podGroup, tc.claim)
 			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
@@ -238,6 +422,7 @@ func TestIsReservedForPod(t *testing.T) {
 func TestName(t *testing.T) {
 	testcases := map[string]struct {
 		pod           *v1.Pod
+		podGroup      *schedulingapi.PodGroup
 		podClaim      *v1.PodResourceClaim
 		expectedName  *string
 		expectedCheck bool
@@ -301,7 +486,7 @@ func TestName(t *testing.T) {
 			},
 			expectedName:  nil,
 			expectedCheck: false,
-			expectedError: fmt.Errorf(`pod "default/test-pod": %w`, ErrClaimNotFound),
+			expectedError: fmt.Errorf("Pod default/test-pod: %w", ErrClaimNotFound),
 		},
 		"neither-resource-claim-name-nor-template-name-set": {
 			pod: &v1.Pod{
@@ -315,13 +500,250 @@ func TestName(t *testing.T) {
 			},
 			expectedName:  nil,
 			expectedCheck: false,
-			expectedError: fmt.Errorf(`pod "default/test-pod", spec.resourceClaim "invalid-claim": %w`, ErrAPIUnsupported),
+			expectedError: fmt.Errorf(`Pod default/test-pod, spec.resourceClaim invalid-claim: %w`, ErrAPIUnsupported),
+		},
+		"podgroup-claim-ungrouped-pod": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{},
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf("Pod default/test-pod does not belong to a PodGroup"),
+		},
+		"podgroup-claim-without-podgroup": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+			},
+			podGroup: nil,
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf(`Pod default/test-pod, spec.resourceClaim pod-claim: %w`, ErrAPIUnsupported),
+		},
+		"podgroup-claim-wrong-podgroup": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("correct-podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "wrong-podgroup",
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				PodGroupResourceClaim: new("claim"),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf("Pod default/test-pod belongs to PodGroup default/correct-podgroup, not PodGroup default/wrong-podgroup"),
+		},
+		"podgroup-claim-not-found": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "podgroup",
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+						{Name: "not-this-one"},
+						{Name: "not-this-one-either"},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				PodGroupResourceClaim: new("claim"),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf("PodGroup default/podgroup does not have claim claim requested by Pod test-pod"),
+		},
+		"podgroup-claim-name": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "podgroup",
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+						{
+							Name:              "podgroup-claim",
+							ResourceClaimName: new("resource-claim"),
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  new("resource-claim"),
+			expectedCheck: false,
+			expectedError: nil,
+		},
+		"podgroup-claim-template-name": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "podgroup",
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+						{
+							Name:                      "podgroup-claim",
+							ResourceClaimTemplateName: new("resource-claim-template"),
+						},
+					},
+				},
+				Status: schedulingapi.PodGroupStatus{
+					ResourceClaimStatuses: []schedulingapi.PodGroupResourceClaimStatus{
+						{
+							Name: "not-this-one",
+						},
+						{
+							Name:              "podgroup-claim",
+							ResourceClaimName: new("generated-claim"),
+						},
+						{
+							Name: "nor-this-one",
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  new("generated-claim"),
+			expectedCheck: true,
+			expectedError: nil,
+		},
+		"podgroup-claim-template-no-status": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "podgroup",
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+						{
+							Name:                      "podgroup-claim",
+							ResourceClaimTemplateName: new("resource-claim-template"),
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  new("resource-claim"),
+			expectedCheck: false,
+			expectedError: fmt.Errorf("PodGroup default/podgroup: %w", ErrClaimNotFound),
+		},
+		"podgroup-claim-template-unsupported-api": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: new("podgroup"),
+					},
+				},
+			},
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "podgroup",
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+						{
+							Name: "podgroup-claim",
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                  "pod-claim",
+				PodGroupResourceClaim: new("podgroup-claim"),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf("PodGroup default/podgroup, spec.resourceClaim podgroup-claim: %w", ErrAPIUnsupported),
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			name, check, err := Name(tc.pod, tc.podClaim)
+			name, check, err := Name(tc.pod, tc.podGroup, tc.podClaim)
 			if tc.expectedError == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedName, name)

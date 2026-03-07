@@ -70,11 +70,15 @@ const (
 	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
+	// UpdatePodGroupGeneratedResourceClaim is an update of the list of
+	// ResourceClaims generated for the pod's PodGroup.
+	// Depends on the DRAWorkloadResourceClaims feature gate.
+	UpdatePodGroupGeneratedResourceClaim
 
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | UpdatePodGroupGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -108,6 +112,8 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
+	case UpdatePodGroupGeneratedResourceClaim:
+		return "UpdatePodGroupGeneratedResourceClaim"
 	case All:
 		return "All"
 	case Update:
@@ -170,7 +176,7 @@ const (
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-	Workload              EventResource = "scheduling.k8s.io/Workload"
+	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,

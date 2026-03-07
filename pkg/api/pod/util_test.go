@@ -914,6 +914,26 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	addPodGroupClaim := func(pod *api.Pod, claimName string) {
+		podGroupClaim := api.ResourceClaim{Name: claimName}
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, api.PodResourceClaim{
+			Name:                  podGroupClaim.Name,
+			PodGroupResourceClaim: new("podgroup-claim"),
+		})
+		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.InitContainers[0].Resources.Claims = append(pod.Spec.InitContainers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.EphemeralContainers[0].Resources.Claims = append(pod.Spec.EphemeralContainers[0].Resources.Claims, podGroupClaim)
+	}
+	podWithPodGroupClaims := func() *api.Pod {
+		pod := podWithClaims.DeepCopy()
+		addPodGroupClaim(pod, "pg-claim")
+		return pod
+	}()
+	podWithMorePodGroupClaims := func() *api.Pod {
+		pod := podWithPodGroupClaims.DeepCopy()
+		addPodGroupClaim(pod, "pg-claim-2")
+		return pod
+	}()
 
 	var noPod *api.Pod
 
@@ -921,6 +941,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		description     string
 		enabled         bool
 		extendedEnabled bool
+		podGroupEnabled bool
 		oldPod          *api.Pod
 		newPod          *api.Pod
 		wantPod         *api.Pod
@@ -1054,17 +1075,86 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			newPod:          podWithExtendedResource,
 			wantPod:         podWithExtendedResource,
 		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / old with podgroup claim / new with new podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          podWithPodGroupClaims,
+			newPod:          podWithMorePodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / old with podgroup claim / new with new podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          podWithMorePodGroupClaims,
+			newPod:          podWithMorePodGroupClaims,
+			wantPod:         podWithMorePodGroupClaims,
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if !tc.enabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			featureOverrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
 				features.DRAExtendedResource:       tc.extendedEnabled,
-			})
+			}
+			if !tc.enabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else {
+				// These features can't be set for pre-1.34 emulation.
+				featureOverrides[features.DRAWorkloadResourceClaims] = tc.podGroupEnabled
+				featureOverrides[features.GenericWorkload] = tc.podGroupEnabled
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -6420,16 +6510,15 @@ func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
 	}
 }
 
-func TestDisabledWorkload(t *testing.T) {
-	podWithWorkload := &api.Pod{
+func TestDisabledSchedulingGroup(t *testing.T) {
+	podWithSchedulingGroup := &api.Pod{
 		Spec: api.PodSpec{
-			WorkloadRef: &api.WorkloadReference{
-				Name:     "w",
-				PodGroup: "pg",
+			SchedulingGroup: &api.PodSchedulingGroup{
+				PodGroupName: new("pg"),
 			},
 		},
 	}
-	podWithoutWorkload := &api.Pod{
+	podWithoutSchedulingGroup := &api.Pod{
 		Spec: api.PodSpec{},
 	}
 
@@ -6441,56 +6530,56 @@ func TestDisabledWorkload(t *testing.T) {
 		wantPod *api.Pod
 	}{
 		{
-			name:    "old with workload / new with workload / disabled",
-			oldPod:  podWithWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			name:    "old with scheduling group / new with scheduling group / disabled",
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new with workload / disabled",
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old without scheduling group / new with scheduling group / disabled",
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new without workload / disabled",
-			oldPod:  podWithWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old with scheduling group / new without scheduling group / disabled",
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new without workload / disabled",
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old without scheduling group / new without scheduling group / disabled",
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new with workload / enabled",
+			name:    "old with scheduling group / new with scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new with workload / enabled",
+			name:    "old without scheduling group / new with scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new without workload / enabled",
+			name:    "old with scheduling group / new without scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new without workload / enabled",
+			name:    "old without scheduling group / new without scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 	}
 

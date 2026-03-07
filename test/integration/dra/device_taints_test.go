@@ -135,6 +135,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule bool) {
 	}
 	controller := devicetainteviction.New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
+		informerFactory.Scheduling().V1alpha2().PodGroups(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		ruleInformer,

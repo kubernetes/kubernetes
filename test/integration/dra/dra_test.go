@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -42,6 +43,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,6 +177,7 @@ func TestDRA(t *testing.T) {
 				})
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
 			},
 		},
 		"v1beta1": {
@@ -214,6 +217,7 @@ func TestDRA(t *testing.T) {
 				resourcev1beta1.SchemeGroupVersion:  true,
 				resourcev1beta2.SchemeGroupVersion:  true,
 				resourcealphaapi.SchemeGroupVersion: true,
+				schedulingapi.SchemeGroupVersion:    true,
 			},
 			features: map[featuregate.Feature]bool{
 				// Additional DRA feature gates go here,
@@ -228,6 +232,8 @@ func TestDRA(t *testing.T) {
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
+				features.DRAWorkloadResourceClaims:    true,
+				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!
@@ -253,6 +259,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true, true) })
 			},
 		},
 	} {
@@ -509,11 +516,13 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 	controller, err := resourceclaim.NewController(
 		klog.FromContext(claimControllerCtx),
 		resourceclaim.Features{
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 		},
 		claimControllerCtx.Client(),
 		claimController.informerFactory.Core().V1().Pods(),
+		claimController.informerFactory.Scheduling().V1alpha2().PodGroups(),
 		claimController.informerFactory.Resource().V1().ResourceClaims(),
 		claimController.informerFactory.Resource().V1().ResourceClaimTemplates(),
 	)
@@ -1505,7 +1514,12 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 	class, _ := createTestClass(tCtx, namespace)
 
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+	features := resourceclaim.Features{
+		AdminAccess:            true,
+		PrioritizedList:        true,
+		WorkloadResourceClaims: true,
+	}
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory, features)
 	informerFactory.Start(tCtx.Done())
 	cache.WaitForCacheSync(tCtx.Done(),
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
@@ -1843,5 +1857,201 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 				}))))
 			}
 		})
+	}
+}
+
+// testWorkloadResourceClaims creates a PodGroup with resource claims and a
+// Pod referencing those claims and then checks whether those claims getting
+// dropped when the DRAWorkloadResourceClaims feature is enabled.
+func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, workloadResourceClaimsEnabled bool) {
+	tCtx.Parallel()
+
+	namespace := createTestNamespace(tCtx, nil)
+
+	startScheduler(tCtx)
+	startClaimController(tCtx)
+
+	// controllerTimeout is the longest the ResourceClaim controller is expected
+	// to take to respond.
+	controllerTimeout := 15 * time.Second
+
+	class, driverName := createTestClass(tCtx, namespace)
+
+	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1, device2)
+	_ = createSlice(tCtx, slice.Obj())
+
+	podGroupResourceClaim := createClaim(tCtx, namespace, "-podgroup", class, claim)
+	podResourceClaim := createClaim(tCtx, namespace, "", class, claim)
+
+	podGroupClaimName := "podgroup-claim"
+	podGroupName := "podgroup"
+	podGroup := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podGroupName,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingapi.PodGroupTemplateReference{
+				Workload: &schedulingapi.WorkloadPodGroupTemplateReference{
+					WorkloadName:         "workload",
+					PodGroupTemplateName: "template",
+				},
+			},
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Basic: &schedulingapi.BasicSchedulingPolicy{},
+			},
+			ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+				{
+					Name:              podGroupClaimName,
+					ResourceClaimName: &podGroupResourceClaim.Name,
+				},
+			},
+		},
+	}
+	podGroup, err := tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{FieldValidation: "Strict"})
+	if workloadAPIEnabled {
+		tCtx.ExpectNoError(err, "create PodGroup")
+		if workloadResourceClaimsEnabled {
+			assert.NotEmpty(tCtx, podGroup.Spec.ResourceClaims, "should store resource claims in PodGroup spec")
+		} else {
+			assert.Empty(tCtx, podGroup.Spec.ResourceClaims, "should drop resource claims from PodGroup spec")
+		}
+	} else {
+		assert.True(tCtx, apierrors.IsNotFound(err), "PodGroup API should not be available")
+	}
+
+	podClaimName := "podgroup-" + resourceName
+	podWithClaimName := podWithClaimName.DeepCopy()
+	podWithClaimName.Namespace = namespace
+	// Add a claim to the Pod referencing a claim made by its PodGroup.
+	podWithClaimName.Spec.ResourceClaims = append(podWithClaimName.Spec.ResourceClaims, v1.PodResourceClaim{Name: podClaimName, PodGroupResourceClaim: &podGroupClaimName})
+	podWithClaimName.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroupName,
+	}
+
+	createPod := func(pod *v1.Pod) *v1.Pod {
+		// createPod isn't used here since we want to define some claims with
+		// PodGroupResourceClaim instead of only ResourceClaimName.
+		pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{FieldValidation: "Strict"})
+		tCtx.ExpectNoError(err, "create pod")
+		return pod
+	}
+	pod := createPod(podWithClaimName)
+
+	hasPodGroupClaim := slices.ContainsFunc(pod.Spec.ResourceClaims, func(claim v1.PodResourceClaim) bool {
+		return claim.Name == podClaimName
+	})
+	if workloadResourceClaimsEnabled {
+		assert.True(tCtx, hasPodGroupClaim, "should store PodGroup claim in Pod spec")
+	} else {
+		assert.False(tCtx, hasPodGroupClaim, "should drop PodGroup claim from Pod spec")
+		// only the PodGroup claim should be dropped
+		assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should not drop non-PodGroup claims from Pod spec")
+	}
+
+	waitForClaimAllocatedToDevice(tCtx, namespace, podResourceClaim.Name, schedulingTimeout)
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, schedulingTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(pod.UID))),
+		),
+		"Claim should have been reserved for the Pod.",
+	)
+	if workloadResourceClaimsEnabled {
+		waitForClaimAllocatedToDevice(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout)
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+			),
+			"Claim should have been reserved for the PodGroup.",
+		)
+	}
+
+	waitForPodScheduled(tCtx, namespace, pod.Name)
+
+	secondPod := podWithClaimName.DeepCopy()
+	secondPod.Name += "-2"
+	secondPod = createPod(secondPod)
+
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, schedulingTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.ConsistOf(
+				gomega.HaveField("UID", gomega.Equal(pod.UID)),
+				gomega.HaveField("UID", gomega.Equal(secondPod.UID)),
+			),
+		),
+		"Claim should have been reserved for both Pods.",
+	)
+	if workloadResourceClaimsEnabled {
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+			),
+			"Claim should stay reserved only for the PodGroup after creating another Pod.",
+		)
+	}
+
+	waitForPodScheduled(tCtx, namespace, secondPod.Name)
+
+	tCtx.Log("Deleting the first Pod")
+	deleteAndWait(tCtx, tCtx.Client().CoreV1().Pods(namespace).Delete, tCtx.Client().CoreV1().Pods(namespace).Get, pod.Name)
+
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, controllerTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.ConsistOf(
+				gomega.HaveField("UID", gomega.Equal(secondPod.UID)),
+			),
+		),
+		"Claim should only be reserved for the second Pod.",
+	)
+	if workloadResourceClaimsEnabled {
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, controllerTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+			),
+			"Claim should stay reserved for the PodGroup after deleting the first Pod.",
+		)
+	}
+
+	tCtx.Log("Deleting the second Pod")
+	deleteAndWait(tCtx, tCtx.Client().CoreV1().Pods(namespace).Delete, tCtx.Client().CoreV1().Pods(namespace).Get, secondPod.Name)
+
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, controllerTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.BeEmpty(),
+		),
+		"Claim should not be reserved after deleting the second Pod.",
+	)
+	if workloadResourceClaimsEnabled {
+		tCtx.Consistently(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaim, error) {
+			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, podGroupResourceClaim.Name, metav1.GetOptions{})
+			return c, err
+		}).
+			WithTimeout(controllerTimeout*2).
+			WithPolling(time.Second).
+			Should(
+				gomega.HaveField(
+					"Status.ReservedFor",
+					gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+				),
+				"Claim should stay reserved for the PodGroup after deleting all of its Pods.",
+			)
+
+		tCtx.Log("Deleting the PodGroup")
+		deleteAndWait(tCtx, tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Delete, tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Get, podGroup.Name)
+
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, controllerTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.BeEmpty(),
+			),
+			"Claim should not be reserved for the PodGroup after deleting it.",
+		)
 	}
 }

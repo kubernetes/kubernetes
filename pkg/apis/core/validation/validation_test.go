@@ -14575,19 +14575,17 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "memory limit change with pod-level resources",
 		}, {
 			new: *podtest.MakePod("pod",
-				podtest.SetWorkloadRef(&core.WorkloadReference{
-					Name:     "w",
-					PodGroup: "pg",
+				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+					PodGroupName: new("pg1"),
 				}),
 			),
 			old: *podtest.MakePod("pod",
-				podtest.SetWorkloadRef(&core.WorkloadReference{
-					Name:     "w2",
-					PodGroup: "pg",
+				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+					PodGroupName: new("pg2"),
 				}),
 			),
 			err:  "pod updates may not change fields other than",
-			test: "updated workloadRef",
+			test: "updated schedulingGroup",
 		},
 	}
 
@@ -23104,6 +23102,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].Name",
 		"ResourceClaims[*].ResourceClaimName",
 		"ResourceClaims[*].ResourceClaimTemplateName",
+		"ResourceClaims[*].PodGroupResourceClaim",
 		"Resources",
 		"RestartPolicy",
 		"RuntimeClassName",
@@ -23119,7 +23118,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Overhead",
 		"Tolerations",
 		"TopologySpreadConstraints",
-		"WorkloadRef",
+		"SchedulingGroup",
 	)
 
 	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
@@ -26985,6 +26984,7 @@ func TestValidatePVSecretReference(t *testing.T) {
 func TestValidateDynamicResourceAllocation(t *testing.T) {
 	externalClaimName := "some-claim"
 	externalClaimTemplateName := "some-claim-template"
+	externalPodGroupClaimName := "podgroup-claim"
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
@@ -27005,6 +27005,15 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			Name:              "my-claim-reference",
 			ResourceClaimName: &externalClaimName,
 		}),
+	)
+	goodPodGroupClaimReference := podtest.MakePod("",
+		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}))),
+		podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		podtest.SetResourceClaims(core.PodResourceClaim{
+			Name:                  "my-claim-reference",
+			PodGroupResourceClaim: &externalPodGroupClaimName,
+		}),
+		podtest.SetSchedulingGroup(&core.PodSchedulingGroup{PodGroupName: new("podgroup")}),
 	)
 
 	successCases := map[string]*core.Pod{
@@ -27053,6 +27062,17 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
 			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	successCasesPodGroupEnabled := map[string]*core.Pod{
+		"podgroup claim reference": goodPodGroupClaimReference,
+	}
+	for k, v := range successCasesPodGroupEnabled {
+		t.Run("podgroup enabled "+k, func(t *testing.T) {
+			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{AllowPodGroupResourceClaims: true}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -27200,6 +27220,43 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
+	}
+
+	failureCasesPodGroupEnabled := map[string]*core.Pod{
+		"static pod with podgroup claim reference": goodPodGroupClaimReference,
+		"resource claim source empty": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name: "my-claim",
+			}),
+		),
+		"resource claim reference and podgroup": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:                  "my-claim",
+				ResourceClaimName:     &externalClaimName,
+				PodGroupResourceClaim: &externalPodGroupClaimName,
+			}),
+		),
+		"invalid podgroup claim reference name": func() *core.Pod {
+			pod := goodPodGroupClaimReference.DeepCopy()
+			notLabel := ".foo_bar"
+			pod.Spec.ResourceClaims[0].PodGroupResourceClaim = &notLabel
+			return pod
+		}(),
+	}
+	for k, v := range failureCasesPodGroupEnabled {
+		podMeta := shortPodName
+		if strings.HasPrefix(k, "static pod") {
+			podMeta = podMeta.DeepCopy()
+			podMeta.Annotations = map[string]string{
+				core.MirrorPodAnnotationKey: "True",
+			}
+		}
+		t.Run("podgroup enabled "+k, func(t *testing.T) {
+			if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{AllowPodGroupResourceClaims: true}); len(errs) == 0 {
+				t.Errorf("expected failure for %q", k)
+			}
+		})
 	}
 }
 
@@ -30542,18 +30599,17 @@ func TestValidateNodeDeclaredFeatures(t *testing.T) {
 	}
 }
 
-func TestValidateWorkloadReference(t *testing.T) {
+func TestValidatePodSchedulingGroup(t *testing.T) {
 	successCases := map[string]*core.Pod{
-		"correct": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"correct": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new("group"),
 		})),
-		"no replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "",
-		})),
+		"pod group claims with scheduling group": podtest.MakePod("",
+			podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+				PodGroupName: new("group"),
+			}),
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim", PodGroupResourceClaim: new("podgroup-claim")}),
+		),
 	}
 	for name, pod := range successCases {
 		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
@@ -30563,46 +30619,19 @@ func TestValidateWorkloadReference(t *testing.T) {
 	}
 
 	failureCases := map[string]*core.Pod{
-		"empty workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"nil pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{})),
+		"empty pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(""),
 		})),
-		"incorrect workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               ".workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"incorrect pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(".podGroup"),
 		})),
-		"too long workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               strings.Repeat("w", 254),
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"too long pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(strings.Repeat("w", 254)),
 		})),
-		"empty pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "",
-			PodGroupReplicaKey: "replica",
-		})),
-		"incorrect pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           ".group",
-			PodGroupReplicaKey: "replica",
-		})),
-		"too long pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           strings.Repeat("g", 64),
-			PodGroupReplicaKey: "replica",
-		})),
-		"incorrect replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: ".replica",
-		})),
-		"too long replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: strings.Repeat("r", 64),
-		})),
+		"pod group claims without scheduling group": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim", PodGroupResourceClaim: new("podgroup-claim")}),
+		),
 	}
 	for name, pod := range failureCases {
 		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})

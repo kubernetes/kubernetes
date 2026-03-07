@@ -23,6 +23,7 @@ import (
 
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
@@ -357,7 +358,7 @@ func (g *Graph) recomputeDestinationIndexLocked(n graph.Node) {
 //	configmap -> pod
 //	pvc       -> pod
 //	svcacct   -> pod
-func (g *Graph) AddPod(pod *corev1.Pod) {
+func (g *Graph) AddPod(pod *corev1.Pod, podGroup *schedulingapi.PodGroup) {
 	start := time.Now()
 	defer func() {
 		graphActionsDuration.WithLabelValues("AddPod").Observe(time.Since(start).Seconds())
@@ -416,7 +417,7 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	}
 
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
+		claimName, _, err := resourceclaim.Name(pod, podGroup, &podResourceClaim)
 		// Do we have a valid claim name? If yes, add an edge that grants
 		// kubelet access to that claim. An error indicates that a claim
 		// still needs to be created, nil that intentionally no claim

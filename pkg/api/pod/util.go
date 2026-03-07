@@ -19,6 +19,7 @@ package pod
 import (
 	"fmt"
 	"iter"
+	"slices"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -430,8 +431,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
 		// This also allows restart rules on sidecar containers.
-		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
-		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		AllowRestartAllContainers:   utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowImageVolumeWithDigest:  utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		AllowPodGroupResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -753,9 +755,10 @@ func dropDisabledFields(
 	dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec)
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
+	dropDisabledDRAWorkloadResourceClaimsFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
-	dropDisabledWorkloadRef(podSpec, oldPodSpec)
+	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1203,6 +1206,79 @@ func dropResourceClaimRequests(containers []api.Container) {
 func dropEphemeralResourceClaimRequests(containers []api.EphemeralContainer) {
 	for i := range containers {
 		containers[i].Resources.Claims = nil
+	}
+}
+
+// dropDisabledDRAWorkloadResourceClaimsFields removes resource
+// claims which refer to a PodGroup claim unless they are already used by the
+// old pod spec.
+func dropDisabledDRAWorkloadResourceClaimsFields(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		// Nothing to drop
+		return
+	}
+	droppedClaims := dropPodGroupResourceClaims(podSpec, oldPodSpec)
+	dropPodGroupResourceClaimRequests(podSpec.Containers, droppedClaims)
+	dropPodGroupResourceClaimRequests(podSpec.InitContainers, droppedClaims)
+	dropEphemeralPodGroupResourceClaimRequests(podSpec.EphemeralContainers, droppedClaims)
+}
+
+// dropPodGroupResourceClaims removes claims referring to a PodGroup claim. It
+// returns the names of the claims that were dropped.
+func dropPodGroupResourceClaims(podSpec, oldPodSpec *api.PodSpec) sets.Set[string] {
+	var keepClaims []api.PodResourceClaim
+	dropClaims := podGroupResourceClaimsToDrop(podSpec, oldPodSpec)
+	for _, claim := range podSpec.ResourceClaims {
+		if !dropClaims.Has(claim.Name) {
+			keepClaims = append(keepClaims, claim)
+		}
+	}
+	podSpec.ResourceClaims = keepClaims
+	return dropClaims
+}
+
+// podGroupResourceClaimsToDrop returns the names of the spec.resourceClaims
+// defining a podGroupResourceClaim which did not already exist.
+func podGroupResourceClaimsToDrop(podSpec, oldPodSpec *api.PodSpec) sets.Set[string] {
+	var oldClaims []api.PodResourceClaim
+	if oldPodSpec != nil {
+		oldClaims = oldPodSpec.ResourceClaims
+	}
+	podGroupResourceClaimInUse := func(claim api.PodResourceClaim) bool {
+		return slices.ContainsFunc(oldClaims, func(oldClaim api.PodResourceClaim) bool {
+			return claim.Name == oldClaim.Name && oldClaim.PodGroupResourceClaim != nil
+		})
+	}
+	droppedClaims := sets.New[string]()
+	for _, claim := range podSpec.ResourceClaims {
+		if claim.PodGroupResourceClaim != nil && !podGroupResourceClaimInUse(claim) {
+			droppedClaims.Insert(claim.Name)
+		}
+	}
+	return droppedClaims
+}
+
+func dropPodGroupResourceClaimRequests(containers []api.Container, droppedClaims sets.Set[string]) {
+	for i := range containers {
+		var keepRequests []api.ResourceClaim
+		for _, req := range containers[i].Resources.Claims {
+			if !droppedClaims.Has(req.Name) {
+				keepRequests = append(keepRequests, req)
+			}
+		}
+		containers[i].Resources.Claims = keepRequests
+	}
+}
+
+func dropEphemeralPodGroupResourceClaimRequests(containers []api.EphemeralContainer, droppedClaims sets.Set[string]) {
+	for i := range containers {
+		var keepRequests []api.ResourceClaim
+		for _, req := range containers[i].Resources.Claims {
+			if !droppedClaims.Has(req.Name) {
+				keepRequests = append(keepRequests, req)
+			}
+		}
+		containers[i].Resources.Claims = keepRequests
 	}
 }
 
@@ -1910,20 +1986,20 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 	return false
 }
 
-// dropDisabledWorkloadRef removes pod workload reference from its spec
+// dropDisabledSchedulingGroup removes pod scheduling group from its spec
 // unless it is already used by the old pod spec.
-func dropDisabledWorkloadRef(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !workloadRefInUse(oldPodSpec) {
-		podSpec.WorkloadRef = nil
+func dropDisabledSchedulingGroup(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !schedulingGroupInUse(oldPodSpec) {
+		podSpec.SchedulingGroup = nil
 	}
 }
 
-func workloadRefInUse(podSpec *api.PodSpec) bool {
+func schedulingGroupInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
 
-	return podSpec.WorkloadRef != nil
+	return podSpec.SchedulingGroup != nil
 }
 
 func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {

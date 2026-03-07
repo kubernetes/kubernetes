@@ -692,7 +692,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: fwk.DeviceClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: fwk.Workload, ActionType: fwk.All}: {
+				{Resource: fwk.PodGroup, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
@@ -838,6 +838,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		enableInPlacePodVerticalScaling bool
 		enableSchedulerQueueingHints    bool
 		enableDynamicResourceAllocation bool
+		enableDRAWorkloadResourceClaims bool
 		enableNodeDeclaredFeatures      bool
 		enableGangScheduling            bool
 	}{
@@ -885,7 +886,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All,
 				fwk.ResourceClaim:         fwk.All,
 				fwk.DeviceClass:           fwk.All,
-				fwk.Workload:              fwk.All,
+				fwk.PodGroup:              fwk.All,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
@@ -1075,12 +1076,36 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
 				fwk.ResourceClaim:         fwk.All - fwk.Delete,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-				fwk.Workload:              fwk.Add,
+				fwk.PodGroup:              fwk.Add,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
 			enableDynamicResourceAllocation: true,
 			enableSchedulerQueueingHints:    true,
+		},
+		{
+			name:    "plugins with default profile and DRAWorkloadResourceClaims",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
+				fwk.DeviceClass:           fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceSlice:         fwk.All - fwk.Delete,
+				fwk.PodGroup:              fwk.UpdatePodGroupGeneratedResourceClaim,
+			},
+			enableSchedulerQueueingHints:    true,
+			enableInPlacePodVerticalScaling: true,
+			enableDynamicResourceAllocation: true,
+			enableDRAWorkloadResourceClaims: true,
+			enableGangScheduling:            true,
 		},
 	}
 	for _, tt := range tests {
@@ -1096,9 +1121,10 @@ func Test_UnionedGVKs(t *testing.T) {
 			} else {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
 				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.NodeDeclaredFeatures: tt.enableNodeDeclaredFeatures,
-					features.GenericWorkload:      tt.enableGangScheduling,
-					features.GangScheduling:       tt.enableGangScheduling,
+					features.NodeDeclaredFeatures:      tt.enableNodeDeclaredFeatures,
+					features.GenericWorkload:           tt.enableGangScheduling,
+					features.GangScheduling:            tt.enableGangScheduling,
+					features.DRAWorkloadResourceClaims: tt.enableDRAWorkloadResourceClaims,
 				})
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{

@@ -34,6 +34,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +64,8 @@ type Builder struct {
 	UseExtendedResourceName bool
 
 	podCounter      int
+	workloadCounter int
+	podGroupCounter int
 	claimCounter    int
 	ClassParameters string // JSON
 	SkipCleanup     bool
@@ -331,6 +334,112 @@ func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
 	return pod
 }
 
+// GroupedPod returns a pod that is a member of the given PodGroup.
+func (b *Builder) GroupedPod(podGroup *schedulingv1alpha2.PodGroup) *v1.Pod {
+	pod := b.Pod()
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroup.Name,
+	}
+	return pod
+}
+
+// GroupedPodWithClaim returns a pod that is a member of the given PodGroup and
+// refers to its given resource claim.
+func (b *Builder) GroupedPodWithClaim(podGroup *schedulingv1alpha2.PodGroup, podGroupClaimName string) *v1.Pod {
+	pod := b.GroupedPod(podGroup)
+	pod.Spec.Containers[0].Name = "with-resource"
+	podClaimName := "resource-claim"
+	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
+		{
+			Name:                  podClaimName,
+			PodGroupResourceClaim: &podGroupClaimName,
+		},
+	}
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
+	return pod
+}
+
+// Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
+func (b *Builder) Workload() *schedulingv1alpha2.Workload {
+	workload := &schedulingv1alpha2.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.workloadCounter),
+		},
+		Spec: schedulingv1alpha2.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+				{
+					Name: "group",
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+	b.workloadCounter++
+	return workload
+}
+
+// WorkloadExternal creates a Workload with one PodGroupTemplate that refers to
+// one ResourceClaim with the given name.
+func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha2.Workload {
+	workload := b.Workload()
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:              "resource-claim",
+			ResourceClaimName: &externalClaimName,
+		},
+	}
+	return workload
+}
+
+// WorkloadInline creates a ResourceClaimTemplate and a Workload with one
+// PodGroupTemplate that refers to that ResourceClaimTemplate.
+func (b *Builder) WorkloadInline() (*schedulingv1alpha2.Workload, *resourceapi.ResourceClaimTemplate) {
+	workload := b.Workload()
+	podGroupClaimName := "my-inline-claim"
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:                      podGroupClaimName,
+			ResourceClaimTemplateName: new(workload.Name),
+		},
+	}
+	template := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workload.Name,
+			Namespace: workload.Namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: b.ClaimSpec(),
+		},
+	}
+	return workload, template
+}
+
+// PodGroup returns a simple PodGroup owned by the given Workload with no
+// resource claims.
+func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroup {
+	podGroup := &schedulingv1alpha2.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
+		},
+		Spec: schedulingv1alpha2.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+				Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+					WorkloadName:         workload.Name,
+					PodGroupTemplateName: template.Name,
+				},
+			},
+			SchedulingPolicy: template.SchedulingPolicy,
+			ResourceClaims:   template.ResourceClaims,
+		},
+	}
+	b.podGroupCounter++
+	return podGroup
+}
+
 // Create takes a bunch of objects and calls their Create function.
 func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.KMetadata {
 	tCtx.Helper()
@@ -388,6 +497,10 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().AppsV1().DaemonSets(b.namespace).Delete(tCtx, obj.Name, metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete daemonset")
 			})
+		case *schedulingv1alpha2.Workload:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1alpha2.PodGroup:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		default:
 			tCtx.Fatalf("internal error, unsupported type %T", obj)
 		}
@@ -483,6 +596,8 @@ func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
 func (b *Builder) setUp(tCtx ktesting.TContext) {
 	b.namespace = tCtx.Namespace()
 	b.podCounter = 0
+	b.workloadCounter = 0
+	b.podGroupCounter = 0
 	b.claimCounter = 0
 	b.Create(tCtx, b.Class().DeviceClass)
 	tCtx.CleanupCtx(b.tearDown)
@@ -500,7 +615,7 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	// the framework, we must ensure that test pods and the claims that
 	// they use are deleted. Otherwise the driver might get deleted first,
 	// in which case deleting the claims won't work anymore.
-	tCtx.Log("delete pods and claims")
+	tCtx.Log("delete pods, podgroups, and claims")
 	pods, err := b.listTestPods(tCtx)
 	tCtx.ExpectNoError(err, "list pods")
 	for _, pod := range pods {
@@ -521,6 +636,23 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
 		return b.listTestPods(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
+
+	// Clean up PodGroups to release claims allocated for them.
+	podGroups, err := b.listTestPodGroups(tCtx)
+	tCtx.ExpectNoError(err, "list podgroups")
+	for _, podGroup := range podGroups {
+		if podGroup.DeletionTimestamp != nil {
+			continue
+		}
+		tCtx.Logf("Deleting %T %s", &podGroup, klog.KObj(&podGroup))
+		err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			tCtx.ExpectNoError(err, "delete podgroup")
+		}
+	}
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+		return b.listTestPodGroups(tCtx)
+	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining podgroups despite deletion")
 
 	claims, err := b.ClientV1(tCtx).ResourceClaims(b.namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "get resource claims")
@@ -560,6 +692,18 @@ func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
 		testPods = append(testPods, pod)
 	}
 	return testPods, nil
+}
+
+func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+	podGroups, err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		// API is disabled
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return podGroups.Items, nil
 }
 
 func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {

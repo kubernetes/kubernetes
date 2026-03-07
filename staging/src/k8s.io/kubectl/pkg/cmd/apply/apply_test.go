@@ -2331,11 +2331,6 @@ func TestApplySetParentValidation(t *testing.T) {
 			expectParentKind: "Deployment",
 			expectErr:        "[namespace is required to use namespace-scoped ApplySet, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent]",
 		},
-		"namespaced builtin parents with multi-segment groups are correctly parsed but invalid": {
-			applysetFlag:     "priorityclasses.scheduling.k8s.io/thename",
-			expectParentKind: "PriorityClass",
-			expectErr:        "resource \"scheduling.k8s.io/v1alpha1, Resource=priorityclasses\" is not permitted as an ApplySet parent",
-		},
 		"non-namespaced builtin types are correctly parsed but invalid": {
 			applysetFlag:        "namespaces/thename",
 			expectParentKind:    "Namespace",

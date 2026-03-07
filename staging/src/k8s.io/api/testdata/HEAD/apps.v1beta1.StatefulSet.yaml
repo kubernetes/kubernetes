@@ -907,6 +907,7 @@ spec:
       - conditionType: conditionTypeValue
       resourceClaims:
       - name: nameValue
+        podGroupResourceClaim: podGroupResourceClaimValue
         resourceClaimName: resourceClaimNameValue
         resourceClaimTemplateName: resourceClaimTemplateNameValue
       resources:
@@ -922,6 +923,8 @@ spec:
       schedulerName: schedulerNameValue
       schedulingGates:
       - name: nameValue
+      schedulingGroup:
+        podGroupName: podGroupNameValue
       securityContext:
         appArmorProfile:
           localhostProfile: localhostProfileValue
@@ -1277,10 +1280,6 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
-      workloadRef:
-        name: nameValue
-        podGroup: podGroupValue
-        podGroupReplicaKey: podGroupReplicaKeyValue
   updateStrategy:
     rollingUpdate:
       maxUnavailable: maxUnavailableValue
