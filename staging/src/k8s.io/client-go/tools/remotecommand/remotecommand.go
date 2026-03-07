@@ -21,8 +21,8 @@ import (
 	"io"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog/v2"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // StreamOptions holds information pertaining to the current streaming session:

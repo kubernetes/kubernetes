@@ -33,12 +33,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	utilexec "k8s.io/client-go/util/exec"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
@@ -180,6 +181,71 @@ func TestSPDYExecutorStream(t *testing.T) {
 				t.Errorf("%s: expected [%v], got [%v]", test.name, test.expectError, gotError)
 			}
 		})
+	}
+}
+
+// TestSPDYExecutorNonZeroExitCode verifies SPDY v4 status-stream non-zero exit
+// code handling remains compatible with CRI streaming servers.
+func TestSPDYExecutorNonZeroExitCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		ctx, err := createHTTPStreams(writer, request, &StreamOptions{
+			Stdin:  strings.NewReader("input"),
+			Stdout: &bytes.Buffer{},
+		})
+		if err != nil {
+			t.Errorf("unexpected stream setup error: %v", err)
+			return
+		}
+		defer ctx.conn.Close()
+
+		if _, err := io.WriteString(ctx.stdoutStream, "stdout-before-exit"); err != nil {
+			t.Errorf("unexpected stdout write error: %v", err)
+			return
+		}
+
+		err = ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusFailure,
+			Reason: remotecommandconsts.NonZeroExitCodeReason,
+			Details: &metav1.StatusDetails{
+				Causes: []metav1.StatusCause{
+					{
+						Type:    remotecommandconsts.ExitCodeCauseType,
+						Message: "17",
+					},
+				},
+			},
+			Message: "command terminated with non-zero exit code: 17",
+		}})
+		if err != nil {
+			t.Errorf("unexpected status write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	uri, _ := url.Parse(server.URL)
+	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
+	if err != nil {
+		t.Fatalf("unexpected executor error: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	err = exec.StreamWithContext(context.Background(), StreamOptions{
+		Stdin:  strings.NewReader("input"),
+		Stdout: &stdout,
+	})
+	if err == nil {
+		t.Fatal("expected non-zero exit error, got nil")
+	}
+
+	var exitErr utilexec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got: %T: %v", err, err)
+	}
+	if exitErr.ExitStatus() != 17 {
+		t.Fatalf("expected exit code 17, got %d", exitErr.ExitStatus())
+	}
+	if got := stdout.String(); got != "stdout-before-exit" {
+		t.Fatalf("unexpected stdout: %q", got)
 	}
 }
 

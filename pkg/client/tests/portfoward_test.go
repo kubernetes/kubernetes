@@ -19,6 +19,7 @@ package tests
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -31,11 +32,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/gorilla/websocket"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubelet/pkg/cri/streaming/portforward"
+	"k8s.io/cri-streaming/pkg/streaming/portforward"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
 // fakePortForwarder simulates port forwarding for testing. It implements
@@ -52,7 +54,7 @@ type fakePortForwarder struct {
 
 var _ portforward.PortForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) PortForward(_ context.Context, name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+func (pf *fakePortForwarder) PortForward(_ context.Context, name string, uid string, port int32, stream io.ReadWriteCloser) error {
 	defer stream.Close()
 
 	// read from the client
@@ -247,5 +249,110 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	}
 	if err := pf2.ForwardPorts(); err == nil {
 		t.Fatal("expected non-nil error for pf2.ForwardPorts")
+	}
+}
+
+func TestForwardPortsWebSocketV4Framing(t *testing.T) {
+	const testPort int32 = 5001
+	const clientPayload = "abcd"
+	const serverPayload = "1234"
+
+	done := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(done)
+
+		opts, err := portforward.NewV4Options(req)
+		if err != nil {
+			t.Errorf("failed to build v4 options: %v", err)
+			return
+		}
+
+		pf := &fakePortForwarder{
+			expected: map[int32]string{testPort: clientPayload},
+			received: make(map[int32]string),
+			send:     map[int32]string{testPort: serverPayload},
+		}
+		portforward.ServePortForward(w, req, pf, "pod", "uid", opts, 0, 10*time.Second, portforward.SupportedProtocols)
+
+		got, ok := pf.received[testPort]
+		if !ok {
+			t.Errorf("server did not receive data for port %d", testPort)
+			return
+		}
+		if got != clientPayload {
+			t.Errorf("server expected %q, got %q for port %d", clientPayload, got, testPort)
+		}
+	}))
+	defer server.Close()
+
+	wsURL := strings.Replace(server.URL, "http://", "ws://", 1) + fmt.Sprintf("?port=%d", testPort)
+	dialer := &websocket.Dialer{
+		Subprotocols: []string{"v4." + wsstream.ChannelWebSocketProtocol},
+	}
+	conn, _, err := dialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("websocket dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	expectedPortBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(expectedPortBytes, uint16(testPort))
+
+	seenDataPreamble := false
+	seenErrorPreamble := false
+	for !(seenDataPreamble && seenErrorPreamble) {
+		_, frame, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("failed reading websocket preamble frame: %v", err)
+		}
+		if len(frame) == 0 {
+			continue
+		}
+		channel := frame[0]
+		payload := frame[1:]
+		switch channel {
+		case 0:
+			if !bytes.Equal(expectedPortBytes, payload) {
+				t.Fatalf("unexpected data-channel preamble payload: %q", payload)
+			}
+			seenDataPreamble = true
+		case 1:
+			if !bytes.Equal(expectedPortBytes, payload) {
+				t.Fatalf("unexpected error-channel preamble payload: %q", payload)
+			}
+			seenErrorPreamble = true
+		}
+	}
+
+	frame := append([]byte{0}, []byte(clientPayload)...)
+	if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
+		t.Fatalf("failed writing data frame: %v", err)
+	}
+
+	gotServerPayload := false
+	for !gotServerPayload {
+		_, frame, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("failed reading websocket response frame: %v", err)
+		}
+		if len(frame) == 0 {
+			continue
+		}
+		if frame[0] != 0 {
+			continue
+		}
+		if bytes.Equal(frame[1:], []byte(serverPayload)) {
+			gotServerPayload = true
+		}
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("failed closing websocket connection: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for websocket portforward handler to complete")
 	}
 }
