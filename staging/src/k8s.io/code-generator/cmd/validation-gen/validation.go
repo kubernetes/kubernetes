@@ -828,7 +828,7 @@ func (g *genValidations) hasValidationsImpl(n *typeNode, seen map[*typeNode]bool
 	}
 	seen[n] = true
 
-	if !n.typeValidations.Empty() {
+	if n.typeValidations.Len() > 0 {
 		return true
 	}
 	allChildren := n.fields
@@ -842,7 +842,7 @@ func (g *genValidations) hasValidationsImpl(n *typeNode, seen map[*typeNode]bool
 		allChildren = append(allChildren, n.underlying)
 	}
 	for _, c := range allChildren {
-		if !c.fieldValidations.Empty() {
+		if c.fieldValidations.Len() > 0 {
 			return true
 		}
 		if g.hasValidationsImpl(c.node, seen) {
