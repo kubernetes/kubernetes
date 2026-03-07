@@ -3703,7 +3703,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 			allowedActions = supportedContainerRestartRuleActionsWithRestartAllContainers
 		}
 		if !allowedActions.Has(rule.Action) {
-			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(supportedContainerRestartRuleActions)))
+			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(allowedActions)))
 		}
 
 		if rule.ExitCodes != nil {
