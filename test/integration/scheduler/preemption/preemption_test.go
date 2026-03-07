@@ -1347,7 +1347,9 @@ func TestAsyncPreemption(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
 
 				createdPods := []*v1.Pod{}
-				defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+				defer func() {
+					testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+				}()
 
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
