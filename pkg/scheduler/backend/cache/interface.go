@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -107,6 +108,18 @@ type Cache interface {
 	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// PodGroupStates returns a PodGroupStateLister backed by the live cache.
+	PodGroupStates() fwk.PodGroupStateLister
+
+	// AddPodInGroup adds a pod to its pod group state.
+	AddPodInGroup(pod *v1.Pod)
+
+	// UpdatePodInGroup updates a pod in its pod group state.
+	UpdatePodInGroup(logger klog.Logger, oldPod, newPod *v1.Pod)
+
+	// RemovePodFromGroup removes a pod from its pod group state.
+	RemovePodFromGroup(pod *v1.Pod)
 }
 
 // Dump is a dump of the cache state.

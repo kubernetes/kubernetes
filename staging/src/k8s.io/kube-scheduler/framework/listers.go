@@ -50,6 +50,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+	PodGroupStates() PodGroupStateLister
+}
+
+// PodGroupStateLister provides read access to pod group states.
+type PodGroupStateLister interface {
+	// Get returns the PodGroupState of the given pod group.
+	Get(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -146,14 +153,13 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// WorkloadManager provides an interface for scheduling plugins to provide workload-aware scheduling.
-// It acts as the central source of truth for runtime information about workloads.
-type WorkloadManager interface {
-	// PodGroupState retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
-	PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+// PodGroupManager provides an interface for runtime information about pod groups in the scheduler cache.
+type PodGroupManager interface {
+	// PodGroupStates returns the PodGroupStateLister backed by the live scheduler cache.
+	PodGroupStates() PodGroupStateLister
 }
 
-// PodGroupState provides an interface to view and modify the state of a single pod group.
+// PodGroupState provides an interface to view the state of a single pod group.
 type PodGroupState interface {
 	// AllPods returns the UIDs of all pods known to the scheduler for this group.
 	AllPods() sets.Set[types.UID]
@@ -166,10 +172,6 @@ type PodGroupState interface {
 	AssumedPods() sets.Set[types.UID]
 	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 	AssignedPods() sets.Set[types.UID]
-	// AssumePod marks a pod as having reached the Reserve stage.
-	AssumePod(podUID types.UID)
-	// ForgetPod removes a pod from the assumed state.
-	ForgetPod(podUID types.UID)
 	// SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 	// A new deadline is created if one doesn't exist, or if the previous one has expired.
 	SchedulingTimeout() time.Duration

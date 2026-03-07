@@ -24,16 +24,25 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
+	"k8s.io/kubernetes/pkg/features"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
+
+func init() {
+	// This is required for tests where cache is initialized, and cache attempts to update metrics.
+	metrics.Register()
+}
 
 func Test_isSchedulableAfterPodAdded(t *testing.T) {
 	tests := []struct {
@@ -259,8 +268,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			logger, ctx := ktesting.NewTestContext(t)
-			manager := workloadmanager.New(logger)
+			cache := internalcache.New(ctx, nil)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 			workloadInformer := informerFactory.Scheduling().V1alpha1().Workloads()
@@ -269,7 +279,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithWorkloadManager(manager),
+				frameworkruntime.WithPodGroupManager(cache),
 				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 				frameworkruntime.WithPodActivator(fakeActivator),
 			)
@@ -284,10 +294,11 @@ func TestGangSchedulingFlow(t *testing.T) {
 					t.Fatalf("Failed to add workload %s to store: %v", wl.Name, err)
 				}
 			}
+
 			for _, p := range tt.initialPods {
-				manager.AddPod(p)
+				cache.AddPodInGroup(p)
 			}
-			manager.AddPod(tt.pod)
+			cache.AddPodInGroup(tt.pod)
 
 			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
 			if err != nil {
@@ -306,32 +317,36 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 			// Simulate that other pods have already hit Permit and are now waiting.
 			for _, p := range tt.podsWaitingOnPermit {
-				// Run Reserve and Permit for these pods to get them into the "assumed" state inside the manager.
-				status := pl.Reserve(ctx, nil, p, "some-node")
-				if !status.IsSuccess() {
-					t.Fatalf("Unexpected Reserve status for pod %q: %v", p.Name, status)
+				pod := p.DeepCopy()
+				pod.Spec.NodeName = "some-node"
+				if err := cache.AssumePod(logger, pod); err != nil {
+					t.Fatalf("Failed to assume pod %q: %v", pod.Name, err)
 				}
-				status, _ = pl.Permit(ctx, nil, p, "some-node")
+				status, _ := pl.Permit(ctx, nil, pod, "some-node")
 				if status.Code() != fwk.Wait {
-					t.Fatalf("Expected Wait status while permitting a pod %q: %v", p.Name, status)
+					t.Fatalf("Expected Wait status while permitting a pod %q: %v", pod.Name, status)
 				}
-			}
-
-			status := pl.Reserve(ctx, nil, tt.pod, "some-node")
-			if !status.IsSuccess() {
-				t.Fatalf("Unexpected Reserve status: %v", status)
 			}
 
 			// Clear activated pods to assert those activated in tt.pod Permit.
 			fakeActivator.activatedPods = nil
 
-			gotPermitStatus, _ := pl.Permit(ctx, nil, tt.pod, "some-node")
+			// Assume and permit tt.pod — the pod currently being scheduled in this cycle.
+			pod := tt.pod.DeepCopy()
+			pod.Spec.NodeName = "some-node"
+			if err := cache.AssumePod(logger, pod); err != nil {
+				t.Fatalf("Failed to assume pod %q: %v", pod.Name, err)
+			}
+
+			gotPermitStatus, _ := pl.Permit(ctx, nil, pod, "some-node")
 			if diff := cmp.Diff(tt.wantPermitStatus, gotPermitStatus); diff != "" {
 				t.Fatalf("Unexpected Permit status (-want, +got):\n%s", diff)
 			}
 			if gotPermitStatus.Code() == fwk.Wait {
-				// Pod waits for others from a gang. Simulate its eventual Unreserve.
-				pl.Unreserve(ctx, nil, tt.pod, "some-node")
+				// Pod waits for others from a gang. Simulate its eventual forget.
+				if err := cache.ForgetPod(logger, pod); err != nil {
+					t.Fatalf("Failed to forget pod %q: %v", pod.Name, err)
+				}
 				return
 			}
 

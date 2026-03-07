@@ -43,7 +43,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/backend/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -90,6 +89,8 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 }
 
 func TestPodGroupInfoForPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
 	ref := &v1.WorkloadReference{Name: "workload", PodGroup: "pg"}
 	p1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").WorkloadRef(ref).Priority(100).Obj()
 	p2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").WorkloadRef(ref).Priority(200).Obj()
@@ -149,11 +150,11 @@ func TestPodGroupInfoForPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			wm := workloadmanager.New(logger)
+			cache := internalcache.New(ctx, nil)
 
-			wm.AddPod(tt.pInfo.Pod)
+			cache.AddPodInGroup(tt.pInfo.Pod)
 			for _, pod := range tt.unscheduledPods {
-				wm.AddPod(pod)
+				cache.AddPodInGroup(pod)
 			}
 
 			q := internalqueue.NewTestQueue(ctx, nil)
@@ -164,7 +165,7 @@ func TestPodGroupInfoForPod(t *testing.T) {
 				}
 			}
 			sched := &Scheduler{
-				WorkloadManager: wm,
+				Cache:           cache,
 				SchedulingQueue: q,
 			}
 
