@@ -103,3 +103,69 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		})
 	}
 }
+
+func TestDeclarativeValidateUpdateForDeclarative(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdateForDeclarative(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
+	mkValidRoleBinding := func() rbac.RoleBinding {
+		return rbac.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-binding", Namespace: "test-ns"},
+			RoleRef: rbac.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     "admin",
+			},
+			Subjects: []rbac.Subject{
+				{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user1"},
+			},
+		}
+	}
+
+	testCases := map[string]struct {
+		oldObj       rbac.RoleBinding
+		updateObj    rbac.RoleBinding
+		expectedErrs field.ErrorList
+	}{
+		"no change to roleRef - valid": {
+			oldObj:    mkValidRoleBinding(),
+			updateObj: mkValidRoleBinding(),
+		},
+		"roleRef changed - invalid": {
+			oldObj: mkValidRoleBinding(),
+			updateObj: func() rbac.RoleBinding {
+				obj := mkValidRoleBinding()
+				obj.RoleRef.Name = "different-role"
+				return obj
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "Role",
+					Name:     "different-role",
+				}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIPrefix:         "apis",
+				APIGroup:          "rbac.authorization.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "rolebindings",
+				Name:              "test-binding",
+				IsResourceRequest: true,
+				Verb:              "update",
+			})
+			tc.oldObj.ResourceVersion = "1"
+			tc.updateObj.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
