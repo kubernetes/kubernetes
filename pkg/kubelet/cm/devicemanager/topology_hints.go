@@ -152,12 +152,17 @@ func (m *ManagerImpl) getAvailableDevices(resource string) sets.Set[string] {
 }
 
 func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.Set[string], reusable sets.Set[string], request int) []topologymanager.TopologyHint {
-	// Initialize minAffinitySize to include all NUMA Nodes
-	minAffinitySize := len(m.numaNodes)
+	candidateNUMANodes := m.candidateNUMANodes(resource, available, reusable)
+	if len(candidateNUMANodes) == 0 {
+		candidateNUMANodes = m.numaNodes
+	}
+
+	// Initialize minAffinitySize to include all candidate NUMA Nodes
+	minAffinitySize := len(candidateNUMANodes)
 
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(m.numaNodes, func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(candidateNUMANodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		devicesInMask := 0
 		for _, device := range m.allDevices[resource] {
@@ -215,7 +220,66 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 		}
 	}
 
+	// Ensure we still expose a fallback hint that spans every NUMA node so that other hint
+	// providers can intersect with a non-preferred "any NUMA" option, matching the behavior
+	// prior to filtering out NUMA nodes with no available devices.
+	if len(hints) > 0 && len(candidateNUMANodes) < len(m.numaNodes) {
+		defaultMask, err := bitmask.NewBitMask(m.numaNodes...)
+		if err == nil && !hintListContainsMask(hints, defaultMask) {
+			hints = append(hints, topologymanager.TopologyHint{
+				NUMANodeAffinity: defaultMask,
+				Preferred:        false,
+			})
+		}
+	}
+
 	return hints
+}
+
+func (m *ManagerImpl) candidateNUMANodes(resource string, available sets.Set[string], reusable sets.Set[string]) []int {
+	nodesWithDevices := sets.New[int]()
+
+	addNodes := func(deviceIDs sets.Set[string]) {
+		if deviceIDs == nil {
+			return
+		}
+		for deviceID := range deviceIDs {
+			device, ok := m.allDevices[resource][deviceID]
+			if !ok || device.Topology == nil {
+				continue
+			}
+			for _, node := range device.Topology.Nodes {
+				nodesWithDevices.Insert(int(node.ID))
+			}
+		}
+	}
+
+	addNodes(available)
+	addNodes(reusable)
+
+	// If no nodes were identified from available or reusable devices, fall back to any node that
+	// has topology information for the resource to preserve the previous behaviour.
+	if nodesWithDevices.Len() == 0 {
+		for _, device := range m.allDevices[resource] {
+			if device.Topology == nil {
+				continue
+			}
+			for _, node := range device.Topology.Nodes {
+				nodesWithDevices.Insert(int(node.ID))
+			}
+		}
+	}
+
+	return sets.List(nodesWithDevices)
+}
+
+func hintListContainsMask(hints []topologymanager.TopologyHint, mask bitmask.BitMask) bool {
+	for i := range hints {
+		if hints[i].NUMANodeAffinity != nil && hints[i].NUMANodeAffinity.IsEqual(mask) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
