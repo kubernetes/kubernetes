@@ -36,7 +36,7 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]http.RoundTripper
 }
 
 // DialerStopCh is stop channel that is passed down to dynamic cert dialer.
@@ -46,11 +46,14 @@ var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{
+	transports: make(map[tlsCacheKey]http.RoundTripper),
+}
 
 type tlsCacheKey struct {
 	insecure           bool
 	caData             string
+	caFile             string
 	certData           string
 	keyData            string `datapolicy:"security-key"`
 	certFile           string
@@ -68,8 +71,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -131,7 +134,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		proxy = config.Proxy
 	}
 
-	transport := utilnet.SetTransportDefaults(&http.Transport{
+	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
@@ -139,6 +142,11 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
 	})
+	var transport http.RoundTripper = httpTransport
+
+	if config.TLS.ReloadCAFiles && tlsConfig != nil && tlsConfig.RootCAs != nil && len(config.TLS.CAFile) > 0 {
+		transport = newAtomicTransportHolder(config.TLS.CAFile, config.TLS.CAData, httpTransport)
+	}
 
 	if canCache {
 		// Cache a single transport for these options
@@ -162,7 +170,6 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
-		caData:             string(c.TLS.CAData),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
@@ -176,6 +183,15 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	} else {
 		k.certData = string(c.TLS.CertData)
 		k.keyData = string(c.TLS.KeyData)
+	}
+
+	if c.TLS.ReloadCAFiles {
+		// When reloading CA files, include CA file path in cache key instead of CA data
+		// This allows the CA to be reloaded from disk on each transport creation
+		k.caFile = c.TLS.CAFile
+	} else {
+		// When not reloading, cache the CA data directly
+		k.caData = string(c.TLS.CAData)
 	}
 
 	return k, true, nil
