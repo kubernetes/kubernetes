@@ -32,6 +32,10 @@ func (c *FakeResourceV1beta2) DeviceClasses() v1beta2.DeviceClassInterface {
 	return newFakeDeviceClasses(c)
 }
 
+func (c *FakeResourceV1beta2) DeviceTaintRules() v1beta2.DeviceTaintRuleInterface {
+	return newFakeDeviceTaintRules(c)
+}
+
 func (c *FakeResourceV1beta2) ResourceClaims(namespace string) v1beta2.ResourceClaimInterface {
 	return newFakeResourceClaims(c, namespace)
 }

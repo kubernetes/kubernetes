@@ -531,12 +531,20 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DRAExtendedResource
   versionedSpecs:
   - default: false

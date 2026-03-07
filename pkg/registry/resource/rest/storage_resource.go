@@ -179,6 +179,15 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		storage[resource] = deviceclassStorage
 	}
 
+	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
+		deviceTaintRuleStorage, deviceTaintRuleStatusStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = deviceTaintRuleStorage
+		storage[resource+"/status"] = deviceTaintRuleStatusStorage
+	}
+
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
 		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
 		if err != nil {

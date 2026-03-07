@@ -145,6 +145,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				// Number of devices per slice is chosen so that Filter takes a few seconds:
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
@@ -185,7 +186,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
 			},
 		},
@@ -194,19 +195,14 @@ func TestDRA(t *testing.T) {
 				resourceapi.SchemeGroupVersion:     false,
 				resourcev1beta2.SchemeGroupVersion: true,
 			},
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			features: map[featuregate.Feature]bool{
+				features.DynamicResourceAllocation: true,
+				features.DRADeviceTaintRules:       true,
+			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
-			},
-		},
-		"slice-taints": {
-			features: map[featuregate.Feature]bool{
-				features.DRADeviceTaints: true,
-			},
-			f: func(tCtx ktesting.TContext) {
-				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
 			},
 		},
 		"all": {
@@ -222,7 +218,6 @@ func TestDRA(t *testing.T) {
 				features.DRAAdminAccess:               true,
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
-				features.DRADeviceTaints:              true,
 				features.DRADeviceTaintRules:          true,
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
@@ -244,8 +239,9 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
-				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
-				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
+				tCtx.Run("EvictClusterWithV1alpha3Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1alpha3Rule) })
+				tCtx.Run("EvictClusterWithV1beta2Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1beta2Rule) })
+				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
 				// Number of devices per slice is chosen so that Filter takes a few seconds: The allocator
 				// in the experimental channel has an improvement that requires a higher number here than

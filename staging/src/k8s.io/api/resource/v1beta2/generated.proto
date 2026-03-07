@@ -405,7 +405,7 @@ message Device {
   // any device in a ResourceSlice, then the maximum number of
   // allowed devices per ResourceSlice is 64 instead of 128.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -922,7 +922,7 @@ message DeviceRequestAllocationResult {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -1081,7 +1081,7 @@ message DeviceSubRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -1151,6 +1151,115 @@ message DeviceTaint {
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+}
+
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
+message DeviceTaintRule {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec specifies the selector and one taint.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  // +required
+  optional DeviceTaintRuleSpec spec = 2;
+
+  // Status provides information about what was requested in the spec.
+  //
+  // +optional
+  optional DeviceTaintRuleStatus status = 3;
+}
+
+// DeviceTaintRuleList is a collection of DeviceTaintRules.
+message DeviceTaintRuleList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of DeviceTaintRules.
+  repeated DeviceTaintRule items = 2;
+}
+
+// DeviceTaintRuleSpec specifies the selector and one taint.
+message DeviceTaintRuleSpec {
+  // DeviceSelector defines which device(s) the taint is applied to.
+  // All selector criteria must be satisfied for a device to
+  // match. The empty selector matches all devices. Without
+  // a selector, no devices are matches.
+  //
+  // +optional
+  optional DeviceTaintSelector deviceSelector = 1;
+
+  // The taint that gets applied to matching devices.
+  //
+  // +required
+  optional DeviceTaint taint = 2;
+}
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+message DeviceTaintRuleStatus {
+  // Conditions provide information about the state of the DeviceTaintRule
+  // and the cluster at some point in time,
+  // in a machine-readable and human-readable format.
+  //
+  // The following condition is currently defined as part of this API, more may
+  // get added:
+  // - Type: EvictionInProgress
+  // - Status: True if there are currently pods which need to be evicted, False otherwise
+  //   (includes the effects which don't cause eviction).
+  // - Reason: not specified, may change
+  // - Message: includes information about number of pending pods and already evicted pods
+  //   in a human-readable format, updated periodically, may change
+  //
+  // For `effect: None`, the condition above gets set once for each change to
+  // the spec, with the message containing information about what would happen
+  // if the effect was `NoExecute`. This feedback can be used to decide whether
+  // changing the effect to `NoExecute` will work as intended. It only gets
+  // set once to avoid having to constantly update the status.
+  //
+  // Must have 8 or fewer entries.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  // +patchStrategy=merge
+  // +patchMergeKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+}
+
+// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
+// The empty selector matches all devices. Without a selector, no devices
+// are matched.
+message DeviceTaintSelector {
+  // If driver is set, only devices from that driver are selected.
+  // This fields corresponds to slice.spec.driver.
+  //
+  // +optional
+  optional string driver = 2;
+
+  // If pool is set, only devices in that pool are selected.
+  //
+  // Also setting the driver name may be useful to avoid
+  // ambiguity when different drivers use the same pool name,
+  // but this is not required because selecting pools from
+  // different drivers may also be useful, for example when
+  // drivers with node-local devices use the node name as
+  // their pool name.
+  //
+  // +optional
+  optional string pool = 3;
+
+  // If device is set, only devices with that name are selected.
+  // This field corresponds to slice.spec.devices[].name.
+  //
+  // Setting also driver and pool may be required to avoid ambiguity,
+  // but is not required.
+  //
+  // +optional
+  optional string device = 4;
 }
 
 // The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches
@@ -1287,7 +1396,7 @@ message ExactDeviceRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
