@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/clock"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -482,6 +483,11 @@ func (sched *Scheduler) bindingCycle(
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
 		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
+	}
+	if assumedPodInfo.NominationTimestamp != nil {
+		nominationToBindingSecs := metrics.SinceInSeconds(*assumedPodInfo.NominationTimestamp)
+		logger.V(4).Info("nomination to binding duration", "pod", klog.KObj(assumedPod), "nominationToBindingDurationSecs", nominationToBindingSecs)
+		metrics.NominationToBindingDuration.Observe(nominationToBindingSecs)
 	}
 	// Count pods scheduled after being flushed from unschedulablePods
 	if assumedPodInfo.WasFlushedFromUnschedulable {
@@ -1249,6 +1255,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
+			maybeSetNominationTimestamp(podInfo, nominatingInfo, clock.RealClock{})
 			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
@@ -1320,4 +1327,16 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
 	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+}
+
+// maybeSetNominationTimestamp records the time a pod was first nominated to a node via a PostFilter plugin.
+// It is a no-op if the nomination didn't succeed or the timestamp was already set.
+func maybeSetNominationTimestamp(podInfo *framework.QueuedPodInfo, nominatingInfo *fwk.NominatingInfo, clk clock.Clock) {
+	if podInfo.NominationTimestamp == nil &&
+		nominatingInfo != nil &&
+		nominatingInfo.Mode() == fwk.ModeOverride &&
+		nominatingInfo.NominatedNodeName != "" {
+		now := clk.Now()
+		podInfo.NominationTimestamp = &now
+	}
 }
