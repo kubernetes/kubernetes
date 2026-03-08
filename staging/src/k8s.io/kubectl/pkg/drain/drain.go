@@ -394,6 +394,11 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 			d.OnPodDeletionOrEvictionStarted(&pod, false)
 		}
 	}
+
+	if d.DryRunStrategy == cmdutil.DryRunServer {
+		return nil
+	}
+
 	ctx := d.getContext()
 	params := waitForDeleteParams{
 		ctx:                             ctx,
