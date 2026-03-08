@@ -1710,7 +1710,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			}
 			strategy := NewStrategy(mockNSClient, authz)
 
-			if !tc.adminAccess {
+			if !tc.adminAccess || !tc.deviceStatusFeatureGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
