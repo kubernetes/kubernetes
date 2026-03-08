@@ -26,7 +26,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
+	"golang.org/x/time/rate"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
@@ -106,6 +108,9 @@ type containerLogManager struct {
 	queue            workqueue.TypedRateLimitingInterface[string]
 	maxWorkers       int
 	monitoringPeriod metav1.Duration
+	// Track high-throughput containers to handle them with priority
+	highThroughputContainers map[string]time.Time
+	highThroughputMutex      sync.RWMutex
 }
 
 // NewContainerLogManager creates a new container log manager.
@@ -133,10 +138,17 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 		mutex:      sync.Mutex{},
 		maxWorkers: maxWorkers,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.NewTypedMaxOfRateLimiter(
+				// Use a more aggressive rate limiter for high-throughput scenarios
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](1*time.Millisecond, 30*time.Second),
+				// Higher QPS token bucket for faster processing
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(50), 200)},
+			),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
 		),
-		monitoringPeriod: monitorInterval,
+		monitoringPeriod:         monitorInterval,
+		highThroughputContainers: make(map[string]time.Time),
+		highThroughputMutex:      sync.RWMutex{},
 	}, nil
 }
 
@@ -154,6 +166,11 @@ func (c *containerLogManager) Start(ctx context.Context) {
 			logger.Error(err, "Failed to rotate container logs")
 		}
 	}, c.monitoringPeriod.Duration)
+
+	// Start a goroutine to clean up stale high-throughput container entries
+	go wait.Forever(func() {
+		c.cleanupStaleHighThroughputContainers(ctx)
+	}, 5*time.Minute)
 }
 
 // Clean removes all logs of specified container (including rotated one).
@@ -182,6 +199,39 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 	return nil
 }
 
+// cleanupStaleHighThroughputContainers removes entries for containers that are no longer running
+// or haven't been seen for a while to prevent memory leaks
+func (c *containerLogManager) cleanupStaleHighThroughputContainers(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	c.highThroughputMutex.Lock()
+	defer c.highThroughputMutex.Unlock()
+
+	now := c.clock.Now()
+	staleThreshold := 10 * time.Minute
+
+	// Get list of running containers
+	containers, err := c.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
+	if err != nil {
+		logger.Error(err, "Failed to list containers for cleanup")
+		return
+	}
+
+	runningContainerIDs := make(map[string]bool)
+	for _, container := range containers {
+		if container.GetState() == runtimeapi.ContainerState_CONTAINER_RUNNING {
+			runningContainerIDs[container.GetId()] = true
+		}
+	}
+
+	// Remove stale entries
+	for id, lastSeen := range c.highThroughputContainers {
+		if !runningContainerIDs[id] || now.Sub(lastSeen) > staleThreshold {
+			delete(c.highThroughputContainers, id)
+			logger.V(4).Info("Cleaned up stale high-throughput container entry", "containerID", id, "lastSeen", lastSeen)
+		}
+	}
+}
+
 func (c *containerLogManager) processQueueItems(ctx context.Context, worker int) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Starting container log rotation worker", "workerID", worker)
@@ -200,17 +250,40 @@ func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
+
+	// First, prioritize high-throughput containers
+	c.highThroughputMutex.RLock()
+	// Add high-throughput containers first for priority processing
+	for id := range c.highThroughputContainers {
+		if v := logger.V(4); v.Enabled() {
+			logger.V(4).Info("Adding high-throughput container to queue for priority processing", "id", id)
+		}
+		c.queue.Add(id)
+	}
+	c.highThroughputMutex.RUnlock()
+
+	// Then add all other running containers
 	for _, container := range containers {
 		// Only rotate logs for running containers. Non-running containers won't
 		// generate new output, it doesn't make sense to keep an empty latest log.
 		if container.GetState() != runtimeapi.ContainerState_CONTAINER_RUNNING {
 			continue
 		}
+
+		// Skip if already added as high-throughput
+		containerID := container.GetId()
+		c.highThroughputMutex.RLock()
+		_, isHighThroughput := c.highThroughputContainers[containerID]
+		c.highThroughputMutex.RUnlock()
+		if isHighThroughput {
+			continue
+		}
+
 		// Doing this to avoid additional overhead with logging of label like arguments that can prove costly
 		if v := logger.V(4); v.Enabled() {
-			logger.V(4).Info("Adding new entry to the queue for processing", "id", container.GetId(), "name", container.Metadata.GetName(), "labels", container.GetLabels())
+			logger.V(4).Info("Adding new entry to the queue for processing", "id", containerID, "name", container.Metadata.GetName(), "labels", container.GetLabels())
 		}
-		c.queue.Add(container.GetId())
+		c.queue.Add(containerID)
 	}
 	return nil
 }
@@ -259,12 +332,39 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 	}
 	if info.Size() < c.policy.MaxSize {
 		logger.V(7).Info("log file doesn't need to be rotated", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
+		// Remove from high-throughput tracking if it's no longer exceeding size
+		c.highThroughputMutex.Lock()
+		delete(c.highThroughputContainers, id)
+		c.highThroughputMutex.Unlock()
 		return
+	}
+
+	// Check if this is a high-throughput container (log size significantly exceeds max size)
+	isHighThroughput := info.Size() > c.policy.MaxSize*2
+	if isHighThroughput {
+		c.highThroughputMutex.Lock()
+		c.highThroughputContainers[id] = c.clock.Now()
+		c.highThroughputMutex.Unlock()
+		logger.V(4).Info("Detected high-throughput container", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
 	}
 
 	if err := c.rotateLog(ctx, id, path); err != nil {
 		logger.Error(err, "Failed to rotate log for container", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
+		// For high-throughput containers, don't let failures block future attempts
+		if isHighThroughput {
+			c.queue.Forget(id)
+			// Re-add immediately for high-throughput containers to prevent unbounded growth
+			c.queue.Add(id)
+		}
 		return
+	}
+
+	// Remove from high-throughput tracking after successful rotation
+	if isHighThroughput {
+		c.highThroughputMutex.Lock()
+		delete(c.highThroughputContainers, id)
+		c.highThroughputMutex.Unlock()
+		logger.V(4).Info("Successfully rotated high-throughput container", "worker", worker, "containerID", id, "path", path)
 	}
 	return
 }
