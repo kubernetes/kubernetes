@@ -40,7 +40,7 @@ func New[T comparable](items ...T) Set[T] {
 func KeySet[T comparable, V any](theMap map[T]V) Set[T] {
 	ret := make(Set[T], len(theMap))
 	for keyValue := range theMap {
-		ret.Insert(keyValue)
+		ret[keyValue] = Empty{}
 	}
 	return ret
 }
@@ -103,7 +103,7 @@ func (s Set[T]) HasAny(items ...T) bool {
 func (s Set[T]) Clone() Set[T] {
 	result := make(Set[T], len(s))
 	for key := range s {
-		result.Insert(key)
+		result[key] = Empty{}
 	}
 	return result
 }
@@ -115,10 +115,10 @@ func (s Set[T]) Clone() Set[T] {
 // s1.Difference(s2) = {a3}
 // s2.Difference(s1) = {a4, a5}
 func (s1 Set[T]) Difference(s2 Set[T]) Set[T] {
-	result := New[T]()
+        result := make(Set[T], len(s1))
 	for key := range s1 {
-		if !s2.Has(key) {
-			result.Insert(key)
+		if _, contained := s2[key]; !contained {
+			result[key] = Empty{}
 		}
 	}
 	return result
@@ -141,9 +141,12 @@ func (s1 Set[T]) SymmetricDifference(s2 Set[T]) Set[T] {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Set[T]) Union(s2 Set[T]) Set[T] {
-	result := s1.Clone()
+	result := make(Set[T], len(s1)+len(s2))
+	for key := range s1 {
+		result[key] = Empty{}
+	}
 	for key := range s2 {
-		result.Insert(key)
+		result[key] = Empty{}
 	}
 	return result
 }
@@ -155,7 +158,7 @@ func (s1 Set[T]) Union(s2 Set[T]) Set[T] {
 // s1.Intersection(s2) = {a2}
 func (s1 Set[T]) Intersection(s2 Set[T]) Set[T] {
 	var walk, other Set[T]
-	result := New[T]()
+	result := make(Set[T], min(len(s1), len(s2)))
 	if s1.Len() < s2.Len() {
 		walk = s1
 		other = s2
@@ -164,12 +167,20 @@ func (s1 Set[T]) Intersection(s2 Set[T]) Set[T] {
 		other = s1
 	}
 	for key := range walk {
-		if other.Has(key) {
-			result.Insert(key)
+		if _, contained := other[key]; contained {
+			result[key] = Empty{}
 		}
 	}
 	return result
 }
+
+func min(lhs, rhs int) int {
+	if lhs < rhs {
+		return lhs
+	}
+	return rhs
+}
+
 
 // IsSuperset returns true if and only if s1 is a superset of s2.
 func (s1 Set[T]) IsSuperset(s2 Set[T]) bool {
