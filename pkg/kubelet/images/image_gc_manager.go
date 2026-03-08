@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -68,6 +69,14 @@ type PostImageGCHook func(ctx context.Context, remainingImages []string, gcStart
 type StatsProvider interface {
 	// ImageFsStats returns the stats of the image filesystem.
 	ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error)
+}
+
+// PodGetter returns the list of pods. When provided to ImageGCManager, images
+// referenced by non-terminal pods (including those in CreateContainerConfigError
+// where no container exists in the runtime) are considered in use to prevent
+// the imageMaximumGCAge download/remove loop.
+type PodGetter interface {
+	GetPods() []*v1.Pod
 }
 
 // ImageGCManager is an interface for managing lifecycle of all images.
@@ -109,6 +118,11 @@ type ImageGCPolicy struct {
 type realImageGCManager struct {
 	// Container runtime
 	runtime container.Runtime
+
+	// Optional: when set, images referenced by non-terminal pods are considered
+	// in use. This fixes the CreateContainerConfigError case where the image
+	// was pulled but no container exists in the runtime.
+	podGetter PodGetter
 
 	// Records of images and their use. Indexed by ImageId.
 	// If RuntimeClassInImageCriAPI feature gate is enabled, imageRecords
@@ -192,7 +206,9 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, postGCHooks []PostImageGCHook, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
+// podGetter is optional; when provided, images referenced by non-terminal pods
+// (e.g. CreateContainerConfigError) are considered in use to prevent GC loops.
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, postGCHooks []PostImageGCHook, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider, podGetter PodGetter) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -206,6 +222,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, p
 	tracer := tracerProvider.Tracer(instrumentationScope)
 	im := &realImageGCManager{
 		runtime:       runtime,
+		podGetter:     podGetter,
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: statsProvider,
@@ -373,6 +390,36 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 					"containerName", container.Name,
 					"containerState", container.State)
 			}
+		}
+	}
+
+	// Consider images referenced by non-terminal pods (desired state). This fixes
+	// the CreateContainerConfigError case: the image was pulled but container
+	// creation failed, so no container exists in the runtime. Without this, the
+	// image would be GC'd and re-pulled repeatedly.
+	if im.podGetter != nil {
+		for _, pod := range im.podGetter.GetPods() {
+			if podutil.IsPodTerminal(pod) {
+				continue
+			}
+			podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, _ podutil.ContainerType) bool {
+				imageRef, err := im.runtime.GetImageRef(ctx, container.ImageSpec{Image: c.Image})
+				if err != nil || imageRef == "" {
+					return true
+				}
+				if !isRuntimeClassInImageCriAPIEnabled {
+					imagesInUse.Insert(imageRef)
+				} else {
+					// Match all images with this ID (any runtime handler) since we don't have container-level runtime info.
+					for _, img := range images {
+						if img.ID == imageRef {
+							imagesInUse.Insert(getImageTuple(img.ID, img.Spec.RuntimeHandler))
+						}
+					}
+				}
+				logger.V(5).Info("Pod spec references image (e.g. CreateContainerConfigError)", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", c.Name, "imageID", imageRef)
+				return true
+			})
 		}
 	}
 
