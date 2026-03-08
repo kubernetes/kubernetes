@@ -17,7 +17,6 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -1952,5 +1951,6 @@ type fakeAuthorizer struct {
 func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if !f.verdict {
 		return authorizer.DecisionDeny, "denied", nil
+	}
 	return authorizer.DecisionAllow, "default accept", nil
 }

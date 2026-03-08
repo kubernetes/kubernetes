@@ -415,7 +415,11 @@ func TestStrategy(t *testing.T) {
 }
 
 func TestStrategyCreate(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "resource.k8s.io",
+		APIVersion: "v1",
+		Resource:   "resourceclaims",
+	})
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
@@ -663,7 +667,11 @@ func TestStrategyCreate(t *testing.T) {
 }
 
 func TestStrategyUpdate(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "resource.k8s.io",
+		APIVersion: "v1",
+		Resource:   "resourceclaims",
+	})
 	testcases := map[string]struct {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
