@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -87,13 +88,11 @@ func TestControllerSync(t *testing.T) {
 			name:            "5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
 			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
 			expectedVolumes: volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			initialClaims:   noclaims,
+			initialClaims:   withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
 			expectedClaims:  withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				claim := withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil))[0]
-				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
@@ -321,6 +320,21 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
 		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
 
+		client.AddReactor("list", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+			pvList := &v1.PersistentVolumeList{}
+			for _, v := range test.initialVolumes {
+				pvList.Items = append(pvList.Items, *v.DeepCopy())
+			}
+			return true, pvList, nil
+		})
+		client.AddReactor("list", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+			pvcList := &v1.PersistentVolumeClaimList{}
+			for _, c := range test.initialClaims {
+				pvcList.Items = append(pvcList.Items, *c.DeepCopy())
+			}
+			return true, pvcList, nil
+		})
+
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(ctx, client, informers, true)
 		if err != nil {
@@ -340,19 +354,15 @@ func TestControllerSync(t *testing.T) {
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
 		reactor := newVolumeReactor(ctx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
-		for _, claim := range test.initialClaims {
-			claim = claim.DeepCopy()
-			reactor.AddClaim(claim)
-			go func(claim *v1.PersistentVolumeClaim) {
-				fakeClaimWatch.Add(claim)
-			}(claim)
-		}
 		for _, volume := range test.initialVolumes {
 			volume = volume.DeepCopy()
 			reactor.AddVolume(volume)
-			go func(volume *v1.PersistentVolume) {
-				fakeVolumeWatch.Add(volume)
-			}(volume)
+			informers.Core().V1().PersistentVolumes().Informer().GetIndexer().Add(volume)
+		}
+		for _, claim := range test.initialClaims {
+			claim = claim.DeepCopy()
+			reactor.AddClaim(claim)
+			informers.Core().V1().PersistentVolumeClaims().Informer().GetIndexer().Add(claim)
 		}
 
 		// Start the controller
@@ -373,7 +383,6 @@ func TestControllerSync(t *testing.T) {
 			return len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
 				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
 		})
-
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
@@ -397,7 +406,6 @@ func TestControllerSync(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			doit(test)
 		})
