@@ -160,7 +160,6 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
-<<<<<<< HEAD
 
 	var consistencyStore consistencyutil.ConsistencyStore
 	var podWriteCallback func(pod *v1.Pod, rs *metav1.OwnerReference)

@@ -41,10 +41,13 @@ func NewInformerSyncHealthChecker(controllerName string, syncFuncs ...cache.Info
 }
 
 // Check verifies that all informers have synced their caches.
+// It returns immediately without blocking; it does not wait for caches to sync.
 func (c *InformerSyncHealthChecker) Check(_ *http.Request) error {
-	if !cache.WaitForCacheSync(nil, c.syncFuncs...) {
-		klog.Errorf("Controller %s informers have not started", c.controllerName)
-		return fmt.Errorf("controller %s informers have not started", c.controllerName)
+	for _, syncFunc := range c.syncFuncs {
+		if !syncFunc() {
+			klog.Errorf("Controller %s informers have not synced", c.controllerName)
+			return fmt.Errorf("controller %s informers have not synced", c.controllerName)
+		}
 	}
 	return nil
 }
