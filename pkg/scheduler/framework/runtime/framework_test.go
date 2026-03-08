@@ -3861,3 +3861,119 @@ func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
 	}
 	return res
 }
+
+func TestPluginEvaluationTotalMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	metrics.PluginEvaluationTotal.Reset()
+
+	registry := Registry{}
+
+	const (
+		preFilterPluginName = "plugin-eval-prefilter"
+		filterPluginNameA   = "plugin-eval-filter-a"
+		filterPluginNameB   = "plugin-eval-filter-b"
+		preScorePluginName  = "plugin-eval-prescore"
+		scorePluginName     = "plugin-eval-score"
+		profileName2        = "test-profile-2"
+	)
+
+	preFilterPl := &TestPlugin{name: preFilterPluginName, inj: injectedResult{PreFilterStatus: int(fwk.Success)}}
+	if err := registry.Register(preFilterPluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return preFilterPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register prefilter plugin %q: %v", preFilterPluginName, err)
+	}
+
+	filterPlA := &TestPlugin{name: filterPluginNameA, inj: injectedResult{FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(filterPluginNameA, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return filterPlA, nil
+	}); err != nil {
+		t.Fatalf("failed to register filter plugin %q: %v", filterPluginNameA, err)
+	}
+
+	filterPlB := &TestPlugin{name: filterPluginNameB, inj: injectedResult{FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(filterPluginNameB, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return filterPlB, nil
+	}); err != nil {
+		t.Fatalf("failed to register filter plugin %q: %v", filterPluginNameB, err)
+	}
+
+	preScorePl := &TestPlugin{name: preScorePluginName, inj: injectedResult{PreScoreStatus: int(fwk.Success)}}
+	if err := registry.Register(preScorePluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return preScorePl, nil
+	}); err != nil {
+		t.Fatalf("failed to register prescore plugin %q: %v", preScorePluginName, err)
+	}
+
+	scorePl := &TestPlugin{name: scorePluginName, inj: injectedResult{}}
+	if err := registry.Register(scorePluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return scorePl, nil
+	}); err != nil {
+		t.Fatalf("failed to register score plugin %q: %v", scorePluginName, err)
+	}
+
+	// Profile 1: exercise PreFilter, Filter, PreScore and Score extension points.
+	cfgPls1 := &config.Plugins{}
+	cfgPls1.PreFilter.Enabled = append(cfgPls1.PreFilter.Enabled, config.Plugin{Name: preFilterPluginName})
+	cfgPls1.Filter.Enabled = append(cfgPls1.Filter.Enabled, config.Plugin{Name: filterPluginNameA})
+	cfgPls1.PreScore.Enabled = append(cfgPls1.PreScore.Enabled, config.Plugin{Name: preScorePluginName})
+	cfgPls1.Score.Enabled = append(cfgPls1.Score.Enabled, config.Plugin{Name: scorePluginName})
+	profile1 := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins:       cfgPls1,
+	}
+
+	f1, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile1, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework (profile=%q): %v", testProfileName, err)
+	}
+	defer func() { _ = f1.Close() }()
+
+	state1 := framework.NewCycleState()
+	if _, st, _ := f1.RunPreFilterPlugins(ctx, state1, pod); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins returned unexpected status: %v", st)
+	}
+	if st := f1.RunFilterPlugins(ctx, state1, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", st)
+	}
+	if st := f1.RunPreScorePlugins(ctx, state1, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunPreScorePlugins returned unexpected status: %v", st)
+	}
+	if _, st := f1.RunScorePlugins(ctx, state1, pod, BuildNodeInfos(nodes)); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunScorePlugins returned unexpected status: %v", st)
+	}
+
+	// Profile 2: exercise a different plugin and profile label on Filter.
+	cfgPls2 := &config.Plugins{}
+	cfgPls2.Filter.Enabled = append(cfgPls2.Filter.Enabled, config.Plugin{Name: filterPluginNameB})
+	profile2 := config.KubeSchedulerProfile{
+		SchedulerName: profileName2,
+		Plugins:       cfgPls2,
+	}
+
+	f2, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile2, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework (profile=%q): %v", profileName2, err)
+	}
+	defer func() { _ = f2.Close() }()
+
+	state2 := framework.NewCycleState()
+	if st := f2.RunFilterPlugins(ctx, state2, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", st)
+	}
+
+	want := `# HELP scheduler_plugin_evaluation_total Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).
+# TYPE scheduler_plugin_evaluation_total counter
+scheduler_plugin_evaluation_total{extension_point="Filter",plugin="plugin-eval-filter-a",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="Filter",plugin="plugin-eval-filter-b",profile="test-profile-2"} 1
+scheduler_plugin_evaluation_total{extension_point="PreFilter",plugin="plugin-eval-prefilter",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="PreScore",plugin="plugin-eval-prescore",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="Score",plugin="plugin-eval-score",profile="test-profile"} 1
+`
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(want), metrics.PluginEvaluationTotal.Name); err != nil {
+		t.Fatalf("unexpected plugin_evaluation_total metric output:\n%v", err)
+	}
+}
