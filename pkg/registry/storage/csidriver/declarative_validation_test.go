@@ -24,7 +24,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/utils/ptr"
 )
 
 var apiVersions = []string{"v1beta1", "v1"}
@@ -58,6 +57,8 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	falseVal := false
+	trueVal := true
 	testCases := map[string]struct {
 		oldObj       storage.CSIDriver
 		updateObj    storage.CSIDriver
@@ -71,14 +72,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			oldObj:    makeValidCSIDriver(),
 			updateObj: makeValidCSIDriver(tweakAttachRequired(false)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "attachRequired"), ptr.To(false), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "attachRequired"), &falseVal, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"invalid update: attachRequired set from unset": {
 			oldObj:    makeValidCSIDriver(clearAttachRequired),
 			updateObj: makeValidCSIDriver(tweakAttachRequired(true)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "attachRequired"), ptr.To(true), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "attachRequired"), &trueVal, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"invalid update: attachRequired unset from set": {
@@ -86,7 +87,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			updateObj: makeValidCSIDriver(clearAttachRequired),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "attachedRequired"), "").MarkFromImperative(),
-				field.Invalid(field.NewPath("spec", "attachRequired"), (*bool)(nil), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "attachRequired"), (*bool)(nil), "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}
@@ -108,16 +109,18 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func makeValidCSIDriver(mutators ...func(*storage.CSIDriver)) storage.CSIDriver {
+	trueVal := true
+	falseVal := false
 	driver := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-driver",
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    ptr.To(true),
-			PodInfoOnMount:    ptr.To(true),
-			RequiresRepublish: ptr.To(false),
-			StorageCapacity:   ptr.To(false),
-			SELinuxMount:      ptr.To(false),
+			AttachRequired:    &trueVal,
+			PodInfoOnMount:    &trueVal,
+			RequiresRepublish: &falseVal,
+			StorageCapacity:   &falseVal,
+			SELinuxMount:      &falseVal,
 		},
 	}
 	for _, mutate := range mutators {
