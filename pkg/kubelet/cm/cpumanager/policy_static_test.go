@@ -1760,7 +1760,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 65, 66),
+			expCSet:     cpuset.New(2, 3, 66),
 		},
 		{
 			// even integer requested on smt-enabled processor with odd integer available cpus on uncore
@@ -1784,7 +1784,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(4, 5, 68, 69),
+			expCSet:     cpuset.New(2, 3, 66, 67),
 		},
 		{
 			// large odd integer cpu required on smt-enabled
@@ -1807,7 +1807,84 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 65, 66, 4, 5, 6, 7, 68, 69, 70, 71), // full uncore 1 and partial uncore 0
+			expCSet:     cpuset.New(2, 3, 66, 4, 5, 6, 7, 68, 69, 70, 71), // partial uncore 0 and full uncore 1
+		},
+		{
+			// avoid SMT misalignment and align to uncore cache
+			description:     "avoid SMT misalignment and align to uncore cache",
+			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
+			numReservedCPUs: 6,
+			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoUncoreSingleSocketSMT.CPUDetails.CPUs().Difference(
+				cpuset.New(4, 6),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(5, 13, 7, 15), // avoids SMT misalignment
+		},
+		{
+			// unable to avoid SMT misalignment of odd-integer cpu container and defaults to packed allocation
+			description:     "unable to avoid SMT misalignment of odd-integer cpu container and defaults to packed allocation",
+			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
+			numReservedCPUs: 6,
+			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoUncoreSingleSocketSMT.CPUDetails.CPUs().Difference(
+				cpuset.New(4, 6, 13),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"3000m", "3000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			// uncore cache alignment is not forced at the cost of SMT misalignment
+			// prefer-align-cpus-by-uncore-cache will fall back to default packed allocation
+			expCSet: cpuset.New(3, 11, 12),
+		},
+		{
+			// unable to avoid SMT misalignment of even-integer cpu container and defaults to packed allocation
+			description:     "unable to avoid SMT misalignment of even-integer cpu container and defaults to packed allocation",
+			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
+			numReservedCPUs: 6,
+			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoUncoreSingleSocketSMT.CPUDetails.CPUs().Difference(
+				cpuset.New(4, 6, 13),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(3, 7, 11, 15), // default static policy will call takeFullCores to avoid SMT misalignment
 		},
 		{
 			// odd integer cpu required on hyperthread-enabled and monolithic uncore cache
@@ -1819,7 +1896,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				PreferAlignByUnCoreCacheOption: "true",
 			},
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
 			pod: WithPodUID(
 				makeMultiContainerPod(
 					[]struct{ request, limit string }{}, // init container
@@ -1830,7 +1907,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 121, 122, 123),
+			expCSet:     cpuset.New(2, 3, 4, 122, 123),
 		},
 		{
 			// even integer cpu required on hyperthread-enabled and monolithic uncore cache
@@ -1842,7 +1919,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				PreferAlignByUnCoreCacheOption: "true",
 			},
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
 			pod: WithPodUID(
 				makeMultiContainerPod(
 					[]struct{ request, limit string }{}, // init container

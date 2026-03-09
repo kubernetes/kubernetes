@@ -569,7 +569,7 @@ func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 
 	// determine the N number of free cores (physical cpus) within the UncoreCache, then
 	// determine the M number of free cpus (virtual cpus) that correspond with the free cores
-	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
+	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, a.topo.CPUsPerCore(), uncoreID)
 	freeCPUs := a.details.CPUsInCores(freeCores.UnsortedList()...)
 
 	// when SMT/hyperthread is enabled and remaining cpu requirement is an odd integer value:
