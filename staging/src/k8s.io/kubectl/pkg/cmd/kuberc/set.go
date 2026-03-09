@@ -17,7 +17,6 @@ limitations under the License.
 package kuberc
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/config/v1beta1"
@@ -69,7 +69,10 @@ var (
 		kubectl kuberc set --section aliases --name runx --command run --option image=nginx --appendarg "--" --appendarg custom-arg1
 
 		# Overwrite an existing default
-		kubectl kuberc set --section defaults --command get --option output=json --overwrite`))
+		kubectl kuberc set --section defaults --command get --option output=json --overwrite
+
+		# Set the credential plugin policy and allowlist
+		kubectl kuberc set --section credentialplugin --policy Allowlist --allowlist-entry command=cloud-credential-helper`))
 )
 
 // SetOptions contains the options for setting kuberc configuration
@@ -126,7 +129,7 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringArrayVar(&o.Options, "option", o.Options, "Flag option in the form flag=value (can be specified multiple times)")
 	cmd.Flags().StringArrayVar(&o.PrependArgs, "prependarg", o.PrependArgs, "Argument to prepend to the command (can be specified multiple times, for aliases only)")
 	cmd.Flags().StringArrayVar(&o.AppendArgs, "appendarg", o.AppendArgs, "Argument to append to the command (can be specified multiple times, for aliases only)")
-	cmd.Flags().StringArrayVar(&o.AllowlistEntries, "allowlist-entry", o.AllowlistEntries, "Allowlist Entry the form field=value (can be specified multiple times)")
+	cmd.Flags().StringArrayVar(&o.AllowlistEntries, "allowlist-entry", o.AllowlistEntries, "Allowlist entry the form field=value (can be specified multiple times)")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Allow overwriting existing entries")
 
 	return cmd
@@ -188,7 +191,7 @@ func (o *SetOptions) Validate() error {
 				return fmt.Errorf("--allowlist-entry is required when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
 			}
 		default:
-			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s",v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll, v1beta1.PluginPolicyAllowlist,  o.PluginPolicy)
+			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s", v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll, v1beta1.PluginPolicyAllowlist, o.PluginPolicy)
 		}
 
 	}
@@ -347,11 +350,13 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 	return nil
 }
 
-// setAlias updates the aliases section of the preference
+// setCredentialPlugin sets the credential plugin policy and (optionally) the allowlist
 func (o *SetOptions) setCredentialPlugin(pref *v1beta1.Preference, options []v1beta1.CommandOptionDefault) error {
 	policy := v1beta1.CredentialPluginPolicy(o.PluginPolicy)
 
 	switch policy {
+	case "":
+		return fmt.Errorf("credential plugin policy cannot be empty")
 	case v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll:
 		if len(o.AllowlistEntries) != 0 {
 			return fmt.Errorf("credential plugin allowlist entries provided when policy was not %q", v1beta1.PluginPolicyAllowlist)
@@ -377,29 +382,28 @@ func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
 
 	var errs []error
 	var entries []v1beta1.AllowlistEntry
-	// Check if this alias already exists
-	for _, entry := range o.AllowlistEntries {
-		for kv := range strings.SplitSeq(entry, ",") {
-			k, v, ok := strings.Cut(kv, "=")
-			if !ok {
-				errs = append(errs, fmt.Errorf("improperly formatted allowlist entry: %q", kv))
+	for _, keyValuepairs := range o.AllowlistEntries {
+		for keyValuePair := range strings.SplitSeq(keyValuepairs, ",") {
+			field, value, hasSeparator := strings.Cut(keyValuePair, "=")
+			if !hasSeparator {
+				errs = append(errs, fmt.Errorf("improperly formatted allowlist entry: %q", keyValuePair))
 				continue
 			}
 
 			var entry v1beta1.AllowlistEntry
-			switch k {
+			switch field {
 			case allowlistEntryFieldName:
 				errs = append(errs, fmt.Errorf("allowlist entry field %q is deprecated, use %q instead", allowlistEntryFieldName, allowlistEntryFieldCommand))
 				continue
 			case allowlistEntryFieldCommand:
-				entry.Command = v
+				entry.Command = value
 			default:
-				errs = append(errs, fmt.Errorf("unrecognized allowlist entry field: %q", k))
+				errs = append(errs, fmt.Errorf("unrecognized allowlist entry field: %q", field))
 				continue
 			}
 
-			if len(strings.TrimSpace(v)) == 0 {
-				errs = append(errs, fmt.Errorf("empty value in allowlist entry for field %q", k))
+			if len(strings.TrimSpace(value)) == 0 {
+				errs = append(errs, fmt.Errorf("empty value in allowlist entry for field %q", field))
 				continue
 			}
 
@@ -407,8 +411,5 @@ func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
 		}
 	}
 
-	if errs != nil {
-		return nil, errors.Join(errs...)
-	}
-	return entries, nil
+	return entries, utilerrors.NewAggregate(errs)
 }

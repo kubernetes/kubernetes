@@ -103,7 +103,8 @@ EOF
 
   # Test: Error cases - invalid policy
   output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Foo 2>&1)
-  kube::test::if_has_string "${output_message}" "invalid value for --policy: \"Foo\""
+  # Initial dash expressed as [-] to prevent grep from interpreting it as a flag
+  kube::test::if_has_string "${output_message}" "[-]-policy must be  \"AllowAll\", \"DenyAll\", or \"Allowlist\", got: Foo"
 
   # Test: Error cases - invalid flag combination
   output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=AllowAll --allowlist-entry=command=foobar 2>&1)

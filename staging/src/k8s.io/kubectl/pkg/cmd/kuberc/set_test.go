@@ -903,6 +903,21 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:           "empty plugin policy",
+			existingKuberc: "",
+			options: SetOptions{
+				Section:      sectionCredentialPlugin,
+				PluginPolicy: "",
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+			},
+			expectError: true,
+		},
+		{
 			name:           "allowlist entries with AllowAll policy",
 			existingKuberc: "",
 			options: SetOptions{
@@ -982,6 +997,27 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name:           "improperly formatted allowlist entry",
+			existingKuberc: "",
+			options: SetOptions{
+				Section:          sectionCredentialPlugin,
+				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				AllowlistEntries: []string{"command=foo,command=bar"},
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+					{Command: "foo"},
+					{Command: "bar"},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1005,14 +1041,20 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			tt.options.KubeRCFile = kubercPath
 			tt.options.IOStreams = streams
 
-			err = tt.options.Run()
-
+			validationErr := tt.options.Validate()
+			runErr := tt.options.Run()
 			if tt.expectError {
-				if err == nil {
+				if validationErr == nil && runErr == nil {
 					t.Fatalf("expected error but got none")
 				}
-				if !strings.Contains(err.Error(), tt.errorContains) {
-					t.Errorf("expected error to contain %q, got: %v", tt.errorContains, err)
+
+				firstErr := validationErr
+				if firstErr == nil {
+					firstErr = runErr
+				}
+
+				if !strings.Contains(firstErr.Error(), tt.errorContains) {
+					t.Errorf("expected firstError to contain %q, got: %v", tt.errorContains, firstErr)
 				}
 				return
 			}
