@@ -68,7 +68,6 @@ import (
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
-	"k8s.io/kubernetes/test/utils/oidc/handlers"
 	utilsnet "k8s.io/utils/net"
 )
 
@@ -178,7 +177,7 @@ jwt:
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID,
 						oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix, oidcUsernameClaim: "user"}, &signingPrivateKey.PublicKey)
 				}
-				utilsoidc.SetPublicKey(oidcServer, t, publicKey)
+				oidcServer.SetPublicKey(t, publicKey)
 
 				adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 				configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
@@ -221,7 +220,7 @@ jwt:
 			name:                    "wrong client ID",
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, _ *rsa.PrivateKey) {
-				oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(handlers.Token{}, utilsoidc.ErrBadClientID)
+				oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(utilsoidc.Token{}, utilsoidc.ErrBadClientID)
 			},
 			configureClient: configureClientWithEmptyIDToken,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -257,7 +256,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				configureOIDCServerToReturnExpiredIDToken(t, 1, oidcServer, signingPrivateKey)
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).Return(handlers.Token{
+				oidcServer.TokenHandler().EXPECT().Token().Times(1).Return(utilsoidc.Token{
 					IDToken:      "",
 					AccessToken:  defaultStubAccessToken,
 					RefreshToken: defaultStubRefreshToken,
@@ -316,7 +315,7 @@ jwt:
 
 				anotherSigningPrivateKey, _ := keyFunc(t)
 
-				utilsoidc.SetPublicKey(oidcServer, t, &anotherSigningPrivateKey.PublicKey)
+				oidcServer.SetPublicKey(t, &anotherSigningPrivateKey.PublicKey)
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
@@ -377,7 +376,7 @@ jwt:
 						&signingPrivateKey.PublicKey)
 				}
 
-				utilsoidc.SetPublicKey(oidcServer, t, &signingPrivateKey.PublicKey)
+				oidcServer.SetPublicKey(t, &signingPrivateKey.PublicKey)
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
@@ -498,13 +497,12 @@ jwt:
 
 		tt.configureOIDCServerBehaviour(t, oidcServer, signingPrivateKey)
 
-		tokenURL, err := oidcServer.TokenURL()
-		require.NoError(t, err)
+		tokenURL := oidcServer.TokenURL()
 
 		client := tt.configureClient(t, apiServer.ClientConfig, caCert, certPath, oidcServer.URL(), tokenURL)
 
 		ctx := testContext(t)
-		_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+		_, err := client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 
 		tt.assertErrFn(t, err)
 	}
@@ -551,8 +549,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 
 	oidcServer, apiServer, signingPrivateKey, caCert, certPath := configureTestInfrastructure(t, func(t *testing.T, _, _ string) string { return "" }, rsaGenerateKey)
 
-	tokenURL, err := oidcServer.TokenURL()
-	require.NoError(t, err)
+	tokenURL := oidcServer.TokenURL()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -562,7 +559,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 			configureOIDCServerToReturnExpiredRefreshTokenErrorOnTryingToUpdateIDToken(oidcServer)
 
 			ctx := testContext(t)
-			_, err = expiredClient.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+			_, err := expiredClient.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			require.Error(t, err)
 
 			tt.configureUpdatingTokenBehaviour(t, oidcServer, signingPrivateKey)
@@ -1057,8 +1054,7 @@ jwt:
 
 			tt.configureOIDCServerBehaviour(t, oidcServer, signingPrivateKey)
 
-			tokenURL, err := oidcServer.TokenURL()
-			require.NoError(t, err)
+			tokenURL := oidcServer.TokenURL()
 
 			client := tt.configureClient(t, apiServer.ClientConfig, caCert, certPath, oidcServer.URL(), tokenURL)
 
@@ -1070,7 +1066,7 @@ jwt:
 				assert.Equal(t, *tt.wantUser, res.Status.UserInfo)
 			}
 
-			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+			_, err := client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.assertErrFn(t, err)
 		})
 	}
@@ -1522,8 +1518,7 @@ jwt:
 			}
 			oidcServer, apiServer, caCert, certPath := configureTestInfrastructureFunc(t, tt.authConfigFn)
 
-			tokenURL, err := oidcServer.TokenURL()
-			require.NoError(t, err)
+			tokenURL := oidcServer.TokenURL()
 
 			client := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCert, certPath, oidcServer.URL(), tokenURL)
 
@@ -1533,7 +1528,7 @@ jwt:
 				assert.Equal(t, *tt.wantUser, res.Status.UserInfo)
 			}
 
-			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+			_, err := client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.assertErrFn(t, err)
 
 			// Create a temporary file
@@ -1703,7 +1698,7 @@ jwt:
     message: "the hd claim must be set to example.com"
 `, tt.issuerURL, discoveryURL, indentCertificateAuthority(string(caCertContent)))
 
-			utilsoidc.SetPublicKey(oidcServer, t, publicKey)
+			oidcServer.SetPublicKey(t, publicKey)
 
 			apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
 
@@ -1722,8 +1717,7 @@ jwt:
 				defaultStubRefreshToken,
 			)).Times(1)
 
-			tokenURL, err := oidcServer.TokenURL()
-			require.NoError(t, err)
+			tokenURL := oidcServer.TokenURL()
 
 			client := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent, caFilePath, oidcServer.URL(), tokenURL)
 			ctx := testContext(t)
@@ -1785,8 +1779,8 @@ jwt:
       expression: "claims.uid"
 `, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
 
-	utilsoidc.SetPublicKey(oidcServer1, t, publicKey1)
-	utilsoidc.SetPublicKey(oidcServer2, t, publicKey2)
+	oidcServer1.SetPublicKey(t, publicKey1)
+	oidcServer2.SetPublicKey(t, publicKey2)
 
 	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey1)
 
@@ -1821,11 +1815,9 @@ jwt:
 		defaultStubRefreshToken,
 	)).Times(1)
 
-	tokenURL1, err := oidcServer1.TokenURL()
-	require.NoError(t, err)
+	tokenURL1 := oidcServer1.TokenURL()
 
-	tokenURL2, err := oidcServer2.TokenURL()
-	require.NoError(t, err)
+	tokenURL2 := oidcServer2.TokenURL()
 
 	client1 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent1, caFilePath1, oidcServer1.URL(), tokenURL1)
 	client2 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent2, caFilePath2, oidcServer2.URL(), tokenURL2)
@@ -1916,8 +1908,8 @@ jwt:
       expression: "'k8s-' + claims.sub"
 `, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
 
-	utilsoidc.SetPublicKey(oidcServer1, t, publicKey1)
-	utilsoidc.SetPublicKey(oidcServer2, t, publicKey2)
+	oidcServer1.SetPublicKey(t, publicKey1)
+	oidcServer2.SetPublicKey(t, publicKey2)
 
 	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{
 		authenticationConfigYAML: authenticationConfig,
@@ -1952,13 +1944,11 @@ jwt:
 
 	ctx := testContext(t)
 
-	tokenURL1, err := oidcServer1.TokenURL()
-	require.NoError(t, err)
-	tokenURL2, err := oidcServer2.TokenURL()
-	require.NoError(t, err)
+	tokenURL1 := oidcServer1.TokenURL()
+	tokenURL2 := oidcServer2.TokenURL()
 
 	client1 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent1, caFilePath1, oidcServer1.URL(), tokenURL1)
-	_, err = client1.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	_, err := client1.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	client2 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent2, caFilePath2, oidcServer2.URL(), tokenURL2)
@@ -2143,7 +2133,7 @@ func configureTestInfrastructureAndEgressProxy[K utilsoidc.JosePrivateKey, L uti
 		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
 
-	utilsoidc.SetPublicKey(oidcServer, t, publicKey)
+	oidcServer.SetPublicKey(t, publicKey)
 
 	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 	configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
@@ -2312,7 +2302,7 @@ func fetchOIDCCredentials(t *testing.T, oidcTokenURL string, caCertContent []byt
 		},
 	}}
 
-	token := new(handlers.Token)
+	token := new(utilsoidc.Token)
 
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -2326,8 +2316,7 @@ func fetchOIDCCredentials(t *testing.T, oidcTokenURL string, caCertContent []byt
 func fetchExpiredToken(t *testing.T, oidcServer *utilsoidc.TestServer, caCertContent []byte, signingPrivateKey *rsa.PrivateKey) (expiredToken, stubRefreshToken string) {
 	t.Helper()
 
-	tokenURL, err := oidcServer.TokenURL()
-	require.NoError(t, err)
+	tokenURL := oidcServer.TokenURL()
 
 	configureOIDCServerToReturnExpiredIDToken(t, 1, oidcServer, signingPrivateKey)
 	expiredToken, stubRefreshToken = fetchOIDCCredentials(t, tokenURL, caCertContent)
@@ -2338,7 +2327,7 @@ func fetchExpiredToken(t *testing.T, oidcServer *utilsoidc.TestServer, caCertCon
 func configureOIDCServerToReturnExpiredIDToken(t *testing.T, returningExpiredTokenTimes int, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 	t.Helper()
 
-	oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(func() (handlers.Token, error) {
+	oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(func() (utilsoidc.Token, error) {
 		token, err := utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 			t,
 			signingPrivateKey,
@@ -2356,7 +2345,7 @@ func configureOIDCServerToReturnExpiredIDToken(t *testing.T, returningExpiredTok
 }
 
 func configureOIDCServerToReturnExpiredRefreshTokenErrorOnTryingToUpdateIDToken(oidcServer *utilsoidc.TestServer) {
-	oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(handlers.Token{}, utilsoidc.ErrRefreshTokenExpired)
+	oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(utilsoidc.Token{}, utilsoidc.ErrRefreshTokenExpired)
 }
 
 func generateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath string) {

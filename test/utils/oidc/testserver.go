@@ -24,10 +24,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"slices"
 	"sync"
@@ -36,7 +34,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
 const (
@@ -51,9 +48,21 @@ var (
 	ErrBadClientID         = errors.New("client ID is bad")
 )
 
+type Token struct {
+	IDToken      string `json:"id_token"`
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
+type TokenHandler interface {
+	Token() (Token, error)
+}
+
 type TestServer struct {
 	httpServer   *httptest.Server
-	tokenHandler *handlers.MockTokenHandler
+	tokenHandler *MockTokenHandler
 
 	// keysLock guards publicKeys, which tests may set after the
 	// kube-apiserver has started fetching /jwks.
@@ -63,9 +72,18 @@ type TestServer struct {
 
 // SetPublicKey computes a thumbprint-based key ID and stores the key
 // so the /jwks endpoint will serve it.
-func SetPublicKey[K JosePublicKey](ts *TestServer, t testutils.TB, publicKey K) {
+func (ts *TestServer) SetPublicKey(t testutils.TB, publicKey crypto.PublicKey) {
 	t.Helper()
-	key := jose.JSONWebKey{Key: publicKey, Use: "sig", Algorithm: string(GetSignatureAlgorithm(publicKey))}
+	var alg string
+	switch publicKey.(type) {
+	case *rsa.PublicKey:
+		alg = string(jose.RS256)
+	case *ecdsa.PublicKey:
+		alg = string(jose.ES256)
+	default:
+		t.Fatalf("unsupported public key type: %T", publicKey)
+	}
+	key := jose.JSONWebKey{Key: publicKey, Use: "sig", Algorithm: alg}
 	thumbprint, err := key.Thumbprint(crypto.SHA256)
 	require.NoError(t, err)
 	key.KeyID = hex.EncodeToString(thumbprint)
@@ -76,7 +94,7 @@ func SetPublicKey[K JosePublicKey](ts *TestServer, t testutils.TB, publicKey K) 
 }
 
 // TokenHandler is getter of JWT token handler
-func (ts *TestServer) TokenHandler() *handlers.MockTokenHandler {
+func (ts *TestServer) TokenHandler() *MockTokenHandler {
 	return ts.tokenHandler
 }
 
@@ -86,13 +104,8 @@ func (ts *TestServer) URL() string {
 }
 
 // TokenURL returns the public URL of JWT token endpoint
-func (ts *TestServer) TokenURL() (string, error) {
-	url, err := url.JoinPath(ts.httpServer.URL, tokenWebPath)
-	if err != nil {
-		return "", fmt.Errorf("error joining paths: %v", err)
-	}
-
-	return url, nil
+func (ts *TestServer) TokenURL() string {
+	return ts.httpServer.URL + tokenWebPath
 }
 
 // BuildAndRunTestServer configures OIDC TLS server and its routing
@@ -120,7 +133,7 @@ func BuildAndRunTestServer(t testutils.TB, caPath, caKeyPath, issuerOverride str
 
 	oidcServer := &TestServer{
 		httpServer:   httpServer,
-		tokenHandler: handlers.NewMockTokenHandler(t),
+		tokenHandler: NewMockTokenHandler(t),
 	}
 
 	issuer := httpServer.URL
@@ -178,18 +191,14 @@ func BuildAndRunTestServer(t testutils.TB, caPath, caKeyPath, issuerOverride str
 }
 
 func discoveryDocHandler(t testutils.TB, writer http.ResponseWriter, httpServerURL, issuer string) {
-	authURL, err := url.JoinPath(httpServerURL + authWebPath)
-	require.NoError(t, err)
-	tokenURL, err := url.JoinPath(httpServerURL + tokenWebPath)
-	require.NoError(t, err)
-	jwksURL, err := url.JoinPath(httpServerURL + jwksWebPath)
-	require.NoError(t, err)
-	userInfoURL, err := url.JoinPath(httpServerURL + authWebPath)
-	require.NoError(t, err)
+	authURL := httpServerURL + authWebPath
+	tokenURL := httpServerURL + tokenWebPath
+	jwksURL := httpServerURL + jwksWebPath
+	userInfoURL := httpServerURL + authWebPath
 
 	writer.Header().Add("Content-Type", "application/json")
 
-	err = json.NewEncoder(writer).Encode(struct {
+	err := json.NewEncoder(writer).Encode(struct {
 		Issuer      string `json:"issuer"`
 		AuthURL     string `json:"authorization_endpoint"`
 		TokenURL    string `json:"token_endpoint"`
@@ -234,11 +243,11 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 	t testutils.TB,
 	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
-) func() (handlers.Token, error) {
+) func() (Token, error) {
 	t.Helper()
 
-	return func() (handlers.Token, error) {
-		return handlers.Token{
+	return func() (Token, error) {
+		return Token{
 			IDToken:      SignToken(t, privateKey, claims),
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
