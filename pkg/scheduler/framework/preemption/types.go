@@ -20,10 +20,12 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -56,6 +58,7 @@ type Preemptor interface {
 type preemptor struct {
 	priority               int32
 	pods                   []*v1.Pod
+	podGroup               *schedulingapi.PodGroup
 	preemptionPolicy       *v1.PreemptionPolicy
 	isGangSchedulingPolicy bool
 	states                 []fwk.CycleState
@@ -227,7 +230,7 @@ func (pu *preemptionUnit) EarliestStartTime() *metav1.Time {
 }
 
 func (pu *preemptionUnit) IsPodGroup() bool {
-	return len(pu.pods) > 0 && (len(pu.pods) > 1 || pu.pods[0].GetPod().Spec.WorkloadRef != nil)
+	return len(pu.pods) > 0 && (len(pu.pods) > 1 || pu.pods[0].GetPod().Spec.SchedulingGroup != nil)
 }
 
 // Candidate represents a nominated node on which the preemptor can be scheduled,

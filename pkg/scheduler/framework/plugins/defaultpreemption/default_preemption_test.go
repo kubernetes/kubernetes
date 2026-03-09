@@ -35,6 +35,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -167,6 +168,7 @@ const (
 type podGroupPreemptor struct {
 	priority               int32
 	pods                   []*v1.Pod
+	podGroup               *schedulingapi.PodGroup
 	isGangSchedulingPolicy bool
 	preemptionPolicy       *v1.PreemptionPolicy
 	states                 []fwk.CycleState
@@ -191,10 +193,7 @@ func (p *podGroupPreemptor) IsEligibleToPreemptOthers() bool {
 }
 
 func (p *podGroupPreemptor) GetNamespace() string {
-	if len(p.pods) > 0 {
-		return p.pods[0].Namespace
-	}
-	return ""
+	return p.podGroup.GetNamespace()
 }
 
 func (p *podGroupPreemptor) CycleStates() []fwk.CycleState {
@@ -216,33 +215,7 @@ func (p *podGroupPreemptor) Snapshot() preemption.Preemptor {
 }
 
 func (p *podGroupPreemptor) GetName() string {
-	if len(p.pods) == 0 {
-		return "unknown"
-	}
-
-	firstPod := p.GetRepresentativePod()
-
-	if p.isGangSchedulingPolicy {
-		ref := firstPod.Spec.WorkloadRef
-
-		// Start with the Workload Name (e.g., "my-job")
-		name := ref.Name
-
-		// Append PodGroup if distinct (e.g., "my-job/group-1")
-		if ref.PodGroup != "" {
-			name = name + "/" + ref.PodGroup
-		}
-
-		// Append ReplicaKey if present (e.g., "my-job/group-1/idx-0")
-		// This is crucial for distinguishing between retries of the same job.
-		if ref.PodGroupReplicaKey != "" {
-			name = name + "/" + ref.PodGroupReplicaKey
-		}
-
-		return name
-	}
-
-	return firstPod.Name
+	return p.podGroup.GetName()
 }
 
 func (p *podGroupPreemptor) GetRepresentativePod() *v1.Pod {
@@ -2558,7 +2531,7 @@ func (m *mockVictim) AffectedNodes() map[string]fwk.NodeInfo {
 }
 
 func (m *mockVictim) IsPodGroup() bool {
-	return len(m.pods) > 0 && (len(m.pods) > 1 || m.pods[0].GetPod().Spec.WorkloadRef != nil)
+	return len(m.pods) > 0 && (len(m.pods) > 1 || m.pods[0].GetPod().Spec.SchedulingGroup != nil)
 }
 
 func (m *mockVictim) EarliestStartTime() *metav1.Time {
@@ -2566,8 +2539,8 @@ func (m *mockVictim) EarliestStartTime() *metav1.Time {
 }
 
 func newSingleDomainForAllNodes(preemptor *podGroupPreemptor, potentialNodes []fwk.NodeInfo, allPossibleVictims []preemption.Victim) preemption.Domain {
-	podGroupName := preemptor.GetRepresentativePod().Spec.WorkloadRef.PodGroup
-	domainName := fmt.Sprintf("Cluster-Scope-%s", podGroupName)
+	podGroupName := preemptor.GetRepresentativePod().Spec.SchedulingGroup.PodGroupName
+	domainName := fmt.Sprintf("Cluster-Scope-%s", *podGroupName)
 
 	return &mockDomain{
 		nodes:              potentialNodes,
@@ -2788,8 +2761,8 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			nodeNames:                     []string{"node1"},
 			enableWorkloadAwarePreemption: true,
 			initPods: []*v1.Pod{
-				st.MakePod().Name("g1-1").UID("g1").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
-				st.MakePod().Name("g1-2").UID("g2").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-1").UID("g1").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-2").UID("g2").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
 			},
 			preemptionUnitTemplates: []preemptionUnitTemplate{
 				{pods: sets.New("g1-1", "g1-2"), priority: lowPriority, affectedNodes: sets.New("node1")},
@@ -2808,8 +2781,8 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			enableWorkloadAwarePreemption: true,
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("g1-1").UID("g1").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
-				st.MakePod().Name("g1-2").UID("g2").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-1").UID("g1").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-2").UID("g2").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
 			},
 			preemptionUnitTemplates: []preemptionUnitTemplate{
 				{pods: sets.New("p1"), priority: lowPriority, affectedNodes: sets.New("node1")},
@@ -2831,8 +2804,8 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(lowPriority).Obj(),
-				st.MakePod().Name("g1-1").UID("g1").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
-				st.MakePod().Name("g1-2").UID("g2").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-1").UID("g1").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("g1-2").UID("g2").Node("node1").PodGroupName("wg1").Priority(lowPriority).Obj(),
 			},
 			preemptionUnitTemplates: []preemptionUnitTemplate{
 				{pods: sets.New("p1"), priority: midPriority, affectedNodes: sets.New("node1")},
@@ -2840,7 +2813,7 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 				{pods: sets.New("g1-1", "g1-2"), priority: lowPriority, affectedNodes: sets.New("node1")},
 			},
 			preemptor: newPodGroupPreemptor(highPriority, []*v1.Pod{
-				st.MakePod().Name("p").UID("p1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(highPriority).Obj(),
+				st.MakePod().Name("p").UID("p1").PodGroupName("wg1").Priority(highPriority).Obj(),
 			}, nil),
 			blockingRules: []blockingRule{
 				{nodeName: "node1", blockingVictims: []string{"g1-1", "g1-2"}, capacity: 1},
