@@ -325,7 +325,7 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +k8s:optional
-	// +k8s:immutable
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 
 	// podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
