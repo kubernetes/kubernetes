@@ -177,3 +177,75 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertToRuntimeSecurityContextCgroupOptions(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+
+	testCases := []struct {
+		desc                    string
+		sc                      *v1.SecurityContext
+		expectedCgroupMountMode string
+	}{
+		{
+			desc:                    "nil SecurityContext",
+			sc:                      nil,
+			expectedCgroupMountMode: "",
+		},
+		{
+			desc:                    "no CgroupOptions",
+			sc:                      &v1.SecurityContext{},
+			expectedCgroupMountMode: "",
+		},
+		{
+			desc: "CgroupOptions with nil MountMode",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{},
+			},
+			expectedCgroupMountMode: "",
+		},
+		{
+			desc: "CgroupOptions Writable",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: "Writable",
+		},
+		{
+			desc: "CgroupOptions ReadOnly",
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readOnly},
+			},
+			expectedCgroupMountMode: "ReadOnly",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							SecurityContext: tc.sc,
+						},
+					},
+				},
+			}
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			assert.NoError(t, err)
+
+			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedCgroupMountMode, result.CgroupMountMode)
+		})
+	}
+}

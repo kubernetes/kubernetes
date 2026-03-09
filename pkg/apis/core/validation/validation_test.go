@@ -23916,6 +23916,72 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 }
 
+func TestValidateSecurityContextCgroupOptions(t *testing.T) {
+	readOnly := core.CgroupMountModeReadOnly
+	writable := core.CgroupMountModeWritable
+	invalid := core.CgroupMountMode("Invalid")
+
+	successCases := map[string]*core.SecurityContext{
+		"nil cgroupOptions": {
+			CgroupOptions: nil,
+		},
+		"cgroupOptions with nil mountMode": {
+			CgroupOptions: &core.CgroupOptions{},
+		},
+		"cgroupOptions ReadOnly": {
+			CgroupOptions: &core.CgroupOptions{MountMode: &readOnly},
+		},
+		"cgroupOptions Writable": {
+			CgroupOptions: &core.CgroupOptions{MountMode: &writable},
+		},
+	}
+	for name, sc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			if errs := ValidateSecurityContext(sc, field.NewPath("field"), false); len(errs) != 0 {
+				t.Errorf("expected success, got %v", errs)
+			}
+		})
+	}
+
+	errorCases := map[string]struct {
+		sc          *core.SecurityContext
+		errorDetail string
+	}{
+		"cgroupOptions with windowsOptions": {
+			sc: &core.SecurityContext{
+				CgroupOptions:  &core.CgroupOptions{MountMode: &writable},
+				WindowsOptions: &core.WindowsSecurityContextOptions{},
+			},
+			errorDetail: "cannot be set when windowsOptions is specified",
+		},
+		"cgroupOptions with invalid mountMode": {
+			sc: &core.SecurityContext{
+				CgroupOptions: &core.CgroupOptions{MountMode: &invalid},
+			},
+			errorDetail: "Unsupported value",
+		},
+	}
+	for name, tc := range errorCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateSecurityContext(tc.sc, field.NewPath("field"), false)
+			if len(errs) == 0 {
+				t.Errorf("expected error containing %q, got no errors", tc.errorDetail)
+				return
+			}
+			found := false
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tc.errorDetail) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error containing %q, got %v", tc.errorDetail, errs)
+			}
+		})
+	}
+}
+
 func fakeValidSecurityContext(priv bool) *core.SecurityContext {
 	return &core.SecurityContext{
 		Privileged: &priv,
