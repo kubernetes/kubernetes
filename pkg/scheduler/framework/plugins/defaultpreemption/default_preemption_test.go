@@ -2401,7 +2401,7 @@ func TestPreempt(t *testing.T) {
 							Pods: res.Victims,
 						}
 						// Use the framework's PreemptionExecutor injected earlier
-						if actStatus := schedFramework.PreemptionExecutor().ActuatePreemption(ctx, res.NominatingInfo.NominatedNodeName, &v, test.preemptor, pl.Evaluator.PluginName); !actStatus.IsSuccess() {
+						if actStatus := schedFramework.PreemptionExecutor().ActuatePodPreemption(ctx, res.NominatingInfo.NominatedNodeName, &v, test.preemptor, pl.Evaluator.PluginName); !actStatus.IsSuccess() {
 							t.Fatalf("unexpected error in actuating preemption: %v", actStatus.AsError())
 						}
 					}

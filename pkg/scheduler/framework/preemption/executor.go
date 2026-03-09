@@ -23,7 +23,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -45,6 +47,26 @@ type pendingVictim struct {
 	name      string
 }
 
+// ExecutorPreemptor is an interface that represents a preemptor.
+// It's mainly used to abstract away fields needed for logging
+// purposes during preemption calls done by Executor.
+type ExecutorPreemptor interface {
+	klog.KMetadata
+	// UID returns the UID of the object that is triggering preemption.
+	UID() types.UID
+	// SchedulerName returns the scheduler name assigned to the object that is triggering preemption.
+	SchedulerName() string
+	// Obj returns the object that is triggering preemption.
+	Obj() runtime.Object
+	// ToActivate returns a list of pods that should be "activated"
+	// if the async preemption failed.
+	ToActivate() map[string]*v1.Pod
+	// Priority returns the priority of the preemptor.
+	Priority() int32
+	// Type returns the type of the preemptor.
+	Type() string
+}
+
 // Executor is responsible for actuating the preemption process based on the provided candidate.
 // It supports both synchronous as well as asynchronous preemption.
 type Executor struct {
@@ -53,16 +75,17 @@ type Executor struct {
 
 	fts feature.Features
 
-	// preempting is a set that records the pods that are currently triggering preemption asynchronously,
-	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
+	// preempting is a set that records the pods/podgroups that are currently triggering preemption asynchronously,
+	// which is used to prevent the pods and pods from podgroups from entering the scheduling cycle meanwhile.
 	preempting sets.Set[types.UID]
-	// lastVictimsPendingPreemption is a map that records the victim pods that are currently being preempted for a given preemptor pod,
+	// lastVictimsPendingPreemption is a map that records the victim pods that are currently being preempted for a given preemptor pod/podgroup,
 	// with a condition that the preemptor is waiting for one last victim to be preempted. This is used together with `preempting`
-	// to prevent the pods from entering the scheduling cycle while waiting for preemption to complete.
+	// to prevent the pods/podgroups from entering the scheduling cycle while waiting for preemption to complete.
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
+
 	// PreemptPod is a function that actually makes API calls to preempt a specific Pod.
 	// This is exposed to be replaced during tests.
-	PreemptPod func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error
+	PreemptPod func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error
 }
 
 // NewExecutor creates a new preemption executor.
@@ -74,22 +97,22 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 		fts:                          fts,
 	}
 
-	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
+	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
 		logger := klog.FromContext(ctx)
 
 		skipAPICall := false
-		eventMessage := fmt.Sprintf("Preempted by pod %v on node %v", preemptor.UID, c.Name())
+		eventMessage := fmt.Sprintf("Preempted by %s %v on node %v", preemptor.Type(), preemptor.UID(), c.Name())
 		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
 		// Otherwise we should delete the victim.
 		if waitingPod := e.fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			if waitingPod.Preempt(pluginName, "preempted") {
-				logger.V(2).Info("Preemptor pod preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
+				logger.V(2).Info(fmt.Sprintf("Preemptor %s preempted a waiting pod", preemptor.Type()), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				skipAPICall = true
 			}
 		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
 			// If the victim is in the preBind cancel the binding process.
 			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
-				logger.V(2).Info("Preemptor pod rejected a pod in preBind", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+				logger.V(2).Info(fmt.Sprintf("Preemptor %s rejected a pod in preBind", preemptor.Type()), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 				skipAPICall = true
 			} else {
 				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
@@ -101,7 +124,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),
 				Status:             v1.ConditionTrue,
 				Reason:             v1.PodReasonPreemptionByScheduler,
-				Message:            fmt.Sprintf("%s: preempting to accommodate a higher priority pod", preemptor.Spec.SchedulerName),
+				Message:            fmt.Sprintf("%s: preempting to accommodate a higher priority %s", preemptor.SchedulerName(), preemptor.Type()),
 			}
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
@@ -128,7 +151,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 			eventMessage += " (in kube-scheduler memory)."
 		}
 
-		fh.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
+		fh.EventRecorder().Eventf(victim, preemptor.Obj(), v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
 		return nil
 	}
@@ -136,21 +159,33 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	return e
 }
 
-// ActuatePreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
+// ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
 // victims to be evicted.
-func (e *Executor) ActuatePreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
+func (e *Executor) ActuatePodPreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
 	candidate := candidate{
 		victims: victims,
 		name:    targetNode,
 	}
 
 	if e.fts.EnableAsyncPreemption {
-		e.prepareCandidateAsync(&candidate, preemptorPod, pluginName)
+		e.prepareCandidateAsync(&candidate, &podExecutorPreemptor{p: preemptorPod}, pluginName)
 	} else {
-		if status := e.prepareCandidate(ctx, &candidate, preemptorPod, pluginName); !status.IsSuccess() {
-			return status
-		}
+		return e.prepareCandidate(ctx, &candidate, preemptorPod, pluginName)
 	}
+
+	return fwk.NewStatus(fwk.Success)
+}
+
+// ActuatePodGroupPreemption actuates the preemption given preemptorPodGroup and a list of victims to be evicted.
+// Preemption happens asynchronously and the preemption can be tracked via IsPodGroupRunningPreemption method.
+func (e *Executor) ActuatePodGroupPreemption(ctx context.Context, victims *extenderv1.Victims, preemptorPods []*v1.Pod, preemptor *schedulingapi.PodGroup, pluginName string) *fwk.Status {
+	candidate := candidate{
+		victims: victims,
+		name:    "cluster",
+	}
+
+	podGroupPreemptor := &podGroupExecutorPreemptor{p: preemptor, pods: preemptorPods}
+	e.prepareCandidateAsync(&candidate, podGroupPreemptor, pluginName)
 
 	return fwk.NewStatus(fwk.Success)
 }
@@ -162,7 +197,7 @@ func (e *Executor) ActuatePreemption(ctx context.Context, targetNode string, vic
 // The Pod won't be retried until the goroutine triggered here completes.
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
-func (e *Executor) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
+func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreemptor, pluginName string) {
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -172,7 +207,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName st
 	for _, victim := range c.Victims().Pods {
 		if victim.DeletionTimestamp != nil {
 			// Graceful pod deletion has already started. Sending another API call is unnecessary.
-			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victim))
+			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", preemptor.Obj(), "node", c.Name(), "victim", klog.KObj(victim))
 			continue
 		}
 		victimPods = append(victimPods, victim)
@@ -187,13 +222,13 @@ func (e *Executor) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName st
 	errCh := parallelize.NewResultChannel[error]()
 	preemptPod := func(index int) {
 		victim := victimPods[index]
-		if err := e.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
+		if err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 		}
 	}
 
 	e.mu.Lock()
-	e.preempting.Insert(pod.UID)
+	e.preempting.Insert(preemptor.UID())
 	e.mu.Unlock()
 
 	go func() {
@@ -206,17 +241,17 @@ func (e *Executor) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName st
 			if result == metrics.GoroutineResultError {
 				// When API call isn't successful, the Pod may get stuck in the unschedulable pod pool in the worst case.
 				// So, we should move the Pod to the activeQ.
-				e.fh.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
+				e.fh.Activate(logger, preemptor.ToActivate())
 			}
 		}()
 		defer cancel()
-		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
+		logger.V(2).Info("Start the preemption asynchronously", "preemptor", preemptor.Obj(), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
 
 		// Lower priority pods nominated to run on this node, may no longer fit on
 		// this node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(e.fh, pod, c.Name())
+		nominatedPods := getLowerPriorityNominatedPods(e.fh, preemptor.Priority(), c.Name())
 		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
@@ -249,20 +284,20 @@ func (e *Executor) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName st
 		if preemptLastVictim {
 			lastVictim := victimPods[len(victimPods)-1]
 			e.mu.Lock()
-			e.lastVictimsPendingPreemption[pod.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			if err := e.PreemptPod(ctx, c, pod, lastVictim, pluginName); err != nil {
+			if err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
 			}
 		}
 		e.mu.Lock()
-		e.preempting.Delete(pod.UID)
-		delete(e.lastVictimsPendingPreemption, pod.UID)
+		e.preempting.Delete(preemptor.UID())
+		delete(e.lastVictimsPendingPreemption, preemptor.UID())
 		e.mu.Unlock()
 
-		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name(), "result", result)
+		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(preemptor), "node", c.Name(), "result", result)
 	}()
 }
 
@@ -287,7 +322,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, pod *v1.Po
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victim))
 			return
 		}
-		if err := e.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
+		if err := e.PreemptPod(ctx, c, &podExecutorPreemptor{pod}, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 		}
 	}, pluginName)
@@ -299,7 +334,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, pod *v1.Po
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(fh, pod, c.Name())
+	nominatedPods := getLowerPriorityNominatedPods(fh, corev1helpers.PodPriority(pod), c.Name())
 	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
@@ -310,16 +345,25 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, pod *v1.Po
 
 // IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.
 func (e *Executor) IsPodRunningPreemption(podUID types.UID) bool {
+	return e.isRunningPreemption(podUID)
+}
+
+// IsPodGroupRunningPreemption returns true if the pod group is currently triggering preemption asynchronously.
+func (e *Executor) IsPodGroupRunningPreemption(podGroupUID types.UID) bool {
+	return e.isRunningPreemption(podGroupUID)
+}
+
+func (e *Executor) isRunningPreemption(uid types.UID) bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	if !e.preempting.Has(podUID) {
+	if !e.preempting.Has(uid) {
 		return false
 	}
 
-	victim, ok := e.lastVictimsPendingPreemption[podUID]
+	victim, ok := e.lastVictimsPendingPreemption[uid]
 	if !ok {
-		// Since pod is in `preempting` but last victim is not registered yet, the async preemption is pending.
+		// Since pod(group) is in `preempting` but last victim is not registered yet, the async preemption is pending.
 		return true
 	}
 	podLister := e.fh.SharedInformerFactory().Core().V1().Pods().Lister()
@@ -369,7 +413,7 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
+func getLowerPriorityNominatedPods(pn fwk.PodNominator, priority int32, nodeName string) []*v1.Pod {
 	podInfos := pn.NominatedPodsForNode(nodeName)
 
 	if len(podInfos) == 0 {
@@ -377,11 +421,103 @@ func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName st
 	}
 
 	var lowerPriorityPods []*v1.Pod
-	podPriority := corev1helpers.PodPriority(pod)
 	for _, pi := range podInfos {
-		if corev1helpers.PodPriority(pi.GetPod()) < podPriority {
+		if corev1helpers.PodPriority(pi.GetPod()) < priority {
 			lowerPriorityPods = append(lowerPriorityPods, pi.GetPod())
 		}
 	}
 	return lowerPriorityPods
+}
+
+type podExecutorPreemptor struct {
+	p *v1.Pod
+}
+
+func (p *podExecutorPreemptor) UID() types.UID {
+	return p.p.UID
+}
+
+func (p *podExecutorPreemptor) SchedulerName() string {
+	return p.p.Spec.SchedulerName
+}
+
+func (p *podExecutorPreemptor) GetName() string {
+	return p.p.Name
+}
+
+func (p *podExecutorPreemptor) GetNamespace() string {
+	return p.p.Namespace
+}
+
+func (p *podExecutorPreemptor) Obj() runtime.Object {
+	return p.p
+}
+
+func (p *podExecutorPreemptor) ToActivate() map[string]*v1.Pod {
+	return map[string]*v1.Pod{p.p.Name: p.p}
+}
+
+func (p *podExecutorPreemptor) Priority() int32 {
+	return corev1helpers.PodPriority(p.p)
+}
+
+func (p *podExecutorPreemptor) Type() string {
+	return "pod"
+}
+
+func NewPodExecutorPreemptor(p *v1.Pod) *podExecutorPreemptor {
+	return &podExecutorPreemptor{p: p}
+}
+
+type podGroupExecutorPreemptor struct {
+	p    *schedulingapi.PodGroup
+	pods []*v1.Pod
+}
+
+func (p *podGroupExecutorPreemptor) UID() types.UID {
+	return p.p.UID
+}
+
+func (p *podGroupExecutorPreemptor) SchedulerName() string {
+	// All pods in a pod group should use the same scheduler name.
+	if len(p.pods) > 0 {
+		return p.pods[0].Spec.SchedulerName
+	}
+	return ""
+}
+
+func (p *podGroupExecutorPreemptor) GetName() string {
+	return p.p.Name
+}
+
+func (p *podGroupExecutorPreemptor) GetNamespace() string {
+	return p.p.Namespace
+}
+
+func (p *podGroupExecutorPreemptor) Obj() runtime.Object {
+	return p.p
+}
+
+func (p *podGroupExecutorPreemptor) Priority() int32 {
+	// TODO(Argh4k): Replace it with v1alpha2 pod group priority
+	// once it's available.
+	maxPrio := int32(0)
+	for _, pod := range p.pods {
+		if prio := corev1helpers.PodPriority(pod); prio > maxPrio {
+			maxPrio = prio
+		}
+	}
+	return maxPrio
+}
+
+func (p *podGroupExecutorPreemptor) ToActivate() map[string]*v1.Pod {
+	m := map[string]*v1.Pod{}
+	for _, pod := range p.pods {
+		m[pod.Name] = pod
+	}
+	return m
+}
+
+func (p *podGroupExecutorPreemptor) Type() string {
+	return "podgroup"
 }

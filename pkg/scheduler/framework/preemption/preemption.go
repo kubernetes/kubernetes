@@ -162,7 +162,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 	// 5) Actuate the preemption if executor is set.
 	if ev.executor != nil {
-		if status := ev.executor.ActuatePreemption(ctx, bestCandidate.Name(), bestCandidate.Victims(), pod, ev.PluginName); !status.IsSuccess() {
+		if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate.Name(), bestCandidate.Victims(), pod, ev.PluginName); !status.IsSuccess() {
 			return nil, status
 		}
 	}

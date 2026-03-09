@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"         //nolint:depguard
 	"github.com/google/go-cmp/cmp/cmpopts" //nolint:depguard
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -938,14 +939,21 @@ type PluginsRunner interface {
 	RunPreFilterExtensionRemovePod(ctx context.Context, state CycleState, podToSchedule *v1.Pod, podInfoToRemove PodInfo, nodeInfo NodeInfo) *Status
 }
 
-// PreemptionExecutor knows how to perform preemption of victims for selected Pods. It also keeps track
+// PreemptionExecutor knows how to perform preemption of victims for selected Pods/PodGroups. It also keeps track
 // of all in progress preemption operations.
 type PreemptionExecutor interface {
-	// ActuatePreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
+	// ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
 	// victims to be evicted.
 	// Preemption can happen asynchronously in which case the preemption can be tracked via IsPodRunningPreemption method.
-	ActuatePreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, source string) *Status
+	ActuatePodPreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, source string) *Status
+
+	// ActuatePodGroupPreemption actuates the preemption given preemptorPodGroup and a list of victims to be evicted.
+	// Preemption happens asynchronously and the preemption can be tracked via IsPodGroupRunningPreemption method.
+	ActuatePodGroupPreemption(ctx context.Context, victims *extenderv1.Victims, preemptorPods []*v1.Pod, preemptor *schedulingapi.PodGroup, pluginName string) *Status
 
 	// IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.
 	IsPodRunningPreemption(podUID types.UID) bool
+
+	// IsPodGroupRunningPreemption returns true if the pod group is currently triggering preemption asynchronously.
+	IsPodGroupRunningPreemption(podGroupUID types.UID) bool
 }
