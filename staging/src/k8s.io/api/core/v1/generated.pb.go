@@ -64,6 +64,8 @@ func (m *CephFSPersistentVolumeSource) Reset() { *m = CephFSPersistentVolumeSour
 
 func (m *CephFSVolumeSource) Reset() { *m = CephFSVolumeSource{} }
 
+func (m *CgroupOptions) Reset() { *m = CgroupOptions{} }
+
 func (m *CinderPersistentVolumeSource) Reset() { *m = CinderPersistentVolumeSource{} }
 
 func (m *CinderVolumeSource) Reset() { *m = CinderVolumeSource{} }
@@ -1302,6 +1304,36 @@ func (m *CephFSVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			i--
 			dAtA[i] = 0xa
 		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CgroupOptions) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CgroupOptions) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CgroupOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.MountMode != nil {
+		i -= len(*m.MountMode)
+		copy(dAtA[i:], *m.MountMode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.MountMode)))
+		i--
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -6604,6 +6636,16 @@ func (m *NodeFeatures) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.SupportsCgroupOptions != nil {
+		i--
+		if *m.SupportsCgroupOptions {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x10
+	}
 	if m.SupplementalGroupsPolicy != nil {
 		i--
 		if *m.SupplementalGroupsPolicy {
@@ -12776,6 +12818,18 @@ func (m *SecurityContext) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.CgroupOptions != nil {
+		{
+			size, err := m.CgroupOptions.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x6a
+	}
 	if m.AppArmorProfile != nil {
 		{
 			size, err := m.AppArmorProfile.MarshalToSizedBuffer(dAtA[:i])
@@ -15399,6 +15453,19 @@ func (m *CephFSVolumeSource) Size() (n int) {
 	return n
 }
 
+func (m *CgroupOptions) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.MountMode != nil {
+		l = len(*m.MountMode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
 func (m *CinderPersistentVolumeSource) Size() (n int) {
 	if m == nil {
 		return 0
@@ -17352,6 +17419,9 @@ func (m *NodeFeatures) Size() (n int) {
 	var l int
 	_ = l
 	if m.SupplementalGroupsPolicy != nil {
+		n += 2
+	}
+	if m.SupportsCgroupOptions != nil {
 		n += 2
 	}
 	return n
@@ -19667,6 +19737,10 @@ func (m *SecurityContext) Size() (n int) {
 		l = m.AppArmorProfile.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.CgroupOptions != nil {
+		l = m.CgroupOptions.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -20689,6 +20763,16 @@ func (this *CephFSVolumeSource) String() string {
 		`SecretFile:` + fmt.Sprintf("%v", this.SecretFile) + `,`,
 		`SecretRef:` + strings.Replace(this.SecretRef.String(), "LocalObjectReference", "LocalObjectReference", 1) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CgroupOptions) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CgroupOptions{`,
+		`MountMode:` + valueToStringGenerated(this.MountMode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -22203,6 +22287,7 @@ func (this *NodeFeatures) String() string {
 	}
 	s := strings.Join([]string{`&NodeFeatures{`,
 		`SupplementalGroupsPolicy:` + valueToStringGenerated(this.SupplementalGroupsPolicy) + `,`,
+		`SupportsCgroupOptions:` + valueToStringGenerated(this.SupportsCgroupOptions) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23932,6 +24017,7 @@ func (this *SecurityContext) String() string {
 		`WindowsOptions:` + strings.Replace(this.WindowsOptions.String(), "WindowsSecurityContextOptions", "WindowsSecurityContextOptions", 1) + `,`,
 		`SeccompProfile:` + strings.Replace(this.SeccompProfile.String(), "SeccompProfile", "SeccompProfile", 1) + `,`,
 		`AppArmorProfile:` + strings.Replace(this.AppArmorProfile.String(), "AppArmorProfile", "AppArmorProfile", 1) + `,`,
+		`CgroupOptions:` + strings.Replace(this.CgroupOptions.String(), "CgroupOptions", "CgroupOptions", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -27085,6 +27171,89 @@ func (m *CephFSVolumeSource) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.ReadOnly = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CgroupOptions) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CgroupOptions: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CgroupOptions: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MountMode", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := CgroupMountMode(dAtA[iNdEx:postIndex])
+			m.MountMode = &s
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -43923,6 +44092,27 @@ func (m *NodeFeatures) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SupplementalGroupsPolicy = &b
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupportsCgroupOptions", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.SupportsCgroupOptions = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -64094,6 +64284,42 @@ func (m *SecurityContext) Unmarshal(dAtA []byte) error {
 				m.AppArmorProfile = &AppArmorProfile{}
 			}
 			if err := m.AppArmorProfile.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CgroupOptions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CgroupOptions == nil {
+				m.CgroupOptions = &CgroupOptions{}
+			}
+			if err := m.CgroupOptions.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
