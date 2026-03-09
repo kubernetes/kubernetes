@@ -281,8 +281,21 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 			}
 
 			value := node.Labels[c.TopologyKey]
-			count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace)
-			countWithTerminating := countPodsMatchSelectorWithTerminating(nodeInfo.GetPods(), c.Selector, pod.Namespace)
+			// Compute counts with and without terminating pods in a single pass.
+			var count, countWithTerminating int
+			for _, pInfo := range nodeInfo.GetPods() {
+				p := pInfo.GetPod()
+				if p.Namespace != pod.Namespace {
+					continue
+				}
+				if !c.Selector.Matches(labels.Set(p.Labels)) {
+					continue
+				}
+				countWithTerminating++
+				if p.DeletionTimestamp == nil {
+					count++
+				}
+			}
 			tpCounts = append(tpCounts, topologyCount{
 				topologyValue:        value,
 				constraintID:         i,

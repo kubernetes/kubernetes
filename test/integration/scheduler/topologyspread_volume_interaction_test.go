@@ -13,6 +13,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	testutil "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Reproducer for issue #116629: interaction between PodTopologySpread and VolumeBinding
@@ -58,6 +59,12 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/pv-a"},
 			},
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  testCtx.NS.Name,
+				Name:       "pvc-a",
+			},
 			NodeAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{{
@@ -83,6 +90,12 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/pv-b"},
+			},
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  testCtx.NS.Name,
+				Name:       "pvc-b",
 			},
 			NodeAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
@@ -110,6 +123,12 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/pv-c"},
 			},
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  testCtx.NS.Name,
+				Name:       "pvc-c",
+			},
 			NodeAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{{
@@ -134,9 +153,25 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 		t.Fatalf("failed creating pv-c: %v", err)
 	}
 
-	// Create PVCs in the test namespace that match the PVs. Do not prebind or set ClaimRef/VolumeName.
+	// Update PV statuses to Bound since there is no PV controller in this integration test.
+	for _, pvName := range []string{"pv-a", "pv-b", "pv-c"} {
+		pv, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed getting %s for status update: %v", pvName, err)
+		}
+		pv.Status.Phase = v1.VolumeBound
+		if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().UpdateStatus(ctx, pv, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("failed updating %s status to Bound: %v", pvName, err)
+		}
+	}
+
+	// Create PVCs pre-bound to their PVs since the PV controller is not running.
 	pvcA := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "pvc-a", Namespace: testCtx.NS.Name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pvc-a",
+			Namespace:   testCtx.NS.Name,
+			Annotations: map[string]string{"pv.kubernetes.io/bind-completed": "yes"},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.VolumeResourceRequirements{
@@ -144,11 +179,16 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			},
 			VolumeMode:       func() *v1.PersistentVolumeMode { m := v1.PersistentVolumeFilesystem; return &m }(),
 			StorageClassName: func() *string { s := ""; return &s }(),
+			VolumeName:       "pv-a",
 		},
 	}
 
 	pvcB := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "pvc-b", Namespace: testCtx.NS.Name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pvc-b",
+			Namespace:   testCtx.NS.Name,
+			Annotations: map[string]string{"pv.kubernetes.io/bind-completed": "yes"},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.VolumeResourceRequirements{
@@ -156,11 +196,16 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			},
 			VolumeMode:       func() *v1.PersistentVolumeMode { m := v1.PersistentVolumeFilesystem; return &m }(),
 			StorageClassName: func() *string { s := ""; return &s }(),
+			VolumeName:       "pv-b",
 		},
 	}
 
 	pvcC := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "pvc-c", Namespace: testCtx.NS.Name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pvc-c",
+			Namespace:   testCtx.NS.Name,
+			Annotations: map[string]string{"pv.kubernetes.io/bind-completed": "yes"},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.VolumeResourceRequirements{
@@ -168,53 +213,27 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			},
 			VolumeMode:       func() *v1.PersistentVolumeMode { m := v1.PersistentVolumeFilesystem; return &m }(),
 			StorageClassName: func() *string { s := ""; return &s }(),
+			VolumeName:       "pv-c",
 		},
 	}
 
-	// Create PVCs and wait until each becomes Bound (let PV controller perform binding).
-	if err := testutil.CreatePersistentVolumeClaimWithRetries(testCtx.ClientSet, testCtx.NS.Name, pvcA); err != nil {
-		t.Fatalf("failed creating pvc-a: %v", err)
-	}
-	if err := wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(c context.Context) (bool, error) {
-		p, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(c, "pvc-a", metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	// Create PVCs and explicitly mark them as Bound since the PV controller
+	// is not running in this integration test environment.
+	for _, pvc := range []*v1.PersistentVolumeClaim{pvcA, pvcB, pvcC} {
+		if err := testutil.CreatePersistentVolumeClaimWithRetries(testCtx.ClientSet, testCtx.NS.Name, pvc); err != nil {
+			t.Fatalf("failed creating %s: %v", pvc.Name, err)
 		}
-		t.Logf("waiting for pvc-a to become Bound: phase=%s volume=%s", p.Status.Phase, p.Spec.VolumeName)
-		return p.Status.Phase == v1.ClaimBound, nil
-	}); err != nil {
-		t.Fatalf("timed out waiting for pvc-a to become Bound: %v", err)
+		fresh, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(ctx, pvc.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed getting %s for status update: %v", pvc.Name, err)
+		}
+		fresh.Status.Phase = v1.ClaimBound
+		if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).UpdateStatus(ctx, fresh, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("failed updating %s status to Bound: %v", pvc.Name, err)
+		}
 	}
 
-	if err := testutil.CreatePersistentVolumeClaimWithRetries(testCtx.ClientSet, testCtx.NS.Name, pvcB); err != nil {
-		t.Fatalf("failed creating pvc-b: %v", err)
-	}
-	if err := wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(c context.Context) (bool, error) {
-		p, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(c, "pvc-b", metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		t.Logf("waiting for pvc-b to become Bound: phase=%s volume=%s", p.Status.Phase, p.Spec.VolumeName)
-		return p.Status.Phase == v1.ClaimBound, nil
-	}); err != nil {
-		t.Fatalf("timed out waiting for pvc-b to become Bound: %v", err)
-	}
-
-	if err := testutil.CreatePersistentVolumeClaimWithRetries(testCtx.ClientSet, testCtx.NS.Name, pvcC); err != nil {
-		t.Fatalf("failed creating pvc-c: %v", err)
-	}
-	if err := wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(c context.Context) (bool, error) {
-		p, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(c, "pvc-c", metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		t.Logf("waiting for pvc-c to become Bound: phase=%s volume=%s", p.Status.Phase, p.Spec.VolumeName)
-		return p.Status.Phase == v1.ClaimBound, nil
-	}); err != nil {
-		t.Fatalf("timed out waiting for pvc-c to become Bound: %v", err)
-	}
-
-	// Create a dedicated pv-new and a matching pvc-new; do not prebind or modify existing pv-a/pvc-a
+	// Create a dedicated pv-new and a matching pvc-new, also pre-bound.
 	pvNew := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "pv-new"},
 		Spec: v1.PersistentVolumeSpec{
@@ -226,6 +245,12 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				HostPath: &v1.HostPathVolumeSource{Path: "/tmp/pv-new"},
+			},
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  testCtx.NS.Name,
+				Name:       "pvc-new",
 			},
 			NodeAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
@@ -243,9 +268,23 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 	if err := testutil.CreatePersistentVolumeWithRetries(testCtx.ClientSet, pvNew); err != nil {
 		t.Fatalf("failed creating pv-new: %v", err)
 	}
+	{
+		pv, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Get(ctx, "pv-new", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed getting pv-new for status update: %v", err)
+		}
+		pv.Status.Phase = v1.VolumeBound
+		if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().UpdateStatus(ctx, pv, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("failed updating pv-new status to Bound: %v", err)
+		}
+	}
 
 	pvcNew := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "pvc-new", Namespace: testCtx.NS.Name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pvc-new",
+			Namespace:   testCtx.NS.Name,
+			Annotations: map[string]string{"pv.kubernetes.io/bind-completed": "yes"},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.VolumeResourceRequirements{
@@ -253,50 +292,51 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 			},
 			VolumeMode:       func() *v1.PersistentVolumeMode { m := v1.PersistentVolumeFilesystem; return &m }(),
 			StorageClassName: func() *string { s := ""; return &s }(),
+			VolumeName:       "pv-new",
 		},
 	}
 	if err := testutil.CreatePersistentVolumeClaimWithRetries(testCtx.ClientSet, testCtx.NS.Name, pvcNew); err != nil {
 		t.Fatalf("failed creating pvc-new: %v", err)
 	}
-	if err := wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(c context.Context) (bool, error) {
-		p, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(c, "pvc-new", metav1.GetOptions{})
+	{
+		fresh, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(ctx, "pvc-new", metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			t.Fatalf("failed getting pvc-new for status update: %v", err)
 		}
-		t.Logf("waiting for pvc-new to become Bound: phase=%s volume=%s", p.Status.Phase, p.Spec.VolumeName)
-		return p.Status.Phase == v1.ClaimBound, nil
-	}); err != nil {
-		t.Fatalf("timed out waiting for pvc-new to become Bound: %v", err)
+		fresh.Status.Phase = v1.ClaimBound
+		if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).UpdateStatus(ctx, fresh, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("failed updating pvc-new status to Bound: %v", err)
+		}
 	}
 
 	// namespace for pod creation
 	ns := testCtx.NS.Name
 
-	// Wait for informers/scheduler caches to observe the PV/PVC status updates.
+	// Wait for informers/scheduler caches to observe the pre-bound PV/PVC objects.
 	if err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		// verify PVs
-		for _, pvName := range []string{"pv-a", "pv-b", "pv-c"} {
+		// verify PVs have ClaimRef set (pre-bound)
+		for _, pvName := range []string{"pv-a", "pv-b", "pv-c", "pv-new"} {
 			pv, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Get(context.Background(), pvName, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
-			if pv.Status.Phase != v1.VolumeBound {
+			if pv.Spec.ClaimRef == nil {
 				return false, nil
 			}
 		}
-		// verify PVCs
-		for _, pvcName := range []string{"pvc-a", "pvc-b", "pvc-c"} {
+		// verify PVCs have VolumeName set (pre-bound)
+		for _, pvcName := range []string{"pvc-a", "pvc-b", "pvc-c", "pvc-new"} {
 			pvc, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Get(context.Background(), pvcName, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
-			if pvc.Status.Phase != v1.ClaimBound {
+			if pvc.Spec.VolumeName == "" {
 				return false, nil
 			}
 		}
 		return true, nil
 	}); err != nil {
-		t.Fatalf("timed out waiting for PV/PVC status to be observed as Bound: %v", err)
+		t.Fatalf("timed out waiting for PV/PVC pre-binding to be observed: %v", err)
 	}
 
 	// Now that PV/PVC statuses are observed as Bound by informers, start the scheduler
@@ -330,13 +370,13 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 
 	// Ensure pods have at least one container (validation requires this)
 	if len(podA.Spec.Containers) == 0 {
-		podA.Spec.Containers = []v1.Container{{Name: "pause", Image: "k8s.gcr.io/pause:3.9"}}
+		podA.Spec.Containers = []v1.Container{{Name: "pause", Image: imageutils.GetPauseImageName()}}
 	}
 	if len(podB.Spec.Containers) == 0 {
-		podB.Spec.Containers = []v1.Container{{Name: "pause", Image: "k8s.gcr.io/pause:3.9"}}
+		podB.Spec.Containers = []v1.Container{{Name: "pause", Image: imageutils.GetPauseImageName()}}
 	}
 	if len(podC.Spec.Containers) == 0 {
-		podC.Spec.Containers = []v1.Container{{Name: "pause", Image: "k8s.gcr.io/pause:3.9"}}
+		podC.Spec.Containers = []v1.Container{{Name: "pause", Image: imageutils.GetPauseImageName()}}
 	}
 
 	if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(context.Background(), podA, metav1.CreateOptions{}); err != nil {
@@ -349,7 +389,7 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 		t.Fatalf("failed creating pod-c: %v", err)
 	}
 
-	// New pod with topologySpreadConstraints using pvc-a
+	// New pod with topologySpreadConstraints using pvc-new
 	newPod := st.MakePod().Name("pod-new").Namespace(ns).PVC("pvc-new").Label("app", "sset").Obj()
 	newPod.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{{
 		MaxSkew:           1,
@@ -358,7 +398,7 @@ func TestTopologySpread_VolumeBinding_Issue116629(t *testing.T) {
 		LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "sset"}},
 	}}
 	if len(newPod.Spec.Containers) == 0 {
-		newPod.Spec.Containers = []v1.Container{{Name: "pause", Image: "k8s.gcr.io/pause:3.9"}}
+		newPod.Spec.Containers = []v1.Container{{Name: "pause", Image: imageutils.GetPauseImageName()}}
 	}
 
 	// Ensure the pod is scheduled by the default scheduler in the test harness
