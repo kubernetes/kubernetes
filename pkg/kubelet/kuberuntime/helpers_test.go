@@ -600,3 +600,61 @@ func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
 	assert.Equal(t, resCfg.Unified, lcr.Unified)
 }
+
+func TestToKubeRuntimeStatusCgroupOptions(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		handlers                 []*runtimeapi.RuntimeHandler
+		expectedCgroupSupport    []bool
+	}{
+		{
+			name:     "nil features",
+			handlers: []*runtimeapi.RuntimeHandler{
+				{Name: "handler1", Features: nil},
+			},
+			expectedCgroupSupport: []bool{false},
+		},
+		{
+			name: "supports cgroup options",
+			handlers: []*runtimeapi.RuntimeHandler{
+				{Name: "handler1", Features: &runtimeapi.RuntimeHandlerFeatures{
+					SupportsCgroupOptions: true,
+				}},
+			},
+			expectedCgroupSupport: []bool{true},
+		},
+		{
+			name: "does not support cgroup options",
+			handlers: []*runtimeapi.RuntimeHandler{
+				{Name: "handler1", Features: &runtimeapi.RuntimeHandlerFeatures{
+					SupportsCgroupOptions: false,
+				}},
+			},
+			expectedCgroupSupport: []bool{false},
+		},
+		{
+			name: "multiple handlers mixed support",
+			handlers: []*runtimeapi.RuntimeHandler{
+				{Name: "default", Features: &runtimeapi.RuntimeHandlerFeatures{SupportsCgroupOptions: false}},
+				{Name: "cgroup-enabled", Features: &runtimeapi.RuntimeHandlerFeatures{SupportsCgroupOptions: true}},
+			},
+			expectedCgroupSupport: []bool{false, true},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			status := &runtimeapi.RuntimeStatus{
+				Conditions: []*runtimeapi.RuntimeCondition{
+					{Type: "RuntimeReady", Status: true},
+				},
+			}
+			result := toKubeRuntimeStatus(status, tc.handlers, nil)
+			assert.Equal(t, len(tc.expectedCgroupSupport), len(result.Handlers))
+			for i, expected := range tc.expectedCgroupSupport {
+				assert.Equal(t, expected, result.Handlers[i].SupportsCgroupOptions,
+					"handler %s SupportsCgroupOptions", result.Handlers[i].Name)
+			}
+		})
+	}
+}

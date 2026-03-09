@@ -8313,3 +8313,67 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeHandlerSupportsCgroupOptions(t *testing.T) {
+	testCases := []struct {
+		name               string
+		runtimeHandlerName string
+		runtimeHandlers    []kubecontainer.RuntimeHandler
+		expected           bool
+	}{
+		{
+			name:               "empty handlers",
+			runtimeHandlerName: "",
+			runtimeHandlers:    []kubecontainer.RuntimeHandler{},
+			expected:           false,
+		},
+		{
+			name:               "handler supports cgroup options",
+			runtimeHandlerName: "test-handler",
+			runtimeHandlers: []kubecontainer.RuntimeHandler{
+				{Name: "test-handler", SupportsCgroupOptions: true},
+			},
+			expected: true,
+		},
+		{
+			name:               "handler does not support cgroup options",
+			runtimeHandlerName: "test-handler",
+			runtimeHandlers: []kubecontainer.RuntimeHandler{
+				{Name: "test-handler", SupportsCgroupOptions: false},
+			},
+			expected: false,
+		},
+		{
+			name:               "unknown handler",
+			runtimeHandlerName: "unknown",
+			runtimeHandlers: []kubecontainer.RuntimeHandler{
+				{Name: "test-handler", SupportsCgroupOptions: true},
+			},
+			expected: false,
+		},
+		{
+			name:               "default handler with cgroup support",
+			runtimeHandlerName: "",
+			runtimeHandlers: []kubecontainer.RuntimeHandler{
+				{Name: "", SupportsCgroupOptions: true},
+			},
+			expected: true,
+		},
+		{
+			name:               "multiple handlers pick correct one",
+			runtimeHandlerName: "handler-b",
+			runtimeHandlers: []kubecontainer.RuntimeHandler{
+				{Name: "handler-a", SupportsCgroupOptions: false},
+				{Name: "handler-b", SupportsCgroupOptions: true},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runtimeHandlerSupportsCgroupOptions(tc.runtimeHandlerName, tc.runtimeHandlers)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

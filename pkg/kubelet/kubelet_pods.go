@@ -629,6 +629,15 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	logger := klog.FromContext(ctx)
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
+	// Validate CgroupOptions runtime support
+	if container.SecurityContext != nil && container.SecurityContext.CgroupOptions != nil &&
+		container.SecurityContext.CgroupOptions.MountMode != nil &&
+		*container.SecurityContext.CgroupOptions.MountMode == v1.CgroupMountModeWritable {
+		if !kl.runtimeClassSupportsCgroupOptions(pod) {
+			return nil, nil, fmt.Errorf("container %q requires CgroupOptions but runtime handler does not support it", container.Name)
+		}
+	}
+
 	opts, err := kl.containerManager.GetResources(ctx, pod, container)
 	if err != nil {
 		return nil, nil, err
@@ -2926,4 +2935,32 @@ func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO bool) (bool, 
 	default:
 		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
+}
+
+func (kl *Kubelet) runtimeClassSupportsCgroupOptions(pod *v1.Pod) bool {
+	if kl.runtimeClassManager == nil {
+		return false
+	}
+	runtimeHandlerName, err := kl.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+	if err != nil {
+		klog.ErrorS(err, "failed to look up the runtime handler", "runtimeClassName", pod.Spec.RuntimeClassName)
+		return false
+	}
+	runtimeHandlers := kl.runtimeState.runtimeHandlers()
+	return runtimeHandlerSupportsCgroupOptions(runtimeHandlerName, runtimeHandlers)
+}
+
+// runtimeHandlerSupportsCgroupOptions checks whether the runtime handler supports CgroupOptions.
+// The kubelet feature gate is not checked here.
+func runtimeHandlerSupportsCgroupOptions(runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+	if len(runtimeHandlers) == 0 {
+		return false
+	}
+	for _, h := range runtimeHandlers {
+		if h.Name == runtimeHandlerName {
+			return h.SupportsCgroupOptions
+		}
+	}
+	klog.ErrorS(nil, "Unknown runtime handler", "runtimeHandlerName", runtimeHandlerName)
+	return false
 }
