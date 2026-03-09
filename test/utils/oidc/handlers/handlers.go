@@ -18,10 +18,6 @@ limitations under the License.
 
 package handlers
 
-import (
-	"gopkg.in/go-jose/go-jose.v2"
-)
-
 type Token struct {
 	IDToken      string `json:"id_token"`
 	AccessToken  string `json:"access_token"`
@@ -32,8 +28,4 @@ type Token struct {
 
 type TokenHandler interface {
 	Token() (Token, error)
-}
-
-type JWKsHandler interface {
-	KeySet() jose.JSONWebKeySet
 }

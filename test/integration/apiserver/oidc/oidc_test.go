@@ -176,7 +176,7 @@ jwt:
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID,
 						oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix, oidcUsernameClaim: "user"}, &signingPrivateKey.PublicKey)
 				}
-				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+				utilsoidc.SetPublicKey(oidcServer, t, publicKey)
 
 				adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 				configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
@@ -314,7 +314,7 @@ jwt:
 
 				anotherSigningPrivateKey, _ := keyFunc(t)
 
-				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &anotherSigningPrivateKey.PublicKey)).Maybe()
+				utilsoidc.SetPublicKey(oidcServer, t, &anotherSigningPrivateKey.PublicKey)
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
@@ -375,7 +375,7 @@ jwt:
 						&signingPrivateKey.PublicKey)
 				}
 
-				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &signingPrivateKey.PublicKey)).Maybe()
+				utilsoidc.SetPublicKey(oidcServer, t, &signingPrivateKey.PublicKey)
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
@@ -1701,7 +1701,7 @@ jwt:
     message: "the hd claim must be set to example.com"
 `, tt.issuerURL, discoveryURL, indentCertificateAuthority(string(caCertContent)))
 
-			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+			utilsoidc.SetPublicKey(oidcServer, t, publicKey)
 
 			apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
 
@@ -1783,8 +1783,8 @@ jwt:
       expression: "claims.uid"
 `, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
 
-	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
-	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
+	utilsoidc.SetPublicKey(oidcServer1, t, publicKey1)
+	utilsoidc.SetPublicKey(oidcServer2, t, publicKey2)
 
 	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey1)
 
@@ -1914,8 +1914,8 @@ jwt:
       expression: "'k8s-' + claims.sub"
 `, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
 
-	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
-	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
+	utilsoidc.SetPublicKey(oidcServer1, t, publicKey1)
+	utilsoidc.SetPublicKey(oidcServer2, t, publicKey2)
 
 	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{
 		authenticationConfigYAML: authenticationConfig,
@@ -2141,7 +2141,7 @@ func configureTestInfrastructureAndEgressProxy[K utilsoidc.JosePrivateKey, L uti
 		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
 
-	oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+	utilsoidc.SetPublicKey(oidcServer, t, publicKey)
 
 	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 	configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)

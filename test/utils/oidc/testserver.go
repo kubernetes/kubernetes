@@ -52,12 +52,18 @@ var (
 type TestServer struct {
 	httpServer   *httptest.Server
 	tokenHandler *handlers.MockTokenHandler
-	jwksHandler  *handlers.MockJWKsHandler
+	publicKeys   []jose.JSONWebKey
 }
 
-// JwksHandler is getter of JSON Web Key Sets handler
-func (ts *TestServer) JwksHandler() *handlers.MockJWKsHandler {
-	return ts.jwksHandler
+// SetPublicKey computes a thumbprint-based key ID and stores the key
+// so the /jwks endpoint will serve it.
+func SetPublicKey[K JosePublicKey](ts *TestServer, t *testing.T, publicKey K) {
+	t.Helper()
+	key := jose.JSONWebKey{Key: publicKey, Use: "sig", Algorithm: string(GetSignatureAlgorithm(publicKey))}
+	thumbprint, err := key.Thumbprint(crypto.SHA256)
+	require.NoError(t, err)
+	key.KeyID = hex.EncodeToString(thumbprint)
+	ts.publicKeys = append(ts.publicKeys, key)
 }
 
 // TokenHandler is getter of JWT token handler
@@ -106,7 +112,6 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 	oidcServer := &TestServer{
 		httpServer:   httpServer,
 		tokenHandler: handlers.NewMockTokenHandler(t),
-		jwksHandler:  handlers.NewMockJWKsHandler(t),
 	}
 
 	issuer := httpServer.URL
@@ -147,7 +152,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 	})
 
 	mux.HandleFunc(jwksWebPath, func(writer http.ResponseWriter, request *http.Request) {
-		keySet := oidcServer.jwksHandler.KeySet()
+		keySet := jose.JSONWebKeySet{Keys: oidcServer.publicKeys}
 
 		writer.Header().Add("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusOK)
@@ -193,6 +198,25 @@ type JosePrivateKey interface {
 	*rsa.PrivateKey | *ecdsa.PrivateKey
 }
 
+// SignToken creates a signed JWT from the given private key and claims,
+// returning the compact-serialized token string.
+func SignToken[K JosePrivateKey](t *testing.T, privateKey K, claims map[string]interface{}) string {
+	t.Helper()
+
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
+	require.NoError(t, err)
+
+	payloadJSON, err := json.Marshal(claims)
+	require.NoError(t, err)
+
+	sig, err := signer.Sign(payloadJSON)
+	require.NoError(t, err)
+
+	token, err := sig.CompactSerialize()
+	require.NoError(t, err)
+	return token
+}
+
 // TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
 // This behavior should being applied to the MockTokenHandler.
 func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
@@ -203,19 +227,8 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 	t.Helper()
 
 	return func() (handlers.Token, error) {
-		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
-		require.NoError(t, err)
-
-		payloadJSON, err := json.Marshal(claims)
-		require.NoError(t, err)
-
-		idTokenSignature, err := signer.Sign(payloadJSON)
-		require.NoError(t, err)
-		idToken, err := idTokenSignature.CompactSerialize()
-		require.NoError(t, err)
-
 		return handlers.Token{
-			IDToken:      idToken,
+			IDToken:      SignToken(t, privateKey, claims),
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
 		}, nil
@@ -224,24 +237,6 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 
 type JosePublicKey interface {
 	*rsa.PublicKey | *ecdsa.PublicKey
-}
-
-// DefaultJwksHandlerBehavior describes the scenario when JSON Web Key Set token is being returned.
-// This behavior should being applied to the MockJWKsHandler.
-func DefaultJwksHandlerBehavior[K JosePublicKey](t *testing.T, verificationPublicKey K) func() jose.JSONWebKeySet {
-	t.Helper()
-
-	return func() jose.JSONWebKeySet {
-		key := jose.JSONWebKey{Key: verificationPublicKey, Use: "sig", Algorithm: string(GetSignatureAlgorithm(verificationPublicKey))}
-
-		thumbprint, err := key.Thumbprint(crypto.SHA256)
-		require.NoError(t, err)
-
-		key.KeyID = hex.EncodeToString(thumbprint)
-		return jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{key},
-		}
-	}
 }
 
 type JoseKey interface{ JosePrivateKey | JosePublicKey }

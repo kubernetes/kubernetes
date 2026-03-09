@@ -8,5 +8,4 @@ template-data:
 packages:
   k8s.io/kubernetes/test/utils/oidc/handlers:
     interfaces:
-      JWKsHandler: {}
       TokenHandler: {}
