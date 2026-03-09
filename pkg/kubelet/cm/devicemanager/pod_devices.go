@@ -104,7 +104,7 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 
 	ret := sets.New[string]()
 	for contName := range pdev.devs[podUID] {
-		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
+		ret = ret.Union(pdev.containerDevicesLocked(podUID, contName, resource))
 	}
 	return ret
 }
@@ -114,6 +114,11 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
 	pdev.RLock()
 	defer pdev.RUnlock()
+	return pdev.containerDevicesLocked(podUID, contName, resource)
+}
+
+// containerDevicesLocked does the work of containerDevices but assumes pdev.RLock is already held.
+func (pdev *podDevices) containerDevicesLocked(podUID, contName, resource string) sets.Set[string] {
 	if _, podExists := pdev.devs[podUID]; !podExists {
 		return nil
 	}

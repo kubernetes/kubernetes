@@ -254,6 +254,34 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 	}
 }
 
+func TestPodDevicesDoesNotDoubleLock(t *testing.T) {
+	pdev := newPodDevices()
+	resourceName := "domain1.com/resource1"
+	podID := "pod1"
+
+	pdev.insert(podID, "con1", resourceName,
+		checkpoint.DevicesPerNUMA{0: []string{"dev1"}},
+		newContainerAllocateResponse(),
+	)
+	pdev.insert(podID, "con2", resourceName,
+		checkpoint.DevicesPerNUMA{0: []string{"dev2"}},
+		newContainerAllocateResponse(),
+	)
+
+	// podDevices() previously called containerDevices() while holding RLock,
+	// which would deadlock if a writer was waiting. Verify it returns correct
+	// results now that the double-lock is fixed.
+	devs := pdev.podDevices(podID, resourceName)
+	assert.True(t, devs.Has("dev1"))
+	assert.True(t, devs.Has("dev2"))
+	assert.Equal(t, 2, devs.Len())
+
+	// containerDevices() still works independently.
+	cdevs := pdev.containerDevices(podID, "con1", resourceName)
+	assert.True(t, cdevs.Has("dev1"))
+	assert.Equal(t, 1, cdevs.Len())
+}
+
 func TestGetPodAndContainerForDevice(t *testing.T) {
 	podDevices := newPodDevices()
 	resourceName1 := "domain1.com/resource1"
