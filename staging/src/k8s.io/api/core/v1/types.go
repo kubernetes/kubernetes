@@ -6614,6 +6614,11 @@ type NodeRuntimeHandlerFeatures struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *bool `json:"userNamespaces,omitempty" protobuf:"varint,2,opt,name=userNamespaces"`
+	// SupportsCgroupOptions is set to true if the runtime handler supports CgroupOptions
+	// as implemented in Kubernetes SecurityContext.
+	// +featureGate=CgroupOptions
+	// +optional
+	SupportsCgroupOptions *bool `json:"supportsCgroupOptions,omitempty" protobuf:"varint,3,opt,name=supportsCgroupOptions"`
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.
@@ -6783,6 +6788,7 @@ type NodeStatus struct {
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 	// The available runtime handlers.
 	// +featureGate=UserNamespacesSupport
+	// +featureGate=CgroupOptions
 	// +optional
 	// +listType=atomic
 	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
@@ -8288,7 +8294,35 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
+	// cgroupOptions controls cgroup filesystem access and configuration.
+	// This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems.
+	// Only effective on Linux containers with cgroup v2.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	CgroupOptions *CgroupOptions `json:"cgroupOptions,omitempty" protobuf:"bytes,13,opt,name=cgroupOptions"`
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// mountMode controls whether the cgroup filesystem is mounted as writable.
+	// Defaults to "ReadOnly" if not specified.
+	// +optional
+	MountMode *CgroupMountMode `json:"mountMode,omitempty" protobuf:"bytes,1,opt,name=mountMode"`
+}
+
+// CgroupMountMode defines the mount mode for cgroup filesystem.
+// +enum
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts cgroup filesystem as read-only (default)
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+
+	// CgroupMountModeWritable mounts cgroup filesystem as writable,
+	// allowing containers to manage their own cgroup subtree
+	CgroupMountModeWritable CgroupMountMode = "Writable"
+)
 
 // +enum
 type ProcMountType string
