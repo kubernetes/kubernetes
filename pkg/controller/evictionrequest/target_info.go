@@ -62,7 +62,7 @@ func (t targetInfo) isGone() bool {
 		if t.pod == nil {
 			return true
 		}
-		return string(t.pod.UID) != t.spec.Pod.UID
+		return t.pod.UID != t.spec.Pod.UID
 	}
 	return false
 }
@@ -76,21 +76,21 @@ func (t targetInfo) isValidTarget() (bool, string) {
 		if t.pod == nil {
 			return false, "Target pod not found"
 		}
-		if string(t.pod.UID) != t.spec.Pod.UID {
+		if t.pod.UID != t.spec.Pod.UID {
 			return false, fmt.Sprintf("Pod UID mismatch: expected %s, got %s", t.spec.Pod.UID, string(t.pod.UID))
 		}
-		if t.hasWorkloadRef() {
-			return false, fmt.Sprintf("Target pod %s is part of a Workload. Eviction of such pods is currently not supported.", t.pod.Name)
+		if t.hasSchedulingGroup() {
+			return false, fmt.Sprintf("Target pod %s is part of a PodGroup. Eviction of such pods is currently not supported.", t.pod.Name)
 		}
 	}
 	return true, ""
 }
 
-// hasWorkloadRef reports whether the target belongs to a Workload.
-func (t targetInfo) hasWorkloadRef() bool {
+// hasSchedulingGroup reports whether the target belongs to a PodGroup.
+func (t targetInfo) hasSchedulingGroup() bool {
 	switch {
 	case t.pod != nil:
-		return t.pod.Spec.WorkloadRef != nil
+		return t.pod.Spec.SchedulingGroup != nil
 	}
 	return false
 }

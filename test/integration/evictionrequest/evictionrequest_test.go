@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coordinationapply "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func setup(ctx context.Context, t *testing.T, extraServerFlags ...string) (
@@ -117,7 +119,7 @@ func newTestEvictionRequest(pod *v1.Pod) *coordinationv1alpha1.EvictionRequest {
 			Target: coordinationv1alpha1.EvictionTarget{
 				Pod: &coordinationv1alpha1.LocalTargetReference{
 					Name: pod.Name,
-					UID:  string(pod.UID),
+					UID:  pod.UID,
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
@@ -192,7 +194,7 @@ func createPodAndWait(ctx context.Context, t *testing.T, cs clientset.Interface,
 }
 
 // TestValidation_PodNotFound verifies that an EvictionRequest targeting a non-existent pod
-// gets a Canceled condition.
+// gets a Failed condition.
 func TestValidation_PodNotFound(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
@@ -217,7 +219,7 @@ func TestValidation_PodNotFound(t *testing.T) {
 			Target: coordinationv1alpha1.EvictionTarget{
 				Pod: &coordinationv1alpha1.LocalTargetReference{
 					Name: "nonexistent-pod",
-					UID:  nonexistentUID,
+					UID:  apimachinerytypes.UID(nonexistentUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
@@ -231,16 +233,16 @@ func TestValidation_PodNotFound(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for Canceled condition
-	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, nonexistentUID, "Canceled", metav1.ConditionTrue)
-	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
-		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
+	// Wait for Failed condition
+	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, nonexistentUID, string(coordinationv1alpha1.EvictionRequestConditionFailed), metav1.ConditionTrue)
+	cond := meta.FindStatusCondition(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid), cond.Reason)
 	}
 }
 
 // TestValidation_UIDMismatch verifies that an EvictionRequest with the wrong pod UID
-// gets a Canceled condition.
+// gets a Failed condition.
 func TestValidation_UIDMismatch(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
@@ -268,7 +270,7 @@ func TestValidation_UIDMismatch(t *testing.T) {
 			Target: coordinationv1alpha1.EvictionTarget{
 				Pod: &coordinationv1alpha1.LocalTargetReference{
 					Name: pod.Name,
-					UID:  wrongUID,
+					UID:  apimachinerytypes.UID(wrongUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
@@ -282,11 +284,11 @@ func TestValidation_UIDMismatch(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for Canceled condition
-	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, wrongUID, "Canceled", metav1.ConditionTrue)
-	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
-		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
+	// Wait for Failed condition
+	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, wrongUID, string(coordinationv1alpha1.EvictionRequestConditionFailed), metav1.ConditionTrue)
+	cond := meta.FindStatusCondition(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid), cond.Reason)
 	}
 }
 
@@ -452,9 +454,9 @@ func TestPodDeleted_Evicted(t *testing.T) {
 		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted), cond.Reason)
 	}
 
-	// Should NOT have Canceled condition
-	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Canceled") {
-		t.Error("should not have Canceled condition when pod is deleted after validation")
+	// Should NOT have Failed condition
+	if meta.IsStatusConditionTrue(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed)) {
+		t.Error("should not have Failed condition when pod is deleted after validation")
 	}
 }
 
@@ -639,7 +641,7 @@ func TestValidation_WorkloadRef(t *testing.T) {
 
 	// Create pod with WorkloadRef
 	pod := newTestPod("test-pod")
-	pod.Spec.WorkloadRef = &v1.WorkloadReference{Name: "my-workload", PodGroup: "my-group"}
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
 	pod = createPodAndWait(tCtx, t, cs, ns.Name, pod)
 
 	// Create EvictionRequest
@@ -649,13 +651,13 @@ func TestValidation_WorkloadRef(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for Canceled condition
+	// Wait for Failed condition
 	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, string(pod.UID),
-		"Canceled", metav1.ConditionTrue)
+		string(coordinationv1alpha1.EvictionRequestConditionFailed), metav1.ConditionTrue)
 
-	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
-		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
+	cond := meta.FindStatusCondition(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid), cond.Reason)
 	}
 }
 
@@ -673,7 +675,7 @@ func TestTerminalStateIdempotent(t *testing.T) {
 	inf.Start(tCtx.Done())
 	go c.Run(tCtx, 1)
 
-	// Create an EvictionRequest targeting a nonexistent pod to get a Canceled condition
+	// Create an EvictionRequest targeting a nonexistent pod to get a Failed condition
 	nonexistentUID := "00000000-0000-0000-0000-000000000099"
 	er := &coordinationv1alpha1.EvictionRequest{
 		ObjectMeta: metav1.ObjectMeta{
@@ -684,7 +686,7 @@ func TestTerminalStateIdempotent(t *testing.T) {
 			Target: coordinationv1alpha1.EvictionTarget{
 				Pod: &coordinationv1alpha1.LocalTargetReference{
 					Name: "nonexistent-pod",
-					UID:  nonexistentUID,
+					UID:  apimachinerytypes.UID(nonexistentUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
@@ -698,8 +700,8 @@ func TestTerminalStateIdempotent(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for Canceled condition
-	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, nonexistentUID, "Canceled", metav1.ConditionTrue)
+	// Wait for Failed condition
+	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, nonexistentUID, string(coordinationv1alpha1.EvictionRequestConditionFailed), metav1.ConditionTrue)
 	observedGenBefore := updated.Status.ObservedGeneration
 
 	// Trigger a re-sync by touching a label on the EvictionRequest
@@ -718,12 +720,12 @@ func TestTerminalStateIdempotent(t *testing.T) {
 		"waiting for label update to be visible",
 	)
 
-	cond := meta.FindStatusCondition(final.Status.Conditions, "Canceled")
+	cond := meta.FindStatusCondition(final.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
 	if cond == nil || cond.Status != metav1.ConditionTrue {
-		t.Error("expected Canceled condition to remain True after re-sync")
+		t.Error("expected Failed condition to remain True after re-sync")
 	}
-	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed) {
-		t.Errorf("expected reason to remain %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), cond.Reason)
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid) {
+		t.Errorf("expected reason to remain %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid), cond.Reason)
 	}
 
 	// ObservedGeneration should not have been bumped by re-processing
@@ -776,8 +778,8 @@ func TestPodTerminal_Evicted(t *testing.T) {
 		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal), cond.Reason)
 	}
 
-	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Canceled") {
-		t.Error("should not have Canceled condition when pod is terminal")
+	if meta.IsStatusConditionTrue(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed)) {
+		t.Error("should not have Failed condition when pod is terminal")
 	}
 }
 
@@ -1017,13 +1019,13 @@ func TestRequestersRemovedDuringProcessing(t *testing.T) {
 		t.Fatalf("Failed to update EvictionRequest: %v", err)
 	}
 
-	// Wait for Canceled condition
+	// Wait for Failed condition
 	updated := waitForEvictionRequestCondition(tCtx, t, cs, ns.Name, string(pod.UID),
-		"Canceled", metav1.ConditionTrue)
+		string(coordinationv1alpha1.EvictionRequestConditionFailed), metav1.ConditionTrue)
 
-	cond := meta.FindStatusCondition(updated.Status.Conditions, "Canceled")
-	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters) {
-		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters), cond.Reason)
+	cond := meta.FindStatusCondition(updated.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
+	if cond.Reason != string(coordinationv1alpha1.EvictionRequestConditionReasonCanceledDueToNoRequesters) {
+		t.Errorf("expected reason %s, got %s", string(coordinationv1alpha1.EvictionRequestConditionReasonCanceledDueToNoRequesters), cond.Reason)
 	}
 
 	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Evicted") {

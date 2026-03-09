@@ -52,6 +52,6 @@ func setCondition(
 // isTerminal returns true if the EvictionRequest has reached
 // a terminal state (Canceled or Evicted condition is True).
 func isTerminal(evictionRequest *coordinationv1alpha1.EvictionRequest) bool {
-	return meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionCanceled)) ||
+	return meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed)) ||
 		meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionEvicted))
 }

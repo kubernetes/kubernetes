@@ -35,7 +35,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coordinationapply "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
-	coreapply "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	coordinationinformers "k8s.io/client-go/informers/coordination/v1alpha1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -351,8 +350,8 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 		statusApply := coordinationapply.EvictionRequestStatus().
 			WithObservedGeneration(evictionRequest.Generation).
 			WithConditions(
-				setCondition(evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionCanceled,
-					metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed),
+				setCondition(evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionFailed,
+					metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid),
 					"Unsupported target type"),
 				setCondition(evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionEvicted,
 					metav1.ConditionFalse, "AwaitingProcessing", ""),
@@ -475,7 +474,7 @@ func (c *EvictionRequestController) computeStatus(
 	}
 
 	for _, ti := range targetInterceptors {
-		statusApply.WithTargetInterceptors(coreapply.EvictionInterceptor().WithName(ti))
+		statusApply.WithTargetInterceptors(coordinationapply.TargetInterceptor().WithName(ti))
 	}
 
 	statusApply.WithActiveInterceptors(active...)
@@ -529,7 +528,7 @@ func computeConditions(
 	deferCompletion bool,
 ) (canceled, evicted *metav1ac.ConditionApplyConfiguration) {
 	existing := evictionRequest.Status.Conditions
-	canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
+	canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionFailed,
 		metav1.ConditionFalse, "AwaitingProcessing", "")
 	evicted = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 		metav1.ConditionFalse, "AwaitingProcessing", "")
@@ -537,8 +536,8 @@ func computeConditions(
 	// Precondition failure
 	if evictionRequest.Status.ObservedGeneration == 0 {
 		if valid, message := target.isValidTarget(); !valid {
-			canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
-				metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonValidationFailed), message)
+			canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+				metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid), message)
 			return canceled, evicted
 		}
 	}
@@ -555,8 +554,8 @@ func computeConditions(
 		evicted = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal), "Pod has reached terminal state")
 	} else if len(evictionRequest.Spec.Requesters) == 0 {
-		canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionCanceled,
-			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonNoRequesters), "Requesters list is empty")
+		canceled = setCondition(existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+			metav1.ConditionTrue, string(coordinationv1alpha1.EvictionRequestConditionReasonCanceledDueToNoRequesters), "Requesters list is empty")
 	}
 
 	return canceled, evicted

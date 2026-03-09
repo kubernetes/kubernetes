@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 const testControllerName = "evictionrequest-controller"
@@ -135,9 +136,9 @@ func newEvictionRequest(namespace, podName, podUID string) *coordinationv1alpha1
 		},
 		Spec: coordinationv1alpha1.EvictionRequestSpec{
 			Target: coordinationv1alpha1.EvictionTarget{
-				Pod: &coordinationv1alpha1.LocalTargetReference{
+				Pod: &coordinationv1alpha1.PodReference{
 					Name: podName,
-					UID:  podUID,
+					UID:  types.UID(podUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
@@ -148,7 +149,7 @@ func newEvictionRequest(namespace, podName, podUID string) *coordinationv1alpha1
 }
 
 func hasCanceledCondition(er *coordinationv1alpha1.EvictionRequest) bool {
-	return meta.IsStatusConditionTrue(er.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionCanceled))
+	return meta.IsStatusConditionTrue(er.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed))
 }
 
 func hasEvictedCondition(er *coordinationv1alpha1.EvictionRequest) bool {
@@ -310,12 +311,12 @@ func TestSyncHandler_ValidationUIDMismatch(t *testing.T) {
 	}
 }
 
-func TestSyncHandler_ValidationWorkloadRef(t *testing.T) {
+func TestSyncHandler_ValidationPodGroup(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	// Create pod with WorkloadRef set
+	// Create pod with PodGroup set
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.WorkloadRef = &v1.WorkloadReference{Name: "my-workload"}
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, nil)
@@ -333,7 +334,7 @@ func TestSyncHandler_ValidationWorkloadRef(t *testing.T) {
 	}
 
 	if !hasCanceledCondition(updated) {
-		t.Error("expected Canceled condition to be set for WorkloadRef pod")
+		t.Error("expected Canceled condition to be set for PodGroup pod")
 	}
 }
 
@@ -397,7 +398,7 @@ func TestSyncHandler_PodDeleted_Evicted(t *testing.T) {
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1 // Simulate that we've already observed this request
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
 
@@ -433,7 +434,7 @@ func TestSyncHandler_PodNotFound_MovesActiveInterceptorToProcessed(t *testing.T)
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: testInterceptor},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -515,7 +516,7 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: testInterceptor},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -709,7 +710,7 @@ func TestSyncHandler_AdvanceOnCompletion(t *testing.T) {
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	// Set up status as if first interceptor is active and completed
 	now := metav1.Now()
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: testEvictionInterceptorClass},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -788,7 +789,7 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 	heartbeatTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: slowEvictionInterceptorClass},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -845,7 +846,7 @@ func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 	startTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: staleInterceptor},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -903,7 +904,7 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 	heartbeatTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: activeEvictionInterceptorClass},
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
@@ -959,7 +960,7 @@ func TestSyncHandler_AllInterceptorsProcessed(t *testing.T) {
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	// Set up status where all interceptors are processed
 	now := metav1.Now()
-	er.Status.TargetInterceptors = []v1.EvictionInterceptor{
+	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
 		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
 	}
 	er.Status.ActiveInterceptors = []string{string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)}

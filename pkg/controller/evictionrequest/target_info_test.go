@@ -23,13 +23,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
 func podTarget(name, uid string) coordinationv1alpha1.EvictionTarget {
 	return coordinationv1alpha1.EvictionTarget{
-		Pod: &coordinationv1alpha1.LocalTargetReference{
+		Pod: &coordinationv1alpha1.PodReference{
 			Name: name,
-			UID:  uid,
+			UID:  types.UID(uid),
 		},
 	}
 }
@@ -146,14 +147,14 @@ func TestIsValidTarget(t *testing.T) {
 			wantMsg:   "Pod UID mismatch: expected uid-1, got uid-2",
 		},
 		{
-			name: "pod with workload ref",
+			name: "pod with PodGroup",
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
-				pod.Spec.WorkloadRef = &v1.WorkloadReference{Name: "my-workload"}
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
 				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
 			}(),
 			wantValid: false,
-			wantMsg:   "Target pod my-pod is part of a Workload. Eviction of such pods is currently not supported.",
+			wantMsg:   "Target pod my-pod is part of a PodGroup. Eviction of such pods is currently not supported.",
 		},
 		{
 			name:      "empty target",
@@ -174,22 +175,22 @@ func TestIsValidTarget(t *testing.T) {
 	}
 }
 
-func TestHasWorkloadRef(t *testing.T) {
+func TestIsPartOfPodGroup(t *testing.T) {
 	tests := []struct {
 		name   string
 		target targetInfo
 		want   bool
 	}{
 		{
-			name:   "pod without workload ref",
+			name:   "pod without PodGroup",
 			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   false,
 		},
 		{
-			name: "pod with workload ref",
+			name: "pod with PodGroup",
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
-				pod.Spec.WorkloadRef = &v1.WorkloadReference{Name: "my-workload"}
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
 				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
 			}(),
 			want: true,
@@ -202,8 +203,8 @@ func TestHasWorkloadRef(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.target.hasWorkloadRef(); got != tt.want {
-				t.Errorf("hasWorkloadRef() = %v, want %v", got, tt.want)
+			if got := tt.target.hasSchedulingGroup(); got != tt.want {
+				t.Errorf("hasSchedulingGroup() = %v, want %v", got, tt.want)
 			}
 		})
 	}
