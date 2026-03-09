@@ -188,7 +188,7 @@ func (o *SetOptions) Validate() error {
 				return fmt.Errorf("--allowlist-entry is required when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
 			}
 		default:
-			return fmt.Errorf("invalid value for --policy: %q", o.PluginPolicy)
+			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s",v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll, v1beta1.PluginPolicyAllowlist,  o.PluginPolicy)
 		}
 
 	}
