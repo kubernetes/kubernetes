@@ -448,6 +448,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/checkpoint/v1alpha1.PodCheckpointList":                                                              schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointList(ref),
 		"k8s.io/api/checkpoint/v1alpha1.PodCheckpointSpec":                                                              schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointSpec(ref),
 		"k8s.io/api/checkpoint/v1alpha1.PodCheckpointStatus":                                                            schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointStatus(ref),
+		"k8s.io/api/checkpoint/v1alpha1.PodRestore":                                                                     schema_k8sio_api_checkpoint_v1alpha1_PodRestore(ref),
+		"k8s.io/api/checkpoint/v1alpha1.PodRestoreList":                                                                 schema_k8sio_api_checkpoint_v1alpha1_PodRestoreList(ref),
+		"k8s.io/api/checkpoint/v1alpha1.PodRestoreSpec":                                                                 schema_k8sio_api_checkpoint_v1alpha1_PodRestoreSpec(ref),
+		"k8s.io/api/checkpoint/v1alpha1.PodRestoreStatus":                                                               schema_k8sio_api_checkpoint_v1alpha1_PodRestoreStatus(ref),
 		coordinationv1.Lease{}.OpenAPIModelName():                                                                       schema_k8sio_api_coordination_v1_Lease(ref),
 		coordinationv1.LeaseList{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseList(ref),
 		coordinationv1.LeaseSpec{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseSpec(ref),
@@ -18528,6 +18532,170 @@ func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointStatus(ref common.Referen
 					"message": {
 						SchemaProps: spec.SchemaProps{
 							Description: "message is a human-readable message indicating details about the checkpoint.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodRestore(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodRestore represents a restore operation from a PodCheckpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the desired restore operation.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/checkpoint/v1alpha1.PodRestoreSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status represents the current status of the restore.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/checkpoint/v1alpha1.PodRestoreStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/checkpoint/v1alpha1.PodRestoreSpec", "k8s.io/api/checkpoint/v1alpha1.PodRestoreStatus", metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodRestoreList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodRestoreList is a list of PodRestore objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is a list of PodRestore objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/checkpoint/v1alpha1.PodRestore"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/checkpoint/v1alpha1.PodRestore", metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodRestoreSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodRestoreSpec defines the desired state of a PodRestore.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"checkpointName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointName is the name of the PodCheckpoint to restore from. The PodCheckpoint must exist in the same namespace and be in Ready phase.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podTemplate defines the pod template for the restored pod. The RestoreFrom field will be set automatically by the controller.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(corev1.PodTemplateSpec{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"checkpointName", "podTemplate"},
+			},
+		},
+		Dependencies: []string{
+			corev1.PodTemplateSpec{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodRestoreStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodRestoreStatus represents the current status of a PodRestore.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "phase represents the current phase of the restore.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"restoredPodName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "restoredPodName is the name of the pod that was created from the restore.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "message is a human-readable message indicating details about the restore.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

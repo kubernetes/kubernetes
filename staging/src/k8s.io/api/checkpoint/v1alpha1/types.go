@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -89,4 +90,76 @@ type PodCheckpointList struct {
 
 	// items is a list of PodCheckpoint objects.
 	Items []PodCheckpoint `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// PodRestorePhase represents the phase of a PodRestore.
+type PodRestorePhase string
+
+const (
+	// PodRestorePending means the restore has been accepted but not yet started.
+	PodRestorePending PodRestorePhase = "Pending"
+	// PodRestoreRestoring means the restore is in progress.
+	PodRestoreRestoring PodRestorePhase = "Restoring"
+	// PodRestoreCompleted means the restore has completed successfully.
+	PodRestoreCompleted PodRestorePhase = "Completed"
+	// PodRestoreFailed means the restore failed.
+	PodRestoreFailed PodRestorePhase = "Failed"
+)
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodRestore represents a restore operation from a PodCheckpoint.
+type PodRestore struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// spec defines the desired restore operation.
+	// +optional
+	Spec PodRestoreSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// status represents the current status of the restore.
+	// +optional
+	Status PodRestoreStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// PodRestoreSpec defines the desired state of a PodRestore.
+type PodRestoreSpec struct {
+	// checkpointName is the name of the PodCheckpoint to restore from.
+	// The PodCheckpoint must exist in the same namespace and be in Ready phase.
+	// +required
+	CheckpointName string `json:"checkpointName" protobuf:"bytes,1,opt,name=checkpointName"`
+
+	// podTemplate defines the pod template for the restored pod.
+	// The RestoreFrom field will be set automatically by the controller.
+	// +required
+	PodTemplate corev1.PodTemplateSpec `json:"podTemplate" protobuf:"bytes,2,opt,name=podTemplate"`
+}
+
+// PodRestoreStatus represents the current status of a PodRestore.
+type PodRestoreStatus struct {
+	// phase represents the current phase of the restore.
+	// +optional
+	Phase PodRestorePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase"`
+
+	// restoredPodName is the name of the pod that was created from the restore.
+	// +optional
+	RestoredPodName string `json:"restoredPodName,omitempty" protobuf:"bytes,2,opt,name=restoredPodName"`
+
+	// message is a human-readable message indicating details about the restore.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodRestoreList is a list of PodRestore objects.
+type PodRestoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// items is a list of PodRestore objects.
+	Items []PodRestore `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

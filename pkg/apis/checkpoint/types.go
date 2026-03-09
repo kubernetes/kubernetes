@@ -18,6 +18,7 @@ package checkpoint
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodCheckpointPhase represents the phase of a PodCheckpoint.
@@ -81,4 +82,66 @@ type PodCheckpointList struct {
 	metav1.ListMeta
 
 	Items []PodCheckpoint
+}
+
+// PodRestorePhase represents the phase of a PodRestore.
+type PodRestorePhase string
+
+const (
+	PodRestorePending   PodRestorePhase = "Pending"
+	PodRestoreRestoring PodRestorePhase = "Restoring"
+	PodRestoreCompleted PodRestorePhase = "Completed"
+	PodRestoreFailed    PodRestorePhase = "Failed"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodRestore represents a restore operation from a PodCheckpoint.
+type PodRestore struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// spec defines the desired restore operation.
+	// +optional
+	Spec PodRestoreSpec
+
+	// status represents the current status of the restore.
+	// +optional
+	Status PodRestoreStatus
+}
+
+// PodRestoreSpec defines the desired state of a PodRestore.
+type PodRestoreSpec struct {
+	// checkpointName is the name of the PodCheckpoint to restore from.
+	CheckpointName string
+
+	// podTemplate defines the pod template for the restored pod.
+	PodTemplate api.PodTemplateSpec
+}
+
+// PodRestoreStatus represents the current status of a PodRestore.
+type PodRestoreStatus struct {
+	// phase represents the current phase of the restore.
+	// +optional
+	Phase PodRestorePhase
+
+	// restoredPodName is the name of the pod created from the restore.
+	// +optional
+	RestoredPodName string
+
+	// message is a human-readable message indicating details about the restore.
+	// +optional
+	Message string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodRestoreList is a list of PodRestore objects.
+type PodRestoreList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	Items []PodRestore
 }

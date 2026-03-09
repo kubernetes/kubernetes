@@ -46,6 +46,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodCheckpoint{},
 		&PodCheckpointList{},
+		&PodRestore{},
+		&PodRestoreList{},
 	)
 	return nil
 }

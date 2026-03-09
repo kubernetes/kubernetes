@@ -43,6 +43,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodCheckpoint{},
 		&PodCheckpointList{},
+		&PodRestore{},
+		&PodRestoreList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

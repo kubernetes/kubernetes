@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/checkpoint"
 	podcheckpointstorage "k8s.io/kubernetes/pkg/registry/checkpoint/podcheckpoint/storage"
+	podrestorestorage "k8s.io/kubernetes/pkg/registry/checkpoint/podrestore/storage"
 )
 
 // RESTStorageProvider is a provider of REST storage for the checkpoint API group.
@@ -53,6 +54,15 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = podCheckpointStorage
 		storage[resource+"/status"] = podCheckpointStatusStorage
+	}
+
+	if resource := "podrestores"; apiResourceConfigSource.ResourceEnabled(checkpointapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		podRestoreStorage, podRestoreStatusStorage, err := podrestorestorage.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = podRestoreStorage
+		storage[resource+"/status"] = podRestoreStatusStorage
 	}
 
 	return storage, nil

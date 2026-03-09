@@ -43,3 +43,26 @@ func ValidatePodCheckpointUpdate(newPC, oldPC *checkpoint.PodCheckpoint) field.E
 
 	return allErrs
 }
+
+// ValidatePodRestore validates a PodRestore.
+func ValidatePodRestore(pr *checkpoint.PodRestore) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if pr.Spec.CheckpointName == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "checkpointName"), "checkpointName is required"))
+	}
+
+	return allErrs
+}
+
+// ValidatePodRestoreUpdate validates a PodRestore update.
+func ValidatePodRestoreUpdate(newPR, oldPR *checkpoint.PodRestore) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// checkpointName is immutable
+	if newPR.Spec.CheckpointName != oldPR.Spec.CheckpointName {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "checkpointName"), newPR.Spec.CheckpointName, "field is immutable"))
+	}
+
+	return allErrs
+}

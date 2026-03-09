@@ -565,6 +565,16 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podrestore-controller"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(checkpointGroup).Resources("podrestores").RuleOrDie(),
+			rbacv1helpers.NewRule("update", "patch").Groups(checkpointGroup).Resources("podrestores/status").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		},
+	})
+
 	return controllerRoles, controllerRoleBindings
 }
 

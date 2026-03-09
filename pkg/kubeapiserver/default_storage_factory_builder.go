@@ -146,9 +146,14 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
 	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
-	// PodCheckpoint types don't have protobuf bindings, so force JSON storage.
+	// Checkpoint types don't have protobuf bindings, so force JSON storage.
 	storageFactory.SetSerializer(
 		checkpoint.Resource("podcheckpoints"),
+		runtime.ContentTypeJSON,
+		c.Serializer,
+	)
+	storageFactory.SetSerializer(
+		checkpoint.Resource("podrestores"),
 		runtime.ContentTypeJSON,
 		c.Serializer,
 	)
