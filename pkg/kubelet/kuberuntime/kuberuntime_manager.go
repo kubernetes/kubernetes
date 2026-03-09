@@ -307,6 +307,7 @@ func NewKubeGenericRuntimeManager(
 	var imagePullManager imagepullmanager.ImagePullManager = &imagepullmanager.NoopImagePullManager{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
 		imagePullCredentialsVerificationPolicy, err := imagepullmanager.NewImagePullCredentialVerificationPolicy(
+			logger,
 			kubeletconfiginternal.ImagePullCredentialsVerificationPolicy(imagePullsCredentialVerificationPolicy),
 			preloadedImagesCredentialVerificationWhitelist)
 

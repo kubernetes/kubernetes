@@ -19,6 +19,9 @@ package pullmanager
 import (
 	"reflect"
 	"testing"
+
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNeverVerifyPreloadedPullPolicy(t *testing.T) {
@@ -40,7 +43,7 @@ func TestNeverVerifyPreloadedPullPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NeverVerifyPreloadedPullPolicy()("test-image", tt.imageRecordsExist); got != tt.want {
+			if got := NeverVerifyPreloadedPullPolicy()("test-image:sometag", tt.imageRecordsExist); got != tt.want {
 				t.Errorf("NeverVerifyPreloadedPullPolicy() = %v, want %v", got, tt.want)
 			}
 		})
@@ -162,7 +165,9 @@ func TestNewNeverVerifyAllowListedPullPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			policyEnforcer, err := NewNeverVerifyAllowListedPullPolicy(tt.allowlist)
+			_, ctx := ktesting.NewTestContext(t)
+			logger := klog.FromContext(ctx)
+			policyEnforcer, err := NewNeverVerifyAllowListedPullPolicy(logger, tt.allowlist)
 			if tt.wantErr != (err != nil) {
 				t.Fatalf("wanted error: %t, got: %v", tt.wantErr, err)
 			}
@@ -179,7 +184,7 @@ func TestNewNeverVerifyAllowListedPullPolicy(t *testing.T) {
 				t.Errorf("expected %d of wildcard image URLs in the allowlist policy, got %d: %v", tt.expectedWildcards, len(policyEnforcer.prefixes), policyEnforcer.prefixes)
 			}
 
-			got := policyEnforcer.RequireCredentialVerificationForImage("test.io/test/test-image", tt.imageRecordsExist)
+			got := policyEnforcer.RequireCredentialVerificationForImage("test.io/test/test-image:tag", tt.imageRecordsExist)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewNeverVerifyAllowListedPullPolicy() = %v, want %v", got, tt.want)
 			}

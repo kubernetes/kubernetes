@@ -23,6 +23,7 @@ import (
 	dockerref "github.com/distribution/reference"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -47,14 +48,14 @@ func (e ImagePullPolicyEnforcerFunc) RequireCredentialVerificationForImage(image
 	return e(image, imagePulledByKubelet)
 }
 
-func NewImagePullCredentialVerificationPolicy(policy kubeletconfiginternal.ImagePullCredentialsVerificationPolicy, imageAllowList []string) (ImagePullPolicyEnforcer, error) {
+func NewImagePullCredentialVerificationPolicy(logger klog.Logger, policy kubeletconfiginternal.ImagePullCredentialsVerificationPolicy, imageAllowList []string) (ImagePullPolicyEnforcer, error) {
 	switch policy {
 	case kubeletconfiginternal.NeverVerify:
 		return NeverVerifyImagePullPolicy(), nil
 	case kubeletconfiginternal.NeverVerifyPreloadedImages:
 		return NeverVerifyPreloadedPullPolicy(), nil
 	case kubeletconfiginternal.NeverVerifyAllowlistedImages:
-		return NewNeverVerifyAllowListedPullPolicy(imageAllowList)
+		return NewNeverVerifyAllowListedPullPolicy(logger, imageAllowList)
 	case kubeletconfiginternal.AlwaysVerify:
 		return AlwaysVerifyImagePullPolicy(), nil
 	default:
@@ -83,11 +84,15 @@ func AlwaysVerifyImagePullPolicy() ImagePullPolicyEnforcerFunc {
 type NeverVerifyAllowlistedImages struct {
 	absoluteURLs sets.Set[string]
 	prefixes     []string
+
+	logger klog.Logger
 }
 
-func NewNeverVerifyAllowListedPullPolicy(allowList []string) (*NeverVerifyAllowlistedImages, error) {
+func NewNeverVerifyAllowListedPullPolicy(logger klog.Logger, allowList []string) (*NeverVerifyAllowlistedImages, error) {
 	policy := &NeverVerifyAllowlistedImages{
 		absoluteURLs: sets.New[string](),
+
+		logger: logger,
 	}
 	for _, pattern := range allowList {
 		normalizedPattern, isWildcard, err := getAllowlistImagePattern(pattern)
@@ -110,11 +115,19 @@ func (p *NeverVerifyAllowlistedImages) RequireCredentialVerificationForImage(ima
 }
 
 func (p *NeverVerifyAllowlistedImages) imageMatches(image string) bool {
-	if p.absoluteURLs.Has(image) {
+	parsedImage, err := dockerref.ParseNormalizedNamed(image)
+	if err != nil {
+		p.logger.Error(err, "failed to parse image name", "image", image)
+		return false
+	}
+	noTagsName := parsedImage.Name()
+
+	if p.absoluteURLs.Has(noTagsName) {
 		return true
 	}
+
 	for _, prefix := range p.prefixes {
-		if strings.HasPrefix(image, prefix) {
+		if strings.HasPrefix(noTagsName, prefix) {
 			return true
 		}
 	}
