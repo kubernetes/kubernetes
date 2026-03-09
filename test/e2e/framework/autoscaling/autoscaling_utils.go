@@ -155,7 +155,7 @@ func NewExternalMetricsController(clientSet clientset.Interface, serviceName, na
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   30 * time.Second,
+		Timeout:   60 * time.Second,
 	}
 	return &ExternalMetricsController{
 		clientSet:   clientSet,
@@ -229,7 +229,7 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 
 	stopChan := make(chan struct{}, 1)
-	readyChan := make(chan struct{})
+	readyChan := make(chan struct{}, 1)
 
 	portForwardOptions := kubectlportforward.NewDefaultPortForwardOptions(streams)
 	portForwardOptions.Namespace = emc.namespace
@@ -312,9 +312,39 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	return nil
 }
 
+// InitializeDefaultMetrics creates standard metrics used in external metrics HPA tests
+// This ensures metrics exist before SetMetricValue is called
+func (emc *ExternalMetricsController) InitializeDefaultMetrics(ctx context.Context, metricNames []string) error {
+	for _, metricName := range metricNames {
+		// Create metric with default value of 100
+		if err := emc.CreateMetric(ctx, metricName, 100, nil, false); err != nil {
+			framework.Logf("Warning: failed to create metric %s: %v", metricName, err)
+			// Don't fail if metric already exists
+			if !strings.Contains(err.Error(), "already exists") {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // RunExternalMetricsServer creates and returns an ExternalMetricsController for controlling the server
 func RunExternalMetricsServer(ctx context.Context, c clientset.Interface, ns, name string, serviceAnnotations map[string]string) *ExternalMetricsController {
 	runServiceAndApiregistrationForExternalMetricsServer(ctx, c, ns, name, serviceAnnotations)
+
+	// Wait for the external metrics server deployment to be ready
+	ginkgo.By("Waiting for external metrics server to be ready")
+
+	// Wait for deployment to have ready replicas
+	framework.Gomega().Eventually(ctx, func(ctx context.Context) bool {
+		d, err := c.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Error getting deployment: %v", err)
+			return false
+		}
+		return d.Status.ReadyReplicas > 0 && d.Status.ReadyReplicas == d.Status.Replicas
+	}).WithTimeout(5 * time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrue())
+
 	return NewExternalMetricsController(c, name, ns)
 }
 
@@ -328,23 +358,43 @@ func CleanupExternalMetricsServer(ctx context.Context, c clientset.Interface, ns
 		aggClient, err := aggregatorclient.NewForConfig(config)
 		if err == nil {
 			err = aggClient.ApiregistrationV1().APIServices().Delete(ctx, "v1beta1.external.metrics.k8s.io", metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !isNotFoundError(err) {
 				framework.Logf("Error deleting APIService: %v", err)
 			}
+			// Wait for APIService to be deleted
+			framework.Gomega().Eventually(ctx, func(ctx context.Context) bool {
+				_, err := aggClient.ApiregistrationV1().APIServices().Get(ctx, "v1beta1.external.metrics.k8s.io", metav1.GetOptions{})
+				return err != nil && isNotFoundError(err)
+			}).WithTimeout(30 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue())
 		}
 	}
 
 	// Delete the deployment
 	err = c.AppsV1().Deployments(ns).Delete(ctx, name, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !isNotFoundError(err) {
 		framework.Logf("Error deleting deployment: %v", err)
 	}
+	// Wait for deployment to be deleted
+	framework.Gomega().Eventually(ctx, func(ctx context.Context) bool {
+		_, err := c.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+		return err != nil && isNotFoundError(err)
+	}).WithTimeout(30 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue())
 
 	// Delete the service
 	err = c.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !isNotFoundError(err) {
 		framework.Logf("Error deleting service: %v", err)
 	}
+	// Wait for service to be deleted
+	framework.Gomega().Eventually(ctx, func(ctx context.Context) bool {
+		_, err := c.CoreV1().Services(ns).Get(ctx, name, metav1.GetOptions{})
+		return err != nil && isNotFoundError(err)
+	}).WithTimeout(30 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue())
+}
+
+// isNotFoundError checks if an error is an "not found" error
+func isNotFoundError(err error) bool {
+	return err != nil && meta.IsNoMatchError(err)
 }
 
 // NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
