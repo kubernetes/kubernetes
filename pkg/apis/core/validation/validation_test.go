@@ -24478,6 +24478,7 @@ func TestValidateOSFields(t *testing.T) {
 	osSpecificFields := sets.NewString(
 		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
+		"Containers[*].SecurityContext.CgroupOptions.MountMode",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
 		"Containers[*].SecurityContext.ProcMount",
@@ -24489,6 +24490,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.WindowsOptions",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
+		"InitContainers[*].SecurityContext.CgroupOptions.MountMode",
 		"InitContainers[*].SecurityContext.Capabilities",
 		"InitContainers[*].SecurityContext.Privileged",
 		"InitContainers[*].SecurityContext.ProcMount",
@@ -24500,6 +24502,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.WindowsOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.CgroupOptions.MountMode",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ProcMount",
@@ -24996,6 +24999,72 @@ func TestValidateSecurityContext(t *testing.T) {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
+	}
+}
+
+func TestValidateSecurityContextCgroupOptions(t *testing.T) {
+	readOnly := core.CgroupMountModeReadOnly
+	writable := core.CgroupMountModeWritable
+	invalid := core.CgroupMountMode("Invalid")
+
+	successCases := map[string]*core.SecurityContext{
+		"nil cgroupOptions": {
+			CgroupOptions: nil,
+		},
+		"cgroupOptions with nil mountMode": {
+			CgroupOptions: &core.CgroupOptions{},
+		},
+		"cgroupOptions ReadOnly": {
+			CgroupOptions: &core.CgroupOptions{MountMode: &readOnly},
+		},
+		"cgroupOptions Writable": {
+			CgroupOptions: &core.CgroupOptions{MountMode: &writable},
+		},
+	}
+	for name, sc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			if errs := ValidateSecurityContext(sc, field.NewPath("field"), true, false); len(errs) != 0 {
+				t.Errorf("expected success, got %v", errs)
+			}
+		})
+	}
+
+	errorCases := map[string]struct {
+		sc          *core.SecurityContext
+		errorDetail string
+	}{
+		"cgroupOptions with windowsOptions": {
+			sc: &core.SecurityContext{
+				CgroupOptions:  &core.CgroupOptions{MountMode: &writable},
+				WindowsOptions: &core.WindowsSecurityContextOptions{},
+			},
+			errorDetail: "cannot be set when windowsOptions is specified",
+		},
+		"cgroupOptions with invalid mountMode": {
+			sc: &core.SecurityContext{
+				CgroupOptions: &core.CgroupOptions{MountMode: &invalid},
+			},
+			errorDetail: "Unsupported value",
+		},
+	}
+	for name, tc := range errorCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateSecurityContext(tc.sc, field.NewPath("field"), true, false)
+			if len(errs) == 0 {
+				t.Errorf("expected error containing %q, got no errors", tc.errorDetail)
+				return
+			}
+			found := false
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tc.errorDetail) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error containing %q, got %v", tc.errorDetail, errs)
+			}
+		})
 	}
 }
 

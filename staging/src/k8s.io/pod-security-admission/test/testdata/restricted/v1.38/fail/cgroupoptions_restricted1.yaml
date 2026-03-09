@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cgroupoptions_restricted1
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      cgroupOptions:
+        mountMode: Writable
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
