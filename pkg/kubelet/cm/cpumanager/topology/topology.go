@@ -154,8 +154,8 @@ func (d CPUDetails) UncoreInNUMANodes(ids ...int) cpuset.CPUSet {
 
 // CoresNeededInUncoreCache returns either the full list of all available unique core IDs associated with the given
 // UnCoreCache IDs in this CPUDetails or subset that matches the ask.
-func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, ids ...int) cpuset.CPUSet {
-	coreIDs := d.coresInUncoreCache(ids...)
+func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, cpusPerCore int, ids ...int) cpuset.CPUSet {
+	coreIDs := d.coresInUncoreCache(cpusPerCore, ids...)
 	if coreIDs.Size() <= numCoresNeeded {
 		return coreIDs
 	}
@@ -163,13 +163,24 @@ func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, ids ...int) cpu
 	return cpuset.New(tmpCoreIDs[:numCoresNeeded]...)
 }
 
-// Helper function that just gets the cores
-func (d CPUDetails) coresInUncoreCache(ids ...int) cpuset.CPUSet {
+// Helper function that gets the available cores based on the uncore cache ID.
+// If SMT/hyperthreading is enabled, only fully available cores are returned
+// to prevent any possible SMT/hyperthreading misalignment
+func (d CPUDetails) coresInUncoreCache(cpusPerCore int, ids ...int) cpuset.CPUSet {
 	var coreIDs []int
 	for _, id := range ids {
 		for _, info := range d {
 			if info.UncoreCacheID == id {
-				coreIDs = append(coreIDs, info.CoreID)
+				if cpusPerCore == 1 {
+					// SMT/hyperthreading disabled case, return the available cores
+					coreIDs = append(coreIDs, info.CoreID)
+				} else {
+					// SMT/hyperthreading enabled case, return only the cores that have all their cpus available
+					cpusInCore := d.CPUsInCores(info.CoreID)
+					if cpusInCore.Size() == cpusPerCore {
+						coreIDs = append(coreIDs, info.CoreID)
+					}
+				}
 			}
 		}
 	}
