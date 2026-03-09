@@ -209,26 +209,56 @@ func (s *socketsFirst) sortAvailableCores() []int {
 	return result
 }
 
+// Sort the UncoreCaches within the NUMA nodes.
+func (a *cpuAccumulator) sortAvailableUncoreCachesForResize() []int {
+	var result []int
+	for _, numa := range a.sortAvailableNUMANodesForResize() {
+		allocatedUncoreCachesSet := a.resultDetails.UncoreInNUMANodes(numa)
+		availableUncoreCachesSet := a.details.UncoreInNUMANodes(numa)
+
+		// Sort UncoreCaches that have allocated CPUs
+		allocatedUncoreCaches := allocatedUncoreCachesSet.Intersection(availableUncoreCachesSet).UnsortedList()
+		a.sort(allocatedUncoreCaches, a.details.CPUsInUncoreCaches)
+		result = append(result, allocatedUncoreCaches...)
+
+		// Sort other available UncoreCaches
+		availableUncoreCaches := availableUncoreCachesSet.Difference(allocatedUncoreCachesSet).UnsortedList()
+		a.sort(availableUncoreCaches, a.details.CPUsInUncoreCaches)
+		result = append(result, availableUncoreCaches...)
+	}
+	return result
+}
+
 // If NUMA nodes are higher in the memory hierarchy than sockets, then we take
 // from the set of NUMA Nodes as the first level for resize.
 func (n *numaFirst) takeFullFirstLevelForResize() {
-	n.acc.takeRemainCpusForFullNUMANodes()
+	n.acc.takeFullNUMANodesForResize()
 }
 
 // If NUMA nodes are higher in the memory hierarchy than sockets, then we take
 // from the set of sockets as the second level for resize.
 func (n *numaFirst) takeFullSecondLevelForResize() {
-	n.acc.takeRemainCpusForFullSockets()
+	n.acc.takeFullSocketsForResize()
 }
 
 // If NUMA nodes are higher in the memory hierarchy than sockets, then return the available NUMA nodes
 // which have allocated CPUs to Container.
 func (n *numaFirst) sortAvailableNUMANodesForResize() []int {
+	var result []int
+
 	allocatedNumaNodesSet := n.acc.resultDetails.NUMANodes()
 	availableNumaNodesSet := n.acc.details.NUMANodes()
-	numas := allocatedNumaNodesSet.Intersection(availableNumaNodesSet).UnsortedList()
-	n.acc.sort(numas, n.acc.details.CPUsInNUMANodes)
-	return numas
+
+	// Sort Numa nodes which have allocated CPUs
+	allocatedNumas := allocatedNumaNodesSet.Intersection(availableNumaNodesSet).UnsortedList()
+	n.acc.sort(allocatedNumas, n.acc.details.CPUsInNUMANodes)
+	result = append(result, allocatedNumas...)
+
+	// Sort other Numa nodes
+	availableNumas := availableNumaNodesSet.Difference(allocatedNumaNodesSet).UnsortedList()
+	n.acc.sort(availableNumas, n.acc.details.CPUsInNUMANodes)
+	result = append(result, availableNumas...)
+	return result
 }
 
 // If NUMA nodes are higher in the memory hierarchy than sockets,
@@ -237,19 +267,19 @@ func (n *numaFirst) sortAvailableNUMANodesForResize() []int {
 func (n *numaFirst) sortAvailableSocketsForResize() []int {
 	var result []int
 
-	// Sort allocated sockets
-	allocatedSocketsSet := n.acc.resultDetails.Sockets()
-	availableSocketsSet := n.acc.details.Sockets()
-	allocatedSockets := allocatedSocketsSet.Intersection(availableSocketsSet).UnsortedList()
-	n.acc.sort(allocatedSockets, n.acc.details.CPUsInSockets)
-	result = append(result, allocatedSockets...)
-
-	// Sort the sockets in allocated numa node, but not allocated CPU on these sockets
 	for _, numa := range n.sortAvailableNUMANodesForResize() {
-		socketSet := n.acc.details.SocketsInNUMANodes(numa)
-		sockets := socketSet.Difference(allocatedSocketsSet).UnsortedList()
-		n.acc.sort(sockets, n.acc.details.CPUsInSockets)
-		result = append(result, sockets...)
+		allocatedSocketsSet := n.acc.resultDetails.SocketsInNUMANodes(numa)
+		availableSocketsSet := n.acc.details.SocketsInNUMANodes(numa)
+
+		// Sort sockets that have allocated CPUs
+		allocatedSockets := allocatedSocketsSet.Intersection(availableSocketsSet).UnsortedList()
+		n.acc.sort(allocatedSockets, n.acc.details.CPUsInSockets)
+		result = append(result, allocatedSockets...)
+
+		// Sort other available sockets
+		availableSockets := availableSocketsSet.Difference(allocatedSocketsSet).UnsortedList()
+		n.acc.sort(availableSockets, n.acc.details.CPUsInSockets)
+		result = append(result, availableSockets...)
 	}
 	return result
 }
@@ -260,19 +290,19 @@ func (n *numaFirst) sortAvailableSocketsForResize() []int {
 func (n *numaFirst) sortAvailableCoresForResize() []int {
 	var result []int
 
-	// Sort allocated cores
-	allocatedCoresSet := n.acc.resultDetails.Cores()
-	availableCoresSet := n.acc.details.Cores()
-	allocatedCores := allocatedCoresSet.Intersection(availableCoresSet).UnsortedList()
-	n.acc.sort(allocatedCores, n.acc.details.CPUsInCores)
-	result = append(result, allocatedCores...)
-
-	// Sort the cores in allocated sockets, and allocated numa, but not allocated CPU on these sockets and numa
 	for _, socket := range n.acc.sortAvailableSocketsForResize() {
-		coresSet := n.acc.details.CoresInSockets(socket)
-		cores := coresSet.Difference(allocatedCoresSet).UnsortedList()
-		n.acc.sort(cores, n.acc.details.CPUsInCores)
-		result = append(result, cores...)
+		allocatedCoresSet := n.acc.resultDetails.CoresInSockets(socket)
+		availableCoresSet := n.acc.details.CoresInSockets(socket)
+
+		// Sort cores that have allocated CPUs
+		allocatedCores := allocatedCoresSet.Intersection(availableCoresSet).UnsortedList()
+		n.acc.sort(allocatedCores, n.acc.details.CPUsInCores)
+		result = append(result, allocatedCores...)
+
+		// Sort other available cores
+		availableCores := availableCoresSet.Difference(allocatedCoresSet).UnsortedList()
+		n.acc.sort(availableCores, n.acc.details.CPUsInCores)
+		result = append(result, availableCores...)
 	}
 	return result
 }
@@ -280,13 +310,13 @@ func (n *numaFirst) sortAvailableCoresForResize() []int {
 // If sockets are higher in the memory hierarchy than NUMA nodes, then we take
 // from the set of NUMA Nodes as the first level for resize.
 func (s *socketsFirst) takeFullFirstLevelForResize() {
-	s.acc.takeRemainCpusForFullSockets()
+	s.acc.takeFullSocketsForResize()
 }
 
 // If sockets are higher in the memory hierarchy than NUMA nodes, then we take
 // from the set of sockets as the second level for resize.
 func (s *socketsFirst) takeFullSecondLevelForResize() {
-	s.acc.takeRemainCpusForFullNUMANodes()
+	s.acc.takeFullNUMANodesForResize()
 }
 
 // If sockets are higher in the memory hierarchy than NUMA nodes,
@@ -295,19 +325,19 @@ func (s *socketsFirst) takeFullSecondLevelForResize() {
 func (s *socketsFirst) sortAvailableNUMANodesForResize() []int {
 	var result []int
 
-	// Sort allocated sockets
-	allocatedNUMANodesSet := s.acc.resultDetails.NUMANodes()
-	availableNUMANodesSet := s.acc.details.NUMANodes()
-	allocatedNUMANodes := allocatedNUMANodesSet.Intersection(availableNUMANodesSet).UnsortedList()
-	s.acc.sort(allocatedNUMANodes, s.acc.details.CPUsInNUMANodes)
-	result = append(result, allocatedNUMANodes...)
-
-	// Sort the sockets in allocated numa node, but not allocated CPU on these sockets
 	for _, socket := range s.sortAvailableSocketsForResize() {
-		NUMANodesSet := s.acc.details.NUMANodesInSockets(socket)
-		NUMANodes := NUMANodesSet.Difference(allocatedNUMANodesSet).UnsortedList()
-		s.acc.sort(NUMANodes, s.acc.details.CPUsInNUMANodes)
-		result = append(result, NUMANodes...)
+		allocatedNumaNodesSet := s.acc.resultDetails.NUMANodesInSockets(socket)
+		availableNumaNodesSet := s.acc.details.NUMANodesInSockets(socket)
+
+		// Sort Numa nodes which have allocated CPUs
+		allocatedNumas := allocatedNumaNodesSet.Intersection(availableNumaNodesSet).UnsortedList()
+		s.acc.sort(allocatedNumas, s.acc.details.CPUsInNUMANodes)
+		result = append(result, allocatedNumas...)
+
+		// Sort other Numa nodes
+		availableNumas := availableNumaNodesSet.Difference(allocatedNumaNodesSet).UnsortedList()
+		s.acc.sort(availableNumas, s.acc.details.CPUsInNUMANodes)
+		result = append(result, availableNumas...)
 	}
 	return result
 }
@@ -315,11 +345,22 @@ func (s *socketsFirst) sortAvailableNUMANodesForResize() []int {
 // If sockets are higher in the memory hierarchy than NUMA nodes, then return the available sockets
 // which have allocated CPUs to Container.
 func (s *socketsFirst) sortAvailableSocketsForResize() []int {
+	var result []int
+
 	allocatedSocketsSet := s.acc.resultDetails.Sockets()
 	availableSocketsSet := s.acc.details.Sockets()
-	sockets := allocatedSocketsSet.Intersection(availableSocketsSet).UnsortedList()
-	s.acc.sort(sockets, s.acc.details.CPUsInSockets)
-	return sockets
+
+	// Sort Sockets which have allocated CPUs
+	allocatedSockets := allocatedSocketsSet.Intersection(availableSocketsSet).UnsortedList()
+	s.acc.sort(allocatedSockets, s.acc.details.CPUsInSockets)
+	result = append(result, allocatedSockets...)
+
+	// Sort other Sockets
+	availableSockets := availableSocketsSet.Difference(allocatedSocketsSet).UnsortedList()
+	s.acc.sort(availableSockets, s.acc.details.CPUsInSockets)
+	result = append(result, availableSockets...)
+
+	return result
 }
 
 // If sockets are higher in the memory hierarchy than NUMA nodes,
@@ -328,19 +369,19 @@ func (s *socketsFirst) sortAvailableSocketsForResize() []int {
 func (s *socketsFirst) sortAvailableCoresForResize() []int {
 	var result []int
 
-	// Sort allocated cores
-	allocatedCoresSet := s.acc.resultDetails.Cores()
-	availableCoresSet := s.acc.details.Cores()
-	allocatedCores := allocatedCoresSet.Intersection(availableCoresSet).UnsortedList()
-	s.acc.sort(allocatedCores, s.acc.details.CPUsInCores)
-	result = append(result, allocatedCores...)
+	for _, numa := range s.acc.sortAvailableNUMANodesForResize() {
+		allocatedCoresSet := s.acc.resultDetails.CoresInNUMANodes(numa)
+		availableCoresSet := s.acc.details.CoresInNUMANodes(numa)
 
-	// Sort the cores in allocated sockets, and allocated numa, but not allocated CPU on these sockets and numa
-	for _, NUMANode := range s.acc.sortAvailableNUMANodesForResize() {
-		coresSet := s.acc.details.CoresInNUMANodes(NUMANode)
-		cores := coresSet.Difference(allocatedCoresSet).UnsortedList()
-		s.acc.sort(cores, s.acc.details.CPUsInCores)
-		result = append(result, cores...)
+		// Sort cores that have allocated CPUs
+		allocatedCores := allocatedCoresSet.Intersection(availableCoresSet).UnsortedList()
+		s.acc.sort(allocatedCores, s.acc.details.CPUsInCores)
+		result = append(result, allocatedCores...)
+
+		// Sort other available cores
+		availableCores := availableCoresSet.Difference(allocatedCoresSet).UnsortedList()
+		s.acc.sort(availableCores, s.acc.details.CPUsInCores)
+		result = append(result, availableCores...)
 	}
 	return result
 }
@@ -623,6 +664,11 @@ func (a *cpuAccumulator) isFullSocketForResize(socketID int) bool {
 // return true if this Socket only allocated CPUs for this Container
 func (a *cpuAccumulator) isFullCoreForResize(coreID int) bool {
 	return a.resultDetails.CPUsInCores(coreID).Size()+a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
+}
+
+// return true if this Socket only allocated CPUs for this Container
+func (a *cpuAccumulator) isFullUncoreCacheForResize(uncoreID int) bool {
+	return a.resultDetails.CPUsInUncoreCaches(uncoreID).Size()+a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
 }
 
 // Sorts the provided list of NUMA nodes/sockets/cores/cpus referenced in 'ids'
@@ -977,40 +1023,69 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 	}
 }
 
-func (a *cpuAccumulator) takeRemainCpusForFullNUMANodes() {
+func (a *cpuAccumulator) takeFullUncoreForResize() {
+	for _, uncore := range a.sortAvailableUncoreCachesForResize() {
+		if a.isFullUncoreCacheForResize(uncore) {
+			cpusInUncore := a.details.CPUsInUncoreCaches(uncore)
+			if !a.needsAtLeast(cpusInUncore.Size()) {
+				continue
+			}
+			a.logger.V(4).Info("takeFullUncoreForResize: claiming uncore", "uncore", uncore)
+			a.take(cpusInUncore)
+		}
+	}
+}
+
+func (a *cpuAccumulator) takeUncoreCacheForResize() {
+	// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
+	a.takeFullUncoreForResize()
+	if a.isSatisfied() {
+		return
+	}
+
+	// take partial UncoreCache if the CPUs needed is less than free UncoreCache size
+	for _, uncore := range a.sortAvailableUncoreCachesForResize() {
+		a.takePartialUncore(uncore)
+		if a.isSatisfied() {
+			return
+		}
+	}
+}
+
+func (a *cpuAccumulator) takeFullNUMANodesForResize() {
 	for _, numa := range a.sortAvailableNUMANodesForResize() {
 		if a.isFullNUMANodeForResize(numa) {
 			cpusInNUMANode := a.details.CPUsInNUMANodes(numa)
 			if !a.needsAtLeast(cpusInNUMANode.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeRemainCpusForFullNUMANodes: claiming NUMA node", "numa", numa, "cpusInNUMANode", cpusInNUMANode)
+			a.logger.V(4).Info("takeFullNUMANodesForResize: claiming NUMA node", "numa", numa, "cpusInNUMANode", cpusInNUMANode)
 			a.take(cpusInNUMANode)
 		}
 	}
 }
 
-func (a *cpuAccumulator) takeRemainCpusForFullSockets() {
+func (a *cpuAccumulator) takeFullSocketsForResize() {
 	for _, socket := range a.sortAvailableSocketsForResize() {
 		if a.isFullSocketForResize(socket) {
 			cpusInSocket := a.details.CPUsInSockets(socket)
 			if !a.needsAtLeast(cpusInSocket.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeRemainCpusForFullSockets: claiming Socket", "socket", socket, "cpusInSocket", cpusInSocket)
+			a.logger.V(4).Info("takeFullSocketsForResize: claiming Socket", "socket", socket, "cpusInSocket", cpusInSocket)
 			a.take(cpusInSocket)
 		}
 	}
 }
 
-func (a *cpuAccumulator) takeRemainCpusForFullCores() {
+func (a *cpuAccumulator) takeFullCoresForResize() {
 	for _, core := range a.sortAvailableCoresForResize() {
 		if a.isFullCoreForResize(core) {
 			cpusInCore := a.details.CPUsInCores(core)
 			if !a.needsAtLeast(cpusInCore.Size()) {
 				continue
 			}
-			a.logger.V(4).Info("takeRemainCpusForFullCores: claiming Core", "core", core, "cpusInCore", cpusInCore)
+			a.logger.V(4).Info("takeFullCoresForResize: claiming Core", "core", core, "cpusInCore", cpusInCore)
 			a.take(cpusInCore)
 		}
 	}
@@ -1520,7 +1595,7 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 	}
 
 	// Otherwise build an accumulator to start allocating CPUs from.
-	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, nil, mustKeepCPUsForResize)
+	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, reusableCPUsForResize, mustKeepCPUsForResize)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -1529,24 +1604,13 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
-	numas := acc.sortAvailableNUMANodes()
-	reusableCPUsForResizeDetail := acc.topo.CPUDetails.KeepOnly(cpuset.New())
-	allocatedCPUsNumber := 0
-	if reusableCPUsForResize != nil {
-		reusableCPUsForResizeDetail = acc.topo.CPUDetails.KeepOnly(*reusableCPUsForResize)
-		allocatedCPUsNumber = reusableCPUsForResize.Size()
-	}
-	allocatedNumas := reusableCPUsForResizeDetail.NUMANodes()
-	allocatedCPUPerNuma := make(mapIntInt, len(numas))
-	for _, numa := range numas {
-		allocatedCPUPerNuma[numa] = reusableCPUsForResizeDetail.CPUsInNUMANodes(numa).Size()
-	}
+	numas := acc.sortAvailableNUMANodesForResize()
 
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
 	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize)
-	minNUMAs = max(minNUMAs, allocatedNumas.Size())
+	minNUMAs = max(minNUMAs, acc.resultDetails.NUMANodes().Size())
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
 	// where we can evenly distribute CPUs across them. To optimize things, we
@@ -1568,14 +1632,14 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 
 			// Check if the 'allocatedNumas' CPU set is a subset of the 'comboSet'
 			comboSet := cpuset.New(combo...)
-			if !allocatedNumas.IsSubsetOf(comboSet) {
+			if !acc.resultDetails.NUMANodes().IsSubsetOf(comboSet) {
 				return Continue
 			}
 
 			// Check that this combination of NUMA nodes has enough CPUs to
 			// satisfy the allocation overall.
 			cpus := acc.details.CPUsInNUMANodes(combo...)
-			if (cpus.Size() + allocatedCPUsNumber) < numCPUs {
+			if (cpus.Size() + acc.result.Size()) < numCPUs {
 				return Continue
 			}
 
@@ -1583,7 +1647,7 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 			// 'cpuGroupSize' across the NUMA nodes in this combo.
 			numCPUGroups := 0
 			for _, numa := range combo {
-				numCPUGroups += ((acc.details.CPUsInNUMANodes(numa).Size() + allocatedCPUPerNuma[numa]) / cpuGroupSize)
+				numCPUGroups += ((acc.details.CPUsInNUMANodes(numa).Size() + acc.resultDetails.CPUsInNUMANodes(numa).Size()) / cpuGroupSize)
 			}
 			if (numCPUGroups * cpuGroupSize) < numCPUs {
 				return Continue
@@ -1595,10 +1659,11 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
 			for _, numa := range combo {
 				cpus := acc.details.CPUsInNUMANodes(numa)
-				if (cpus.Size() + allocatedCPUPerNuma[numa]) < distribution {
+				allocateCpus := acc.resultDetails.CPUsInNUMANodes(numa)
+				if (cpus.Size() + allocateCpus.Size()) < distribution {
 					return Continue
 				}
-				if allocatedCPUPerNuma[numa] > distribution {
+				if allocateCpus.Size() > distribution {
 					return Continue
 				}
 			}
@@ -1613,7 +1678,7 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 				availableAfterAllocation[numa] = acc.details.CPUsInNUMANodes(numa).Size()
 			}
 			for _, numa := range combo {
-				availableAfterAllocation[numa] -= (distribution - allocatedCPUPerNuma[numa])
+				availableAfterAllocation[numa] -= (distribution - acc.resultDetails.CPUsInNUMANodes(numa).Size())
 			}
 
 			// Check if there are any remaining CPUs to distribute across the
@@ -1720,9 +1785,9 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 		// size 'cpuGroupSize' from 'bestCombo'.
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
 		for _, numa := range bestCombo {
-			reusableCPUsPerNumaForResize := reusableCPUsForResizeDetail.CPUsInNUMANodes(numa)
-			cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false, &reusableCPUsPerNumaForResize, mustKeepCPUsForResize)
-			acc.take(cpus)
+			allocatedCPUs := acc.resultDetails.CPUsInNUMANodes(numa)
+			cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false, &allocatedCPUs, nil)
+			acc.take(cpus.Difference(allocatedCPUs))
 		}
 
 		// Then allocate any remaining CPUs in groups of size 'cpuGroupSize'
@@ -1736,8 +1801,10 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
 					continue
 				}
-				cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false, nil, mustKeepCPUsForResize)
-				acc.take(cpus)
+				allocatedCPUs := acc.resultDetails.CPUsInNUMANodes(numa)
+				needCPUsInNuma := allocatedCPUs.Size() + cpuGroupSize
+				cpus, _ := takeByTopologyNUMAPackedForResize(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), needCPUsInNuma, cpuSortingStrategy, false, &allocatedCPUs, nil)
+				acc.take(cpus.Difference(allocatedCPUs))
 				remainder -= cpuGroupSize
 			}
 		}
@@ -1790,15 +1857,8 @@ func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTop
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
-	acc.numaOrSocketsFirst.takeFullFirstLevel()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
+
 	acc.numaOrSocketsFirst.takeFullSecondLevelForResize()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
-	acc.numaOrSocketsFirst.takeFullSecondLevel()
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -1807,7 +1867,7 @@ func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTop
 	//    if available and the container requires at least a UncoreCache's-worth
 	//    of CPUs. Otherwise, acquire CPUs from the least amount of UncoreCaches.
 	if preferAlignByUncoreCache {
-		acc.takeUncoreCache()
+		acc.takeUncoreCacheForResize()
 		if acc.isSatisfied() {
 			return acc.result, nil
 		}
@@ -1817,11 +1877,7 @@ func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTop
 	//    a core's-worth of CPUs.
 	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
 	if cpuSortingStrategy != CPUSortingStrategySpread {
-		acc.takeRemainCpusForFullCores()
-		if acc.isSatisfied() {
-			return acc.result, nil
-		}
-		acc.takeFullCores()
+		acc.takeFullCoresForResize()
 		if acc.isSatisfied() {
 			return acc.result, nil
 		}
@@ -1831,10 +1887,6 @@ func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTop
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	acc.takeRemainingCPUsForResize()
-	if acc.isSatisfied() {
-		return acc.result, nil
-	}
-	acc.takeRemainingCPUs()
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
