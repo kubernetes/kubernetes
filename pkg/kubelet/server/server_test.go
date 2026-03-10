@@ -149,6 +149,24 @@ func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, 
 	return nil
 }
 
+func (fk *fakeKubelet) CheckpointPod(_ context.Context, podUID types.UID, podFullName string, options *runtimeapi.CheckpointPodRequest) error {
+	if podFullName == "checkpointingPodFailure_other" {
+		return fmt.Errorf("Returning error for test")
+	}
+	return nil
+}
+
+func (fk *fakeKubelet) RestorePod(_ context.Context, options *runtimeapi.RestorePodRequest) (string, error) {
+	if strings.Contains(options.Path, "restore-failure") {
+		return "", fmt.Errorf("Returning error for test")
+	}
+	return "restored-sandbox-id", nil
+}
+
+func (fk *fakeKubelet) GetPodSnapshotsDir() string {
+	return "/var/lib/kubelet/pod-snapshots"
+}
+
 func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return nil, nil
 }
@@ -696,9 +714,10 @@ func TestAuthFilters(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ContainerCheckpoint:    true,
-		zpagesfeatures.ComponentStatusz: true,
-		zpagesfeatures.ComponentFlagz:   true,
+		features.ContainerCheckpoint:              true,
+		features.KubeletLocalPodCheckpointRestore: true,
+		zpagesfeatures.ComponentStatusz:           true,
+		zpagesfeatures.ComponentFlagz:             true,
 	})
 
 	fw := newServerTest(tCtx)
@@ -1321,6 +1340,184 @@ func TestCheckpointContainer(t *testing.T) {
 			t.Errorf("Got error POSTing: %v", err)
 		}
 		assert.Equal(t, 404, resp.StatusCode)
+	})
+}
+
+func TestCheckpointPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	podNamespace := "other"
+	podName := "foo"
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletLocalPodCheckpointRestore, featureGate)
+
+		fw := newServerTest(tCtx)
+		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+			return nil, false
+		}
+		return fw
+	}
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
+	t.Run("pod not found", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+
+	// Now test checkpointing of the pod fails
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      "checkpointingPodFailure",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod fails", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, 500, resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		assert.Equal(t, "checkpointing of other/foo failed (Returning error for test)", string(body))
+	})
+
+	// Now test a successful pod checkpoint
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod succeeds", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with timeout", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"?timeout=30", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with invalid timeout", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"?timeout=invalid", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	// Test for 404 if checkpointing support is explicitly disabled
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 404, resp.StatusCode)
+	})
+}
+
+func TestRestorePod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletLocalPodCheckpointRestore, featureGate)
+		return newServerTest(tCtx)
+	}
+
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
+	t.Run("restore succeeds", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/restore/default/my-snapshot", "", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		assert.Contains(t, string(body), "restored-sandbox-id")
+	})
+
+	t.Run("restore uses correct snapshot path", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/restore/my-ns/my-ckpt", "", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("restore fails from runtime error", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/restore/default/restore-failure", "", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		assert.Contains(t, string(body), "restore of default/restore-failure failed")
+	})
+
+	t.Run("restore rejects path traversal in snapshot name", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/restore/default/..secret", "", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	// Test for 404 if feature gate is disabled
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+
+	t.Run("restore fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/restore/default/my-snapshot", "", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }
 

@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -28,6 +29,7 @@ import (
 	"os"
 	"reflect"
 	goruntime "runtime"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -282,6 +284,9 @@ type HostInterface interface {
 	GetRunningPods(ctx context.Context) ([]*v1.Pod, error)
 	RunInContainer(ctx context.Context, name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
+	CheckpointPod(ctx context.Context, podUID types.UID, podFullName string, options *runtimeapi.CheckpointPodRequest) error
+	RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (string, error)
+	GetPodSnapshotsDir() string
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	SyncLoopHealthCheck(req *http.Request) error
@@ -622,14 +627,35 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
 
-	// Only enable checkpoint API if the feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+	// Register checkpoint routes under a single WebService to avoid
+	// duplicate root path errors in go-restful.
+	containerCheckpoint := utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint)
+	podCheckpoint := utilfeature.DefaultFeatureGate.Enabled(features.KubeletLocalPodCheckpointRestore)
+	if containerCheckpoint || podCheckpoint {
 		s.addMetricsBucketMatcher("checkpoint")
 		ws = &restful.WebService{}
 		ws.Path(checkpointPath).Produces(restful.MIME_JSON)
-		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
-			To(s.checkpoint).
-			Operation("checkpoint"))
+		if containerCheckpoint {
+			ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+				To(s.checkpoint).
+				Operation("checkpoint"))
+		}
+		if podCheckpoint {
+			s.addMetricsBucketMatcher("checkpointpod")
+			ws.Route(ws.POST("/{podNamespace}/{podID}").
+				To(s.checkpointpod).
+				Operation("checkpointpod"))
+		}
+		s.restfulCont.Add(ws)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletLocalPodCheckpointRestore) {
+		s.addMetricsBucketMatcher("restorepod")
+		ws = &restful.WebService{}
+		ws.Path("/restore/").Produces(restful.MIME_JSON)
+		ws.Route(ws.POST("/{podNamespace}/{snapshotName}").
+			To(s.restorepod).
+			Operation("restorepod"))
 		s.restfulCont.Add(ws)
 	}
 
@@ -1113,7 +1139,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		timeout, err := strconv.ParseInt(timeouts[len(timeouts)-1], 10, 64)
 		if err != nil {
 			response.WriteError(
-				http.StatusNotFound,
+				http.StatusBadRequest,
 				fmt.Errorf("cannot parse value of timeout parameter"),
 			)
 			return
@@ -1139,6 +1165,125 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		response,
 		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Location)),
 	)
+}
+
+// checkpointpod handles the Pod-level checkpoint API request. It checks if the requested
+// podNamespace and pod actually exist and only then calls the runtime.
+func (s *Server) checkpointpod(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	pod, ok := s.host.GetPodByName(request.PathParameter("podNamespace"), request.PathParameter("podID"))
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	options := &runtimeapi.CheckpointPodRequest{}
+	// Query parameter to select an optional timeout. Without the timeout parameter
+	// the checkpoint command will use the default CRI timeout.
+	timeouts := request.Request.URL.Query()["timeout"]
+	if len(timeouts) > 0 {
+		// If the user specified one or multiple values for timeouts we
+		// are using the last available value.
+		timeout, err := strconv.ParseInt(timeouts[len(timeouts)-1], 10, 64)
+		if err != nil {
+			response.WriteError(
+				http.StatusBadRequest,
+				fmt.Errorf("cannot parse value of timeout parameter"),
+			)
+			return
+		}
+		options.Timeout = timeout
+	}
+
+	if err := s.host.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), options); err != nil {
+		response.WriteError(
+			http.StatusInternalServerError,
+			fmt.Errorf(
+				"checkpointing of %v/%v failed (%v)",
+				request.PathParameter("podNamespace"),
+				request.PathParameter("podID"),
+				err,
+			),
+		)
+		return
+	}
+	respBytes, err := json.Marshal(map[string][]string{"items": {options.Path}})
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("failed to encode response: %v", err))
+		return
+	}
+	writeJSONResponse(logger, response, respBytes)
+}
+
+// restorepod handles the Pod-level restore API request.
+func (s *Server) restorepod(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	podNamespace := request.PathParameter("podNamespace")
+	snapshotName := request.PathParameter("snapshotName")
+
+	// Reject path components that could escape the snapshot directory.
+	if strings.Contains(snapshotName, "/") || strings.Contains(snapshotName, "..") ||
+		strings.Contains(podNamespace, "/") || strings.Contains(podNamespace, "..") {
+		response.WriteError(
+			http.StatusBadRequest,
+			fmt.Errorf("invalid snapshot name or namespace"),
+		)
+		return
+	}
+
+	snapshotDir := s.host.GetPodSnapshotsDir()
+	// Use snapshotName directly as the filename within the snapshot
+	// directory. The podNamespace URL parameter is for authorization scoping,
+	// not path construction. The snapshot filename already encodes the
+	// pod name, namespace, and timestamp (set by CheckpointPod).
+	snapshotPath := filepath.Join(snapshotDir, snapshotName)
+
+	// Verify the resolved path is still within the snapshot directory
+	// after symlink resolution.
+	absSnapshotDir, err := filepath.Abs(snapshotDir)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("failed to resolve snapshot directory: %v", err))
+		return
+	}
+	absSnapshotPath, err := filepath.Abs(snapshotPath)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("failed to resolve snapshot path: %v", err))
+		return
+	}
+	if !strings.HasPrefix(absSnapshotPath, absSnapshotDir+string(filepath.Separator)) &&
+		absSnapshotPath != absSnapshotDir {
+		response.WriteError(
+			http.StatusBadRequest,
+			fmt.Errorf("invalid snapshot path"),
+		)
+		return
+	}
+
+	options := &runtimeapi.RestorePodRequest{
+		Path: snapshotPath,
+	}
+
+	podSandboxID, err := s.host.RestorePod(ctx, options)
+	if err != nil {
+		response.WriteError(
+			http.StatusInternalServerError,
+			fmt.Errorf(
+				"restore of %v/%v failed (%v)",
+				podNamespace,
+				snapshotName,
+				err,
+			),
+		)
+		return
+	}
+	respBytes, err := json.Marshal(map[string]string{"podSandboxId": podSandboxID})
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("failed to encode response: %v", err))
+		return
+	}
+	writeJSONResponse(logger, response, respBytes)
 }
 
 // getURLRootPath trims a URL path.
