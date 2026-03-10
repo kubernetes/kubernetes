@@ -93,6 +93,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
+	defaultPodLevelLimits(pod)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
@@ -991,4 +992,86 @@ func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
 	}
+}
+
+// defaultPodLevelLimits sets pod-level limits equal to aggregated container
+// limits if all containers have limits set.
+func defaultPodLevelLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil {
+		return
+	}
+	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	candidates := sets.New[api.ResourceName]()
+	// We iterate over pod-level requests because the presence of a pod-level request
+	// is the necessary signal for pod-level resource management. Due to existing
+	// defaulting logic, if a resource has container-level limits, they would be
+	// propagated to container-level requests, and then aggregated to pod-level
+	// requests (if not explicitly set). Thus, any resource that is a candidate
+	// for pod-level limit defaulting will already be present in the pod-level
+	// requests map. This makes iterating over Requests both efficient and
+	// sufficient for identifying defaulting candidates.
+	for resName := range pod.Spec.Resources.Requests {
+		if !resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			continue
+		}
+		// If pod-level limits for that resource is already set, defaulting logic
+		// should not be applied.
+		if _, ok := pod.Spec.Resources.Limits[resName]; !ok {
+			candidates.Insert(resName)
+		}
+	}
+
+	if candidates.Len() == 0 {
+		return
+	}
+
+	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates)
+	if aggrLimits == nil {
+		return
+	}
+
+	for resName := range candidates {
+		if val, ok := aggrLimits[apiv1.ResourceName(resName)]; ok {
+			if pod.Spec.Resources.Limits == nil {
+				pod.Spec.Resources.Limits = make(api.ResourceList)
+			}
+			pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+		}
+	}
+}
+
+// aggregateContainerLimits returns the aggregated limits for all containers in the pod spec.
+// It also filters the candidates set, removing any resource for which not all containers have limits.
+func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName]) apiv1.ResourceList {
+	// For a resource to be defaulted at the pod level, all containers (including sidecars)
+	// must have a limit specified for that resource.
+	podutil.VisitContainers(spec, podutil.AllContainers, func(ctr *api.Container, _ podutil.ContainerType) bool {
+		for resName := range candidates {
+			if _, ok := ctr.Resources.Limits[resName]; !ok {
+				candidates.Delete(resName)
+			}
+		}
+		return candidates.Len() > 0
+	})
+
+	if candidates.Len() == 0 {
+		return nil
+	}
+	// Simplest way to convert only the needed fields (containers and init containers)
+	// without manual loops, avoiding the overhead of converting the entire PodSpec.
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     spec.Containers,
+		InitContainers: spec.InitContainers,
+	}, v1PodSpec, nil); err != nil {
+		return nil
+	}
+
+	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 }
