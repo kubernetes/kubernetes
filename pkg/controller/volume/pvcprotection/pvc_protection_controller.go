@@ -119,7 +119,7 @@ type Controller struct {
 
 var unusedSinceNowFunc = metav1.Now
 
-type podUsageCheck func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
+type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
@@ -349,7 +349,7 @@ func (c *Controller) updateUnusedSince(ctx context.Context, pvc *v1.PersistentVo
 	return nil
 }
 
-func (c *Controller) isBeingUsedWith(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheck) (bool, error) {
+func (c *Controller) isBeingUsedWith(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheckFunc) (bool, error) {
 	// Look for a Pod using pvc in the Informer's cache. If one is found the
 	// correct decision to keep pvc is taken without doing an expensive live
 	// list.
@@ -372,7 +372,7 @@ func (c *Controller) isBeingUsedWith(ctx context.Context, pvc *v1.PersistentVolu
 	return c.askAPIServer(ctx, pvc, lazyLivePodList, podUsage)
 }
 
-func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeClaim, podUsage podUsageCheck) (bool, error) {
+func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeClaim, podUsage podUsageCheckFunc) (bool, error) {
 	logger.V(4).Info("Looking for Pods using PVC in the Informer's cache", "PVC", klog.KObj(pvc))
 
 	// The indexer is used to find pods which might use the PVC.
@@ -398,7 +398,7 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 	return false, nil
 }
 
-func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheck) (bool, error) {
+func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheckFunc) (bool, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Looking for Pods using PVC", "PVC", klog.KObj(pvc))
 	if lazyLivePodList.getCache() == nil {
