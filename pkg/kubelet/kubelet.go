@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -3384,6 +3385,164 @@ func (kl *Kubelet) CheckpointContainer(
 	}
 
 	return nil
+}
+
+func (kl *Kubelet) CheckpointPod(
+	ctx context.Context,
+	podUID types.UID,
+	podFullName string,
+	options *runtimeapi.CheckpointPodRequest,
+) error {
+	existingStatus, ok := kl.statusManager.GetPodStatus(podUID)
+	if !ok {
+		return fmt.Errorf("failed to get status for pod %v, phase %v", podFullName, existingStatus.Phase)
+	}
+	if existingStatus.Phase != v1.PodRunning {
+		return fmt.Errorf("pod %v is not in running state, cannot be checkpointed", podFullName)
+	}
+
+	options.Path = filepath.Join(
+		kl.getPodSnapshotsDir(),
+		fmt.Sprintf(
+			"snapshot-%s-%s",
+			podFullName,
+			time.Now().Format(time.RFC3339),
+		),
+	)
+
+	// Look up the actual CRI sandbox ID for this pod. The pod UID is not the
+	// same as the CRI sandbox ID — we need to query the container runtime.
+	runtimePod, err := kl.containerRuntime.GetPod(ctx, podUID)
+	if err != nil {
+		return fmt.Errorf("failed to get runtime pod for %v: %v", podFullName, err)
+	}
+
+	runtimePodStatus, err := kl.containerRuntime.GetPodStatus(ctx, runtimePod)
+	if err != nil {
+		return fmt.Errorf("failed to get runtime pod status for %v: %v", podFullName, err)
+	}
+
+	if len(runtimePodStatus.SandboxStatuses) == 0 {
+		return fmt.Errorf("no sandbox found for pod %v", podFullName)
+	}
+
+	// Use the first (most recent) sandbox that is in READY state.
+	var sandboxID string
+	for _, ss := range runtimePodStatus.SandboxStatuses {
+		if ss.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			sandboxID = ss.Id
+			break
+		}
+	}
+	if sandboxID == "" {
+		return fmt.Errorf("no ready sandbox found for pod %v", podFullName)
+	}
+
+	options.PodSandboxId = sandboxID
+
+	return kl.containerRuntime.CheckpointPod(ctx, options)
+}
+
+func (kl *Kubelet) RestorePod(
+	ctx context.Context,
+	options *runtimeapi.RestorePodRequest,
+) (string, error) {
+	// Read the pod sandbox config from the snapshot.
+	configPath := filepath.Join(options.Path, "pod-config.json")
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read pod config from snapshot: %w", err)
+	}
+
+	var sandboxConfig runtimeapi.PodSandboxConfig
+	if err := json.Unmarshal(configData, &sandboxConfig); err != nil {
+		return "", fmt.Errorf("failed to unmarshal pod config: %w", err)
+	}
+
+	meta := sandboxConfig.GetMetadata()
+	if meta == nil {
+		return "", fmt.Errorf("sandbox config has no metadata")
+	}
+
+	// Look up the Pod object that the controller should have created
+	// before calling this endpoint. The Pod must exist so that CNI
+	// plugins (e.g. Calico) can resolve it during network setup, and
+	// so the kubelet's GC won't remove the restored sandbox.
+	if kl.kubeClient != nil {
+		existingPod, err := kl.kubeClient.CoreV1().Pods(meta.Namespace).Get(ctx, meta.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("pod %s/%s must exist before restore (create it first): %w",
+				meta.Namespace, meta.Name, err)
+		}
+		// Save the old UID before overwriting — meta is a pointer
+		// to sandboxConfig.Metadata, so changing Metadata.Uid also
+		// changes meta.Uid.
+		oldUID := meta.Uid
+
+		klog.FromContext(ctx).Info("Found existing Pod for restore",
+			"pod", meta.Name, "uid", existingPod.UID,
+			"oldUID", oldUID,
+			"oldCgroupParent", sandboxConfig.GetLinux().GetCgroupParent())
+
+		// Update the sandbox config UID to match the existing Pod's UID.
+		options.Config = &sandboxConfig
+		options.Config.Metadata.Uid = string(existingPod.UID)
+		// Also update the LogDirectory to match the Pod's UID.
+		if sandboxConfig.LogDirectory != "" && oldUID != "" {
+			options.Config.LogDirectory = strings.ReplaceAll(
+				sandboxConfig.LogDirectory, oldUID, string(existingPod.UID))
+		}
+		// Update the CgroupParent to match the new Pod's UID.
+		// The cgroup parent contains the pod UID (e.g.
+		// /kubepods/besteffort/pod<uid>). If we don't update it,
+		// restored containers end up in the old pod's cgroup
+		// hierarchy, and the kubelet's orphaned cgroup cleanup
+		// kills them.
+		if linux := options.Config.GetLinux(); linux != nil && oldUID != "" {
+			if linux.CgroupParent != "" {
+				linux.CgroupParent = strings.ReplaceAll(
+					linux.CgroupParent, oldUID, string(existingPod.UID))
+				klog.FromContext(ctx).Info("Updated CgroupParent for restore",
+					"old", oldUID, "new", linux.CgroupParent)
+			}
+		}
+
+		// Build ContainerConfigs from the Pod spec so that the
+		// restored containers have the correct image name. This
+		// ensures the kubelet's container hash (based on name +
+		// image) matches, preventing unnecessary restarts.
+		for i := range existingPod.Spec.Containers {
+			c := &existingPod.Spec.Containers[i]
+			options.ContainerConfigs = append(options.ContainerConfigs,
+				&runtimeapi.ContainerConfig{
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name: c.Name,
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: c.Image,
+					},
+				})
+		}
+		for i := range existingPod.Spec.InitContainers {
+			c := &existingPod.Spec.InitContainers[i]
+			options.ContainerConfigs = append(options.ContainerConfigs,
+				&runtimeapi.ContainerConfig{
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name: c.Name,
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: c.Image,
+					},
+				})
+		}
+	}
+
+	return kl.containerRuntime.RestorePod(ctx, options)
+}
+
+// GetPodSnapshotsDir returns the directory where pod snapshots are stored.
+func (kl *Kubelet) GetPodSnapshotsDir() string {
+	return kl.getPodSnapshotsDir()
 }
 
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.

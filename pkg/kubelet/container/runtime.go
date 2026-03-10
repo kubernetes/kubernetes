@@ -131,6 +131,10 @@ type Runtime interface {
 	// CheckpointContainer tells the runtime to checkpoint a container
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
+	// CheckpointPod tells the runtime to create a Pod-level checkpoint.
+	CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error
+	// RestorePod tells the runtime to restore a Pod from a snapshot.
+	RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (string, error)
 	// Generate pod status from the CRI event
 	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
