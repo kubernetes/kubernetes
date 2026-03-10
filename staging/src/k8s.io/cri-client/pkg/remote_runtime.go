@@ -859,6 +859,62 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 	return nil
 }
 
+// CheckpointPod triggers a checkpoint of the given CheckpointPodRequest
+func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	r.log(10, "[RemoteRuntimeService] CheckpointPod", "options", options)
+	if options == nil {
+		return errors.New("CheckpointPod requires non-nil CheckpointPodRequest parameter")
+	}
+	if options.Timeout < 0 {
+		return errors.New("CheckpointPod requires the timeout value to be > 0")
+	}
+
+	ctx, cancel := func(ctx context.Context) (context.Context, context.CancelFunc) {
+		defaultTimeout := int64(r.timeout / time.Second)
+		if options.Timeout > defaultTimeout {
+			// The user requested a specific timeout, let's use that if it
+			// is larger than the CRI default.
+			return context.WithTimeout(ctx, time.Duration(options.Timeout)*time.Second)
+		}
+		// If the user requested a timeout less than the
+		// CRI default, let's use the CRI default.
+		options.Timeout = defaultTimeout
+		return context.WithTimeout(ctx, r.timeout)
+	}(ctx)
+	defer cancel()
+
+	_, err := r.runtimeClient.CheckpointPod(ctx, options)
+
+	if err != nil {
+		r.logErr(err, "CheckpointPod from runtime service failed", "podSandboxID", options.PodSandboxId)
+		return err
+	}
+	r.log(10, "[RemoteRuntimeService] CheckpointPod Response", "podSandboxID", options.PodSandboxId)
+
+	return nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint
+func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (string, error) {
+	r.log(10, "[RemoteRuntimeService] RestorePod", "options", options)
+	if options == nil {
+		return "", errors.New("RestorePod requires non-nil RestorePodRequest parameter")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.RestorePod(ctx, options)
+
+	if err != nil {
+		r.logErr(err, "RestorePod from runtime service failed", "location", options.Path)
+		return "", err
+	}
+	r.log(10, "[RemoteRuntimeService] RestorePod Response", "podSandboxID", resp.PodSandboxId)
+
+	return resp.PodSandboxId, nil
+}
+
 func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(ctx, &runtimeapi.GetEventsRequest{})
 	if err != nil {
