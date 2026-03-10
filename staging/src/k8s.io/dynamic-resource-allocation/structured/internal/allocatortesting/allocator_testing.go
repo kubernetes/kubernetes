@@ -993,7 +993,7 @@ func TestAllocator(t *testing.T,
 			classes: objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
 				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName("boolAttribute"): {BoolValue: ptr.To(false)},
+					resourceapi.QualifiedName("boolAttribute"): {BoolValue: new(bool)},
 				}),
 			)),
 			node:        node(node1, region1),
