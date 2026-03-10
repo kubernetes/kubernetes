@@ -1299,7 +1299,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 				restart = *container.RestartPolicy != v1.ContainerRestartPolicyNever
 			}
 		}
-		if _, _, changed := containerChanged(&container, containerStatus); changed {
+		// Skip hash checking for pods restored from a snapshot. The
+		// restored container has a different hash because it was created
+		// by RestorePod, not by the kubelet's normal SyncPod.
+		isRestored := pod.Annotations["checkpoint.k8s.io/restored-from"] != ""
+		if _, _, changed := containerChanged(&container, containerStatus); changed && !isRestored {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
 			// spec changed.
@@ -1428,6 +1432,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 2: Kill the pod if the sandbox has changed.
+	// Skip all container lifecycle actions for pods restored from a
+	// snapshot. The restore flow creates the sandbox and containers
+	// via the CRI RestorePod RPC, outside of the kubelet's normal
+	// sync path. On the first SyncPod after restore, the kubelet may
+	// see stale state (exited containers, changed sandbox) and try to
+	// kill/restart things. Skipping here gives the runtime time to
+	// report the restored containers as running.
+	isRestoredPod := pod.Annotations["checkpoint.k8s.io/restored-from"] != ""
+	if isRestoredPod {
+		logger.Info("Skipping SyncPod actions for restored pod", "pod", klog.KObj(pod))
+		return
+	}
 	if podContainerChanges.KillPod {
 		if podContainerChanges.CreateSandbox {
 			logger.V(4).Info("Stopping PodSandbox for pod, will start new one", "pod", klog.KObj(pod))
