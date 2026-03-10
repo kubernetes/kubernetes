@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -81,9 +82,40 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 	}
 
 	ipList := make([]string, 0, len(ipInfoList.Items))
-	for _, ip := range ipInfoList.Items {
-		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
-			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+	for _, ipInfo := range ipInfoList.Items {
+		if len(ipInfo.Subsets) > 0 && len(ipInfo.Subsets[0].Addresses) > 0 && len(ipInfo.Subsets[0].Addresses[0].IP) > 0 {
+			ipList = append(ipList, ipInfo.Subsets[0].Addresses[0].IP)
+		}
+	}
+
+	if len(ipList) > 0 {
+		loopbacks := make([]string, 0)
+		globals := make([]string, 0)
+		unparseable := make([]string, 0)
+
+		for _, ipStr := range ipList {
+			ip := netutils.ParseIPSloppy(ipStr)
+			if ip == nil {
+				unparseable = append(unparseable, ipStr)
+				continue
+			}
+			if ip.IsLoopback() {
+				loopbacks = append(loopbacks, ipStr)
+			} else if !ip.IsUnspecified() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() {
+				globals = append(globals, ipStr)
+			}
+		}
+
+		if len(globals) > 0 {
+			ipList = globals
+		} else if len(loopbacks) > 0 {
+			ipList = loopbacks
+		} else if len(unparseable) > 0 {
+			ipList = unparseable
+			klog.Warningf("All endpoints were unparseable IPs, keeping original values: %v", unparseable)
+		} else {
+			ipList = []string{}
+			klog.Warningf("All endpoints were invalid or filtered out, no valid master IPs available")
 		}
 	}
 
@@ -95,9 +127,11 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 // UpdateLease resets the TTL on a master IP in storage
 // UpdateLease will create a new key if it doesn't exist.
 func (s *storageLeases) UpdateLease(ip string) error {
+	if !isValidEndpointIP(ip) {
+		return fmt.Errorf("cannot update lease for invalid master IP %q", ip)
+	}
 	key := path.Join(s.baseKey, ip)
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
-		// just make sure we've got the right IP set, and then refresh the TTL
 		existing := input.(*corev1.Endpoints)
 		existing.Subsets = []corev1.EndpointSubset{
 			{
@@ -105,13 +139,8 @@ func (s *storageLeases) UpdateLease(ip string) error {
 			},
 		}
 
-		// leaseTime needs to be in seconds
 		leaseTime := uint64(s.leaseTime / time.Second)
 
-		// NB: GuaranteedUpdate does not perform the store operation unless
-		// something changed between load and store (not including resource
-		// version), meaning we can't refresh the TTL without actually
-		// changing a field.
 		existing.Generation++
 
 		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
@@ -136,7 +165,7 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 	// can be left blank unless the storage.Watch method is used
 	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, baseKey)
 	if err != nil {
-		return nil, fmt.Errorf("error creating storage factory: %v", err)
+		return nil, fmt.Errorf("error creating storage factory: %w", err)
 	}
 	var once sync.Once
 	return &storageLeases{
@@ -213,7 +242,6 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		}
 	}
 
-	// ... and the list of master IP keys from etcd
 	masterIPs, err := r.masterLeases.ListLeases()
 	if err != nil {
 		return err
@@ -344,4 +372,15 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 
 func (r *leaseEndpointReconciler) Destroy() {
 	r.masterLeases.Destroy()
+}
+
+func isValidEndpointIP(ipAddress string) bool {
+	ip := netutils.ParseIPSloppy(ipAddress)
+	if ip == nil {
+		return true
+	}
+	if ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return false
+	}
+	return true
 }

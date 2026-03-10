@@ -22,7 +22,9 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 */
 
 import (
+	"path"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -30,11 +32,13 @@ import (
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -82,12 +86,34 @@ func (f *fakeLeases) SetKeys(keys []string) error {
 	return nil
 }
 
+func (f *fakeLeases) SetKeysWithoutValidation(keys []string) error {
+	for _, ip := range keys {
+		key := path.Join(f.baseKey, ip)
+		err := f.storage.Create(apirequest.NewDefaultContext(), key, createLegacyEndpoint(ip), nil, 0)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+//nolint:kubeapilinter
+func createLegacyEndpoint(ip string) *corev1.Endpoints {
+	return &corev1.Endpoints{ //nolint:kubeapilinter
+		Subsets: []corev1.EndpointSubset{ //nolint:kubeapilinter
+			{
+				Addresses: []corev1.EndpointAddress{{IP: ip}},
+			},
+		},
+	}
+}
+
 func TestLeaseEndpointReconciler(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	reconcileTests := []struct {
@@ -271,17 +297,17 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				// can't use makeEndpointsArray() here because we don't want the
-				// skip-mirror label
-				&corev1.Endpoints{
+				&corev1.Endpoints{ //nolint:kubeapilinter
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: metav1.NamespaceDefault,
 						Name:      "foo",
 					},
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
+					Subsets: []corev1.EndpointSubset{ //nolint:kubeapilinter
+						{
+							Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+							Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+						},
+					},
 				},
 				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
@@ -326,14 +352,38 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			),
 			expectLeases: []string{"1.2.3.4"},
 		},
+		{
+			testName:      "existing endpoints satisfy but some are invalid",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "127.0.0.1", "169.254.1.1"},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "127.0.0.1", "169.254.1.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:  []string{"1.2.3.4"},
+		},
+		{
+			testName:      "loopback only allowed for integration tests",
+			serviceName:   "foo",
+			ip:            "127.0.0.1",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"127.0.0.1"},
+			initialState:  makeEndpointsArray("foo", []string{"127.0.0.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:  []string{"127.0.0.1"},
+		},
+		{
+			testName:      "loopback filtered when global unicast available",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"127.0.0.1", "1.2.3.4", "4.5.6.7"},
+			initialState:  makeEndpointsArray("foo", []string{"127.0.0.1", "1.2.3.4", "4.5.6.7"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.5.6.7"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:  []string{"1.2.3.4", "4.5.6.7"},
+		},
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			// use the same base key used by the controlplane, but add a random
-			// prefix so we can reuse the etcd instance for subtests independently.
-			// pkg/controlplane/instance.go:268:
-			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
-			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
 			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
 			if err != nil {
@@ -341,7 +391,11 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			}
 			t.Cleanup(dFunc)
 			fakeLeases := newFakeLeases(t, baseKey, s)
-			err = fakeLeases.SetKeys(test.endpointKeys)
+			if test.testName == "existing endpoints satisfy but some are invalid" {
+				err = fakeLeases.SetKeysWithoutValidation(test.endpointKeys)
+			} else {
+				err = fakeLeases.SetKeys(test.endpointKeys)
+			}
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -419,11 +473,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			// use the same base key used by the controlplane, but add a random
-			// prefix so we can reuse the etcd instance for subtests independently.
-			// pkg/controlplane/instance.go:268:
-			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
-			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
 			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
 			if err != nil {
@@ -466,8 +515,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	stopTests := []struct {
@@ -534,11 +583,6 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
-			// use the same base key used by the controlplane, but add a random
-			// prefix so we can reuse the etcd instance for subtests independently.
-			// pkg/controlplane/instance.go:268:
-			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
-			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
 			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
 			if err != nil {
@@ -558,7 +602,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 			err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
-			if !contains(test.endpointKeys, test.ip) {
+			if !slices.Contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {
 					t.Errorf("expected error StorageError: key not found, Code: 1, Key: /registry/base/key/%s got:  %v", test.ip, err)
 				}
@@ -585,21 +629,12 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	}
 }
 
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-	return false
-}
-
 func TestApiserverShutdown(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	reconcileTests := []struct {
@@ -660,11 +695,6 @@ func TestApiserverShutdown(t *testing.T) {
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			// use the same base key used by the controlplane, but add a random
-			// prefix so we can reuse the etcd instance for subtests independently.
-			// pkg/controlplane/instance.go:268:
-			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
-			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
 			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
 			if err != nil {
