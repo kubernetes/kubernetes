@@ -28,6 +28,9 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
+	"io"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
@@ -43,8 +46,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/portforward"
+	// "k8s.io/client-go/tools/portforward" // nolint: staticcheck # Manual port-forwarding is replaced by utility
 	"k8s.io/client-go/transport/spdy"
+	kubectlportforward "k8s.io/kubectl/pkg/cmd/portforward"
+	printers "k8s.io/kubectl/pkg/util/printers"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -201,6 +206,7 @@ func (emc *ExternalMetricsController) sendMetricRequest(ctx context.Context, act
 	}).WithTimeout(serviceInitializationTimeout).WithPolling(serviceInitializationInterval).Should(gomega.Succeed())
 }
 
+// doRequestWithPortForward sets up port-forwarding and makes an HTTP request to the external metrics server.
 func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Context, action, metricName string, params url.Values) error {
 	// Find the pod
 	pods, err := emc.clientSet.CoreV1().Pods(emc.namespace).List(ctx, metav1.ListOptions{
@@ -212,57 +218,50 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	if len(pods.Items) == 0 {
 		return fmt.Errorf("no pods found for service %s", emc.serviceName)
 	}
-	podName := pods.Items[0].Name
+	pod := &pods.Items[0]
 
-	// Set up port-forward
 	config, err := framework.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
-	}
-
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
-	stopChan := make(chan struct{})
+	// Setup portforwarding
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
 	readyChan := make(chan struct{})
+	// Use port "0" to indicate to the portforwarder that it should select a random port.
+	// The port is replaced with the randomly selected port's number in the `ports` slice.
+	ports := []string{"0:6443"}
 
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
+	opts := &kubectlportforward.PortForwardOptions{
+		ResourcePrinter: &printers.BasicResourcePrinter{},
+		Config:          config,
+		Pod:             pod,
+		Ports:           ports,
+		StopChannel:     make(chan struct{}, 1),
+		ReadyChannel:    readyChan,
+		Out:             out,
+		ErrOut:          errOut,
 	}
 
-	errChan := make(chan error, 1)
+	// This go routine will terminate when opts.StopChannel is closed
 	go func() {
-		errChan <- fw.ForwardPorts()
+		defer ginkgo.GinkgoRecover()
+		err = opts.RunPortForwardContext(ctx)
 	}()
 
 	select {
 	case <-readyChan:
-		// Ready
-	case err := <-errChan:
-		return fmt.Errorf("port-forward failed: %w", err)
+		// The portforwarder is ready
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	defer close(stopChan)
 
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
+	// The `ports` value is updated in the kubectlportforward.PortForwardOptions struct for the random port assigned.
+	localPort, err := strconv.Atoi(strings.Split(opts.Ports[0], ":")[0])
 	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
+		return fmt.Errorf("failed to parse local port: %w", err)
 	}
-	localPort := forwardedPorts[0].Local
 
 	// Build URL and make request
 	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
@@ -285,7 +284,7 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	defer resp.Body.Close() //nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return fmt.Errorf("unexpected status code: %d, output: %s", resp.StatusCode, errOut.String())
 	}
 
 	return nil
