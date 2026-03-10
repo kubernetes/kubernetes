@@ -30,8 +30,10 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/version"
 )
 
 // Feature is the name of a certain feature that the cluster under test must have.
@@ -262,12 +264,12 @@ func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text
 // leafNodeLabels contains labels that
 // - might get added multiple times while constructing the spec tree and
 // - only need to be shown once and
-// - is very likely not considered part of the full test name string.
+// - are very likely not considered part of the full test name string.
 //
-// Injecting their tag multiple times directly into the text at the place which
-// triggers their addition, they get only added as label (not visible) and the
-// text then gets added at the end of the leaf node text (= ginkgo.It name)
-// based on the previously added labels.
+// Instead of injecting their tag multiple times directly into the text at the
+// place which triggers their addition, they get only added as label (not
+// visible) and the text then gets added at the end of the leaf node text (=
+// ginkgo.It name) based on the previously added labels.
 //
 // The initial set contains the labels defined in the E2E framework. Feature
 // gate stability texts (Alpha, Beta, etc.) and feature gate dependencies
@@ -276,6 +278,7 @@ func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text
 // they simply aren't known upfront.
 var leafNodeLabels = sets.New[string](
 	"Conformance",
+	"FutureConformance",
 	"Disruptive",
 	"Feature:OffByDefault",
 	"Flaky",
@@ -369,10 +372,17 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 	}
 
 	haveEmptyStrings := false
+	var conformanceArg *conformance
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case featureGate:
 			addFeatureGate(arg.name, arg.spec, true)
+		case conformance:
+			// Record the "best" WithConformance/WithConformanceVersion arg,
+			// where versioned conformance overrides unversioned.
+			if conformanceArg == nil || arg.version != "" {
+				conformanceArg = &arg
+			}
 		case label:
 			fullLabel := arg.String()
 			if arg.parts[0] == "Provider" {
@@ -437,6 +447,32 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 			ginkgoArgs = append(ginkgoArgs, arg)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
+		}
+	}
+
+	if conformanceArg != nil {
+		if conformanceArg.version == "" {
+			// We have only an unversioned conformance tag.
+			addLabel("Conformance")
+		} else {
+			// Add either "Conformance" or "FutureConformance" depending on the
+			// version, and add a semver constraint either way.
+			k8sVersion := utilversion.MustParseMajorMinor(version.DefaultKubeBinaryVersion)
+			conformanceVersion := utilversion.MustParseMajorMinor(conformanceArg.version)
+			if k8sVersion.AtLeast(conformanceVersion) {
+				addLabel("Conformance")
+			} else {
+				addLabel("FutureConformance")
+			}
+			// While ginkgo lets us have multiple "Conformance" constraints,
+			// we can't actually use this to list "base release plus releases
+			// where the test changed" like the conformance Release comment
+			// does, because ginkgo uses only the *most-restrictive*
+			// constraint, so running with
+			// `-ginkgo.sem-ver-filter="Conformance=1.30"` would skip a test
+			// with `[Conformance: [>=1.21 >=1.35]]`, which is the opposite of
+			// what we want.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.ComponentSemVerConstraint("Conformance", ">="+conformanceArg.version))
 		}
 	}
 
@@ -720,6 +756,10 @@ func withProvider(providers []string) interface{} {
 	return newLabel("Provider", strings.Join(providers, ","))
 }
 
+type conformance struct {
+	version string
+}
+
 // WithConformance specifies that a certain test or group of tests must pass in
 // all conformant Kubernetes clusters. The return value may be passed as additional
 // argument to the framework wrappers and the Ginkgo functions directly.
@@ -733,7 +773,22 @@ func (f *Framework) WithConformance() interface{} {
 }
 
 func withConformance() interface{} {
-	return newLabel("Conformance")
+	return conformance{}
+}
+
+// WithConformanceVersion specifies that a certain test or group of tests must pass in all
+// conformant Kubernetes clusters starting with the indicated version.
+func WithConformanceVersion(version string) interface{} {
+	return withConformanceVersion(version)
+}
+
+// WithConformanceVersion is a shorthand for the corresponding package function.
+func (f *Framework) WithConformanceVersion(version string) interface{} {
+	return withConformanceVersion(version)
+}
+
+func withConformanceVersion(version string) interface{} {
+	return conformance{version: version}
 }
 
 // WithNodeConformance specifies that a certain test or group of tests for node
