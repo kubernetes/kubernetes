@@ -37,7 +37,7 @@
           }
         },
         "required": [
-          "revision"
+          "data"
         ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
@@ -174,10 +174,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.apps.v1.DaemonSetList": {
@@ -457,10 +453,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.apps.v1.DeploymentList": {
@@ -732,10 +724,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.apps.v1.ReplicaSetList": {
@@ -1021,10 +1009,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.apps.v1.StatefulSetList": {
@@ -1088,14 +1072,20 @@
         "description": "StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
         "properties": {
           "whenDeleted": {
+            "default": "",
             "description": "WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted. The default policy of `Retain` causes PVCs to not be affected by StatefulSet deletion. The `Delete` policy causes those PVCs to be deleted.",
             "type": "string"
           },
           "whenScaled": {
+            "default": "",
             "description": "WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down. The default policy of `Retain` causes PVCs to not be affected by a scaledown. The `Delete` policy causes the associated PVCs for any excess pods above the replica count to be deleted.",
             "type": "string"
           }
         },
+        "required": [
+          "whenDeleted",
+          "whenScaled"
+        ],
         "type": "object"
       },
       "io.k8s.api.apps.v1.StatefulSetSpec": {

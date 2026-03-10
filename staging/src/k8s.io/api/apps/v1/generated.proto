@@ -46,11 +46,11 @@ message ControllerRevision {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Data is the serialized representation of the state.
-  // +optional
+  // +required
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // Revision indicates the revision of the state represented by Data.
-  // +required
+  // +optional
   optional int64 revision = 3;
 }
 
@@ -89,11 +89,11 @@ message DaemonSet {
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
   // Type of DaemonSet condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -247,11 +247,11 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // The last time this condition was updated.
@@ -420,11 +420,11 @@ message ReplicaSet {
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // The last time the condition transitioned from one status to another.
@@ -639,11 +639,11 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // Type of statefulset condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -692,7 +692,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
   // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
   // `Delete` policy causes those PVCs to be deleted.
-  // +optional
+  // +required
   optional string whenDeleted = 1;
 
   // WhenScaled specifies what happens to PVCs created from StatefulSet
@@ -700,7 +700,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // policy of `Retain` causes PVCs to not be affected by a scaledown. The
   // `Delete` policy causes the associated PVCs for any excess pods above
   // the replica count to be deleted.
-  // +optional
+  // +required
   optional string whenScaled = 2;
 }
 

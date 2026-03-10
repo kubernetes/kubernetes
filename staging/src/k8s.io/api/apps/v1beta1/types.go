@@ -42,7 +42,7 @@ type ScaleSpec struct {
 // ScaleStatus represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// replias is the actual number of observed instances of the scaled object.
-	// +required
+	// +optional
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -78,7 +78,7 @@ type Scale struct {
 	Spec ScaleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status defines current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
-	// +required
+	// +optional
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -206,15 +206,15 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
 	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
 	// `Delete` policy causes those PVCs to be deleted.
-	// +optional
-	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty" protobuf:"bytes,1,opt,name=whenDeleted,casttype=PersistentVolumeClaimRetentionPolicyType"`
+	// +required
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted" protobuf:"bytes,1,opt,name=whenDeleted,casttype=PersistentVolumeClaimRetentionPolicyType"`
 	// whenScaled specifies what happens to PVCs created from StatefulSet
 	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
 	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
 	// `Delete` policy causes the associated PVCs for any excess pods above
 	// the replica count to be deleted.
-	// +optional
-	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty" protobuf:"bytes,2,opt,name=whenScaled,casttype=PersistentVolumeClaimRetentionPolicyType"`
+	// +required
+	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled" protobuf:"bytes,2,opt,name=whenScaled,casttype=PersistentVolumeClaimRetentionPolicyType"`
 }
 
 // StatefulSetOrdinals describes the policy used for replica ordinal assignment
@@ -375,10 +375,10 @@ type StatefulSetConditionType string
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
 	// Type of statefulset condition.
-	// +required
+	// +optional
 	Type StatefulSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
@@ -642,10 +642,10 @@ const (
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
-	// +required
+	// +optional
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// The last time this condition was updated.
 	// +optional

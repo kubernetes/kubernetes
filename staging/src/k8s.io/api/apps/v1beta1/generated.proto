@@ -87,11 +87,11 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // The last time this condition was updated.
@@ -323,7 +323,7 @@ message Scale {
   optional ScaleSpec spec = 2;
 
   // status defines current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
-  // +required
+  // +optional
   optional ScaleStatus status = 3;
 }
 
@@ -340,7 +340,7 @@ message ScaleSpec {
 // ScaleStatus represents the current status of a scale subresource.
 message ScaleStatus {
   // replias is the actual number of observed instances of the scaled object.
-  // +required
+  // +optional
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -384,11 +384,11 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // Type of statefulset condition.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -434,7 +434,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
   // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
   // `Delete` policy causes those PVCs to be deleted.
-  // +optional
+  // +required
   optional string whenDeleted = 1;
 
   // whenScaled specifies what happens to PVCs created from StatefulSet
@@ -442,7 +442,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // policy of `Retain` causes PVCs to not be affected by a scaledown. The
   // `Delete` policy causes the associated PVCs for any excess pods above
   // the replica count to be deleted.
-  // +optional
+  // +required
   optional string whenScaled = 2;
 }
 

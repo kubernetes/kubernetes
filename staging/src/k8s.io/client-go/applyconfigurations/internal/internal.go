@@ -2060,9 +2060,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: whenDeleted
       type:
         scalar: string
+      default: ""
     - name: whenScaled
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.apps.v1.StatefulSetSpec
   map:
     fields:
@@ -2372,9 +2374,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: whenDeleted
       type:
         scalar: string
+      default: ""
     - name: whenScaled
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.apps.v1beta1.StatefulSetSpec
   map:
     fields:
@@ -2883,9 +2887,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: whenDeleted
       type:
         scalar: string
+      default: ""
     - name: whenScaled
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.apps.v1beta2.StatefulSetSpec
   map:
     fields:

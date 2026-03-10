@@ -159,15 +159,15 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
 	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
 	// `Delete` policy causes those PVCs to be deleted.
-	// +optional
-	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty" protobuf:"bytes,1,opt,name=whenDeleted,casttype=PersistentVolumeClaimRetentionPolicyType"`
+	// +required
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted" protobuf:"bytes,1,opt,name=whenDeleted,casttype=PersistentVolumeClaimRetentionPolicyType"`
 	// WhenScaled specifies what happens to PVCs created from StatefulSet
 	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
 	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
 	// `Delete` policy causes the associated PVCs for any excess pods above
 	// the replica count to be deleted.
-	// +optional
-	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty" protobuf:"bytes,2,opt,name=whenScaled,casttype=PersistentVolumeClaimRetentionPolicyType"`
+	// +required
+	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled" protobuf:"bytes,2,opt,name=whenScaled,casttype=PersistentVolumeClaimRetentionPolicyType"`
 }
 
 // StatefulSetOrdinals describes the policy used for replica ordinal assignment
@@ -329,10 +329,10 @@ type StatefulSetConditionType string
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
 	// Type of statefulset condition.
-	// +required
+	// +optional
 	Type StatefulSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
@@ -565,10 +565,10 @@ const (
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
-	// +required
+	// +optional
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// The last time this condition was updated.
 	// +optional
@@ -764,10 +764,10 @@ type DaemonSetConditionType string
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 type DaemonSetCondition struct {
 	// Type of DaemonSet condition.
-	// +required
+	// +optional
 	Type DaemonSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
@@ -958,10 +958,10 @@ const (
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetCondition struct {
 	// Type of replica set condition.
-	// +required
+	// +optional
 	Type ReplicaSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ReplicaSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// The last time the condition transitioned from one status to another.
 	// +optional
@@ -995,11 +995,11 @@ type ControllerRevision struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Data is the serialized representation of the state.
-	// +optional
-	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
+	// +required
+	Data runtime.RawExtension `json:"data" protobuf:"bytes,2,opt,name=data"`
 
 	// Revision indicates the revision of the state represented by Data.
-	// +required
+	// +optional
 	Revision int64 `json:"revision" protobuf:"varint,3,opt,name=revision"`
 }
 
