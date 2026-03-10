@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
@@ -441,7 +442,7 @@ func TestGetStaticPodPriorityWarning(t *testing.T) {
 			priority:          ptr.To(int32(2000001000)),
 			priorityClassName: "",
 			shouldWarn:        true,
-			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority",
+			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority.",
 		},
 		{
 			podName:           "static-pod-with-priority-and-priorityclassname",
@@ -455,14 +456,14 @@ func TestGetStaticPodPriorityWarning(t *testing.T) {
 			priority:          ptr.To(int32(0)),
 			priorityClassName: "",
 			shouldWarn:        true,
-			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority",
+			warning:           "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority.",
 		},
 		{
 			podName:           "static-pod-with-invalid-priorityclassname",
 			priority:          ptr.To(int32(2000001000)),
 			priorityClassName: "invalid-priority-class-name",
 			shouldWarn:        true,
-			warning:           "Static Pod has non-standard values for Priority and PriorityClassName. Mirror Pod may be attempted to be evicted from the node ineffectively",
+			warning:           fmt.Sprintf("Static Pod has a priority other than %d or a priorityClassName other than %s. Mirror Pod may be attempted to be evicted from the node ineffectively.", nodeCriticalPriority, schedulingapi.SystemNodeCritical),
 		},
 	}
 
