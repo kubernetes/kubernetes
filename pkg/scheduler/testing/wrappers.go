@@ -869,7 +869,7 @@ func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 // PodGroupName sets `name` as the PodGroupName of the inner pod.
 func (p *PodWrapper) PodGroupName(name string) *PodWrapper {
 	p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
-		PodGroupName: new(name),
+		PodGroupName: ptr.To(name),
 	}
 	return p
 }

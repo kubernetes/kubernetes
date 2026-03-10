@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -456,4 +457,107 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+func FilterVictimsWithPDBViolation(victims []Victim, pdbs []*policy.PodDisruptionBudget) (violatingVictims, nonViolatingVictims []Victim) {
+	pdbsAllowed := make([]int32, len(pdbs))
+	podIsViolating := func(pod *v1.Pod) bool {
+		if len(pod.Labels) == 0 {
+			return false
+		}
+
+		for i, pdb := range pdbs {
+			if pdb.Namespace != pod.Namespace {
+				continue
+			}
+			selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+			if err != nil {
+				// This object has an invalid selector, it does not match the pod
+				continue
+			}
+			// A PDB with a nil or empty selector matches nothing.
+			if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+
+			// Existing in DisruptedPods means it has been processed in API server,
+			// we don't treat it as a violating case.
+			if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+				continue
+			}
+			// Only decrement the matched pdb when it's not in its <DisruptedPods>;
+			// otherwise we may over-decrement the budget number.
+			pdbsAllowed[i]--
+			// We have found a matching PDB.
+			if pdbsAllowed[i] < 0 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for i, pdb := range pdbs {
+		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
+	}
+
+	for _, victim := range victims {
+		isUnitViolating := false
+
+		for _, pi := range victim.Pods() {
+			if podIsViolating(pi.GetPod()) {
+				isUnitViolating = true
+			}
+		}
+		if isUnitViolating {
+			violatingVictims = append(violatingVictims, victim)
+		} else {
+			nonViolatingVictims = append(nonViolatingVictims, victim)
+		}
+	}
+
+	return violatingVictims, nonViolatingVictims
+}
+
+// moreImportantVictim decides which of two preemption units is considered more critical.
+//
+// The comparison logic follows this strict hierarchy:
+//
+//  1. Priority: Higher priority units are always more important.
+//
+//  2. Workload Type (if WorkloadAwarePreemption is enabled):
+//     Atomic workloads (PodGroups) are considered more important than individual Pods
+//     of the same priority.
+//
+//  3. Start Time (for Single Pods):
+//     If both units are single Pods, the one with the older StartTime is more important.
+//     This honors "first-come, first-served".
+//
+//  4. Group Size (for PodGroups):
+//     If both units are PodGroups, the one with more members (larger size) is considered
+//     more important. This avoids the high cost of rescheduling massive jobs.
+//
+//  5. Start Time (Tie-breaker for PodGroups):
+//     If sizes are equal, the group that started earlier (has the oldest pod)
+//     is more important.
+func MoreImportantVictim(vi1, vi2 Victim, enableWorkloadAwarePreemption bool) bool {
+	if vi1.Priority() != vi2.Priority() {
+		return vi1.Priority() > vi2.Priority()
+	}
+
+	if enableWorkloadAwarePreemption && vi1.IsPodGroup() != vi2.IsPodGroup() {
+		return vi1.IsPodGroup()
+	}
+
+	if !vi1.IsPodGroup() {
+		return util.GetPodStartTime(vi1.Pods()[0].GetPod()).Before(util.GetPodStartTime(vi2.Pods()[0].GetPod()))
+	}
+
+	if len(vi1.Pods()) != len(vi2.Pods()) {
+		return len(vi1.Pods()) > len(vi2.Pods())
+	}
+
+	t1 := vi1.EarliestStartTime()
+	t2 := vi2.EarliestStartTime()
+	return t1.Before(t2)
 }

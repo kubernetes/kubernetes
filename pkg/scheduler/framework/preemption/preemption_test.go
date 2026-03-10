@@ -49,7 +49,7 @@ import (
 )
 
 var (
-	midPriority, highPriority = int32(100), int32(1000)
+	lowPriority, midPriority, highPriority = int32(10), int32(100), int32(1000)
 
 	veryLargeRes = map[v1.ResourceName]string{
 		v1.ResourceCPU:    "500m",

@@ -76,6 +76,25 @@ func NewPodPreemptor(p *v1.Pod, state fwk.CycleState) Preemptor {
 	}
 }
 
+func NewPodGroupPreemptor(pg *schedulingapi.PodGroup, pods []*v1.Pod, states []fwk.CycleState) Preemptor {
+	prio := int32(0)
+	// TODO(Argh4k): Replace it with pg.Spec.Priority once it's implemented:
+	// https://github.com/kubernetes/kubernetes/pull/136426
+	for _, pod := range pods {
+		if p := corev1helpers.PodPriority(pod); p > prio {
+			prio = p
+		}
+	}
+
+	return &preemptor{
+		priority:         prio,
+		pods:             pods,
+		preemptionPolicy: new(v1.PreemptLowerPriority),
+		podGroup:         pg,
+		states:           states,
+	}
+}
+
 func (p *preemptor) Priority() int32 {
 	return p.priority
 }
@@ -140,6 +159,24 @@ func NewDomainForPodByPodPreemption(node fwk.NodeInfo, name string) Domain {
 
 	return &domain{
 		nodes:              []fwk.NodeInfo{node},
+		allPossibleVictims: allPossibleVictims,
+		name:               name,
+	}
+}
+
+func NewDomainForWorkloadPreemption(nodes []fwk.NodeInfo, name string) Domain {
+	// TODO(Argh4k): PodGroups with a DisruptionMode == DisruptionModePodGroup
+	// should be treated as a single Victim.
+	// https://github.com/kubernetes/kubernetes/pull/136589
+	allPossibleVictims := make([]Victim, 0, len(nodes))
+	for _, node := range nodes {
+		for _, p := range node.GetPods() {
+			allPossibleVictims = append(allPossibleVictims, NewVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node}))
+		}
+	}
+
+	return &domain{
+		nodes:              nodes,
 		allPossibleVictims: allPossibleVictims,
 		name:               name,
 	}

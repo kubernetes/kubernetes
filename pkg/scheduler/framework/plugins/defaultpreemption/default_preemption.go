@@ -25,8 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/listers/scheduling/v1alpha2"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -39,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Name of the plugin used in the plugin registry and configurations.
@@ -143,7 +140,9 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	// 2. If WorkloadAwarePreemption is enabled: PodGroup > Single Pod.
 	// 3. For single Pods: Older StartTime (longer runtime).
 	// 4. For PodGroups: Larger Group Size, then Older StartTime.
-	pl.MoreImportantVictim = pl.moreImportantVictim
+	pl.MoreImportantVictim = func(vi1, vi2 preemption.Victim) bool {
+		return preemption.MoreImportantVictim(vi1, vi2, pl.fts.EnableWorkloadAwarePreemption)
+	}
 
 	pl.podSchedulingSimulator = &defaultPodSchedulingSimulator{fh: fh}
 
@@ -373,7 +372,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest importance victims.
-	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
+	violatingVictims, nonViolatingVictims := preemption.FilterVictimsWithPDBViolation(potentialVictims, pdbs)
 	numViolatingVictim := 0
 	var victims []preemption.Victim
 	reprieveVictim := func(v preemption.Victim) (bool, error) {
@@ -469,66 +468,6 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 	return true, ""
 }
 
-func filterVictimsWithPDBViolation(victims []preemption.Victim, pdbs []*policy.PodDisruptionBudget) (violatingVictims, nonViolatingVictims []preemption.Victim) {
-	pdbsAllowed := make([]int32, len(pdbs))
-	podIsViolating := func(pod *v1.Pod) bool {
-		if len(pod.Labels) == 0 {
-			return false
-		}
-
-		for i, pdb := range pdbs {
-			if pdb.Namespace != pod.Namespace {
-				continue
-			}
-			selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
-			if err != nil {
-				// This object has an invalid selector, it does not match the pod
-				continue
-			}
-			// A PDB with a nil or empty selector matches nothing.
-			if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-				continue
-			}
-
-			// Existing in DisruptedPods means it has been processed in API server,
-			// we don't treat it as a violating case.
-			if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
-				continue
-			}
-			// Only decrement the matched pdb when it's not in its <DisruptedPods>;
-			// otherwise we may over-decrement the budget number.
-			pdbsAllowed[i]--
-			// We have found a matching PDB.
-			if pdbsAllowed[i] < 0 {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	for i, pdb := range pdbs {
-		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
-	}
-
-	for _, victim := range victims {
-		isUnitViolating := false
-
-		for _, pi := range victim.Pods() {
-			if podIsViolating(pi.GetPod()) {
-				isUnitViolating = true
-			}
-		}
-		if isUnitViolating {
-			violatingVictims = append(violatingVictims, victim)
-		} else {
-			nonViolatingVictims = append(nonViolatingVictims, victim)
-		}
-	}
-
-	return violatingVictims, nonViolatingVictims
-}
-
 // OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
 	return nil
@@ -552,47 +491,4 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 		}
 	}
 	return false
-}
-
-// moreImportantVictim decides which of two preemption units is considered more critical.
-//
-// The comparison logic follows this strict hierarchy:
-//
-//  1. Priority: Higher priority units are always more important.
-//
-//  2. Workload Type (if WorkloadAwarePreemption is enabled):
-//     Atomic workloads (PodGroups) are considered more important than individual Pods
-//     of the same priority.
-//
-//  3. Start Time (for Single Pods):
-//     If both units are single Pods, the one with the older StartTime is more important.
-//     This honors "first-come, first-served".
-//
-//  4. Group Size (for PodGroups):
-//     If both units are PodGroups, the one with more members (larger size) is considered
-//     more important. This avoids the high cost of rescheduling massive jobs.
-//
-//  5. Start Time (Tie-breaker for PodGroups):
-//     If sizes are equal, the group that started earlier (has the oldest pod)
-//     is more important.
-func (pl *DefaultPreemption) moreImportantVictim(vi1, vi2 preemption.Victim) bool {
-	if vi1.Priority() != vi2.Priority() {
-		return vi1.Priority() > vi2.Priority()
-	}
-
-	if pl.fts.EnableWorkloadAwarePreemption && vi1.IsPodGroup() != vi2.IsPodGroup() {
-		return vi1.IsPodGroup()
-	}
-
-	if !vi1.IsPodGroup() {
-		return util.GetPodStartTime(vi1.Pods()[0].GetPod()).Before(util.GetPodStartTime(vi2.Pods()[0].GetPod()))
-	}
-
-	if len(vi1.Pods()) != len(vi2.Pods()) {
-		return len(vi1.Pods()) > len(vi2.Pods())
-	}
-
-	t1 := vi1.EarliestStartTime()
-	t2 := vi2.EarliestStartTime()
-	return t1.Before(t2)
 }
