@@ -262,6 +262,17 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
+	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1beta1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationRunning, migrationRunningStatusReason, ""),
+			metav1.UpdateOptions{},
+		)
+	if err != nil {
+		return err
+	}
+
 	err, failedMigration := svmc.runMigration(ctx, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
 	if err != nil {
 		return err

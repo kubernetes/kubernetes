@@ -365,10 +365,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.36"
 - name: CRDValidationRatcheting
   versionedSpecs:
   - default: false
