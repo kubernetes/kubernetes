@@ -38,7 +38,10 @@ import (
 )
 
 var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
-	f := framework.NewDefaultFramework("ensure-credential-pulled-images")
+	f := framework.NewFramework("ensure-credential-pulled-images", framework.Options{
+		ClientQPS:   50,
+		ClientBurst: 100,
+	}, nil)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var is internalapi.ImageManagerService
 
