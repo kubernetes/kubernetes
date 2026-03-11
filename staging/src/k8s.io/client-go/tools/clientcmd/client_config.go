@@ -610,6 +610,100 @@ type inClusterClientConfig struct {
 
 var _ ClientConfig = &inClusterClientConfig{}
 
+func applyConfigOverrides(cfg *restclient.Config, overrides *ConfigOverrides) error {
+	if overrides == nil {
+		return nil
+	}
+
+	overrideConfig := &DirectClientConfig{
+		config: *clientcmdapi.NewConfig(),
+		overrides: &ConfigOverrides{
+			AuthInfo:    overrides.AuthInfo,
+			ClusterInfo: overrides.ClusterInfo,
+		},
+	}
+
+	clusterInfo, err := overrideConfig.getCluster()
+	if err != nil {
+		return err
+	}
+	authInfo, err := overrideConfig.getAuthInfo()
+	if err != nil {
+		return err
+	}
+
+	if len(overrides.ClusterInfo.Server) > 0 {
+		cfg.Host = clusterInfo.Server
+		if u, err := url.ParseRequestURI(cfg.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
+			u.RawQuery = ""
+			u.Fragment = ""
+			cfg.Host = u.String()
+		}
+	}
+	if len(overrides.ClusterInfo.ProxyURL) > 0 {
+		u, err := parseProxyURL(clusterInfo.ProxyURL)
+		if err != nil {
+			return err
+		}
+		cfg.Proxy = http.ProxyURL(u)
+	}
+	if overrides.ClusterInfo.DisableCompression {
+		cfg.DisableCompression = clusterInfo.DisableCompression
+	}
+	if len(overrides.Timeout) > 0 {
+		timeout, err := ParseTimeout(overrides.Timeout)
+		if err != nil {
+			return err
+		}
+		cfg.Timeout = timeout
+	}
+
+	if len(overrides.ClusterInfo.Server) > 0 || overrides.ClusterInfo.InsecureSkipTLSVerify ||
+		len(overrides.ClusterInfo.CertificateAuthority) > 0 || len(overrides.ClusterInfo.CertificateAuthorityData) > 0 {
+		cfg.CAFile = clusterInfo.CertificateAuthority
+		cfg.CAData = clusterInfo.CertificateAuthorityData
+		cfg.Insecure = clusterInfo.InsecureSkipTLSVerify
+	}
+	if len(overrides.ClusterInfo.Server) > 0 || len(overrides.ClusterInfo.TLSServerName) > 0 {
+		cfg.ServerName = clusterInfo.TLSServerName
+	}
+
+	if len(overrides.AuthInfo.Token) > 0 || len(overrides.AuthInfo.TokenFile) > 0 {
+		cfg.BearerToken = authInfo.Token
+		cfg.BearerTokenFile = authInfo.TokenFile
+	}
+	if len(overrides.AuthInfo.Impersonate) > 0 || len(overrides.AuthInfo.ImpersonateUID) > 0 ||
+		len(overrides.AuthInfo.ImpersonateGroups) > 0 || len(overrides.AuthInfo.ImpersonateUserExtra) > 0 {
+		cfg.Impersonate = restclient.ImpersonationConfig{
+			UserName: authInfo.Impersonate,
+			UID:      authInfo.ImpersonateUID,
+			Groups:   authInfo.ImpersonateGroups,
+			Extra:    authInfo.ImpersonateUserExtra,
+		}
+	}
+	if len(overrides.AuthInfo.ClientCertificate) > 0 || len(overrides.AuthInfo.ClientCertificateData) > 0 ||
+		len(overrides.AuthInfo.ClientKey) > 0 || len(overrides.AuthInfo.ClientKeyData) > 0 {
+		cfg.CertFile = authInfo.ClientCertificate
+		cfg.CertData = authInfo.ClientCertificateData
+		cfg.KeyFile = authInfo.ClientKey
+		cfg.KeyData = authInfo.ClientKeyData
+	}
+	if len(overrides.AuthInfo.Username) > 0 || len(overrides.AuthInfo.Password) > 0 {
+		cfg.Username = authInfo.Username
+		cfg.Password = authInfo.Password
+	}
+	if overrides.AuthInfo.AuthProvider != nil {
+		cfg.AuthProvider = authInfo.AuthProvider
+	}
+	if overrides.AuthInfo.Exec != nil {
+		cfg.ExecProvider = authInfo.Exec
+		cfg.ExecProvider.InstallHint = cleanANSIEscapeCodes(cfg.ExecProvider.InstallHint)
+		cfg.ExecProvider.Config = clusterInfo.Extensions[clusterExtensionKey]
+	}
+
+	return nil
+}
+
 func (config *inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
@@ -625,19 +719,8 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		return nil, err
 	}
 
-	// in-cluster configs only takes a host, token, or CA file
-	// if any of them were individually provided, overwrite anything else
-	if config.overrides != nil {
-		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
-			icc.Host = server
-		}
-		if len(config.overrides.AuthInfo.Token) > 0 || len(config.overrides.AuthInfo.TokenFile) > 0 {
-			icc.BearerToken = config.overrides.AuthInfo.Token
-			icc.BearerTokenFile = config.overrides.AuthInfo.TokenFile
-		}
-		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
-			icc.TLSClientConfig.CAFile = certificateAuthorityFile
-		}
+	if err := applyConfigOverrides(icc, config.overrides); err != nil {
+		return nil, err
 	}
 
 	return icc, nil

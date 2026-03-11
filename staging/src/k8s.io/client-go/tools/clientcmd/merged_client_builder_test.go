@@ -86,6 +86,17 @@ func TestInClusterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	timeoutDefaultConfig, ok := NewDefaultClientConfig(*clientcmdapi.NewConfig(), &ConfigOverrides{
+		ClusterDefaults: ClusterDefaults,
+		Timeout:         "30s",
+	}).(*DirectClientConfig)
+	if !ok {
+		t.Fatalf("unexpected default config type %T", NewDefaultClientConfig(*clientcmdapi.NewConfig(), &ConfigOverrides{}))
+	}
+	timeoutConfig, err := timeoutDefaultConfig.ClientConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
 	config2 := &restclient.Config{Host: "config2"}
 	err1 := fmt.Errorf("unique error")
 
@@ -143,6 +154,16 @@ func TestInClusterConfig(t *testing.T) {
 
 			checkedICC: false,
 			result:     config2,
+			err:        nil,
+		},
+
+		"in-cluster checked when config only differs by timeout override": {
+			defaultConfig: timeoutDefaultConfig,
+			clientConfig:  &testClientConfig{config: timeoutConfig},
+			icc:           &testICC{},
+
+			checkedICC: true,
+			result:     timeoutConfig,
 			err:        nil,
 		},
 

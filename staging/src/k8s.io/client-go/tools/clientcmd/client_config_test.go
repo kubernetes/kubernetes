@@ -17,10 +17,13 @@ limitations under the License.
 package clientcmd
 
 import (
+	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -963,6 +966,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 
 		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
 			expectedServer = overridenServer
+			if len(tc.overrides.ClusterInfo.CertificateAuthority) == 0 {
+				expectedCAFile = ""
+			}
 		}
 		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
 			expectedToken = tc.overrides.AuthInfo.Token
@@ -984,6 +990,215 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
 		}
+	}
+}
+
+func TestInClusterClientConfigAppliesOverrides(t *testing.T) {
+	baseConfig := func() *restclient.Config {
+		return &restclient.Config{
+			Host:            "https://host-from-cluster.com",
+			BearerToken:     "token-from-cluster",
+			BearerTokenFile: "tokenfile-from-cluster",
+			TLSClientConfig: restclient.TLSClientConfig{
+				CAFile:     "/path/to/ca-from-cluster.crt",
+				ServerName: "cluster-server-name",
+			},
+		}
+	}
+
+	tests := []struct {
+		name      string
+		overrides *ConfigOverrides
+		validate  func(*testing.T, *restclient.Config)
+	}{
+		{
+			name: "timeout override preserves in-cluster host",
+			overrides: &ConfigOverrides{
+				Timeout: "30s",
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				matchStringArg("https://host-from-cluster.com", cfg.Host, t)
+				if cfg.Timeout != 30*time.Second {
+					t.Fatalf("expected timeout %s, got %s", 30*time.Second, cfg.Timeout)
+				}
+			},
+		},
+		{
+			name: "server override clears inherited TLS settings",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server: "https://host-from-overrides.com",
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				matchStringArg("https://host-from-overrides.com", cfg.Host, t)
+				matchStringArg("", cfg.CAFile, t)
+				matchStringArg("", cfg.ServerName, t)
+				matchStringArg("token-from-cluster", cfg.BearerToken, t)
+			},
+		},
+		{
+			name: "server override keeps explicit TLS settings",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:               "https://host-from-overrides.com",
+					CertificateAuthority: "/path/to/ca-from-overrides.crt",
+					TLSServerName:        "override-server-name",
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				matchStringArg("https://host-from-overrides.com", cfg.Host, t)
+				matchStringArg("/path/to/ca-from-overrides.crt", cfg.CAFile, t)
+				matchStringArg("override-server-name", cfg.ServerName, t)
+			},
+		},
+		{
+			name: "insecure override clears CA",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					InsecureSkipTLSVerify: true,
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				matchBoolArg(true, cfg.Insecure, t)
+				matchStringArg("", cfg.CAFile, t)
+			},
+		},
+		{
+			name: "proxy and compression overrides are replayed",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					ProxyURL:           "https://proxy.example.com:8443",
+					DisableCompression: true,
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				if cfg.Proxy == nil {
+					t.Fatal("expected proxy function to be configured")
+				}
+				requestURL, err := url.Parse("https://host-from-cluster.com")
+				if err != nil {
+					t.Fatalf("unexpected request url error: %v", err)
+				}
+				proxyURL, err := cfg.Proxy(&http.Request{URL: requestURL})
+				if err != nil {
+					t.Fatalf("unexpected proxy resolution error: %v", err)
+				}
+				if proxyURL == nil {
+					t.Fatal("expected proxy url")
+				}
+				matchStringArg("https://proxy.example.com:8443", proxyURL.String(), t)
+				matchBoolArg(true, cfg.DisableCompression, t)
+			},
+		},
+		{
+			name: "impersonation override is replayed",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Impersonate:       "alice",
+					ImpersonateUID:    "1000",
+					ImpersonateGroups: []string{"team-a", "team-b"},
+					ImpersonateUserExtra: map[string][]string{
+						"scope": {"ops"},
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				expected := restclient.ImpersonationConfig{
+					UserName: "alice",
+					UID:      "1000",
+					Groups:   []string{"team-a", "team-b"},
+					Extra: map[string][]string{
+						"scope": {"ops"},
+					},
+				}
+				if !reflect.DeepEqual(expected, cfg.Impersonate) {
+					t.Fatalf("unexpected impersonation config: diff=%s", cmp.Diff(expected, cfg.Impersonate))
+				}
+			},
+		},
+		{
+			name: "token override is replayed",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					Token:     "token-from-override",
+					TokenFile: "tokenfile-from-override",
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				matchStringArg("token-from-override", cfg.BearerToken, t)
+				matchStringArg("tokenfile-from-override", cfg.BearerTokenFile, t)
+			},
+		},
+		{
+			name: "auth provider override is replayed",
+			overrides: &ConfigOverrides{
+				AuthInfo: clientcmdapi.AuthInfo{
+					AuthProvider: &clientcmdapi.AuthProviderConfig{
+						Name: "oidc",
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				if cfg.AuthProvider == nil {
+					t.Fatal("expected auth provider to be configured")
+				}
+				matchStringArg("oidc", cfg.AuthProvider.Name, t)
+			},
+		},
+		{
+			name: "exec provider override is replayed",
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Extensions: map[string]runtime.Object{
+						clusterExtensionKey: &runtime.Unknown{
+							Raw:         []byte(`{"audience":"foo"}`),
+							ContentType: "application/json",
+						},
+					},
+				},
+				AuthInfo: clientcmdapi.AuthInfo{
+					Exec: &clientcmdapi.ExecConfig{
+						APIVersion:      "client.authentication.k8s.io/v1beta1",
+						Command:         "example-plugin",
+						InstallHint:     "install \x1b[1mplugin\x1b[0m",
+						InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *restclient.Config) {
+				if cfg.ExecProvider == nil {
+					t.Fatal("expected exec provider to be configured")
+				}
+				matchStringArg("example-plugin", cfg.ExecProvider.Command, t)
+				matchStringArg("install U+001B[1mpluginU+001B[0m", cfg.ExecProvider.InstallHint, t)
+				expectedConfig := &runtime.Unknown{
+					Raw:         []byte(`{"audience":"foo"}`),
+					ContentType: "application/json",
+				}
+				if !reflect.DeepEqual(expectedConfig, cfg.ExecProvider.Config) {
+					t.Fatalf("unexpected exec config: diff=%s", cmp.Diff(expectedConfig, cfg.ExecProvider.Config))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			icc := &inClusterClientConfig{
+				inClusterConfigProvider: func() (*restclient.Config, error) {
+					return baseConfig(), nil
+				},
+				overrides: tt.overrides,
+			}
+
+			cfg, err := icc.ClientConfig()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			tt.validate(t, cfg)
+		})
 	}
 }
 
