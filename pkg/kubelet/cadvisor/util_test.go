@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/cadvisor/container/crio"
 	info "github.com/google/cadvisor/info/v1"
+	infov2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,6 +51,38 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	actual := CapacityFromMachineInfo(machineInfo)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("when set hugepages true, got resource list %v, want %v", actual, expected)
+	}
+}
+
+func TestEphemeralStorageCapacityFromFsInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		capacity uint64
+		expected v1.ResourceList
+	}{
+		{
+			name:     "non-1024-aligned capacity uses DecimalSI",
+			capacity: 97842800000,
+			expected: v1.ResourceList{
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(int64(97842800000), resource.DecimalSI),
+			},
+		},
+		{
+			name:     "1024-aligned capacity uses DecimalSI",
+			capacity: 1048576,
+			expected: v1.ResourceList{
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(int64(1048576), resource.DecimalSI),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fsInfo := infov2.FsInfo{Capacity: tt.capacity}
+			actual := EphemeralStorageCapacityFromFsInfo(fsInfo)
+			if !reflect.DeepEqual(actual, tt.expected) {
+				t.Errorf("got resource list %v, want %v", actual, tt.expected)
+			}
+		})
 	}
 }
 
