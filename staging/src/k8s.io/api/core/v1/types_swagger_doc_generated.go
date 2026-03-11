@@ -852,10 +852,20 @@ var map_GRPCAction = map[string]string{
 	"":        "GRPCAction specifies an action involving a GRPC service.",
 	"port":    "Port number of the gRPC service. Number must be in the range 1 to 65535.",
 	"service": "Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).\n\nIf this is not specified, the default behavior is defined by gRPC.",
+	"tls":     "If set, indicates that TLS should be used for the gRPC health check.",
 }
 
 func (GRPCAction) SwaggerDoc() map[string]string {
 	return map_GRPCAction
+}
+
+var map_GRPCTLSConfiguration = map[string]string{
+	"":     "GRPCTLSConfiguration holds TLS configuration for a gRPC probe.",
+	"mode": "mode indicates the TLS certificate verification mode. Defaults to NoVerify if not specified.",
+}
+
+func (GRPCTLSConfiguration) SwaggerDoc() map[string]string {
+	return map_GRPCTLSConfiguration
 }
 
 var map_GitRepoVolumeSource = map[string]string{

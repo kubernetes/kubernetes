@@ -30,6 +30,8 @@ type GRPCActionApplyConfiguration struct {
 	//
 	// If this is not specified, the default behavior is defined by gRPC.
 	Service *string `json:"service,omitempty"`
+	// If set, indicates that TLS should be used for the gRPC health check.
+	TLS *GRPCTLSConfigurationApplyConfiguration `json:"tls,omitempty"`
 }
 
 // GRPCActionApplyConfiguration constructs a declarative configuration of the GRPCAction type for use with
@@ -51,5 +53,13 @@ func (b *GRPCActionApplyConfiguration) WithPort(value int32) *GRPCActionApplyCon
 // If called multiple times, the Service field is set to the value of the last call.
 func (b *GRPCActionApplyConfiguration) WithService(value string) *GRPCActionApplyConfiguration {
 	b.Service = &value
+	return b
+}
+
+// WithTLS sets the TLS field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TLS field is set to the value of the last call.
+func (b *GRPCActionApplyConfiguration) WithTLS(value *GRPCTLSConfigurationApplyConfiguration) *GRPCActionApplyConfiguration {
+	b.TLS = value
 	return b
 }

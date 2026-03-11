@@ -2001,6 +2001,19 @@ message GRPCAction {
   // +optional
   // +default=""
   optional string service = 2;
+
+  // If set, indicates that TLS should be used for the gRPC health check.
+  // +featureGate=GRPCContainerProbeTLS
+  // +optional
+  optional GRPCTLSConfiguration tls = 3;
+}
+
+// GRPCTLSConfiguration holds TLS configuration for a gRPC probe.
+message GRPCTLSConfiguration {
+  // mode indicates the TLS certificate verification mode.
+  // Defaults to NoVerify if not specified.
+  // +optional
+  optional string mode = 1;
 }
 
 // Represents a volume that is populated with the contents of a git repository.

@@ -536,6 +536,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.FlockerVolumeSource{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_FlockerVolumeSource(ref),
 		corev1.GCEPersistentDiskVolumeSource{}.OpenAPIModelName():                                                       schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref),
 		corev1.GRPCAction{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_GRPCAction(ref),
+		corev1.GRPCTLSConfiguration{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_GRPCTLSConfiguration(ref),
 		corev1.GitRepoVolumeSource{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_GitRepoVolumeSource(ref),
 		corev1.GlusterfsPersistentVolumeSource{}.OpenAPIModelName():                                                     schema_k8sio_api_core_v1_GlusterfsPersistentVolumeSource(ref),
 		corev1.GlusterfsVolumeSource{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref),
@@ -23519,8 +23520,37 @@ func schema_k8sio_api_core_v1_GRPCAction(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"tls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If set, indicates that TLS should be used for the gRPC health check.",
+							Ref:         ref(corev1.GRPCTLSConfiguration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"port"},
+			},
+		},
+		Dependencies: []string{
+			corev1.GRPCTLSConfiguration{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_GRPCTLSConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GRPCTLSConfiguration holds TLS configuration for a gRPC probe.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode indicates the TLS certificate verification mode. Defaults to NoVerify if not specified.\n\nPossible enum values:\n - `\"NoVerify\"` indicates that TLS should be used with certificate verification disabled.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoVerify"},
+						},
+					},
+				},
 			},
 		},
 	}

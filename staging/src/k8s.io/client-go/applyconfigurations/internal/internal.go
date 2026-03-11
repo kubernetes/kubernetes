@@ -5540,6 +5540,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: tls
+      type:
+        namedType: io.k8s.api.core.v1.GRPCTLSConfiguration
+- name: io.k8s.api.core.v1.GRPCTLSConfiguration
+  map:
+    fields:
+    - name: mode
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.GitRepoVolumeSource
   map:
     fields:

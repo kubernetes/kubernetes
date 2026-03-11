@@ -367,6 +367,11 @@ func (in GRPCAction) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in GRPCTLSConfiguration) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.GRPCTLSConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in GitRepoVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.GitRepoVolumeSource"
 }
