@@ -18,12 +18,14 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
@@ -33,9 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 )
 
+// TLSOptions holds TLS configuration for the gRPC probe.
+// nil means no TLS (plaintext).
+type TLSOptions struct {
+	InsecureSkipVerify bool
+}
+
 // Prober is an interface that defines the Probe function for doing GRPC readiness/liveness/startup checks.
 type Prober interface {
-	Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error)
+	Probe(host, service string, port int, timeout time.Duration, tlsOptions *TLSOptions) (probe.Result, string, error)
 }
 
 type grpcProber struct {
@@ -50,20 +58,28 @@ func New() Prober {
 // Returns the Result status, command output, and errors if any.
 // Any failure is considered as a probe failure to mimic grpc_health_probe tool behavior.
 // err is always nil
-func (p grpcProber) Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error) {
+func (p grpcProber) Probe(host, service string, port int, timeout time.Duration, tlsOptions *TLSOptions) (probe.Result, string, error) {
 	v := version.Get()
+
+	var transportCreds credentials.TransportCredentials
+	if tlsOptions != nil {
+		transportCreds = credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: tlsOptions.InsecureSkipVerify,
+		})
+	} else {
+		transportCreds = insecure.NewCredentials()
+	}
 
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), //credentials are currently not supported
+		grpc.WithTransportCredentials(transportCreds),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
 	defer cancel()
 
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
