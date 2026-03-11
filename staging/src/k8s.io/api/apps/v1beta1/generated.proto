@@ -48,11 +48,11 @@ message ControllerRevision {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // data is the serialized representation of the state.
-  // +optional
+  // +required
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // revision indicates the revision of the state represented by Data.
-  // +required
+  // +optional
   optional int64 revision = 3;
 }
 
