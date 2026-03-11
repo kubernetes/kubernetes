@@ -216,7 +216,7 @@ func TestPVCProtectionController(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
+		name                     string
 		enablePVCUnusedSinceTime bool
 		// Object to insert into fake kubeclient before the test starts.
 		initialObjects []runtime.Object
