@@ -72,7 +72,7 @@ func NewInTreeRegistry() runtime.Registry {
 		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
 		gangscheduling.Name:                  runtime.FactoryAdapter(fts, gangscheduling.New),
 		topologyaware.Name:                   runtime.FactoryAdapter(fts, topologyaware.New),
-		podgroupcount.Name:                   podgroupcount.New,
+		podgroupcount.Name:                   runtime.FactoryAdapter(fts, podgroupcount.New),
 	}
 
 	return registry
