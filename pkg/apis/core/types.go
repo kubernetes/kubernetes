@@ -2781,7 +2781,30 @@ type GRPCAction struct {
 	// If this is not specified, the default behavior is to probe the server's overall health status.
 	// +optional
 	Service *string
+
+	// If set, indicates that TLS should be used for the gRPC health check.
+	// +featureGate=GRPCContainerProbeTLS
+	// +optional
+	TLS *GRPCTLSConfiguration
 }
+
+// GRPCTLSConfiguration holds TLS configuration for a gRPC probe.
+type GRPCTLSConfiguration struct {
+	// mode indicates the TLS certificate verification mode.
+	// Defaults to NoVerify if not specified.
+	// +optional
+	Mode GRPCTLSMode
+}
+
+// GRPCTLSMode describes the TLS certificate verification mode for a gRPC probe.
+// +enum
+type GRPCTLSMode string
+
+const (
+	// GRPCTLSModeNoVerify indicates that TLS should be used with certificate
+	// verification disabled.
+	GRPCTLSModeNoVerify GRPCTLSMode = "NoVerify"
+)
 
 // Signal defines the stop signal of containers
 // +enum

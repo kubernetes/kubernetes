@@ -2687,7 +2687,30 @@ type GRPCAction struct {
 	// +optional
 	// +default=""
 	Service *string `json:"service" protobuf:"bytes,2,opt,name=service"`
+
+	// If set, indicates that TLS should be used for the gRPC health check.
+	// +featureGate=GRPCContainerProbeTLS
+	// +optional
+	TLS *GRPCTLSConfiguration `json:"tls,omitempty" protobuf:"bytes,3,opt,name=tls"`
 }
+
+// GRPCTLSConfiguration holds TLS configuration for a gRPC probe.
+type GRPCTLSConfiguration struct {
+	// mode indicates the TLS certificate verification mode.
+	// Defaults to NoVerify if not specified.
+	// +optional
+	Mode GRPCTLSMode `json:"mode,omitempty" protobuf:"bytes,1,opt,name=mode,casttype=GRPCTLSMode"`
+}
+
+// GRPCTLSMode describes the TLS certificate verification mode for a gRPC probe.
+// +enum
+type GRPCTLSMode string
+
+const (
+	// GRPCTLSModeNoVerify indicates that TLS should be used with certificate
+	// verification disabled.
+	GRPCTLSModeNoVerify GRPCTLSMode = "NoVerify"
+)
 
 // ExecAction describes a "run in container" action.
 type ExecAction struct {
