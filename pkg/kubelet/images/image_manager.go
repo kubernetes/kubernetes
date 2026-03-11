@@ -278,7 +278,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return "", err.Error(), err
 	}
 
-	return m.pullImage(ctx, logPrefix, objRef, pod.UID, requestedImage, spec, pullCredentials, podSandboxConfig)
+	return m.pullImage(ctx, logPrefix, objRef, pod.UID, requestedImage, pullPolicy, spec, pullCredentials, podSandboxConfig)
 }
 
 func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) func() ([]credentialprovider.TrackedAuthConfig, error) {
@@ -314,7 +314,7 @@ func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, 
 	})
 }
 
-func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
+func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, pullPolicy v1.PullPolicy, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
 	logger := klog.FromContext(ctx)
 	var pullSucceeded bool
 	var finalPullCredentials *credentialprovider.TrackedAuthConfig
@@ -373,7 +373,11 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
 	m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
 		image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
-	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
+	metrics.ImagePullDuration.WithLabelValues(
+		metrics.GetImageNameForMetrics(image),
+		string(pullPolicy),
+		metrics.GetImageSizeBucket(imagePullResult.imageSize),
+	).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 	finalPullCredentials = imagePullResult.credentialsUsed
 	pullSucceeded = true
