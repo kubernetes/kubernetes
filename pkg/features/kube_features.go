@@ -374,6 +374,12 @@ const (
 	// If enabled, it allows passing --service-account-signing-endpoint flag to configure external signer.
 	ExternalServiceAccountTokenSigner featuregate.Feature = "ExternalServiceAccountTokenSigner"
 
+	// owner: @amritansh1502
+	// kep: https://kep.k8s.io/4939
+	//
+	// Enables TLS support for gRPC health check probes.
+	GRPCContainerProbeTLS featuregate.Feature = "GRPCContainerProbeTLS"
+
 	// owner: @erictune @wojtek-t
 	//
 	// Enables support for generic Workload API.
@@ -1412,6 +1418,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	GRPCContainerProbeTLS: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	GenericWorkload: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2343,6 +2353,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
 
 	ExternalServiceAccountTokenSigner: {},
+
+	GRPCContainerProbeTLS: {},
 
 	GenericWorkload: {},
 
