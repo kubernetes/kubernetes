@@ -3453,6 +3453,8 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
 
+var supportedGRPCTLSModes = sets.New(core.GRPCTLSModeNoVerify, core.GRPCTLSMode(""))
+
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
@@ -3489,8 +3491,16 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
-func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrors := ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+	if grpc.TLS != nil {
+		if !opts.AllowGRPCContainerProbeTLS {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("tls"), "setting tls on a gRPC probe requires the GRPCContainerProbeTLS feature gate to be enabled"))
+		} else if !supportedGRPCTLSModes.Has(grpc.TLS.Mode) {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("tls", "mode"), grpc.TLS.Mode, []string{string(core.GRPCTLSModeNoVerify)}))
+		}
+	}
+	return allErrors
 }
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	numHandlers := 0
@@ -3524,7 +3534,7 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("grpc"), "may not specify more than 1 handler type"))
 		} else {
 			numHandlers++
-			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
+			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"), opts)...)
 		}
 	}
 	if handler.Sleep != nil {
@@ -4487,6 +4497,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	// Allows TLS configuration on gRPC probe actions
+	AllowGRPCContainerProbeTLS bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

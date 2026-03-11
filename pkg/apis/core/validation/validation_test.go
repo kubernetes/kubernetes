@@ -7899,6 +7899,71 @@ func TestValidateHandler(t *testing.T) {
 	}
 }
 
+func TestValidateGRPCAction(t *testing.T) {
+	fldPath := field.NewPath("grpc")
+
+	testCases := []struct {
+		name      string
+		grpc      *core.GRPCAction
+		allowTLS  bool
+		expectErr field.ErrorList
+	}{
+		{
+			name:     "TLS allowed when gate enabled",
+			grpc:     &core.GRPCAction{Port: 8443, TLS: &core.GRPCTLSConfiguration{}},
+			allowTLS: true,
+		},
+		{
+			name:     "TLS with explicit NoVerify mode allowed when gate enabled",
+			grpc:     &core.GRPCAction{Port: 8443, TLS: &core.GRPCTLSConfiguration{Mode: core.GRPCTLSModeNoVerify}},
+			allowTLS: true,
+		},
+		{
+			name:      "TLS rejected when gate disabled",
+			grpc:      &core.GRPCAction{Port: 8443, TLS: &core.GRPCTLSConfiguration{}},
+			allowTLS:  false,
+			expectErr: field.ErrorList{field.Forbidden(fldPath.Child("tls"), "setting tls on a gRPC probe requires the GRPCContainerProbeTLS feature gate to be enabled")},
+		},
+		{
+			name:     "TLS=nil passes when gate disabled",
+			grpc:     &core.GRPCAction{Port: 8443, TLS: nil},
+			allowTLS: false,
+		},
+		{
+			name:      "unsupported TLS mode rejected",
+			grpc:      &core.GRPCAction{Port: 8443, TLS: &core.GRPCTLSConfiguration{Mode: core.GRPCTLSMode("Verify")}},
+			allowTLS:  true,
+			expectErr: field.ErrorList{field.NotSupported(fldPath.Child("tls", "mode"), core.GRPCTLSMode("Verify"), []string{string(core.GRPCTLSModeNoVerify)})},
+		},
+		{
+			name:      "unsupported TLS mode with gate disabled only returns forbidden",
+			grpc:      &core.GRPCAction{Port: 8443, TLS: &core.GRPCTLSConfiguration{Mode: core.GRPCTLSMode("Verify")}},
+			allowTLS:  false,
+			expectErr: field.ErrorList{field.Forbidden(fldPath.Child("tls"), "setting tls on a gRPC probe requires the GRPCContainerProbeTLS feature gate to be enabled")},
+		},
+		{
+			name:     "TLS=nil passes when gate enabled",
+			grpc:     &core.GRPCAction{Port: 8443, TLS: nil},
+			allowTLS: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateGRPCAction(tc.grpc, fldPath, PodValidationOptions{AllowGRPCContainerProbeTLS: tc.allowTLS})
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Expected error %v, got %v", tc.expectErr[0], errs[0])
+				}
+			}
+		})
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      core.Container
