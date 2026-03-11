@@ -2136,7 +2136,7 @@ func TestValidateMetricFallback(t *testing.T) {
 				Replicas:               1,
 				FailureDurationSeconds: ptr.To[int64](300),
 			},
-			msg: "must be greater than minReplicas",
+			msg: "must be between minReplicas and maxReplicas, inclusive",
 		},
 		{
 			name: "bigger then maxReplicas",
@@ -2144,7 +2144,7 @@ func TestValidateMetricFallback(t *testing.T) {
 				Replicas:               10,
 				FailureDurationSeconds: ptr.To[int64](300),
 			},
-			msg: "must be lower than maxReplicas",
+			msg: "must be between minReplicas and maxReplicas, inclusive",
 		},
 		{
 			name: "both replicas and failureDurationSeconds invalid",

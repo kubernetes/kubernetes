@@ -392,6 +392,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 			// Create a unique key from metric name and selector
 			key := metric.External.Metric.Name
 			if metric.External.Metric.Selector != nil {
+				// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility.
 				selectorBytes, err := json.Marshal(metric.External.Metric.Selector)
 				if err != nil {
 					return err

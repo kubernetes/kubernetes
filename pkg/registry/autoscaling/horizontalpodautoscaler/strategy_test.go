@@ -389,6 +389,97 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
+func TestDropDisabledStatusFields(t *testing.T) {
+	fetchStatus := autoscaling.MetricFetchFailing
+	now := metav1.Now()
+
+	statusWithFallbackFields := func() *autoscaling.HorizontalPodAutoscalerStatus {
+		return &autoscaling.HorizontalPodAutoscalerStatus{
+			CurrentMetrics: []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.ExternalMetricSourceType,
+					External: &autoscaling.ExternalMetricStatus{
+						MetricFetchStatus: &fetchStatus,
+						FirstFailureTime:  &now,
+					},
+				},
+			},
+		}
+	}
+
+	statusWithoutFallbackFields := func() *autoscaling.HorizontalPodAutoscalerStatus {
+		return &autoscaling.HorizontalPodAutoscalerStatus{
+			CurrentMetrics: []autoscaling.MetricStatus{
+				{
+					Type:     autoscaling.ExternalMetricSourceType,
+					External: &autoscaling.ExternalMetricStatus{},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		newStatus      *autoscaling.HorizontalPodAutoscalerStatus
+		oldStatus      *autoscaling.HorizontalPodAutoscalerStatus
+		expectCleared  bool
+	}{
+		{
+			name:           "feature enabled, fields preserved",
+			featureEnabled: true,
+			newStatus:      statusWithFallbackFields(),
+			oldStatus:      statusWithoutFallbackFields(),
+			expectCleared:  false,
+		},
+		{
+			name:           "feature disabled, old has fields, fields preserved",
+			featureEnabled: false,
+			newStatus:      statusWithFallbackFields(),
+			oldStatus:      statusWithFallbackFields(),
+			expectCleared:  false,
+		},
+		{
+			name:           "feature disabled, old has no fields, fields cleared",
+			featureEnabled: false,
+			newStatus:      statusWithFallbackFields(),
+			oldStatus:      statusWithoutFallbackFields(),
+			expectCleared:  true,
+		},
+		{
+			name:           "feature disabled, nil old status, fields cleared",
+			featureEnabled: false,
+			newStatus:      statusWithFallbackFields(),
+			oldStatus:      nil,
+			expectCleared:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAExternalMetricFallback, tc.featureEnabled)
+			dropDisabledStatusFields(tc.newStatus, tc.oldStatus)
+
+			ext := tc.newStatus.CurrentMetrics[0].External
+			if tc.expectCleared {
+				if ext.MetricFetchStatus != nil {
+					t.Errorf("expected MetricFetchStatus to be cleared, got %v", ext.MetricFetchStatus)
+				}
+				if ext.FirstFailureTime != nil {
+					t.Errorf("expected FirstFailureTime to be cleared, got %v", ext.FirstFailureTime)
+				}
+			} else {
+				if ext.MetricFetchStatus == nil {
+					t.Error("expected MetricFetchStatus to be preserved, got nil")
+				}
+				if ext.FirstFailureTime == nil {
+					t.Error("expected FirstFailureTime to be preserved, got nil")
+				}
+			}
+		})
+	}
+}
+
 func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
 	tolerance := ptr.To(resource.MustParse("0.1"))
 	if !hasTolerance {

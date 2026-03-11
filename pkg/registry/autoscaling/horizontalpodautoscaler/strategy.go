@@ -248,19 +248,15 @@ func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
 
 // dropDisabledStatusFields removes disabled fields from the HPA status.
 func dropDisabledStatusFields(newHPAStatus, oldHPAStatus *autoscaling.HorizontalPodAutoscalerStatus) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) {
-		if externalFallbackStatusInUse(oldHPAStatus) {
-			return
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAExternalMetricFallback) || externalFallbackStatusInUse(oldHPAStatus) {
+		return
 	}
 
-	if newHPAStatus.CurrentMetrics != nil {
-		for i := range newHPAStatus.CurrentMetrics {
-			metric := &newHPAStatus.CurrentMetrics[i]
-			if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
-				metric.External.MetricFetchStatus = nil
-				metric.External.FirstFailureTime = nil
-			}
+	for i := range newHPAStatus.CurrentMetrics {
+		metric := &newHPAStatus.CurrentMetrics[i]
+		if metric.Type == autoscaling.ExternalMetricSourceType && metric.External != nil {
+			metric.External.MetricFetchStatus = nil
+			metric.External.FirstFailureTime = nil
 		}
 	}
 }

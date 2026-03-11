@@ -26,8 +26,7 @@ type ExternalMetricFallbackApplyConfiguration struct {
 	// failureDurationSeconds is the duration in seconds for which the external metric must be
 	// continuously failing before the fallback value is used. The duration is measured from the
 	// first consecutive failure. Must be greater than 0.
-	// default=180
-	// min=180
+	// Defaults to 180. Minimum value is 180.
 	FailureDurationSeconds *int64 `json:"failureDurationSeconds,omitempty"`
 	// replicas is the desired replica count to use when the external metric cannot be retrieved.
 	// This value is treated as the desired replica count from this metric.

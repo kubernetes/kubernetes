@@ -15596,7 +15596,7 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricFallback(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"failureDurationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "failureDurationSeconds is the duration in seconds for which the external metric must be continuously failing before the fallback value is used. The duration is measured from the first consecutive failure. Must be greater than 0. default=180 min=180",
+							Description: "failureDurationSeconds is the duration in seconds for which the external metric must be continuously failing before the fallback value is used. The duration is measured from the first consecutive failure. Must be greater than 0. Defaults to 180. Minimum value is 180.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

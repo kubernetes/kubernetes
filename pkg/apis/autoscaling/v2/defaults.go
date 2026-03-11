@@ -89,6 +89,15 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 		}
 	}
 	SetDefaults_HorizontalPodAutoscalerBehavior(obj)
+
+	for i := range obj.Spec.Metrics {
+		if obj.Spec.Metrics[i].Type == autoscalingv2.ExternalMetricSourceType &&
+			obj.Spec.Metrics[i].External != nil &&
+			obj.Spec.Metrics[i].External.Fallback != nil &&
+			obj.Spec.Metrics[i].External.Fallback.FailureDurationSeconds == nil {
+			obj.Spec.Metrics[i].External.Fallback.FailureDurationSeconds = ptr.To[int64](180)
+		}
+	}
 }
 
 // SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it contains

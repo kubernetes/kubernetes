@@ -34,6 +34,8 @@ const (
 	MaxPeriodSeconds int32 = 1800
 	// MaxStabilizationWindowSeconds is the largest allowed stabilization window (in seconds)
 	MaxStabilizationWindowSeconds int32 = 3600
+	// MinFailureDurationSeconds is the lowest allowed failure duration seconds (in seconds)
+	MinFailureDurationSeconds = 180
 )
 
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
@@ -386,18 +388,15 @@ func validateMetricFallback(et *autoscaling.ExternalMetricFallback, minReplicas 
 		return allErrs
 	}
 	if et.FailureDurationSeconds != nil {
-		if *et.FailureDurationSeconds < 180 {
+		if *et.FailureDurationSeconds < MinFailureDurationSeconds {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("failureDurationSeconds"), *et.FailureDurationSeconds, "must be at least 180 seconds"))
 		}
 	}
 	if et.Replicas <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be greater than 0"))
 	}
-	if et.Replicas < *minReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be greater than minReplicas"))
-	}
-	if maxReplicas < et.Replicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be lower than maxReplicas"))
+	if (minReplicas != nil && et.Replicas < *minReplicas) || maxReplicas < et.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), et.Replicas, "must be between minReplicas and maxReplicas, inclusive"))
 	}
 	return allErrs
 }
