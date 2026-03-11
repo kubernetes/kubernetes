@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,4 +156,122 @@ func (f *fakeSnapshotter) Add(rv uint64, indexer OrderedLister) {}
 func (f *fakeSnapshotter) RemoveLess(rv uint64)                 {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
+}
+
+func TestSliceSnapshotterCompaction(t *testing.T) {
+	cache := NewSnapshotter()
+	// Add 100 entries.
+	for i := uint64(1); i <= 100; i++ {
+		cache.Add(i, fakeOrderedLister{rv: int(i)})
+	}
+	assert.Equal(t, 100, cache.Len())
+
+	// Remove the first 80 entries (rv < 81).
+	cache.RemoveLess(81)
+	assert.Equal(t, 20, cache.Len())
+
+	// Verify that lookups still work correctly after compaction.
+	_, found := cache.GetLessOrEqual(80)
+	assert.False(t, found)
+
+	snapshot, found := cache.GetLessOrEqual(81)
+	assert.True(t, found)
+	assert.Equal(t, 81, snapshot.(fakeOrderedLister).rv)
+
+	snapshot, found = cache.GetLessOrEqual(100)
+	assert.True(t, found)
+	assert.Equal(t, 100, snapshot.(fakeOrderedLister).rv)
+
+	snapshot, found = cache.GetLessOrEqual(200)
+	assert.True(t, found)
+	assert.Equal(t, 100, snapshot.(fakeOrderedLister).rv)
+}
+
+func TestSliceSnapshotterEdgeCases(t *testing.T) {
+	cache := NewSnapshotter()
+
+	t.Log("Empty snapshotter: GetLessOrEqual returns not found")
+	_, found := cache.GetLessOrEqual(10)
+	assert.False(t, found)
+
+	t.Log("Empty snapshotter: RemoveLess is a no-op")
+	cache.RemoveLess(10) // should not panic
+	assert.Equal(t, 0, cache.Len())
+
+	t.Log("Single element")
+	cache.Add(5, fakeOrderedLister{rv: 5})
+	assert.Equal(t, 1, cache.Len())
+
+	_, found = cache.GetLessOrEqual(4)
+	assert.False(t, found)
+
+	snapshot, found := cache.GetLessOrEqual(5)
+	assert.True(t, found)
+	assert.Equal(t, 5, snapshot.(fakeOrderedLister).rv)
+
+	snapshot, found = cache.GetLessOrEqual(100)
+	assert.True(t, found)
+	assert.Equal(t, 5, snapshot.(fakeOrderedLister).rv)
+
+	t.Log("RemoveLess with rv beyond all entries removes everything")
+	cache.RemoveLess(1000)
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(5)
+	assert.False(t, found)
+
+	t.Log("Reset on empty snapshotter is a no-op")
+	cache.Reset()
+	assert.Equal(t, 0, cache.Len())
+
+	t.Log("GetLessOrEqual on exact boundary")
+	cache.Add(10, fakeOrderedLister{rv: 10})
+	cache.Add(20, fakeOrderedLister{rv: 20})
+	snapshot, found = cache.GetLessOrEqual(10)
+	assert.True(t, found)
+	assert.Equal(t, 10, snapshot.(fakeOrderedLister).rv)
+
+	snapshot, found = cache.GetLessOrEqual(20)
+	assert.True(t, found)
+	assert.Equal(t, 20, snapshot.(fakeOrderedLister).rv)
+}
+
+func TestSliceSnapshotterConcurrent(t *testing.T) {
+	cache := NewSnapshotter()
+	const goroutines = 10
+	const ops = 1000
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines * 3)
+
+	// Writers
+	for g := 0; g < goroutines; g++ {
+		go func(offset int) {
+			defer wg.Done()
+			for i := 0; i < ops; i++ {
+				cache.Add(uint64(offset*ops+i), fakeOrderedLister{rv: offset*ops + i})
+			}
+		}(g)
+	}
+
+	// Readers
+	for g := 0; g < goroutines; g++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < ops; i++ {
+				cache.GetLessOrEqual(uint64(i))
+			}
+		}()
+	}
+
+	// Removers
+	for g := 0; g < goroutines; g++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < ops; i++ {
+				cache.RemoveLess(uint64(i))
+			}
+		}()
+	}
+
+	wg.Wait()
 }

@@ -25,6 +25,19 @@ import (
 	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
+type Snapshotter interface {
+	Reset()
+	GetLessOrEqual(rv uint64) (OrderedLister, bool)
+	Add(rv uint64, indexer OrderedLister)
+	RemoveLess(rv uint64)
+	Len() int
+}
+
+type rvSnapshot struct {
+	resourceVersion uint64
+	snapshot        OrderedLister
+}
+
 // newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
 // * btree based storage for efficient LIST operation on prefix
 // * map based indexer for retrieving values by index.
@@ -393,113 +406,3 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*Element
 	}
 }
 
-// newStoreSnapshotter returns a storeSnapshotter that stores snapshots for
-// serving read requests with exact resource versions (RV) and pagination.
-//
-// Snapshots are created by calling Clone method on orderedLister, which is
-// expected to be fast and efficient thanks to usage of B-trees.
-// B-trees can create a lazy copy of the tree structure, minimizing overhead.
-//
-// Assuming the watch cache observes all events and snapshots cache after each of them,
-// requests for a specific resource version can be served by retrieving
-// the snapshot with the greatest RV less than or equal to the requested RV.
-// To make snapshot retrivial efficient we need an ordered data structure, such as tree.
-//
-// The initial implementation uses a B-tree to achieve the following performance characteristics (n - number of snapshots stored):
-//   - `Add`: Adds a new snapshot.
-//     Complexity: O(log n).
-//     Executed for each watch event observed by the cache.
-//   - `GetLessOrEqual`: Retrieves the snapshot with the greatest RV less than or equal to the requested RV.
-//     Complexity: O(log n).
-//     Executed for each LIST request with match=Exact or continuation.
-//   - `RemoveLess`: Cleans up snapshots outside the watch history window.
-//     Complexity: O(k log n), k - number of snapshots to remove, usually only one if watch capacity was not reduced.
-//     Executed per watch event observed when the cache is full.
-//   - `Reset`: Cleans up all snapshots.
-//     Complexity: O(1).
-//     Executed when the watch cache is reinitialized.
-//
-// Further optimization is possible by leveraging the property that adds always
-// increase the maximum RV and deletes only increase the minimum RV.
-// For example, a binary search on a cyclic buffer of (RV, snapshot)
-// should reduce number of allocations and improve removal complexity.
-// However, this solution is more complex and is deferred for future implementation.
-//
-// TODO: Rewrite to use a cyclic buffer
-func NewSnapshotter() Snapshotter {
-	s := &storeSnapshotter{
-		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
-			return a.resourceVersion < b.resourceVersion
-		}),
-	}
-	return s
-}
-
-var _ Snapshotter = (*storeSnapshotter)(nil)
-
-type Snapshotter interface {
-	Reset()
-	GetLessOrEqual(rv uint64) (OrderedLister, bool)
-	Add(rv uint64, indexer OrderedLister)
-	RemoveLess(rv uint64)
-	Len() int
-}
-
-type storeSnapshotter struct {
-	mux       sync.RWMutex
-	snapshots *btree.BTree[rvSnapshot]
-}
-
-type rvSnapshot struct {
-	resourceVersion uint64
-	snapshot        OrderedLister
-}
-
-func (s *storeSnapshotter) Reset() {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	s.snapshots.Clear(false)
-}
-
-func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
-	var result *rvSnapshot
-	s.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
-		result = &rvs
-		return false
-	})
-	if result == nil {
-		return nil, false
-	}
-	return result.snapshot, true
-}
-
-func (s *storeSnapshotter) Add(rv uint64, indexer OrderedLister) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
-}
-
-func (s *storeSnapshotter) RemoveLess(rv uint64) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	for s.snapshots.Len() > 0 {
-		oldest, ok := s.snapshots.Min()
-		if !ok {
-			break
-		}
-		if rv <= oldest.resourceVersion {
-			break
-		}
-		s.snapshots.DeleteMin()
-	}
-}
-
-func (s *storeSnapshotter) Len() int {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
-	return s.snapshots.Len()
-}
