@@ -50,19 +50,15 @@ func TestScorePlacement(t *testing.T) {
 	}{
 		{
 			name: "existing assigned and assumed pods",
-			pod: st.MakePod().Name("p-new").Namespace("default").
-				WorkloadRef(&v1.WorkloadReference{Name: "pg1", PodGroup: "PodGroup"}).Obj(),
+			pod:  st.MakePod().Name("p-new").Namespace("default").PodGroupName("pg1").Obj(),
 			assignedPods: []*v1.Pod{
 				// Assigned pods
-				st.MakePod().Name("p2").Namespace("default").UID("p2").
-					WorkloadRef(&v1.WorkloadReference{Name: "pg1", PodGroup: "PodGroup"}).Node("node2").Obj(),
-				st.MakePod().Name("p3").Namespace("default").UID("p3").
-					WorkloadRef(&v1.WorkloadReference{Name: "pg1", PodGroup: "PodGroup"}).Node("node3").Obj(),
+				st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg1").Node("node2").Obj(),
+				st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg1").Node("node3").Obj(),
 			},
 			assumedPods: []*v1.Pod{
 				// Assumed pod
-				st.MakePod().Name("p1").Namespace("default").UID("p1").
-					WorkloadRef(&v1.WorkloadReference{Name: "pg1", PodGroup: "PodGroup"}).Node("node1").Obj(),
+				st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg1").Node("node1").Obj(),
 			},
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: make([]fwk.ProposedAssignment, 2), // 2 new assignments
@@ -71,11 +67,9 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name: "no assumed pods",
-			pod: st.MakePod().Name("p-new").Namespace("default").
-				WorkloadRef(&v1.WorkloadReference{Name: "pg2", PodGroup: "PodGroup"}).Obj(),
+			pod:  st.MakePod().Name("p-new").Namespace("default").PodGroupName("pg2").Obj(),
 			assignedPods: []*v1.Pod{
-				st.MakePod().Name("p1").Namespace("default").UID("p1").
-					WorkloadRef(&v1.WorkloadReference{Name: "pg2", PodGroup: "PodGroup"}).Node("node1").Obj(),
+				st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg2").Node("node1").Obj(),
 			},
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: make([]fwk.ProposedAssignment, 3), // 3 new assignments
@@ -92,7 +86,7 @@ func TestScorePlacement(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 
 			// Setup cache and framework
-			cache := internalcache.New(ctx, nil)
+			cache := internalcache.New(ctx, nil, true)
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
@@ -127,7 +121,7 @@ func TestScorePlacement(t *testing.T) {
 			// Construct PodGroupInfo for the test pod
 			pgInfo := &testPodGroupInfo{
 				namespace: tt.pod.Namespace,
-				workload:  tt.pod.Spec.WorkloadRef,
+				name:      *tt.pod.Spec.SchedulingGroup.PodGroupName,
 			}
 
 			// Run ScorePlacement
@@ -217,9 +211,9 @@ func TestNormalizePlacementScore(t *testing.T) {
 // testPodGroupInfo implements fwk.PodGroupInfo for testing
 type testPodGroupInfo struct {
 	namespace string
-	workload  *v1.WorkloadReference
+	name      string
 }
 
-func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod               { return nil }
-func (t *testPodGroupInfo) GetWorkloadReference() *v1.WorkloadReference { return t.workload }
-func (t *testPodGroupInfo) GetNamespace() string                        { return t.namespace }
+func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod { return nil }
+func (t *testPodGroupInfo) GetName() string               { return t.name }
+func (t *testPodGroupInfo) GetNamespace() string          { return t.namespace }

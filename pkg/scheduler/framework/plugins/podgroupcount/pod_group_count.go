@@ -46,7 +46,7 @@ func (pl *PodGroupCount) Name() string {
 
 // ScorePlacement calculates a score for a given Placement.
 func (pl *PodGroupCount) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
-	pgState, err := pl.handle.PodGroupManager().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetWorkloadReference())
+	pgState, err := pl.handle.PodGroupManager().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
 	if err != nil {
 		return 0, fwk.AsStatus(err)
 	}
