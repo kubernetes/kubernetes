@@ -347,6 +347,12 @@ const (
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
+	// owner: @aamritan
+	// kep: https://kep.k8s.io/4939
+	//
+	// Enables TLS support for gRPC health check probes.
+	GRPCContainerProbeTLS featuregate.Feature = "GRPCContainerProbeTLS"
+
 	// owner: @jm-franc
 	// kep: https://kep.k8s.io/4951
 	//
@@ -1357,6 +1363,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
+	GRPCContainerProbeTLS: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
 
 	HPAConfigurableTolerance: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
@@ -2289,6 +2298,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	GracefulNodeShutdown: {},
 
 	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
+
+	GRPCContainerProbeTLS: {},
 
 	HPAConfigurableTolerance: {},
 
