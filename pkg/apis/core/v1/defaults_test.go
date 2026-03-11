@@ -84,8 +84,11 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Containers[0].TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.Containers[0].TerminationMessagePolicy":                   `"File"`,
 		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.TLS.Mode":  `"NoVerify"`,
 		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.DNSPolicy": `"ClusterFirst"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
@@ -108,17 +111,20 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme":           `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.FailureThreshold":             "3",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.TLS.Mode":  `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.PeriodSeconds":                "10",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.SuccessThreshold":             "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.TimeoutSeconds":               "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Ports[0].Protocol":                          `"TCP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.FailureThreshold":            "3",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.TLS.Mode": `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.PeriodSeconds":               "10",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.SuccessThreshold":            "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds":              "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.FailureThreshold":              "3",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":                 "10",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":              "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":                "1",
@@ -133,17 +139,20 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme":                                         `"HTTP"`,
 		".Spec.InitContainers[0].LivenessProbe.FailureThreshold":                                           `3`,
 		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.Service":                                  `""`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.TLS.Mode":                                 `"NoVerify"`,
 		".Spec.InitContainers[0].LivenessProbe.PeriodSeconds":                                              `10`,
 		".Spec.InitContainers[0].LivenessProbe.SuccessThreshold":                                           `1`,
 		".Spec.InitContainers[0].LivenessProbe.TimeoutSeconds":                                             `1`,
 		".Spec.InitContainers[0].Ports[0].Protocol":                                                        `"TCP"`,
 		".Spec.InitContainers[0].ReadinessProbe.FailureThreshold":                                          `3`,
 		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.Service":                                 `""`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.TLS.Mode":                                `"NoVerify"`,
 		".Spec.InitContainers[0].ReadinessProbe.PeriodSeconds":                                             `10`,
 		".Spec.InitContainers[0].ReadinessProbe.SuccessThreshold":                                          `1`,
 		".Spec.InitContainers[0].ReadinessProbe.TimeoutSeconds":                                            `1`,
 		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                            "3",
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.Service":                                   `""`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.TLS.Mode":                                  `"NoVerify"`,
 		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                               "10",
 		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                            "1",
 		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                              "1",
@@ -272,8 +281,11 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Containers[0].TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.Containers[0].TerminationMessagePolicy":                   `"File"`,
 		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.TLS.Mode":  `"NoVerify"`,
 		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.DNSPolicy":          `"ClusterFirst"`,
 		".Spec.EnableServiceLinks": `true`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
@@ -322,21 +334,27 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                            "1",
 		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                              "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.TLS.Mode":  `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.TLS.Mode": `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path":   `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme": `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.TLS.Mode":   `"NoVerify"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme":   `"HTTP"`,
 		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.Service":                                  `""`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.TLS.Mode":                                 `"NoVerify"`,
 		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Path":                                  `"/"`,
 		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme":                                `"HTTP"`,
 		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.Service":                                 `""`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.TLS.Mode":                                `"NoVerify"`,
 		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Path":                                 `"/"`,
 		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme":                               `"HTTP"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.Service":                                   `""`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.TLS.Mode":                                  `"NoVerify"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
@@ -3216,6 +3234,64 @@ func TestSetDefaultProbe(t *testing.T) {
 	actualProbe := *output.Spec.Containers[0].LivenessProbe
 	if actualProbe != expectedProbe {
 		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
+	}
+}
+
+func TestSetDefaultProbeGRPCTLSMode(t *testing.T) {
+	tests := []struct {
+		name         string
+		grpc         *v1.GRPCAction
+		expectedTLS  *v1.GRPCTLSConfiguration
+	}{
+		{
+			name: "empty TLS config defaults Mode to NoVerify",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				TLS:  &v1.GRPCTLSConfiguration{},
+			},
+			expectedTLS: &v1.GRPCTLSConfiguration{
+				Mode: v1.GRPCTLSModeNoVerify,
+			},
+		},
+		{
+			name: "nil TLS stays nil",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+			},
+			expectedTLS: nil,
+		},
+		{
+			name: "explicit Mode is not overwritten",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				TLS: &v1.GRPCTLSConfiguration{
+					Mode: v1.GRPCTLSModeNoVerify,
+				},
+			},
+			expectedTLS: &v1.GRPCTLSConfiguration{
+				Mode: v1.GRPCTLSModeNoVerify,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								GRPC: tc.grpc,
+							},
+						},
+					}},
+				},
+			}
+			output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+			actualTLS := output.Spec.Containers[0].LivenessProbe.GRPC.TLS
+			if !reflect.DeepEqual(actualTLS, tc.expectedTLS) {
+				t.Errorf("expected TLS %+v, got %+v", tc.expectedTLS, actualTLS)
+			}
+		})
 	}
 }
 

@@ -243,6 +243,9 @@ func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.FailureThreshold == 0 {
 		obj.FailureThreshold = 3
 	}
+	if obj.GRPC != nil && obj.GRPC.TLS != nil && obj.GRPC.TLS.Mode == "" {
+		obj.GRPC.TLS.Mode = v1.GRPCTLSModeNoVerify
+	}
 }
 func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
 	if obj.DefaultMode == nil {
