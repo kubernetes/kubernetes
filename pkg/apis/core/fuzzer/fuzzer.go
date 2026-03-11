@@ -552,6 +552,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if j.Service == nil {
 				j.Service = &empty
 			}
+			if c.Bool() {
+				modes := []core.GRPCTLSMode{core.GRPCTLSModeNoVerify, ""}
+				j.TLS = &core.GRPCTLSConfiguration{
+					Mode: modes[c.Intn(len(modes))],
+				}
+			}
 		},
 		func(j *core.LoadBalancerStatus, c randfill.Continue) {
 			ipMode := core.LoadBalancerIPModeVIP
