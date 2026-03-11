@@ -34,6 +34,7 @@ type APIGroupDiscoveryList struct {
 	// +optional
 	v1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// items is the list of groups for discovery. The groups are listed in priority order.
+	// +optional
 	Items []APIGroupDiscovery `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -63,7 +64,7 @@ type APIGroupDiscovery struct {
 // APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.
 type APIVersionDiscovery struct {
 	// version is the name of the version within a group version.
-	// +required
+	// +optional
 	Version string `json:"version" protobuf:"bytes,1,opt,name=version"`
 	// resources is a list of APIResourceDiscovery objects for the corresponding group version.
 	// +listType=map
@@ -87,7 +88,7 @@ type APIResourceDiscovery struct {
 	// for this resource across all versions in the API group.
 	// Resources with non-empty groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>
 	// Resources with empty groups are located at /api/v1/<APIResourceDiscovery.Resource>
-	// +required
+	// +optional
 	Resource string `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
@@ -95,19 +96,19 @@ type APIResourceDiscovery struct {
 	// +optional
 	ResponseKind *v1.GroupVersionKind `json:"responseKind,omitempty" protobuf:"bytes,2,opt,name=responseKind"`
 	// scope indicates the scope of a resource, either Cluster or Namespaced
-	// +required
+	// +optional
 	Scope ResourceScope `json:"scope" protobuf:"bytes,3,opt,name=scope"`
 	// singularResource is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
 	// For many clients the singular form of the resource will be more understandable to users reading messages and should be used when integrating the name of the resource into a sentence.
 	// The command line tool kubectl, for example, allows use of the singular resource name in place of plurals.
 	// The singular form of a resource should always be an optional element - when in doubt use the canonical resource name.
-	// +required
+	// +optional
 	SingularResource string `json:"singularResource" protobuf:"bytes,4,opt,name=singularResource"`
 	// verbs is a list of supported API operation types (this includes
 	// but is not limited to get, list, watch, create, update, patch,
 	// delete, deletecollection, and proxy).
 	// +listType=set
-	// +required
+	// +optional
 	Verbs []string `json:"verbs" protobuf:"bytes,5,opt,name=verbs"`
 	// shortNames is a list of suggested short names of the resource.
 	// +listType=set
@@ -145,7 +146,7 @@ const (
 type APISubresourceDiscovery struct {
 	// subresource is the name of the subresource.  This is used in the URL path and is the unique identifier
 	// for this resource across all versions.
-	// +required
+	// +optional
 	Subresource string `json:"subresource" protobuf:"bytes,1,opt,name=subresource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// Some subresources do not return normal resources, these will have null or empty return types.
@@ -168,6 +169,6 @@ type APISubresourceDiscovery struct {
 	// should expect the behavior of standard verbs to align with
 	// Kubernetes interaction conventions.
 	// +listType=set
-	// +required
+	// +optional
 	Verbs []string `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
 }

@@ -6797,7 +6797,6 @@ func schema_k8sio_api_apidiscovery_v2_APIGroupDiscoveryList(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -6921,7 +6920,6 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"resource", "scope", "singularResource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -6993,7 +6991,6 @@ func schema_k8sio_api_apidiscovery_v2_APISubresourceDiscovery(ref common.Referen
 						},
 					},
 				},
-				Required: []string{"subresource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7045,7 +7042,6 @@ func schema_k8sio_api_apidiscovery_v2_APIVersionDiscovery(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"version"},
 			},
 		},
 		Dependencies: []string{
@@ -7152,7 +7148,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIGroupDiscoveryList(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -7276,7 +7271,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"resource", "scope", "singularResource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7348,7 +7342,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APISubresourceDiscovery(ref common.Re
 						},
 					},
 				},
-				Required: []string{"subresource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7400,7 +7393,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIVersionDiscovery(ref common.Refere
 						},
 					},
 				},
-				Required: []string{"version"},
 			},
 		},
 		Dependencies: []string{

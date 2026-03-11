@@ -59,6 +59,7 @@ message APIGroupDiscoveryList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of groups for discovery. The groups are listed in priority order.
+  // +optional
   repeated APIGroupDiscovery items = 2;
 }
 
@@ -68,7 +69,7 @@ message APIResourceDiscovery {
   // for this resource across all versions in the API group.
   // Resources with non-empty groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>
   // Resources with empty groups are located at /api/v1/<APIResourceDiscovery.Resource>
-  // +required
+  // +optional
   optional string resource = 1;
 
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
@@ -78,21 +79,21 @@ message APIResourceDiscovery {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
 
   // scope indicates the scope of a resource, either Cluster or Namespaced
-  // +required
+  // +optional
   optional string scope = 3;
 
   // singularResource is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
   // For many clients the singular form of the resource will be more understandable to users reading messages and should be used when integrating the name of the resource into a sentence.
   // The command line tool kubectl, for example, allows use of the singular resource name in place of plurals.
   // The singular form of a resource should always be an optional element - when in doubt use the canonical resource name.
-  // +required
+  // +optional
   optional string singularResource = 4;
 
   // verbs is a list of supported API operation types (this includes
   // but is not limited to get, list, watch, create, update, patch,
   // delete, deletecollection, and proxy).
   // +listType=set
-  // +required
+  // +optional
   repeated string verbs = 5;
 
   // shortNames is a list of suggested short names of the resource.
@@ -117,7 +118,7 @@ message APIResourceDiscovery {
 message APISubresourceDiscovery {
   // subresource is the name of the subresource.  This is used in the URL path and is the unique identifier
   // for this resource across all versions.
-  // +required
+  // +optional
   optional string subresource = 1;
 
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
@@ -143,14 +144,14 @@ message APISubresourceDiscovery {
   // should expect the behavior of standard verbs to align with
   // Kubernetes interaction conventions.
   // +listType=set
-  // +required
+  // +optional
   repeated string verbs = 4;
 }
 
 // APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.
 message APIVersionDiscovery {
   // version is the name of the version within a group version.
-  // +required
+  // +optional
   optional string version = 1;
 
   // resources is a list of APIResourceDiscovery objects for the corresponding group version.
