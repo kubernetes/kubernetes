@@ -19,7 +19,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -50,7 +50,7 @@ type ControllerConstructor func(ctx context.Context, controllerContext Controlle
 type ControllerDescriptor struct {
 	name                      string
 	constructor               ControllerConstructor
-	requiredFeatureGates      []featuregate.Feature
+	requiredFeatureGates      []string
 	aliases                   []string
 	isDisabledByDefault       bool
 	isCloudProviderController bool
@@ -65,8 +65,10 @@ func (r *ControllerDescriptor) GetControllerConstructor() ControllerConstructor 
 	return r.constructor
 }
 
-func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
-	return append([]featuregate.Feature(nil), r.requiredFeatureGates...)
+func (r *ControllerDescriptor) GetRequiredFeatureGates() []string {
+	gates := append([]string(nil), r.requiredFeatureGates...)
+	slices.Sort(gates)
+	return gates
 }
 
 // GetAliases returns aliases to ensure backwards compatibility and should never be removed!
@@ -95,7 +97,10 @@ func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCt
 	controllerName := r.Name()
 
 	for _, featureGate := range r.GetRequiredFeatureGates() {
-		if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
+		// We can just cast the feature gate string to featuregate.Feature and use .Enabled,
+		// because the client features are added to the set of all features by default as well:
+		// https://github.com/kubernetes/kubernetes/blob/0a4651c9910533f4649b8a11c334cf23237b1ccc/pkg/features/kube_features.go#L2017-L2019
+		if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(featureGate)) {
 			logger.Info("Controller is disabled by a feature gate",
 				"controller", controllerName,
 				"requiredFeatureGates", r.GetRequiredFeatureGates())
@@ -137,8 +142,7 @@ func ControllersDisabledByDefault() []string {
 		}
 	}
 
-	sort.Strings(controllersDisabledByDefault)
-
+	slices.Sort(controllersDisabledByDefault)
 	return controllersDisabledByDefault
 }
 
