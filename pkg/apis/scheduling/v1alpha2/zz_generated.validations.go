@@ -489,6 +489,7 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.MinItems(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha()...)
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupTemplate, b schedulingv1alpha2.PodGroupTemplate) bool {
 				return a.Name == b.Name

@@ -52,7 +52,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_Min0Type validates an instance of Min0Type according
 // to declarative validation rules in the API schema.
 func Validate_Min0Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Min0Type) (errs field.ErrorList) {
-	errs = append(errs, validate.MinItems(ctx, op, fldPath, obj, oldObj, 0)...)
+	// minItems=0: lists can't have negative length, so this is a no-op
 
 	return errs
 }
@@ -60,7 +60,7 @@ func Validate_Min0Type(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_Min0TypedefType validates an instance of Min0TypedefType according
 // to declarative validation rules in the API schema.
 func Validate_Min0TypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Min0TypedefType) (errs field.ErrorList) {
-	errs = append(errs, validate.MinItems(ctx, op, fldPath, obj, oldObj, 0)...)
+	// minItems=0: lists can't have negative length, so this is a no-op
 
 	return errs
 }

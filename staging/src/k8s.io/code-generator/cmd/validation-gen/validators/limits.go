@@ -187,6 +187,18 @@ func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
+	if intVal == 0 {
+		// nothing needed in this case
+		result.AddComment("minItems=0: lists can't have negative length, so this is a no-op")
+		return result, nil
+	}
+	// TODO: If a field is required, then minItems=1 is redundant.  We could
+	// handle that as a special-case and skip validating it, but we'd need to
+	// pass the full list of tags to to every tag validator.  This is tricky
+	// because nested tags would need to be evaluated (e.g.
+	// +k8s:alpha=+k8s:required).
+	//
+	// For now, we just allow the redundancy.
 	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal))
 	return result, nil
 }

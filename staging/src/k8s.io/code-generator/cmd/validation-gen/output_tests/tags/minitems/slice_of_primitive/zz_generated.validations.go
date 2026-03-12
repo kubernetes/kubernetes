@@ -57,12 +57,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Min0Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			errs = append(errs, validate.MinItems(ctx, op, fldPath, obj, oldObj, 0)...)
+			// minItems=0: lists can't have negative length, so this is a no-op
 			return
 		}(fldPath.Child("min0Field"), obj.Min0Field, safe.Field(oldObj, func(oldObj *Struct) []int { return oldObj.Min0Field }), oldObj != nil)...)
 
@@ -81,12 +76,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Min0TypedefField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []IntType, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			errs = append(errs, validate.MinItems(ctx, op, fldPath, obj, oldObj, 0)...)
+			// minItems=0: lists can't have negative length, so this is a no-op
 			return
 		}(fldPath.Child("min0TypedefField"), obj.Min0TypedefField, safe.Field(oldObj, func(oldObj *Struct) []IntType { return oldObj.Min0TypedefField }), oldObj != nil)...)
 

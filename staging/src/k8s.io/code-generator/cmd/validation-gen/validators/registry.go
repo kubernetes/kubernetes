@@ -192,8 +192,8 @@ func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag
 	validations := Validations{}
 	// Run tag-validators first.
 	phases := reg.sortTagsIntoPhases(tags)
-	for _, tags := range phases {
-		for _, tag := range tags {
+	for _, phase := range phases {
+		for _, tag := range phase {
 			tv := reg.tagValidators[tag.Name]
 			// At this point we know tv exists and is not nil due to the upfront check
 			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
@@ -285,7 +285,7 @@ type TagValidationExtractor interface {
 	// ExtractTagValidations extracts all validations associated with the given tags.
 	// Some tag validators may return empty validations and update internal state
 	// that is then used by FieldValidators.
-	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+	ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error)
 }
 
 // ValidationExtractor represents an aggregation of validator plugins.

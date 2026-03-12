@@ -79,6 +79,7 @@ type WorkloadSpec struct {
 	// +k8s:required
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
+	// +k8s:alpha(since:"1.36")=+k8s:minItems=1
 	// +k8s:maxItems=8
 	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,2,rep,name=podGroupTemplates"`
