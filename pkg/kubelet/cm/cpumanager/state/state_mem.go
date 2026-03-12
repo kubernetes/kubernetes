@@ -64,16 +64,8 @@ func (s *stateMemory) GetCPUSet(podUID string, containerName string) (cpuset.CPU
 	s.RLock()
 	defer s.RUnlock()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		res, ok := s.assignments[podUID][containerName]
-		return res.Clone(), ok
-	} else {
-		entry, exists := s.allocations[podUID][containerName]
-		if entry.Resized.IsEmpty() {
-			return entry.Baseline.Clone(), exists
-		}
-		return entry.Resized.Clone(), exists
-	}
+	res, ok := s.assignments[podUID][containerName]
+	return res.Clone(), ok
 }
 
 func (s *stateMemory) GetDefaultCPUSet() cpuset.CPUSet {
@@ -189,18 +181,9 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	s.Lock()
 	defer s.Unlock()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		delete(s.assignments[podUID], containerName)
-		if len(s.assignments[podUID]) == 0 {
-			delete(s.assignments, podUID)
-		}
-		s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
-	} else {
-		delete(s.allocations[podUID], containerName)
-		if len(s.allocations[podUID]) == 0 {
-			delete(s.allocations, podUID)
-		}
-		s.logger.V(2).Info("Deleted CPUSet allocations", "podUID", podUID, "containerName", containerName)
+	delete(s.assignments[podUID], containerName)
+	if len(s.assignments[podUID]) == 0 {
+		delete(s.assignments, podUID)
 	}
 	s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
 

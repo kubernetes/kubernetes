@@ -515,7 +515,7 @@ func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, available
 	return acc
 }
 
-func newCPUAccumulatorForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) *cpuAccumulator {
+func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) *cpuAccumulator {
 	acc := &cpuAccumulator{
 		logger:        logger,
 		topo:          topo,
@@ -546,11 +546,7 @@ func newCPUAccumulatorForResize(logger logr.Logger, topo *topology.CPUTopology, 
 					// addition in container[].resources ... which
 					// could be possible to patch ? Esotsal Note This means
 					// modifying API code
-					if !(mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
-						acc.take(mustKeepCPUsForResize.Clone())
-					} else {
-						return acc
-					}
+					acc.take(mustKeepCPUsForResize.Clone())
 				}
 			}
 
@@ -660,12 +656,12 @@ func (a *cpuAccumulator) isFullSocketForResize(socketID int) bool {
 	return a.resultDetails.CPUsInSockets(socketID).Size()+a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
 }
 
-// return true if this Socket only allocated CPUs for this Container
+// return true if this Core only allocated CPUs for this Container
 func (a *cpuAccumulator) isFullCoreForResize(coreID int) bool {
 	return a.resultDetails.CPUsInCores(coreID).Size()+a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
 }
 
-// return true if this Socket only allocated CPUs for this Container
+// return true if this UncoreCache only allocated CPUs for this Container
 func (a *cpuAccumulator) isFullUncoreCacheForResize(uncoreID int) bool {
 	return a.resultDetails.CPUsInUncoreCaches(uncoreID).Size()+a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
 }
@@ -1607,7 +1603,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
 }
 
-func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -1620,7 +1616,7 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 	// If the number of CPUs requested to be retained is not a subset
 	// of reusableCPUs, then we fail early
 	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
-		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+		if !mustKeepCPUsForResize.Clone().IsSubsetOf(reusableCPUsForResize.Clone()) {
 			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
 		}
 	}
@@ -1861,12 +1857,12 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 	return takeByTopologyNUMAPackedForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForResize)
 }
 
-func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
+func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForResize *cpuset.CPUSet) (cpuset.CPUSet, error) {
 
 	// If the number of CPUs requested to be retained is not a subset
 	// of reusableCPUs, then we fail early
 	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
-		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+		if !mustKeepCPUsForResize.Clone().IsSubsetOf(reusableCPUsForResize.Clone()) {
 			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
 		}
 	}

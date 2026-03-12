@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -169,6 +170,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 		// Still, the pod-level limits field itself will not have default values set.
 		// To cover this pattern, we allow overriding the values when comparing against the PodSpec.
 		expectedPodLevelResourcesOverride *cgroups.ContainerResources
+		hasExclusiveCPUs                  map[string]bool
 	}
 
 	tests := []testCase{
@@ -182,6 +184,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "120m", CPULim: "120m", MemReq: "120Mi", MemLim: "120Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Guaranteed QoS pod, no container resources",
@@ -191,6 +194,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Guaranteed QoS pod with other container resources",
@@ -203,6 +207,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Guaranteed QoS pod, 1 container with resources",
@@ -215,6 +220,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Guaranteed QoS pod, pod resources limits, no container resources",
@@ -227,6 +233,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources limits, container resources limits",
@@ -239,6 +246,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "100m", MemReq: "80Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources limits, container resources requests",
@@ -251,6 +259,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "100m", MemReq: "80Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, no container resources",
@@ -260,6 +269,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, container resources requests",
@@ -272,6 +282,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, container resources requests and partial limits",
@@ -284,6 +295,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, container resources limits",
@@ -297,6 +309,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
 			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+			hasExclusiveCPUs:                  map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, partial container resources limits",
@@ -312,6 +325,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			},
 			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+			hasExclusiveCPUs:                  map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, container resources requests and limits",
@@ -330,6 +344,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "60m", MemReq: "100Mi", MemLim: "60Mi"},
 			},
 			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+			hasExclusiveCPUs:                  map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, no container resources",
@@ -342,6 +357,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod with yet some other container resources",
@@ -354,6 +370,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, 1 container with resources",
@@ -366,6 +383,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests and limits, container resources limits",
@@ -378,6 +396,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests and limits, container resources requests",
@@ -390,6 +409,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name:         "Burstable QoS pod, partial requests in pod level resources, 1 container with guaranteed resources",
@@ -402,6 +422,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBurstable,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
 		},
 		{
 			name: "BestEffort QoS no pod resources, no container resources",
@@ -413,6 +434,33 @@ func podLevelResourcesTests(f *framework.Framework) {
 				qos:               v1.PodQOSBestEffort,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "", CPULim: "", MemReq: "", MemLim: ""},
 			},
+			hasExclusiveCPUs: map[string]bool{"c1": false, "c2": false},
+		},
+		{
+			name:         "Guaranteed QoS pod with one container with exclusive CPUs other container resources",
+			podResources: &cgroups.ContainerResources{CPUReq: "2050m", CPULim: "2050m", MemReq: "100Mi", MemLim: "100Mi"},
+			containers: []containerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "50Mi", MemLim: "100Mi"}},
+				{Name: "c2", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"}},
+			},
+			expected: expectedPodConfig{
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "2050m", CPULim: "2050m", MemReq: "100Mi", MemLim: "100Mi"},
+			},
+			hasExclusiveCPUs: map[string]bool{"c1": true, "c2": false},
+		},
+		{
+			name:         "Guaranteed QoS pod, 1 container with resources and exclusive CPUs",
+			podResources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "100Mi", MemLim: "100Mi"},
+			containers: []containerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "50Mi", MemLim: "100Mi"}},
+				{Name: "c2"},
+			},
+			expected: expectedPodConfig{
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "100Mi", MemLim: "100Mi"},
+			},
+			hasExclusiveCPUs: map[string]bool{"c1": true, "c2": false},
 		},
 	}
 
@@ -440,7 +488,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
-			err = verifyContainersCgroupLimits(ctx, f, pod)
+			err = verifyContainersCgroupLimits(ctx, f, pod, tc.hasExclusiveCPUs)
 			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
 
 			ginkgo.By("deleting pods")
@@ -450,7 +498,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 	}
 }
 
-func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
+func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod, hasExclusiveCPUs map[string]bool) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
@@ -463,7 +511,8 @@ func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, p
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
+			disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && hasExclusiveCPUs[container.Name]
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true, disableCPUQuota)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}

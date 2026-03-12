@@ -236,7 +236,6 @@ func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
 	}
 
 	pod.UID = types.UID(podUID)
-	pod.Name = podUID
 	pod.Spec.Containers[0].Name = containerName
 
 	return pod
@@ -1656,7 +1655,7 @@ func TestCPUManagerAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -1673,7 +1672,7 @@ func TestCPUManagerAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 	testCases := []struct {
 		description        string
@@ -1724,7 +1723,7 @@ func TestCPUManagerAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
-		err := mgr.Allocate(pod, container, lifecycle.AddOperation)
+		err := mgr.Allocate(tCtx, pod, container, lifecycle.AddOperation)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -1767,7 +1766,7 @@ func TestCPUManagerAddWithInitContainersWithInPlacePodVerticalScalingExclusiveCP
 			topo:             topoSingleSocketHT,
 			numReservedCPUs:  0,
 			stAssignments:    state.ContainerCPUAssignments{},
-			stBaselines:    state.ContainerCPUBaselines{},
+			stBaselines:      state.ContainerCPUBaselines{},
 			stDefaultCPUSet:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			initContainerIDs: []string{"initFakeID"},
 			containerIDs:     []string{"appFakeID"},
@@ -1835,7 +1834,7 @@ func TestCPUManagerAddWithInitContainersWithInPlacePodVerticalScalingExclusiveCP
 			topo:             topoSingleSocketHT,
 			numReservedCPUs:  0,
 			stAssignments:    state.ContainerCPUAssignments{},
-			stBaselines:    state.ContainerCPUBaselines{},
+			stBaselines:      state.ContainerCPUBaselines{},
 			stDefaultCPUSet:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
 			containerIDs:     []string{"appFakeID"},
@@ -1962,17 +1961,11 @@ func TestCPUManagerAddWithInitContainersWithInPlacePodVerticalScalingExclusiveCP
 			},
 		}
 
-		containers := append(
-			testCase.pod.Spec.InitContainers,
-			testCase.pod.Spec.Containers...)
+		containers := append(testCase.pod.Spec.InitContainers, testCase.pod.Spec.Containers...) //nolint:gocritic
 
-		containerIDs := append(
-			testCase.initContainerIDs,
-			testCase.containerIDs...)
+		containerIDs := append(testCase.initContainerIDs, testCase.containerIDs...) //nolint:gocritic
 
-		expCSets := append(
-			testCase.expInitCSets,
-			testCase.expCSets...)
+		expCSets := append(testCase.expInitCSets, testCase.expCSets...) //nolint:gocritic
 
 		cumCSet := cpuset.New()
 		cumBaselineCSet := cpuset.New()
@@ -2157,7 +2150,7 @@ func TestCPUManagerRemoveWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T
 			err: nil,
 		},
 		state: &mockState{
-			baselines:   state.ContainerCPUBaselines},
+			baselines:     state.ContainerCPUBaselines{},
 			defaultCPUSet: cpuset.New(),
 		},
 		lastUpdateState:   state.NewMemoryState(logger),
@@ -2231,7 +2224,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 		stAssignments                state.ContainerCPUAssignments
 		stBaselines                  state.ContainerCPUBaselines
 		stDefaultCPUSet              cpuset.CPUSet
-		lastUpdateStBaselines      state.ContainerCPUBaselines
+		lastUpdateStBaselines        state.ContainerCPUBaselines
 		lastUpdateStDefaultCPUSet    cpuset.CPUSet
 		expectStAssignments          state.ContainerCPUAssignments
 		expectStBaselines            state.ContainerCPUBaselines
@@ -2281,7 +2274,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				},
 			},
 			stDefaultCPUSet:           cpuset.New(3, 4, 5, 6, 7),
-			lastUpdateStBaselines:   state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:     state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet: cpuset.New(),
 			expectStAssignments: state.ContainerCPUAssignments{
 				"fakePodUID": map[string]cpuset.CPUSet{
@@ -2339,7 +2332,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				},
 			},
 			stDefaultCPUSet:           cpuset.New(3, 4, 5, 6, 7),
-			lastUpdateStBaselines:   state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:     state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet: cpuset.New(),
 			expectStAssignments: state.ContainerCPUAssignments{
 				"fakePodUID": map[string]cpuset.CPUSet{
@@ -2377,12 +2370,12 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 			pspFound:                     false,
 			updateErr:                    nil,
 			stAssignments:                state.ContainerCPUAssignments{},
-			stBaselines:                state.ContainerCPUBaselines{},
+			stBaselines:                  state.ContainerCPUBaselines{},
 			stDefaultCPUSet:              cpuset.New(),
-			lastUpdateStBaselines:      state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:        state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet:    cpuset.New(),
 			expectStAssignments:          state.ContainerCPUAssignments{},
-			expectStBaselines:          state.ContainerCPUBaselines{},
+			expectStBaselines:            state.ContainerCPUBaselines{},
 			expectStDefaultCPUSet:        cpuset.New(),
 			expectSucceededContainerName: "",
 			expectFailedContainerName:    "",
@@ -2416,12 +2409,12 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 			pspFound:                     true,
 			updateErr:                    nil,
 			stAssignments:                state.ContainerCPUAssignments{},
-			stBaselines:                state.ContainerCPUBaselines{},
+			stBaselines:                  state.ContainerCPUBaselines{},
 			stDefaultCPUSet:              cpuset.New(),
-			lastUpdateStBaselines:      state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:        state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet:    cpuset.New(),
 			expectStAssignments:          state.ContainerCPUAssignments{},
-			expectStBaselines:          state.ContainerCPUBaselines{},
+			expectStBaselines:            state.ContainerCPUBaselines{},
 			expectStDefaultCPUSet:        cpuset.New(),
 			expectSucceededContainerName: "",
 			expectFailedContainerName:    "fakeContainerName",
@@ -2468,7 +2461,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				},
 			},
 			stDefaultCPUSet:           cpuset.New(1, 2, 3, 4, 5, 6, 7),
-			lastUpdateStBaselines:   state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:     state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet: cpuset.New(),
 			expectStAssignments: state.ContainerCPUAssignments{
 				"fakePodUID": map[string]cpuset.CPUSet{
@@ -2520,13 +2513,13 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 					"fakeContainerName": cpuset.New(1, 2),
 				},
 			},
-			stBselines: state.ContainerCPUBaselines{
+			stBaselines: state.ContainerCPUBaselines{
 				"fakePodUID": map[string]state.ContainerCPUBaseline{
 					"fakeContainerName": {Baseline: cpuset.New(1, 2)},
 				},
 			},
 			stDefaultCPUSet:           cpuset.New(3, 4, 5, 6, 7),
-			lastUpdateStBaselines:   state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:     state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet: cpuset.New(),
 			expectStAssignments: state.ContainerCPUAssignments{
 				"fakePodUID": map[string]cpuset.CPUSet{
@@ -2581,7 +2574,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 					"secondfakeContainerName": cpuset.New(3, 4),
 				},
 			},
-			stBaselines: state.ContainerCPBaselines{
+			stBaselines: state.ContainerCPUBaselines{
 				"fakePodUID": map[string]state.ContainerCPUBaseline{
 					"fakeContainerName": {Baseline: cpuset.New(1, 2)},
 				},
@@ -2590,7 +2583,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				},
 			},
 			stDefaultCPUSet:           cpuset.New(5, 6, 7),
-			lastUpdateStBaselines:   state.ContainerCPUBaselines{},
+			lastUpdateStBaselines:     state.ContainerCPUBaselines{},
 			lastUpdateStDefaultCPUSet: cpuset.New(),
 			expectStAssignments: state.ContainerCPUAssignments{
 				"fakePodUID": map[string]cpuset.CPUSet{
@@ -2738,7 +2731,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 			policy: testCase.policy,
 			state: &mockState{
 				assignments:   testCase.stAssignments,
-				baselines:   testCase.stBaselines,
+				baselines:     testCase.stBaselines,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			},
 			lastUpdateState: state.NewMemoryState(logger),
@@ -2763,7 +2756,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 
 		}
 
-		if !reflect.DeepEqual(testCase.expectStiBaselines, mgr.state.GetCPUBaselines()) {
+		if !reflect.DeepEqual(testCase.expectStBaselines, mgr.state.GetCPUBaselines()) {
 			t.Errorf("%v", testCase.description)
 			t.Errorf("Expected state container cpu baselines: %v, actual: %v", testCase.expectStBaselines, mgr.state.GetCPUBaselines())
 
@@ -2855,7 +2848,8 @@ func TestCPUManagerAddWithResvListWithInPlacePodVerticalScalingExclusiveCPUs(t *
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
-				allocations:   state.ContainerCPUAllocations{},
+				assignments:   state.ContainerCPUAssignments{},
+				baselines:     state.ContainerCPUBaselines{},
 				defaultCPUSet: cpuset.New(0, 1, 2, 3),
 			},
 			lastUpdateState: state.NewMemoryState(logger),
@@ -2871,7 +2865,7 @@ func TestCPUManagerAddWithResvListWithInPlacePodVerticalScalingExclusiveCPUs(t *
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
-		err := mgr.Allocate(pod, container, lifecycle.AddOperation)
+		err := mgr.Allocate(tCtx, pod, container, lifecycle.AddOperation)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -2947,10 +2941,11 @@ func TestCPUManagerHandlePolicyOptionsWithInPlacePodVerticalScalingExclusiveCPUs
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
-			defer os.RemoveAll(sDir)
-
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(sDir), "unable to remove dir %s", sDir)
+			})
 			logger, _ := ktesting.NewTestContext(t)
-			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -2963,7 +2958,7 @@ func TestCPUManagerHandlePolicyOptionsWithInPlacePodVerticalScalingExclusiveCPUs
 }
 
 func TestCPUManagerGetAllocatableCPUsWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -3029,158 +3024,6 @@ func TestCPUManagerGetAllocatableCPUsWithInPlacePodVerticalScalingExclusiveCPUs(
 		if !mgr.GetAllocatableCPUs().Equals(testCase.expAllocatableCPUs) {
 			t.Errorf("Policy GetAllocatableCPUs() error (%v). expected cpuset %v for container %v but got %v",
 				testCase.description, testCase.expAllocatableCPUs, "fakeContainer", mgr.GetAllocatableCPUs())
-		}
-	}
-}
-
-func TestCPUManagerAddResize(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
-	}
-
-	logger, tCtx := ktesting.NewTestContext(t)
-
-	testPolicy, _ := NewStaticPolicy(
-		logger,
-		&topology.CPUTopology{
-			NumCPUs:    4,
-			NumSockets: 1,
-			NumCores:   4,
-			CPUDetails: map[int]topology.CPUInfo{
-				0: {CoreID: 0, SocketID: 0},
-				1: {CoreID: 1, SocketID: 0},
-				2: {CoreID: 2, SocketID: 0},
-				3: {CoreID: 3, SocketID: 0},
-			},
-		},
-		0,
-		cpuset.New(),
-		topologymanager.NewFakeManager(logger),
-		nil)
-
-	type testStep struct {
-		description      string
-		operation        lifecycle.Operation
-		expDefaultCPUSet cpuset.CPUSet
-		expAllocateErr   error
-		expContainerErr  error
-	}
-
-	testCases := []struct {
-		description string
-		updateErr   error
-		policy      Policy
-		testSteps   []testStep
-	}{
-		{
-			description: "CPU Manager first add then resize",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "first add operation - no error",
-					operation:        lifecycle.AddOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-				{
-					description:      "then resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
-		},
-		{
-			description: "CPU Manager attempt to resize",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "no error - skip allocation",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
-		},
-		{
-			description: "CPU Manager attempt to use empty operation",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "no error - skip allocation",
-					operation:        "",
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
-		},
-		{
-			description: "CPU Manager first resize then add",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "first resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-				{
-					description:      "then add operation - no error",
-					operation:        lifecycle.AddOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
-		},
-	}
-
-	for _, testCase := range testCases {
-		mgr := &manager{
-			policy: testCase.policy,
-			state: &mockState{
-				assignments:   state.ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.New(1, 2, 3, 4),
-			},
-			lastUpdateState: state.NewMemoryState(logger),
-			containerRuntime: mockRuntimeService{
-				err: testCase.updateErr,
-			},
-			containerMap:      containermap.NewContainerMap(),
-			podStatusProvider: mockPodStatusProvider{},
-			sourcesReady:      &sourcesReadyStub{},
-		}
-
-		pod := makePod("fakePod", "fakeContainer", "2", "2")
-		container := &pod.Spec.Containers[0]
-		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
-
-		for _, testStep := range testCase.testSteps {
-			err := mgr.Allocate(tCtx, pod, container, testStep.operation)
-			if !reflect.DeepEqual(err, testStep.expAllocateErr) {
-				t.Errorf("CPU Manager Allocate(%v) error (%v). expected error: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expAllocateErr, err)
-			}
-
-			mgr.AddContainer(logger, pod, container, "fakeID")
-			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
-			if !reflect.DeepEqual(err, testStep.expContainerErr) {
-				t.Errorf("CPU Manager AddContainer(%v) error (%v). expected error: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expContainerErr, err)
-			}
-			if !testStep.expDefaultCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
-				t.Errorf("CPU Manager AddContainer(%v) error (%v). expected default cpuset: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expDefaultCPUSet, mgr.state.GetDefaultCPUSet())
-			}
 		}
 	}
 }

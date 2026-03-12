@@ -136,28 +136,13 @@ func (sc *stateCheckpoint) restoreState() error {
 	if tmpDefaultCPUSet, err = cpuset.Parse(cp.CheckpointData.DefaultCPUSet); err != nil {
 		return fmt.Errorf("could not parse default CPU set %q: %w", cp.CheckpointData.DefaultCPUSet, err)
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		for pod := range cp.CheckpointData.Entries {
-			tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(cp.CheckpointData.Entries[pod]))
-			for container, cpuString := range cp.CheckpointData.Entries[pod] {
-				if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-					return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
-				}
-				tmpAssignments[pod][container] = tmpContainerCPUSet
+	for pod := range cp.CheckpointData.Entries {
+		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(cp.CheckpointData.Entries[pod]))
+		for container, cpuString := range cp.CheckpointData.Entries[pod] {
+			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
+				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
 			}
-		}
-	} else {
-		for pod := range cp.CheckpointData.Allocations {
-			tmpAllocations[pod] = make(map[string]ContainerCPUAllocation, len(cp.CheckpointData.Allocations[pod]))
-			for container, cpuAllocation := range cp.CheckpointData.Allocations[pod] {
-				if tmpContainerOriginalCPUSet, err = cpuset.Parse(cpuAllocation.Original); err != nil {
-					return fmt.Errorf("could not parse Original cpuset %q for container %q in pod %q: %w", cpuAllocation.Original, container, pod, err)
-				}
-				if tmpContainerResizedCPUSet, err = cpuset.Parse(cpuAllocation.Resized); err != nil {
-					return fmt.Errorf("could not parse Resized cpuset %q for container %q in pod %q: %w", cpuAllocation.Resized, container, pod, err)
-				}
-				tmpAllocations[pod][container] = ContainerCPUAllocation{Original: tmpContainerOriginalCPUSet, Resized: tmpContainerResizedCPUSet}
-			}
+			tmpAssignments[pod][container] = tmpContainerCPUSet
 		}
 	}
 
