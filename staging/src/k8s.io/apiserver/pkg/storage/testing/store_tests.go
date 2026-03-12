@@ -2841,15 +2841,46 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 
 const (
 	// if the following annotation is present, the object is marked to become corrupt
-	CorruptErrKey = "testing.transformer.k8s.io/corrupt-error"
+	corruptErrKey = "testing.transformer.k8s.io/corrupt-error"
 
 	// if the following annotation is present, the object is marked
 	// to fail with an unexpected non-corrupt error
-	UnexpectedErrKey = "testing.transformer.k8s.io/unexpected-error"
+	unexpectedErrKey = "testing.transformer.k8s.io/unexpected-error"
 )
 
+// errInjectingTransformer wraps an existing transformer and injects errors
+// for objects whose raw data contains specific marker strings. This lets the
+// shared test code own both the markers (annotations on test objects) and the
+// transformer behavior (error injection), keeping the full test fixture in one place.
+type errInjectingTransformer struct {
+	value.Transformer
+	// corruptErr is the error returned for objects marked with corruptErrKey.
+	// The caller provides this because the concrete error type (e.g. corruptObjectError)
+	// may be unexported in the storage backend package.
+	corruptErr error
+}
+
+func (t *errInjectingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	out, stale, err = t.Transformer.TransformFromStorage(ctx, data, dataCtx)
+	switch {
+	case err != nil:
+		return out, stale, err
+	case strings.Contains(string(data), corruptErrKey):
+		return out, stale, t.corruptErr
+	case strings.Contains(string(data), unexpectedErrKey):
+		return out, stale, fmt.Errorf("bits flipped")
+	}
+	return out, stale, err
+}
+
+func newErrInjectingModifier(corruptErr error) TransformerModifier {
+	return func(orig value.Transformer) value.Transformer {
+		return &errInjectingTransformer{Transformer: orig, corruptErr: corruptErr}
+	}
+}
+
 // RunTestGetListWithErrorAggregation tests aggregation of errors while the list operation is in progress
-func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
+func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
 	// the test creates n objects and assigns each object unique id i ie. 1 <= i <= n
 	objNameFn := func(id int) string {
 		// pad with leading zeros so that for i, j where i < j, object
@@ -2884,9 +2915,9 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			corrupter: func(i int) string {
 				switch {
 				case i == 2:
-					return UnexpectedErrKey
+					return unexpectedErrKey
 				case i%2 == 0:
-					return CorruptErrKey
+					return corruptErrKey
 				default:
 					return ""
 				}
@@ -2925,7 +2956,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			n: 7,
 			corrupter: func(i int) string {
 				if i%2 == 0 {
-					return CorruptErrKey
+					return corruptErrKey
 				}
 				return ""
 			},
@@ -2974,9 +3005,9 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			corrupter: func(i int) string {
 				switch {
 				case i == 4:
-					return UnexpectedErrKey
+					return unexpectedErrKey
 				case i%2 == 0:
-					return CorruptErrKey
+					return corruptErrKey
 				default:
 					return ""
 				}
@@ -3034,7 +3065,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			n: 210,
 			corrupter: func(i int) string {
 				if i%2 == 0 {
-					return CorruptErrKey
+					return corruptErrKey
 				}
 				return ""
 			},
@@ -3076,7 +3107,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// - good: {}, all the objects are marked to become corrupt
 			// - corrupt: {1, 2, 3 ... 99, 100}, these objects are marked to become corrupt
 			n:         100,
-			corrupter: func(i int) string { return CorruptErrKey },
+			corrupter: func(i int) string { return corruptErrKey },
 			//  while listing the n objects, we expect the following:
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
@@ -3147,7 +3178,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			}
 
 			// step 3: change the transformer so the marked objects appear corrupt
-			revertTransformer := store.CorruptTransformer()
+			revertTransformer := store.UpdateTransformer(newErrInjectingModifier(corruptErr))
 			defer revertTransformer()
 
 			// step 4: invoke GetList again, this time it should encounter the corrupt object(s)
@@ -3165,7 +3196,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 
 // RunTestGetListWithoutErrorAggregation tests that when the AllowUnsafeMalformedObjectDeletion
 // feature is disabled, GetList maintains backward compatibility by aborting on the first error.
-func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
+func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
 	prefix := "/pods/ns/"
 	objNameFn := func(id int) string {
 		return fmt.Sprintf("foo-%06d", id)
@@ -3185,7 +3216,7 @@ func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, st
 		}}
 		if i%2 == 0 {
 			obj.Annotations = map[string]string{
-				CorruptErrKey: "",
+				corruptErrKey: "",
 			}
 		}
 		testPropagateStore(ctx, t, store, obj)
@@ -3206,7 +3237,7 @@ func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, st
 	}
 
 	// Step 3: corrupt the transformer so marked objects fail to decode
-	revertTransformer := store.CorruptTransformer()
+	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(corruptErr))
 	defer revertTransformer()
 
 	// Step 4: list again, expect GetList to abort on the first corrupt object
@@ -3692,9 +3723,11 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
-type InterfaceWithCorruptTransformer interface {
+type TransformerModifier func(value.Transformer) value.Transformer
+
+type InterfaceWithTransformerOverride interface {
 	storage.Interface
-	CorruptTransformer() func()
+	UpdateTransformer(TransformerModifier) func()
 }
 
 func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {

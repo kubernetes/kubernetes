@@ -413,14 +413,14 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 	testCheckEventType(t, w, watch.Error)
 }
 
-func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
+func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
 	obj := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test-ns",
 			// this annotation marks the object to become corrupt
 			Annotations: map[string]string{
-				CorruptErrKey: "",
+				corruptErrKey: "",
 			},
 		},
 	}
@@ -443,7 +443,7 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 	}
 
 	// Now trigger watch error by injecting failing transformer.
-	revertTransformer := store.CorruptTransformer()
+	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(corruptErr))
 	defer revertTransformer()
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
