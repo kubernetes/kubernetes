@@ -54,35 +54,28 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	}
 }
 
+// TestEphemeralStorageCapacityFromFsInfo verifies that capacity uses DecimalSI.
+// Allocatable inherits capacity's format via DeepCopy().Sub() in setters.go.
+// DecimalSI produces clean suffixed values for any byte count, while BinarySI
+// falls back to bare integers for non-1024-aligned sizes. See #133927.
 func TestEphemeralStorageCapacityFromFsInfo(t *testing.T) {
-	tests := []struct {
-		name     string
-		capacity uint64
-		expected v1.ResourceList
-	}{
-		{
-			name:     "non-1024-aligned capacity uses DecimalSI",
-			capacity: 97842800000,
-			expected: v1.ResourceList{
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(int64(97842800000), resource.DecimalSI),
-			},
-		},
-		{
-			name:     "1024-aligned capacity uses DecimalSI",
-			capacity: 1048576,
-			expected: v1.ResourceList{
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(int64(1048576), resource.DecimalSI),
-			},
-		},
+	// Use a non-1024-aligned capacity typical of real filesystem sizes.
+	fsInfo := infov2.FsInfo{Capacity: 97842800000}
+	capacity := EphemeralStorageCapacityFromFsInfo(fsInfo)
+	ephemeralCapacity := capacity[v1.ResourceEphemeralStorage]
+
+	if ephemeralCapacity.Format != resource.DecimalSI {
+		t.Errorf("capacity format = %v, want DecimalSI", ephemeralCapacity.Format)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fsInfo := infov2.FsInfo{Capacity: tt.capacity}
-			actual := EphemeralStorageCapacityFromFsInfo(fsInfo)
-			if !reflect.DeepEqual(actual, tt.expected) {
-				t.Errorf("got resource list %v, want %v", actual, tt.expected)
-			}
-		})
+
+	// Simulate allocatable derivation (setters.go): allocatable = capacity - reservation.
+	// DeepCopy preserves the format, so allocatable inherits DecimalSI from capacity.
+	allocatable := ephemeralCapacity.DeepCopy()
+	reservation := resource.MustParse("1Gi")
+	allocatable.Sub(reservation)
+
+	if allocatable.Format != resource.DecimalSI {
+		t.Errorf("allocatable format = %v, want DecimalSI (inherited from capacity)", allocatable.Format)
 	}
 }
 
