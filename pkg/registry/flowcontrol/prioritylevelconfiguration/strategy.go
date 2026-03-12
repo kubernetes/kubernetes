@@ -20,10 +20,12 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -94,8 +96,10 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	// That means we should not allow 0 values to be introduced, either
 	// via v1 or v1beta3(with the roundtrip annotation) until we know
 	// all servers are at 1.29+ and will honor the zero value correctly.
+	plc := obj.(*flowcontrol.PriorityLevelConfiguration)
 	opts := validation.PriorityLevelValidationOptions{}
-	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
+	allErrs := validation.ValidatePriorityLevelConfiguration(plc, getRequestGroupVersion(ctx), opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, plc, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -119,6 +123,7 @@ func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPL := obj.(*flowcontrol.PriorityLevelConfiguration)
+	oldPL := old.(*flowcontrol.PriorityLevelConfiguration)
 
 	// 1.28 server is not aware of the roundtrip annotation, and will
 	// default any 0 value persisted (for the NominalConcurrencyShares
@@ -128,7 +133,8 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	// via v1 or v1beta3(with the roundtrip annotation) until we know
 	// all servers are at 1.29+ and will honor the zero value correctly.
 	opts := validation.PriorityLevelValidationOptions{}
-	return validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)
+	allErrs := validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPL, oldPL, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

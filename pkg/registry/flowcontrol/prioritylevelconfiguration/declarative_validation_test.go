@@ -1,0 +1,190 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package prioritylevelconfiguration
+
+import (
+	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+)
+
+var apiVersions = []string{"v1", "v1beta1", "v1beta2", "v1beta3"}
+
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "flowcontrol.apiserver.k8s.io",
+		APIVersion: apiVersion,
+	})
+
+	testCases := map[string]struct {
+		input        flowcontrol.PriorityLevelConfiguration
+		expectedErrs field.ErrorList
+	}{
+		"valid Limited PLC with Reject": {
+			input: mkPLC(),
+		},
+		"valid Limited PLC with Queue": {
+			input: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
+		},
+		"valid Exempt PLC": {
+			input: mkPLC(tweakExempt()),
+		},
+		"valid Exempt PLC with Exempt field set": {
+			input: mkPLC(tweakExempt(), tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptrInt32(100),
+			})),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	testCases := map[string]struct {
+		old          flowcontrol.PriorityLevelConfiguration
+		update       flowcontrol.PriorityLevelConfiguration
+		expectedErrs field.ErrorList
+	}{
+		"valid update (no changes)": {
+			old:    mkPLC(),
+			update: mkPLC(),
+		},
+		"valid update: Reject to Queue": {
+			old:    mkPLC(),
+			update: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIPrefix:         "apis",
+				APIGroup:          "flowcontrol.apiserver.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "prioritylevelconfigurations",
+				Name:              tc.old.Name,
+				IsResourceRequest: true,
+				Verb:              "update",
+			})
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
+
+// mkPLC creates a valid Limited PriorityLevelConfiguration with Reject limit response.
+func mkPLC(tweaks ...func(*flowcontrol.PriorityLevelConfiguration)) flowcontrol.PriorityLevelConfiguration {
+	obj := flowcontrol.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-limited",
+		},
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 100,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return obj
+}
+
+// tweakExempt switches the PLC to Exempt type with the mandatory "exempt" name.
+func tweakExempt() func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		obj.Name = "exempt"
+		obj.Spec.Type = flowcontrol.PriorityLevelEnablementExempt
+		obj.Spec.Limited = nil
+	}
+}
+
+// tweakLimited sets the Limited field directly.
+func tweakLimited(limited *flowcontrol.LimitedPriorityLevelConfiguration) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		obj.Spec.Limited = limited
+	}
+}
+
+// tweakExemptConfig sets the Exempt configuration field.
+func tweakExemptConfig(exempt *flowcontrol.ExemptPriorityLevelConfiguration) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		obj.Spec.Exempt = exempt
+	}
+}
+
+// tweakLimitResponseType sets the LimitResponse type and auto-populates Queuing if Queue.
+func tweakLimitResponseType(lrt flowcontrol.LimitResponseType) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		if obj.Spec.Limited == nil {
+			return
+		}
+		obj.Spec.Limited.LimitResponse.Type = lrt
+		if lrt == flowcontrol.LimitResponseTypeQueue {
+			obj.Spec.Limited.LimitResponse.Queuing = &flowcontrol.QueuingConfiguration{
+				Queues:           64,
+				HandSize:         8,
+				QueueLengthLimit: 50,
+			}
+		} else {
+			obj.Spec.Limited.LimitResponse.Queuing = nil
+		}
+	}
+}
+
+// tweakQueuing sets the Queuing field directly, overriding auto-population.
+func tweakQueuing(queuing *flowcontrol.QueuingConfiguration) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		if obj.Spec.Limited == nil {
+			return
+		}
+		obj.Spec.Limited.LimitResponse.Queuing = queuing
+	}
+}
+
+func ptrInt32(v int32) *int32 {
+	return &v
+}
