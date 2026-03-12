@@ -3010,13 +3010,16 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 				}
 
 				details := statusGot.Status().Details
-				// a) only the corruptObjErr from object {2} should be aggregated;
-				// the aggregator saw the corrupt error before aborting on the unexpected one
-				if details == nil || len(details.Causes) != 1 {
-					t.Errorf("expected the API status to include exactly 1 corrupt object error, but got: %v", details)
+				// a) the corrupt error from {2} plus the unexpected abort error from {4}
+				// should both be surfaced as causes
+				if details == nil || len(details.Causes) != 2 {
+					t.Fatalf("expected 2 causes (1 corrupt + 1 abort), but got: %v", details)
 				}
 				if want, got := keyFn(2), details.Causes[0].Field; want != got {
-					t.Errorf("expected an object name of %q, but got: %q", want, got)
+					t.Errorf("expected corrupt object key %q, but got: %q", want, got)
+				}
+				if want, got := metav1.CauseTypeUnexpectedServerResponse, details.Causes[1].Type; want != got {
+					t.Errorf("expected abort cause type %q, but got: %q", want, got)
 				}
 
 				// b) verify that GetList successfully decodes objects before the abort

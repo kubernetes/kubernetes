@@ -82,7 +82,7 @@ type corruptObjErrAggregator struct {
 }
 
 func (a *corruptObjErrAggregator) Append(key string, err error) bool {
-	if a.abortErr != nil || len(a.errs) >= a.maxCount {
+	if a.abortErr != nil {
 		return true
 	}
 
@@ -90,8 +90,8 @@ func (a *corruptObjErrAggregator) Append(key string, err error) bool {
 	if errors.As(err, &corruptObjErr) {
 		a.errs = append(a.errs, storage.NewCorruptObjError(key, corruptObjErr))
 		if len(a.errs) >= a.maxCount {
-			// add a sentinel error to indicate there are more
-			a.errs = append(a.errs, errTooMany)
+			// treat exceeding the limit as an abort condition
+			a.abortErr = errTooMany
 			return true
 		}
 		return false
@@ -108,7 +108,7 @@ func (a *corruptObjErrAggregator) Aggregate() error {
 		return a.abortErr
 	case len(a.errs) > 0:
 		err := utilerrors.NewAggregate(a.errs)
-		return &aggregatedStorageError{errs: err, resourcePrefix: "list"}
+		return &aggregatedStorageError{errs: err, abortErr: a.abortErr, resourcePrefix: "list"}
 	default:
 		return nil
 	}
@@ -221,6 +221,9 @@ func (e *corruptObjectError) Error() string {
 type aggregatedStorageError struct {
 	resourcePrefix string
 	errs           utilerrors.Aggregate
+	// abortErr is the reason the aggregation stopped, if any.
+	// It is nil when all items were processed without hitting a limit or unexpected error.
+	abortErr error
 }
 
 func (e *aggregatedStorageError) Error() string {
@@ -247,14 +250,19 @@ func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.Grou
 				// TODO: do we need to expose the internal error message here?
 				Message: err.Error(),
 			})
-			continue
 		}
-		if errors.Is(err, errTooMany) {
-			causes = append(causes, metav1.StatusCause{
-				Type:    metav1.CauseTypeTooMany,
-				Message: errTooMany.Error(),
-			})
-		}
+	}
+	switch {
+	case errors.Is(e.abortErr, errTooMany):
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeTooMany,
+			Message: errTooMany.Error(),
+		})
+	case e.abortErr != nil:
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeUnexpectedServerResponse,
+			Message: e.abortErr.Error(),
+		})
 	}
 
 	return &apierrors.StatusError{
