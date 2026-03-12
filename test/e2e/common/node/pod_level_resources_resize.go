@@ -397,7 +397,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
 			},
-			resourceRequestsLimits{cpuReq: "4m"},
+			resourceRequestsLimits{cpuReq: "4m", cpuLim: "10m"},
 			resourceRequestsLimits{cpuReq: "5m", cpuLim: "25m"},
 			false,
 		),

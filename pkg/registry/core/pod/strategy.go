@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -47,10 +48,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -87,13 +90,14 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Generation = 1
+
+	podutil.DropDisabledPodFields(pod, nil)
+	defaultPodLevelLimits(pod)
+
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
 	}
-
-	podutil.DropDisabledPodFields(pod, nil)
-	defaultPodLevelLimits(pod)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
@@ -1000,6 +1004,8 @@ func defaultPodLevelLimits(pod *api.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
 		return
 	}
+	// TODO: replace with helper.IsPodLevelResourcesSet once
+	// https://github.com/kubernetes/kubernetes/pull/137150 merges.
 	if pod.Spec.Resources == nil {
 		return
 	}
@@ -1037,12 +1043,22 @@ func defaultPodLevelLimits(pod *api.Pod) {
 	}
 
 	for resName := range candidates {
-		if val, ok := aggrLimits[apiv1.ResourceName(resName)]; ok {
-			if pod.Spec.Resources.Limits == nil {
-				pod.Spec.Resources.Limits = make(api.ResourceList)
-			}
-			pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+		val, ok := aggrLimits[apiv1.ResourceName(resName)]
+		if !ok {
+			continue
 		}
+		// If the pod-level request exceeds the aggregated container limits, raise the
+		// pod-level limit to match the pod-level request. This ensures the pod remains
+		// valid (requests <= limits) and prevents the apiserver from rejecting the
+		// update during subsequent validation.
+		podReq := pod.Spec.Resources.Requests[resName]
+		if podReq.Cmp(val) > 0 {
+			val = podReq
+		}
+		if pod.Spec.Resources.Limits == nil {
+			pod.Spec.Resources.Limits = make(api.ResourceList)
+		}
+		pod.Spec.Resources.Limits[resName] = val.DeepCopy()
 	}
 }
 
