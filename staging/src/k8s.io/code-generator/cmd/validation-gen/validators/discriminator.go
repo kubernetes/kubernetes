@@ -55,6 +55,8 @@ type discriminatorGroup struct {
 	discriminatorMember *types.Member
 	// members maps field names to their rules in this discriminator group.
 	members map[string]*fieldMemberRules
+	// stabilityLevel denotes the stability level of the corresponding discriminator validation.
+	stabilityLevel ValidationStabilityLevel
 }
 
 type fieldMemberRules struct {
@@ -123,6 +125,10 @@ func (mtv *discriminatorTagValidator) GetValidations(context Context, tag codeta
 		return Validations{}, fmt.Errorf("duplicate discriminator: %q", groupName)
 	}
 	group.discriminatorMember = context.Member
+
+	if context.StabilityLevel != "" {
+		group.stabilityLevel = context.StabilityLevel
+	}
 
 	return Validations{}, nil
 }
@@ -201,6 +207,10 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 	payloadValidations, err := mtv.validator.ExtractTagValidations(context, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
+	}
+
+	if context.StabilityLevel != "" {
+		group.stabilityLevel = context.StabilityLevel
 	}
 
 	group.members[fieldName].rules = append(group.members[fieldName].rules, memberRule{
@@ -403,7 +413,7 @@ func (mtfv *discriminatorFieldValidator) generateMemberFieldValidation(context C
 		equivArg,
 		defaultForbidden,
 		rulesSlice,
-	)
+	).WithStabilityLevel(group.stabilityLevel)
 
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
