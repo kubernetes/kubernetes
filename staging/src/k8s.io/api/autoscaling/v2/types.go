@@ -435,7 +435,7 @@ const (
 	// MetricFetchFailing indicates the metric is failing to be fetched
 	MetricFetchFailing MetricFetchStatusType = "Failing"
 	// MetricFetchFallback indicates the metric is using a fallback value due to retrieval failures
-	MetricFetchFallback MetricFetchStatusType = "Fallback"
+	MetricFetchFallback MetricFetchStatusType = "UsingFallbackReplicas"
 )
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
