@@ -267,13 +267,15 @@ func TestGetListWithErrorAggregation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 	ctx, s, _ := testSetup(t)
 	store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
-	storagetesting.RunTestGetListWithErrorAggregation(ctx, t, &storeWithCorruptedTransformer{Interface: store, store: s})
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: store, store: s}, corruptErr)
 }
 
 func TestGetListWithoutErrorAggregation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, false)
 	ctx, s, _ := testSetup(t)
-	storagetesting.RunTestGetListWithoutErrorAggregation(ctx, t, &storeWithCorruptedTransformer{Interface: s, store: s})
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithoutErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: s, store: s}, corruptErr)
 }
 
 type storeWithPrefixTransformer struct {
@@ -291,37 +293,19 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	}
 }
 
-type corruptedTransformer struct {
-	value.Transformer
-}
-
-func (f *corruptedTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	out, stale, err = f.Transformer.TransformFromStorage(ctx, data, dataCtx)
-
-	switch {
-	case err != nil: // unexpected error
-		return out, stale, err
-	case strings.Contains(string(data), storagetesting.CorruptErrKey):
-		return out, stale, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
-	case strings.Contains(string(data), storagetesting.UnexpectedErrKey):
-		return out, stale, fmt.Errorf("bits flipped")
-	}
-	return out, stale, err
-}
-
-type storeWithCorruptedTransformer struct {
+type storeWithTransformerOverride struct {
 	storage.Interface
 	// we need the original *store instance to mutate the transformer
 	store *store
 }
 
-func (s *storeWithCorruptedTransformer) CorruptTransformer() func() {
-	ct := &corruptedTransformer{Transformer: s.store.transformer}
-	s.store.transformer = ct
-	s.store.watcher.transformer = ct
+func (s *storeWithTransformerOverride) UpdateTransformer(modifier storagetesting.TransformerModifier) func() {
+	orig := s.store.transformer
+	s.store.transformer = modifier(orig)
+	s.store.watcher.transformer = modifier(orig)
 	return func() {
-		s.store.transformer = ct.Transformer
-		s.store.watcher.transformer = ct.Transformer
+		s.store.transformer = orig
+		s.store.watcher.transformer = orig
 	}
 }
 
