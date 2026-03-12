@@ -2803,51 +2803,6 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	}
 }
 
-// This wraps the current list error aggregator factory to enable the test to
-// record the values GetList passed to the error aggregator
-func WrapListErrorAggregatorFactory(factory func() storage.ListItemErrors) *ErrorAggregatorFactory {
-	return &ErrorAggregatorFactory{factory: factory}
-}
-
-// This wraps the actual error aggregation factory in use by the store implemenation
-// so we can record the values GetList passes to its error aggregator.
-type ErrorAggregatorFactory struct {
-	// this is the original error aggregation factory in use by the store implementation
-	factory func() storage.ListItemErrors
-
-	// every time GetList invokes the factory, we wrap it by a recorder, this
-	// is stored here so the test can access the values recorded
-	// TODO: this forces the test be serial, but we are okay for now since this
-	// is used by a single test that calls GetList serially, in the future we could
-	// change the signature of the factory to take the request context object, this
-	// will allow the test to store its recorder (ListErrorAggregator) into the
-	// request Context object, to enable multiple tests to run concurrently
-	recorder *listErrorAggregatorRecorder
-}
-
-func (f *ErrorAggregatorFactory) WithRecorder() func() storage.ListItemErrors {
-	return func() storage.ListItemErrors {
-		f.recorder = &listErrorAggregatorRecorder{ListItemErrors: f.factory()}
-		return f.recorder
-	}
-}
-
-// it wraps the actual ListErrorAggregator in use by the store and
-// records the values GetList passes to the the error aggregator
-type listErrorAggregatorRecorder struct {
-	// the ListItemErrors we are going to observe
-	storage.ListItemErrors
-	// Keep track of the values GetList passes to the aggregator
-	errs []error
-	keys []string
-}
-
-func (f *listErrorAggregatorRecorder) Append(key string, err error) bool {
-	f.errs = append(f.errs, err)
-	f.keys = append(f.keys, key)
-	return f.ListItemErrors.Append(key, err)
-}
-
 const (
 	// if the following annotation is present, the object is marked to become corrupt
 	CorruptErrKey = "testing.transformer.k8s.io/corrupt-error"
@@ -2858,7 +2813,7 @@ const (
 )
 
 // RunTestGetListWithErrorAggregation tests aggregation of errors while the list operation is in progress
-func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T) (context.Context, *ErrorAggregatorFactory, InterfaceWithCorruptTransformer)) {
+func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T) (context.Context, InterfaceWithCorruptTransformer)) {
 	prefix := "/pods/ns/"
 	// the test creates n objects and assigns each object unique id i ie. 1 <= i <= n
 	objNameFn := func(id int) string {
@@ -2881,10 +2836,9 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 		// fail to transform with an unexpected error
 		corrupter func(id int) string
 		// verifies the result from GetList
-		// recorder: records the values GetList passes to the error aggregator
 		// list: result of GetList operation is saved into list
 		// err: error returned from GetList
-		verifier func(t *testing.T, _ *listErrorAggregatorRecorder, list *example.PodList, err error)
+		verifier func(t *testing.T, list *example.PodList, err error)
 	}{
 		{
 			name: "feature disabled, should maintain backward compatibility",
@@ -2908,8 +2862,9 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//
 			//  a) GetList encounters corruptObjErr while retrieving {2} and immediately aborts
 			//  b) GetList successfully decodes {1}
-			verifier: func(t *testing.T, recorder *listErrorAggregatorRecorder, list *example.PodList, err error) {
-				// a) the error returned from GetList should not be wrapped
+			verifier: func(t *testing.T, list *example.PodList, err error) {
+				// a) the error returned from GetList should be a bare
+				// storage.InternalError, not wrapped — proves no aggregation
 				// nolint:errorlint // the aggregator should return the error as is
 				intErr, ok := err.(storage.InternalError)
 				if !ok {
@@ -2917,16 +2872,6 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 				}
 				if want, got := fmt.Sprintf(`unable to transform key "%s"`, keyFn(2)), intErr.Error(); !strings.HasPrefix(got, want) {
 					t.Errorf("expected the error to start with %q, but got: %v", want, got)
-				}
-				// the error observed by the recorder should be
-				// the same error returned by GetList
-				if want, got := 1, len(recorder.errs); want != got {
-					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
-				}
-				// nolint:errorlint // the aggregator in use should return
-				// the error as is, so the test is asserting with identity.
-				if want, got := err, recorder.errs[0]; want != got {
-					t.Errorf("expected the aggregator to return the original error as is: %v, but got: %v", want, got)
 				}
 
 				// b) GetList successfully decodes {1}
@@ -2964,16 +2909,12 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList encounters an unexpected (not corruptObjErr)
 			//  error while retrieving {2} and immediately aborts
 			//  b) GetList successfully decodes {1}
-			verifier: func(t *testing.T, recorder *listErrorAggregatorRecorder, list *example.PodList, err error) {
-				// a) the error observed by the recorder should be the same
-				// error returned by GetList, and it should not be wrapped
-				if want, got := 1, len(recorder.errs); want != got {
-					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
-				}
-				// nolint:errorlint // the aggregator in use should return
-				// the error as is, so the test is asserting with identity.
-				if want, got := err, recorder.errs[0]; want != got {
-					t.Errorf("expected GetList to return the original error as is: %v, but got: %v", want, got)
+			verifier: func(t *testing.T, list *example.PodList, err error) {
+				// a) the error returned from GetList should be a bare
+				// storage.InternalError, not wrapped — proves no aggregation
+				// nolint:errorlint // the aggregator should return the error as is
+				if _, ok := err.(storage.InternalError); !ok {
+					t.Fatalf("expected the error to be %T, but got: %#v", storage.InternalError{}, err)
 				}
 
 				// b) GetList should successfully decode object 1 from the good set
@@ -3001,7 +2942,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			// while retrieving the n objects, we expect the following from GetList:
 			//  a) GetList encounters corruptObjErr while retrieving objects in the corrupt set
 			//  b) GetList successfully decodes object(s) in the good set
-			verifier: func(t *testing.T, _ *listErrorAggregatorRecorder, list *example.PodList, listErr error) {
+			verifier: func(t *testing.T, list *example.PodList, listErr error) {
 				// the error returned from GetList should be an API status object
 				var statusGot apierrors.APIStatus
 				if !errors.As(listErr, &statusGot) {
@@ -3061,7 +3002,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  b) GetList encounters an unexpected (not corruptObjErr) error while
 			//  retrieving {4} in the unexpected set, and immediately aborts
 			//  c) GetList successfully decodes {1,3} in the good set before it aborts
-			verifier: func(t *testing.T, recorder *listErrorAggregatorRecorder, list *example.PodList, err error) {
+			verifier: func(t *testing.T, list *example.PodList, err error) {
 				// the error returned from GetList should be an API status object
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
@@ -3069,20 +3010,16 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 				}
 
 				details := statusGot.Status().Details
-				// a) only the corruptObjErr from object {2} should be aggregated
+				// a) only the corruptObjErr from object {2} should be aggregated;
+				// the aggregator saw the corrupt error before aborting on the unexpected one
 				if details == nil || len(details.Causes) != 1 {
-					t.Errorf("expected the API status to include the corrupt object error aggregated, but got: %v", details)
+					t.Errorf("expected the API status to include exactly 1 corrupt object error, but got: %v", details)
 				}
 				if want, got := keyFn(2), details.Causes[0].Field; want != got {
 					t.Errorf("expected an object name of %q, but got: %q", want, got)
 				}
 
-				// b) the recorder should observe the unexpected error as well
-				if want, got := 2, len(recorder.errs); want != got {
-					t.Fatalf("expected GetList to pass the unexpected error to the aggregator, want %d error(s), but got: %d", want, got)
-				}
-
-				// c) verify that GetList successfully decodes
+				// b) verify that GetList successfully decodes objects before the abort
 				ids := []int{1, 3}
 				if want, got := len(ids), len(list.Items); want != got {
 					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
@@ -3112,21 +3049,17 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes the first 100 objects in the good set into list
-			verifier: func(t *testing.T, recorder *listErrorAggregatorRecorder, list *example.PodList, err error) {
-				// a) the recorder should observe exactly N errors, N=limit
+			verifier: func(t *testing.T, list *example.PodList, err error) {
 				limit := 100
-				if want, got := limit, len(recorder.errs); want != got {
-					t.Errorf("expected GetList to aggregate exactly %d error(s), but got: %d", want, got)
-				}
-
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
 					t.Fatalf("expected an API status error object, but got: %v", err)
 				}
 				details := statusGot.Status().Details
-				// the (limit+1)th entry should be the sentinel error
+				// a) the returned error should contain limit+1 causes:
+				// limit corrupt errors + the sentinel "too many" entry
 				if want := limit + 1; details == nil || len(details.Causes) != want {
-					t.Fatalf("expected GetList to append the sentinel error to the list, want: %d, but got: %d", want, len(details.Causes))
+					t.Fatalf("expected %d causes (limit + sentinel), but got: %d", want, len(details.Causes))
 				}
 				want := metav1.StatusCause{
 					Type:    metav1.CauseTypeTooMany,
@@ -3155,21 +3088,17 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes zero objects
-			verifier: func(t *testing.T, recorder *listErrorAggregatorRecorder, list *example.PodList, err error) {
-				// a) the recorder should observe the corrupt errors
+			verifier: func(t *testing.T, list *example.PodList, err error) {
 				limit := 100
-				if want, got := limit, len(recorder.errs); want != got {
-					t.Errorf("expected GetList to aggregate exactly %d error(s), but got: %d", want, got)
-				}
-
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
 					t.Fatalf("expected an API status error object, but got: %v", err)
 				}
-				// the (limit+1)th entry should be the sentinel error
+				// a) the returned error should contain limit+1 causes:
+				// limit corrupt errors + the sentinel "too many" entry
 				details := statusGot.Status().Details
 				if want := limit + 1; details == nil || len(details.Causes) != want {
-					t.Errorf("expected GetList to append the sentinel error to the list, want: %d, but got: %d", want, len(details.Causes))
+					t.Fatalf("expected %d causes (limit + sentinel), but got: %d", want, len(details.Causes))
 				}
 				want := metav1.StatusCause{
 					Type:    metav1.CauseTypeTooMany,
@@ -3179,7 +3108,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 					t.Errorf("expected the sentinel error, diff: %s", cmp.Diff(want, got))
 				}
 
-				// b) before the limit is hit and GetList aborts, it successfully decodes 0 objects
+				// b) all objects are corrupt, so GetList should decode 0 objects
 				if want, got := 0, len(list.Items); want != got {
 					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
 				}
@@ -3190,7 +3119,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, test.featureEnabled)
-			ctx, factory, store := newStoreFn(t)
+			ctx, store := newStoreFn(t)
 
 			// Step 1: add N objects to the store foo-{1 ... n}
 			// we construct the names of the objects in a way that ensures
@@ -3236,7 +3165,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			}
 
 			// step 5: verify what we expect from GetList
-			test.verifier(t, factory.recorder, out, err)
+			test.verifier(t, out, err)
 		})
 	}
 }

@@ -264,19 +264,14 @@ func TestKeySchema(t *testing.T) {
 }
 
 func TestGetListWithErrorAggregation(t *testing.T) {
-	storagetesting.RunTestGetListWithErrorAggregation(t, func(t *testing.T) (context.Context, *storagetesting.ErrorAggregatorFactory, storagetesting.InterfaceWithCorruptTransformer) {
+	storagetesting.RunTestGetListWithErrorAggregation(t, func(t *testing.T) (context.Context, storagetesting.InterfaceWithCorruptTransformer) {
 		ctx, s, _ := testSetup(t)
 		var store storage.Interface = s
 		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
 			store = NewStoreWithUnsafeCorruptObjectDeletion(store, s.groupResource)
 		}
 
-		// wrap the original error aggregator the store is using so the test can
-		// keep track of the values GetList passes to the original aggregator.
-		factory := storagetesting.WrapListErrorAggregatorFactory(s.listErrAggrFactory)
-		s.listErrAggrFactory = factory.WithRecorder()
-
-		return ctx, factory, &storeWithCorruptedTransformer{Interface: store, store: s}
+		return ctx, &storeWithCorruptedTransformer{Interface: store, store: s}
 	})
 }
 
