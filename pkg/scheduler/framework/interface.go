@@ -289,11 +289,20 @@ type Framework interface {
 	Close() error
 }
 
-func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
+// NewPostFilterResult creates PostFilterResult with a provided nominated node
+// and a list of victims (if any) that need to be preempted to make the pod schedulable.
+func NewPostFilterResult(nodeName string, victims []*v1.Pod) *fwk.PostFilterResult {
 	return &fwk.PostFilterResult{
 		NominatingInfo: &fwk.NominatingInfo{
-			NominatedNodeName: name,
+			NominatedNodeName: nodeName,
 			NominatingMode:    fwk.ModeOverride,
 		},
+		Victims: victims,
 	}
+}
+
+// Deprecated: use NewPostFilterResult instead, even if no victims were identified.
+// Got deprecated in Kubernetes 1.36 and will be removed in 1.38.
+func NewPostFilterResultWithNominatedNode(nodeName string) *fwk.PostFilterResult {
+	return NewPostFilterResult(nodeName, nil)
 }
