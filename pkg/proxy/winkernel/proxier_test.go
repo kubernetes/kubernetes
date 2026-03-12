@@ -20,6 +20,7 @@ package winkernel
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -35,10 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -2673,4 +2677,142 @@ func TestEndpointTransitionWithLBFailures(t *testing.T) {
 	epANew := findRemoteEp(svcPortName1, localIP)
 	assert.NotNil(t, epANew, "Local endpoint A should still exist")
 	assert.True(t, epANew.IsLocal(), "A should be local")
+}
+
+func TestClassifyLBError(t *testing.T) {
+	// Note: classifyLBError uses hcn.Is*Error functions which check for *hcn.HcnError
+	// with specific error codes. Since HcnError can only be created internally by the
+	// hcn package, we can only test nil and generic error cases here. The actual HCN
+	// error classification is tested through the hcn package's own tests.
+	tests := []struct {
+		name     string
+		err      error
+		expected lbErrorType
+	}{
+		{
+			name:     "nil error returns other",
+			err:      nil,
+			expected: lbErrOther,
+		},
+		{
+			name:     "generic error returns other",
+			err:      errors.New("something went wrong"),
+			expected: lbErrOther,
+		},
+		{
+			// hcn.NetworkNotFoundError is a shim error type, not an HCN system error.
+			// hcn.IsNetworkNotFoundError checks for HcnError with HCN_E_NETWORK_NOT_FOUND code,
+			// so this returns lbErrOther.
+			name:     "hcn NetworkNotFoundError shim type returns other",
+			err:      hcn.NetworkNotFoundError{NetworkName: "testnet"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "hcn LoadBalancerNotFoundError shim type returns other",
+			err:      hcn.LoadBalancerNotFoundError{LoadBalancerId: "lb-123"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "hcn EndpointNotFoundError shim type returns other",
+			err:      hcn.EndpointNotFoundError{EndpointID: "ep-123"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "wrapped generic error returns other",
+			err:      fmt.Errorf("wrapped: %w", errors.New("inner error")),
+			expected: lbErrOther,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := classifyLBError(tc.err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerTypeConstants(t *testing.T) {
+	// Verify all loadBalancerType constants have non-empty string values.
+	lbTypes := []loadBalancerType{
+		lbTypeClusterIP,
+		lbTypeNodePort,
+		lbTypeExternalIP,
+		lbTypeIngressIP,
+		lbTypeHealthCheck,
+	}
+	seen := make(map[loadBalancerType]bool)
+	for _, lbt := range lbTypes {
+		assert.NotEmpty(t, string(lbt), "loadBalancerType constant should not be empty")
+		assert.False(t, seen[lbt], "duplicate loadBalancerType constant: %s", lbt)
+		seen[lbt] = true
+	}
+}
+
+func TestLBErrorTypeConstants(t *testing.T) {
+	// Verify all lbErrorType constants have non-empty, unique string values.
+	errTypes := []lbErrorType{
+		lbErrNetworkNotFound,
+		lbErrPortAlreadyExists,
+		lbErrNotImplemented,
+		lbErrInvalidIP,
+		lbErrOther,
+	}
+	seen := make(map[lbErrorType]bool)
+	for _, et := range errTypes {
+		assert.NotEmpty(t, string(et), "lbErrorType constant should not be empty")
+		assert.False(t, seen[et], "duplicate lbErrorType constant: %s", et)
+		seen[et] = true
+	}
+}
+
+func TestLBMetricEmission(t *testing.T) {
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeKernelspace)
+
+	tests := []struct {
+		name      string
+		metricVec *basemetrics.CounterVec
+		ipFamily  string
+		lbType    loadBalancerType
+		errType   lbErrorType
+	}{
+		{
+			name:      "create failure with clusterip and network_not_found",
+			metricVec: metrics.WinKernelLBCreateFailure,
+			ipFamily:  "IPv4",
+			lbType:    lbTypeClusterIP,
+			errType:   lbErrNetworkNotFound,
+		},
+		{
+			name:      "update failure with nodeport and port_already_exists",
+			metricVec: metrics.WinKernelLBUpdateFailure,
+			ipFamily:  "IPv4",
+			lbType:    lbTypeNodePort,
+			errType:   lbErrPortAlreadyExists,
+		},
+		{
+			name:      "delete failure with ingressip and other",
+			metricVec: metrics.WinKernelLBDeleteFailure,
+			ipFamily:  "IPv6",
+			lbType:    lbTypeIngressIP,
+			errType:   lbErrOther,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.metricVec.Reset()
+
+			tc.metricVec.WithLabelValues(tc.ipFamily, string(tc.lbType), string(tc.errType)).Inc()
+
+			val, err := testutil.GetCounterMetricValue(tc.metricVec.WithLabelValues(tc.ipFamily, string(tc.lbType), string(tc.errType)))
+			assert.NoError(t, err)
+			assert.Equal(t, float64(1), val)
+
+			// Verify a different label combination was not incremented.
+			val, err = testutil.GetCounterMetricValue(tc.metricVec.WithLabelValues(tc.ipFamily, string(lbTypeHealthCheck), string(lbErrInvalidIP)))
+			assert.NoError(t, err)
+			assert.Equal(t, float64(0), val)
+		})
+	}
 }

@@ -5234,6 +5234,42 @@
   componentEndpoints:
   - component: kube-proxy
     endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_create_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb create failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_delete_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb delete failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_update_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb update failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
 - name: leader_election_master_status
   help: Gauge of if the reporting system is master of the relevant lease, 0 indicates
     backup, 1 indicates master. 'name' is the string used to identify the lease. Please
