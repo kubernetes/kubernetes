@@ -45,7 +45,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -2826,8 +2825,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 	}
 
 	tests := []struct {
-		name           string
-		featureEnabled bool
+		name string
 		// number of Pod objects to be created when the test starts, the
 		// objects are named as "foo-{i}" where 1 <= i <= n
 		n int
@@ -2841,51 +2839,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 		verifier func(t *testing.T, list *example.PodList, err error)
 	}{
 		{
-			name: "feature disabled, should maintain backward compatibility",
-			// when the feature is disabled, we should maintain
-			// backward compatibility, which is to abort on the first error
-			featureEnabled: false,
-			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
-			// - good: {1, 3, 5, 7}, these objects will never become corrupt
-			// - corrupt: {2, 4, 6}, these objects are marked to become corrupt
-			n: 7,
-			corrupter: func(i int) string {
-				if i%2 == 0 {
-					return CorruptErrKey
-				}
-				return ""
-			},
-			// the following sequence of events are expected to occur in order while retrieving the n objects:
-			//
-			// -- |- 1: no error, successfully decoded
-			//    |- 2: yields an expected corruptObjErr, GetList aborts immediately
-			//
-			//  a) GetList encounters corruptObjErr while retrieving {2} and immediately aborts
-			//  b) GetList successfully decodes {1}
-			verifier: func(t *testing.T, list *example.PodList, err error) {
-				// a) the error returned from GetList should be a bare
-				// storage.InternalError, not wrapped — proves no aggregation
-				// nolint:errorlint // the aggregator should return the error as is
-				intErr, ok := err.(storage.InternalError)
-				if !ok {
-					t.Fatalf("expected the error to be %T, but got: %#v", storage.InternalError{}, err)
-				}
-				if want, got := fmt.Sprintf(`unable to transform key "%s"`, keyFn(2)), intErr.Error(); !strings.HasPrefix(got, want) {
-					t.Errorf("expected the error to start with %q, but got: %v", want, got)
-				}
-
-				// b) GetList successfully decodes {1}
-				if want, got := 1, len(list.Items); want != got {
-					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
-				}
-				if want, got := objNameFn(1), list.Items[0].Name; want != got {
-					t.Errorf("expected an object name of %q, but got: %q", want, got)
-				}
-			},
-		},
-		{
-			name:           "feature enabled, first error is an unexpected error, no aggregation expected",
-			featureEnabled: true,
+			name: "first error is an unexpected error, no aggregation expected",
 			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
 			// - good: {1, 3, 5, 7}, these objects will never become corrupt
 			// - unexpected: {2}, this object is marked to yield an unexpected error (not corruptObjErr)
@@ -2927,8 +2881,8 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			},
 		},
 		{
-			name:           "feature enabled, should aggregate corrupt object errors",
-			featureEnabled: true,
+			name: "feature enabled, should aggregate corrupt object errors",
+
 			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
 			// - good: {1, 3, 5, 7}, these objects will never become corrupt
 			// - corrupt: {2, 4, 6}, these objects are marked to become corrupt
@@ -2974,8 +2928,8 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			},
 		},
 		{
-			name:           "feature enabled, aggregation should abort as soon as it encounters an unexpected error",
-			featureEnabled: true,
+			name: "feature enabled, aggregation should abort as soon as it encounters an unexpected error",
+
 			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
 			// - good: {1, 3, 5, 7}, these objects will never become corrupt
 			// - unexpected: {4}, this object is marked to yield an unexpected error (not corruptObjErr)
@@ -3035,8 +2989,8 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			},
 		},
 		{
-			name:           "feature enabled, error aggregation should not exceed the maximum limit",
-			featureEnabled: true,
+			name: "feature enabled, error aggregation should not exceed the maximum limit",
+
 			// aggregation limit is currently hard coded to 100
 			// we initially create n=210 objects with ids {1, 2, 3 ... 210}, they are put in the following disjoint sets:
 			// - good: {1, 3, 5 ... 195, 197, 199, ... 207, 209}, these 105 objects will never become corrupt
@@ -3079,8 +3033,8 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			},
 		},
 		{
-			name:           "feature enabled, there are exactly 100 (error aggregation limit) corrupt errors",
-			featureEnabled: true,
+			name: "feature enabled, there are exactly 100 (error aggregation limit) corrupt errors",
+
 			// aggregation limit is currently hard coded to 100
 			// we initially create n=100 objects with ids {1, 2, 3 ... 100}, they are put in the following disjoint sets:
 			// - good: {}, all the objects are marked to become corrupt
@@ -3121,7 +3075,6 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, test.featureEnabled)
 			ctx, store := newStoreFn(t)
 
 			// Step 1: add N objects to the store foo-{1 ... n}
@@ -3170,6 +3123,80 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			// step 5: verify what we expect from GetList
 			test.verifier(t, out, err)
 		})
+	}
+}
+
+// RunTestGetListBackwardCompatibility tests that when the AllowUnsafeMalformedObjectDeletion
+// feature is disabled, GetList maintains backward compatibility by aborting on the first error.
+func RunTestGetListBackwardCompatibility(t *testing.T, newStoreFn func(*testing.T) (context.Context, InterfaceWithCorruptTransformer)) {
+	prefix := "/pods/ns/"
+	objNameFn := func(id int) string {
+		return fmt.Sprintf("foo-%06d", id)
+	}
+	keyFn := func(id int) string {
+		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
+	}
+
+	ctx, store := newStoreFn(t)
+
+	// Step 1: create 7 objects, where even-numbered ones are corrupt
+	// - good: {1, 3, 5, 7}
+	// - corrupt: {2, 4, 6}
+	n := 7
+	for i := 1; i <= n; i++ {
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      objNameFn(i),
+			Namespace: "ns",
+		}}
+		if i%2 == 0 {
+			obj.Annotations = map[string]string{
+				CorruptErrKey: "",
+			}
+		}
+		testPropagateStore(ctx, t, store, obj)
+	}
+
+	// Step 2: list all objects, expect no error before corruption
+	out := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}
+	err := store.GetList(ctx, prefix, storageOpts, out)
+	if err != nil {
+		t.Fatalf("GetList failed with unexpected error: %v", err)
+	}
+	if want, got := n, len(out.Items); want != got {
+		t.Fatalf("Expected length: %d, but got: %d", want, got)
+	}
+
+	// Step 3: corrupt the transformer so marked objects fail to decode
+	revertTransformer := store.CorruptTransformer()
+	defer revertTransformer()
+
+	// Step 4: list again, expect GetList to abort on the first corrupt object
+	out = &example.PodList{}
+	err = store.GetList(ctx, prefix, storageOpts, out)
+	if err == nil {
+		t.Fatalf("Expected GetList to return error")
+	}
+
+	// Verify: the error should be a bare storage.InternalError (no aggregation)
+	// nolint:errorlint // the aggregator should return the error as is
+	intErr, ok := err.(storage.InternalError)
+	if !ok {
+		t.Fatalf("expected the error to be %T, but got: %#v", storage.InternalError{}, err)
+	}
+	if want, got := fmt.Sprintf(`unable to transform key "%s"`, keyFn(2)), intErr.Error(); !strings.HasPrefix(got, want) {
+		t.Errorf("expected the error to start with %q, but got: %v", want, got)
+	}
+
+	// Verify: GetList successfully decodes {1} before aborting
+	if want, got := 1, len(out.Items); want != got {
+		t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+	}
+	if want, got := objNameFn(1), out.Items[0].Name; want != got {
+		t.Errorf("expected an object name of %q, but got: %q", want, got)
 	}
 }
 

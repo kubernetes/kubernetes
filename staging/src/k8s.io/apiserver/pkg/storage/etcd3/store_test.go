@@ -264,14 +264,19 @@ func TestKeySchema(t *testing.T) {
 }
 
 func TestGetListWithErrorAggregation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 	storagetesting.RunTestGetListWithErrorAggregation(t, func(t *testing.T) (context.Context, storagetesting.InterfaceWithCorruptTransformer) {
 		ctx, s, _ := testSetup(t)
-		var store storage.Interface = s
-		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-			store = NewStoreWithUnsafeCorruptObjectDeletion(store, s.groupResource)
-		}
-
+		store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
 		return ctx, &storeWithCorruptedTransformer{Interface: store, store: s}
+	})
+}
+
+func TestGetListBackwardCompatibility(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, false)
+	storagetesting.RunTestGetListBackwardCompatibility(t, func(t *testing.T) (context.Context, storagetesting.InterfaceWithCorruptTransformer) {
+		ctx, s, _ := testSetup(t)
+		return ctx, &storeWithCorruptedTransformer{Interface: s, store: s}
 	})
 }
 
