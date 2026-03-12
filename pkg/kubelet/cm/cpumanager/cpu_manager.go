@@ -412,26 +412,48 @@ func (m *manager) removeStaleState(rootLogger logr.Logger) {
 		}
 	}
 
-	// Loop through the CPUManager state. Remove any state for containers not
-	// in the `activeContainers` list built above.
-	assignments := m.state.GetCPUAssignments()
-	for podUID := range assignments {
-		for containerName := range assignments[podUID] {
-			logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScalingExclusiveCPUs) {
 
-			if _, ok := activeContainers[podUID][containerName]; ok {
-				logger.V(5).Info("container still active")
-				continue
+		// Loop through the CPUManager state. Remove any state for containers not
+		// in the `activeContainers` list built above.
+		assignments := m.state.GetCPUAssignments()
+		for podUID := range assignments {
+			for containerName := range assignments[podUID] {
+				logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
+
+				if _, ok := activeContainers[podUID][containerName]; ok {
+					logger.V(5).Info("container still active")
+					continue
+				}
+
+				logger.V(2).Info("removing container")
+				err := m.policyRemoveContainerByRef(logger, podUID, containerName)
+				if err != nil {
+					logger.Error(err, "failed to remove container")
+				}
 			}
+		}
+	} else {
+		// Loop through the CPUManager state. Remove any state for containers not
+		// in the `activeContainers` list built above.
+		allocations := m.state.GetCPUAllocations()
+		for podUID := range allocations {
+			for containerName := range allocations[podUID] {
+				logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 
-			logger.V(2).Info("removing container")
-			err := m.policyRemoveContainerByRef(logger, podUID, containerName)
-			if err != nil {
-				logger.Error(err, "failed to remove container")
+				if _, ok := activeContainers[podUID][containerName]; ok {
+					logger.V(5).Info("container still active")
+					continue
+				}
+
+				logger.V(2).Info("removing container")
+				err := m.policyRemoveContainerByRef(logger, podUID, containerName)
+				if err != nil {
+					logger.Error(err, "failed to remove container")
+				}
 			}
 		}
 	}
-
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {

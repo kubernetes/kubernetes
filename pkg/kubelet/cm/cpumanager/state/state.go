@@ -115,7 +115,7 @@ type Reader interface {
 	GetPodCPUAssignments() PodCPUAssignments
 	// GetCPUAllocations, GetOriginalCPUSet and GetResizedCPUSet are used
 	// with InPlacePodVerticalScalingExclusiveCPUs to checkpoint CPU
-	// original and most recent resize assigments.
+	// original and most recent resize assignments.
 	GetCPUAllocations() ContainerCPUAllocations
 	GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 	GetResizedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)

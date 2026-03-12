@@ -51,7 +51,7 @@ type CPUManagerCheckpointData struct {
 	DefaultCPUSet string                              `json:"defaultCpuSet"`
 	Entries       map[string]map[string]string        `json:"entries,omitempty"`
 	PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
-	Allocations   map[string]map[string]ContainerCPUs `json:"ResizeEntries,omitempty"`
+	Allocations   map[string]map[string]ContainerCPUs `json:"allocations,omitempty"`
 }
 
 // CPUManagerCheckpoint represents a structure to store CPU manager checkpoint data.
@@ -116,8 +116,9 @@ func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
 			Entries: make(map[string]map[string]string),
 		},
 		CheckpointData: CPUManagerCheckpointData{
-			Entries:    make(map[string]map[string]string),
-			PodEntries: make(PodCPUAssignments),
+			Entries:     make(map[string]map[string]string),
+			PodEntries:  make(PodCPUAssignments),
+			Allocations: make(map[string]map[string]ContainerCPUs),
 		},
 	}
 }

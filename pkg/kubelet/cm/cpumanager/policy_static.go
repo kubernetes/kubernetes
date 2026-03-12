@@ -49,9 +49,9 @@ const (
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
-	// ErrorIncosistendCPUAllocation represents the type of an incosistentCPUAllocationError
+	// ErrorIncosistentCPUAllocation represents the type of an incosistentCPUAllocationError
 	ErrorInconsistentCPUAllocation = "inconsistentCPUAllocationError"
-	// ErrorProhibitedCPUAlloacation represents the type of an prohibitedCPUAllocationError
+	// ErrorProhibitedCPUAllocation represents the type of an prohibitedCPUAllocationError
 	ErrorProhibitedCPUAllocation = "prohibitedCPUAllocationError"
 	// ErrorGetOriginalCPUSetError represents the type of an getOriginalCPUSetError
 	ErrorGetOriginalCPUSet = "getOriginalCPUSetError"
@@ -131,7 +131,7 @@ func (e inconsistentCPUAllocationError) Error() string {
 	if e.Shared2Exclusive {
 		return fmt.Sprintf("inconsistentCPUAllocation Error: Not allowed to move a container from shared pool to exclusively allocated pool, (requested CPUs = %s, allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
 	} else {
-		return fmt.Sprintf("inconsistentCPUAllocation Error: Not allowed to move a container from  exclusively allocated pool to shared pool, not allowed (requested CPUs = %s, allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
+		return fmt.Sprintf("inconsistentCPUAllocation Error: Not allowed to move a container from exclusively allocated pool to shared pool, not allowed (requested CPUs = %s, allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
 	}
 }
 
@@ -719,10 +719,6 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 	case lifecycle.AddOperation:
 		return p.allocateForAdd(logger, s, pod, container)
 	case lifecycle.ResizeOperation:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) || !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			logger.Info("CPU Manager allocation resize operation skipped, InPlacePodVerticalScaling and/or InPlacePodVerticalScalingExclusiveCPUs not enabled")
-			return nil
-		}
 		return p.allocateForResize(logger, s, pod, container)
 	default:
 		return UnsupportedLifecycleOperationError{
@@ -961,17 +957,32 @@ func (p *staticPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID
 	// Check if this pod is managed with pod-level CPUs.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		if podCPUSet, isPodLevel := s.GetPodCPUSet(podUID); isPodLevel {
-			// If this was the last container for the pod, then release the entire pod-level CPU set.
-			if len(s.GetCPUAssignments()[podUID]) == 0 {
-				updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
-				s.SetDefaultCPUSet(updatedCPUSets)
-				s.DeletePod(podUID) // Clean up all state for the pod.
-				p.updateMetricsOnRelease(logger, s, podCPUSet)
-				logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+				// If this was the last container for the pod, then release the entire pod-level CPU set.
+				if len(s.GetCPUAssignments()[podUID]) == 0 {
+					updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
+					s.SetDefaultCPUSet(updatedCPUSets)
+					s.DeletePod(podUID) // Clean up all state for the pod.
+					p.updateMetricsOnRelease(logger, s, podCPUSet)
+					logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
+				}
+				// If other containers still exist, do not release any CPUs yet.
+				// The pod-level CPUs will be released when the last container is removed.
+				return nil
+			} else {
+				// If this was the last container for the pod, then release the entire pod-level CPU set.
+				if len(s.GetCPUAllocations()[podUID]) == 0 {
+					updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
+					s.SetDefaultCPUSet(updatedCPUSets)
+					s.DeletePod(podUID) // Clean up all state for the pod.
+					p.updateMetricsOnRelease(logger, s, podCPUSet)
+					logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
+				}
+				// If other containers still exist, do not release any CPUs yet.
+				// The pod-level CPUs will be released when the last container is removed.
+				return nil
+
 			}
-			// If other containers still exist, do not release any CPUs yet.
-			// The pod-level CPUs will be released when the last container is removed.
-			return nil
 		}
 	}
 
@@ -1552,6 +1563,8 @@ func (p *staticPolicy) initializeMetrics(logger logr.Logger, s state.State) {
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalAssignedCPUs.Size()))
 	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)
+	// TODO fix the hard coded nodeID
+	metrics.CPUManagerAllocationPerNUMA.WithLabelValues("1").Add(0)
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(logger logr.Logger, s state.State, cpuAlloc topology.Allocation) {
@@ -1808,14 +1821,9 @@ func (p *staticPolicy) getTopologyHintsForResize(logger logr.Logger, s state.Sta
 			if allocated.Size() < requested {
 				reusable = reusable.Union(allocated)
 			} else {
-				reusable = allocated
-
-				// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
-				// It should be an empty CPUSet for a newly created pod.
-				reusable = reusable.Union(p.cpusToReuse[string(pod.UID)])
-
 				// Generate hints.
-				cpuHints := p.generateCPUTopologyHintsForResize(cpuset.New(), reusable, requested)
+				mustKeepCPUsForResize, _ := s.GetOriginalCPUSet(string(pod.UID), container.Name)
+				cpuHints := p.generateCPUTopologyHintsForResize(allocated, mustKeepCPUsForResize, requested)
 				logger.Info("TopologyHints generated", "pod", klog.KObj(pod), "containerName", container.Name, "cpuHints", cpuHints)
 
 				return map[string][]topologymanager.TopologyHint{
