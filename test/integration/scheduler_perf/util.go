@@ -112,9 +112,12 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		tCtx.Fatalf("start apiserver: %v", err)
 	}
 	// Cleanup will be in reverse order: first the clients by canceling the
-	// child context (happens automatically), then the server.
+	// child context, then the server.
 	tCtx.Cleanup(server.TearDownFn)
 	tCtx = tCtx.WithCancel()
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("test is done")
+	})
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.

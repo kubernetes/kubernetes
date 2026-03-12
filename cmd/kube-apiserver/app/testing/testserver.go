@@ -156,7 +156,11 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	// Some callers may have initialize ktesting already.
 	tCtx, ok := t.(ktesting.TContext)
-	if !ok {
+	if ok {
+		// tCtx.Cancel below must not cancel whatever else might be using
+		// this existing TContext.
+		tCtx = tCtx.WithCancel()
+	} else {
 		tCtx = ktesting.Init(t)
 	}
 
