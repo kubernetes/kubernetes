@@ -587,11 +587,16 @@ type LimitResponse struct {
 	// are rejected.
 	// Required.
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:discriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `queuing` holds the configuration parameters for queuing.
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:member("Queue")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:member("Reject")=+k8s:forbidden
 	Queuing *QueuingConfiguration `json:"queuing,omitempty" protobuf:"bytes,2,opt,name=queuing"`
 }
 

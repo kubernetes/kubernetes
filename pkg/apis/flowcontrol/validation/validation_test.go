@@ -940,7 +940,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 							QueueLengthLimit: 100,
 						}}}},
 		},
-		expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited")},
+		expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited").MarkCoveredByDeclarative()},
 	}, {
 		name: "wrong backstop spec should fail",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
@@ -980,7 +980,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 						Type: flowcontrol.LimitResponseTypeQueue,
 					}}},
 		},
-		expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must not be empty if limited.limitResponse.type is Limited")},
+		expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must not be empty if limited.limitResponse.type is Limited").MarkCoveredByDeclarative()},
 	}, {
 		name: "normal customized priority level should work",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{

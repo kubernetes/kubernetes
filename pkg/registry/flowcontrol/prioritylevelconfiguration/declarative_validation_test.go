@@ -89,6 +89,24 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
+
+		// --- LimitResponse discriminator errors ---
+		"limitResponse.type: Queue with queuing=nil": {
+			input: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"limitResponse.type: Reject with queuing set": {
+			input: mkPLC(tweakQueuing(&flowcontrol.QueuingConfiguration{
+				Queues:           64,
+				HandSize:         8,
+				QueueLengthLimit: 50,
+			})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -134,6 +152,24 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			update: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
 				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"update: Queue with queuing set to nil": {
+			old:    mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
+			update: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"update: Reject with queuing added": {
+			old: mkPLC(),
+			update: mkPLC(tweakQueuing(&flowcontrol.QueuingConfiguration{
+				Queues:           64,
+				HandSize:         8,
+				QueueLengthLimit: 50,
+			})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
 	}
