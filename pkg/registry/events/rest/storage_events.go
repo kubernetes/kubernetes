@@ -31,6 +31,10 @@ import (
 
 type RESTStorageProvider struct {
 	TTL time.Duration
+	// GetEventStorage returns a shared event storage instance. When set, this
+	// is used instead of creating a new event storage, ensuring that core/v1
+	// and events.k8s.io/v1 share a single etcd store and watch cache.
+	GetEventStorage func(generic.RESTOptionsGetter) (*eventstore.REST, error)
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -52,7 +56,13 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// events
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(eventsapiv1.SchemeGroupVersion.WithResource(resource)) {
-		eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		var eventsStorage *eventstore.REST
+		var err error
+		if p.GetEventStorage != nil {
+			eventsStorage, err = p.GetEventStorage(restOptionsGetter)
+		} else {
+			eventsStorage, err = eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		}
 		if err != nil {
 			return storage, err
 		}

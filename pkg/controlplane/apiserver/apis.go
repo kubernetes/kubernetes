@@ -69,8 +69,9 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 	// with specific priorities.
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
+	coreGenericConfig := c.NewCoreGenericConfig()
 	return []RESTStorageProvider{
-		c.NewCoreGenericConfig(),
+		coreGenericConfig,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.Generic.Authentication.Authenticator, APIAudiences: c.Generic.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, RuleResolver: c.Generic.RuleResolver},
@@ -80,7 +81,7 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 		svmrest.RESTStorageProvider{},
 		flowcontrolrest.RESTStorageProvider{InformerFactory: c.Generic.SharedInformerFactory},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, DiscoveryClient: discovery},
-		eventsrest.RESTStorageProvider{TTL: c.EventTTL},
+		eventsrest.RESTStorageProvider{TTL: c.EventTTL, GetEventStorage: coreGenericConfig.GetEventStorage},
 	}, nil
 }
 
