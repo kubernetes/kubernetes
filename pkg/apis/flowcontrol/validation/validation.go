@@ -400,18 +400,18 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 	switch spec.Type {
 	case flowcontrol.PriorityLevelEnablementExempt:
 		if spec.Limited != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited").MarkCoveredByDeclarative())
 		}
 		if spec.Exempt != nil {
 			allErrs = append(allErrs, ValidateExemptPriorityLevelConfiguration(spec.Exempt, fldPath.Child("exempt"))...)
 		}
 	case flowcontrol.PriorityLevelEnablementLimited:
 		if spec.Exempt != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative())
 		}
 
 		if spec.Limited == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative())
 		} else {
 			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"), opts)...)
 		}

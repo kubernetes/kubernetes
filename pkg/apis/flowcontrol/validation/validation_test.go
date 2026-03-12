@@ -856,7 +856,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		priorityLevelConfiguration: exemptTypeRepurposed,
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
-			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative(),
 			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
@@ -869,7 +869,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		},
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec"), badExemptSpec3, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
-			field.Forbidden(field.NewPath("spec").Child("limited"), "must be nil if the type is not Limited"),
+			field.Forbidden(field.NewPath("spec").Child("limited"), "must be nil if the type is not Limited").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "admins are allowed to change the Exempt field of the 'exempt' pl",
@@ -892,8 +892,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
-			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative(),
+			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "limited requires more details",
@@ -905,7 +905,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 			},
 		},
-		expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited")},
+		expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative()},
 	}, {
 		name: "max-in-flight should work",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{

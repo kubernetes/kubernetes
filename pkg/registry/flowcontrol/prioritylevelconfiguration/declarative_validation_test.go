@@ -42,6 +42,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		APIVersion: apiVersion,
 	})
 
+	specPath := field.NewPath("spec")
+
 	testCases := map[string]struct {
 		input        flowcontrol.PriorityLevelConfiguration
 		expectedErrs field.ErrorList
@@ -59,6 +61,33 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkPLC(tweakExempt(), tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{
 				NominalConcurrencyShares: ptrInt32(100),
 			})),
+		},
+
+		// --- PriorityLevelConfigurationSpec discriminator errors ---
+		"spec.type: Limited with limited=nil": {
+			input: mkPLC(tweakLimited(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"spec.type: Exempt with limited set": {
+			input: mkPLC(tweakExempt(), tweakLimited(&flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 100,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			})),
+			expectedErrs: field.ErrorList{
+				// Mandatory object check: spec of 'exempt' differs from bootstrap (HW-only)
+				field.Invalid(specPath, nil, "").MarkFromImperative(),
+				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"spec.type: Limited with exempt set": {
+			input: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
 		},
 	}
 
@@ -78,6 +107,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	specPath := field.NewPath("spec")
+
 	testCases := map[string]struct {
 		old          flowcontrol.PriorityLevelConfiguration
 		update       flowcontrol.PriorityLevelConfiguration
@@ -90,6 +121,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update: Reject to Queue": {
 			old:    mkPLC(),
 			update: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
+		},
+		"update: limited set to nil": {
+			old:    mkPLC(),
+			update: mkPLC(tweakLimited(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"update: add exempt field to Limited PLC": {
+			old:    mkPLC(),
+			update: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
 		},
 	}
 
