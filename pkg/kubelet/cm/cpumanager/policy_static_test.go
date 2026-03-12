@@ -1079,6 +1079,8 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
@@ -2065,11 +2067,13 @@ type staticPolicyAllocatePodTest struct {
 	reservedCPUs                    cpuset.CPUSet
 	options                         map[string]string
 	stAssignments                   state.ContainerCPUAssignments
+	stAllocations                   state.ContainerCPUAllocations
 	stDefaultCPUSet                 cpuset.CPUSet
 	pod                             *v1.Pod
 	topologyHint                    topologymanager.TopologyHint
 	expErr                          error
 	expPodAssignments               state.ContainerCPUAssignments
+	expPodAllocations               state.ContainerCPUAllocations
 	expDefaultCPUSet                cpuset.CPUSet
 	podLevelResourcesEnabled        bool
 	podLevelResourceManagersEnabled bool
@@ -2894,6 +2898,8 @@ func TestStaticPolicyStartWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), testCase.options)
 			if err != nil {
@@ -2936,9 +2942,10 @@ func TestStaticPolicyAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T)
 	largeTopo := *topoQuadSocketFourWayHT
 	for cpuid, val := range largeTopo.CPUDetails {
 		largeTopoCPUids = append(largeTopoCPUids, cpuid)
-		if val.SocketID == 0 {
+		switch val.SocketID {
+		case 0:
 			largeTopoSock0CPUids = append(largeTopoSock0CPUids, cpuid)
-		} else if val.SocketID == 1 {
+		case 1:
 			largeTopoSock1CPUids = append(largeTopoSock1CPUids, cpuid)
 		}
 	}
@@ -3480,9 +3487,14 @@ func runStaticPolicyTestCaseWithInPlacePodVerticalScalingExclusiveCPUs(t *testin
 		cpus = testCase.reservedCPUs.Clone()
 	}
 	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+	// Below will be used only for alignBySocketOptionTestCases ( adding here not to duplicate function )
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+
 	policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 	if err != nil {
-		t.Fatalf("NewStaticPolicy() failed: %v", err)
+		t.Fatalf("NewStaticPolicy() failed (%v) : %v", testCase.description, err)
 	}
 
 	st := &mockState{
@@ -3551,7 +3563,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			},
 			expCSetAfterAlloc:  cpuset.New(1, 2, 3, 5, 6, 7),
-			expCSetAfterResize: cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(2, 3, 6, 7),
 			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 		},
 		{
@@ -3732,7 +3744,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 		t.Run(testCase.description, func(t *testing.T) {
 
 			policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
@@ -3848,7 +3860,7 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 			},
 			containerName2:     "appContainer-1",
 			expCSetAfterAlloc:  cpuset.New(2, 3, 6, 7),
-			expCSetAfterResize: cpuset.New(2, 3, 6, 7),
+			expCSetAfterResize: cpuset.New(3, 7),
 			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 		},
 		{
@@ -4022,7 +4034,7 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 		t.Run(testCase.description, func(t *testing.T) {
 
 			policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
@@ -4173,6 +4185,8 @@ func TestStaticPolicyRemoveAlognsideInPlacePodVerticalScalingExclusiveCPUs(t *te
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -4267,6 +4281,8 @@ func TestTopologyAwareAllocateCPUsAlongsideInPlacePodVerticalScalingExclusiveCPU
 	}
 	for _, tc := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -4359,6 +4375,8 @@ func TestStaticPolicyAddWithResvListAlongsideInPlacePodVerticalScalingExclusiveC
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -4401,5 +4419,318 @@ func TestStaticPolicyAddWithResvListAlongsideInPlacePodVerticalScalingExclusiveC
 					testCase.description, container.Name, st.allocations)
 			}
 		}
+	}
+}
+
+func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []staticPolicyAllocatePodTest{
+		{
+			description:     "should successfully allocate CPUs for a guaranteed pod with pod-level resources",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod:             makePodWithPodLevelResources("pod1", "2", "2", "container1", "1", "1"),
+			topologyHint:    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"pod1": map[string]state.ContainerCPUAllocation{
+					"container1": {Original: cpuset.New(2), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and guaranteed container, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod:             makePodWithPodLevelResources("gu-pod-level-resources", "2", "2", "gu-container", "1", "1"),
+			topologyHint:    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-resources": map[string]state.ContainerCPUAllocation{
+					"gu-container": {Original: cpuset.New(2), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and non-guaranteed container, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-resources", "1", "1", []containerSpec{}, []containerSpec{
+				{name: "ngu-container"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-resources": map[string]state.ContainerCPUAllocation{
+					"ngu-container": {Original: cpuset.New(6), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     0,
+				expPodSharedPoolAssignments: 1,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-mix-ctn", "3", "3", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+				{name: "gu-container-2", request: "1", limit: "1"},
+				{name: "ngu-container"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-mix-ctn": {
+					"gu-container-1": {Original: cpuset.New(6), Resized: cpuset.New()},
+					"gu-container-2": {Original: cpuset.New(2), Resized: cpuset.New()},
+					"ngu-container":  {Original: cpuset.New(8), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              3,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 1,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and mix of guaranteed standard and init containers, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-gu-init-ctn", "2", "2", []containerSpec{
+				{name: "gu-init-container-1", request: "1", limit: "1"},
+				{name: "gu-init-container-2", request: "1", limit: "1"},
+			}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+				{name: "gu-container-2", request: "1", limit: "1"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-gu-init-ctn": {
+					"gu-init-container-1": {Original: cpuset.New(2), Resized: cpuset.New()},
+					"gu-init-container-2": {Original: cpuset.New(2), Resized: cpuset.New()},
+					"gu-container-1":      {Original: cpuset.New(2), Resized: cpuset.New()},
+					"gu-container-2":      {Original: cpuset.New(8), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 6, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              4,
+				expExclusiveAssignments:     4,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and mix of guaranteed standard and guaranteed restartable and non-guaranteed standard init containers, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-gu-init-ctn", "3", "3", []containerSpec{
+				{name: "ngu-init-container-1"},
+				{name: "gu-init-restartable-2", request: "1", limit: "1", restartPolicy: &containerRestartPolicyAlways},
+				{name: "ngu-init-container-3"},
+			}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+				{name: "ngu-container-2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-gu-init-ctn": {
+					"ngu-init-container-1":  {Original: cpuset.New(2, 6, 8), Resized: cpuset.New()},
+					"gu-init-restartable-2": {Original: cpuset.New(6), Resized: cpuset.New()},
+					"ngu-init-container-3":  {Original: cpuset.New(2, 8), Resized: cpuset.New()},
+					"gu-container-1":        {Original: cpuset.New(2), Resized: cpuset.New()},
+					"ngu-container-2":       {Original: cpuset.New(8), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              5,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 3,
+			},
+		},
+		{
+			description:     "scope: pod, should allocate exclusive CPUs to a guaranteed pod with pod-level resources and mix of guaranteed standard and non-guaranteed restartable init containers, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-gu-init-ctn", "3", "3", []containerSpec{
+				{name: "ngu-init-container-1"},
+				{name: "ngu-init-restartable-2", restartPolicy: &containerRestartPolicyAlways},
+				{name: "ngu-init-container-3"},
+			}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+				{name: "ngu-container-2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAllocations: state.ContainerCPUAllocations{
+				"gu-pod-level-gu-init-ctn": {
+					"ngu-init-container-1":   {Original: cpuset.New(2, 6, 8), Resized: cpuset.New()},
+					"ngu-init-restartable-2": {Original: cpuset.New(2, 8), Resized: cpuset.New()},
+					"ngu-init-container-3":   {Original: cpuset.New(2, 6, 8), Resized: cpuset.New()},
+					"gu-container-1":         {Original: cpuset.New(6), Resized: cpuset.New()},
+					"ngu-container-2":        {Original: cpuset.New(2, 8), Resized: cpuset.New()},
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(0, 1, 3, 4, 5, 7, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              5,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 4,
+			},
+		},
+		{
+			description:     "scope: pod, should reject a pod that would result in an empty pod shared pool",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("gu-pod-level-empty-pod-shared-pool", "2", "2", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+				{name: "gu-container-2", request: "1", limit: "1"},
+				{name: "ngu-container"},
+			}),
+			topologyHint:                    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:                          admission.NewEmptyPodSharedPoolError(fmt.Errorf("pod rejected, sum of exclusive container cpu requests equals pod budget, leaving no cpus for shared containers")),
+			expPodAllocations:               state.ContainerCPUAllocations{},
+			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 1,
+			},
+		},
+		{
+			description:     "scope: pod, should not allocate exclusive CPUs to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			reservedCPUs:    cpuset.New(0),
+			stAllocations:   state.ContainerCPUAllocations{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("ngu-pod-level-empty-pod-shared-pool", "2", "1", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "1", limit: "1"},
+			}),
+			topologyHint:                    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:                          nil,
+			expPodAllocations:               state.ContainerCPUAllocations{},
+			expDefaultCPUSet:                cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 0,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+			metrics.Register()
+			metrics.ResourceManagerAllocationsTotal.Reset()
+			metrics.ResourceManagerAllocationErrorsTotal.Reset()
+			metrics.ResourceManagerContainerAssignments.Reset()
+
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(), testCase.options)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				allocations:   testCase.stAllocations,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+
+			err = policy.AllocatePod(logger, st, testCase.pod, lifecycle.AddOperation)
+			if testCase.expErr != nil {
+				require.Error(t, err)
+
+				errors, err := testutil.GetCounterMetricValue(metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerPod))
+				require.NoError(t, err)
+				require.InDelta(t, float64(testCase.requiredMetrics.expTotalErrors), errors, 0.001, "expected allocation errors to be incremented")
+
+				return
+			}
+			require.NoError(t, err)
+
+			if !reflect.DeepEqual(st.GetCPUAllocations(), testCase.expPodAllocations) {
+				t.Errorf("StaticPolicy AllocatePod() error (%v). expected allocations: %v but got: %v",
+					testCase.description, testCase.expPodAllocations, st.GetCPUAllocations())
+			}
+
+			if !st.GetDefaultCPUSet().Equals(testCase.expDefaultCPUSet) {
+				t.Errorf("StaticPolicy AllocatePod() error (%v). expected default cpuset: %v but got: %v",
+					testCase.description, testCase.expDefaultCPUSet, st.GetDefaultCPUSet())
+			}
+
+			allocations, err := testutil.GetCounterMetricValue(metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerPod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expTotalAllocs), allocations, 0.001, "unexpected number of allocations")
+
+			exclusiveAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusivePod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expExclusiveAssignments), exclusiveAssignments, 0.001, "unexpected number of assignments")
+
+			podSharedPoolAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerSharedPod))
+			require.NoError(t, err)
+			require.InDelta(t, float64(testCase.requiredMetrics.expPodSharedPoolAssignments), podSharedPoolAssignments, 0.001, "unexpected number of assignments")
+		})
 	}
 }

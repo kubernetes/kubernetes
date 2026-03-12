@@ -41,6 +41,12 @@ const podLevelResourceManagersEnabled = true
 const inPlacePodVerticalScalingExclusiveCPUsDisabled = false
 const inPlacePodVerticalScalingExclusiveCPUsEnabled = true
 
+func removeStateDirectory(t *testing.T, stateDirectory string) {
+	if err := os.RemoveAll(stateDirectory); err != nil {
+		t.Fatalf("Fail to remove stateDirectory: %v", err)
+	}
+}
+
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
 		description                                   string
@@ -901,7 +907,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	require.NoError(t, err)
-	defer os.RemoveAll(testingDir)
+	defer removeStateDirectory(t, testingDir)
+
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
@@ -966,7 +973,7 @@ func TestCheckpointStateStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	defer removeStateDirectory(t, testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -1040,7 +1047,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	defer removeStateDirectory(t, testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -1100,7 +1107,7 @@ func TestCheckpointStateClear(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.RemoveAll(testingDir)
+			defer removeStateDirectory(t, testingDir)
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
@@ -1144,6 +1151,13 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
+
+	cpuallocationSf := sf.GetCPUAllocations()
+	cpuallocationSm := sm.GetCPUAllocations()
+	if !reflect.DeepEqual(cpuallocationSf, cpuallocationSm) {
+		t.Errorf("State CPU allocations mismatch. Have %s, want %s", cpuallocationSf, cpuallocationSm)
+	}
+
 }
 
 func TestCPUManagerCheckpointV2_MarshalCheckpoint_ForwardCompatibility(t *testing.T) {

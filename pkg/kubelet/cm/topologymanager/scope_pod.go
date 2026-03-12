@@ -64,6 +64,14 @@ func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod
 
 	bestHint, admit := s.checkAffinity(logger, pod, operation)
 	if !admit {
+		if IsAlignmentGuaranteed(s.policy) {
+			// increment only if we know we allocate aligned resources.
+			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
+		}
+		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
+		if operation == lifecycle.ResizeOperation {
+			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: "Resources cannot be resized with Topology locality"}
+		}
 		return admission.GetPodAdmitResult(NewTopologyAffinityError())
 	}
 

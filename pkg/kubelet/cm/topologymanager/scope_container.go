@@ -64,6 +64,9 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifec
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
 				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
 			}
+			if operation == lifecycle.ResizeOperation {
+				return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: "Resources cannot be resized with Topology locality"}
+			}
 			return admission.GetPodAdmitResult(&TopologyAffinityError{})
 		}
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
