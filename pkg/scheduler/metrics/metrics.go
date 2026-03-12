@@ -113,12 +113,13 @@ const (
 	BatchFlushPodNotBatchable = "pod_not_batchable"
 )
 
-// All the histogram based metrics have 1ms as size for the smallest bucket.
+// All the histogram based metrics have 1ms as size for the smallest bucket (except NominationToBindingDuration duration).
 var (
 	scheduleAttempts             *metrics.CounterVec
 	EventHandlingLatency         *metrics.HistogramVec
 	schedulingLatency            *metrics.HistogramVec
 	SchedulingAlgorithmLatency   *metrics.Histogram
+	NominationToBindingDuration  *metrics.Histogram
 	PreemptionVictims            *metrics.Histogram
 	PreemptionAttempts           *metrics.Counter
 	pendingPods                  *metrics.GaugeVec
@@ -236,6 +237,14 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	NominationToBindingDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "nomination_to_binding_duration_seconds",
+			Help:           "Duration in seconds from when a pod is first nominated to a node via a PostFilter plugin to when it is successfully bound.",
+			Buckets:        metrics.ExponentialBuckets(1, 2, 10),
+			StabilityLevel: metrics.ALPHA,
+		})
 	PreemptionVictims = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -503,6 +512,7 @@ func InitMetrics() {
 		schedulingLatency,
 		SchedulingAlgorithmLatency,
 		EventHandlingLatency,
+		NominationToBindingDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,

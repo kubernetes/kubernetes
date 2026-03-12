@@ -558,6 +558,11 @@ type QueuedPodInfo struct {
 	// or doesn't belong to any pod group.
 	// This field can only be set to true when GenericWorkload feature flag is enabled.
 	NeedsPodGroupScheduling bool
+	// NominationTimestamp is the time when the pod was first nominated to a node via
+	// a PostFilter plugin (e.g. preemption). It's used to measure how long the pod
+	// waited for victims to be evicted before it was successfully bound.
+	// It shouldn't be updated once initialized.
+	NominationTimestamp *time.Time
 }
 
 func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
@@ -619,6 +624,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
 		BackoffExpiration:       pqi.BackoffExpiration,
+		NominationTimestamp:     pqi.NominationTimestamp,
 		GatingPlugin:            pqi.GatingPlugin,
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
