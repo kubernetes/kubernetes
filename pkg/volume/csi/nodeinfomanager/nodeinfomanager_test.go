@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,7 +54,6 @@ type testcase struct {
 	expectedCSINode  *storage.CSINode
 	expectFail       bool
 	hasModified      bool
-	migratedPlugins  map[string](func() bool)
 }
 
 type nodeIDMap map[string]string
@@ -319,9 +317,6 @@ func TestInstallCSIDriver(t *testing.T) {
 				csiNode.OwnerReferences[0].UID = types.UID("node2")
 				return csiNode
 			}(),
-			migratedPlugins: map[string](func() bool){
-				"com.example.csi.driver1": func() bool { return true },
-			},
 			inputNodeID: "com.example.csi/csi-node1",
 			expectedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -341,7 +336,6 @@ func TestInstallCSIDriver(t *testing.T) {
 						},
 					},
 				}
-				csiNode.Annotations = map[string]string{v1.MigratedPluginsAnnotationKey: "com.example.csi.driver1"}
 				return csiNode
 			}(),
 		},
@@ -816,156 +810,6 @@ func TestUninstallCSIDriver(t *testing.T) {
 	test(t, false /* addNodeInfo */, testcases)
 }
 
-func TestSetMigrationAnnotation(t *testing.T) {
-	testcases := []struct {
-		name            string
-		migratedPlugins map[string](func() bool)
-		existingNode    *storage.CSINode
-		expectedNode    *storage.CSINode
-		expectModified  bool
-	}{
-		{
-			name: "nil migrated plugins",
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-			},
-		},
-		{
-			name: "one modified plugin",
-			migratedPlugins: map[string](func() bool){
-				"test": func() bool { return true },
-			},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
-				},
-			},
-			expectModified: true,
-		},
-		{
-			name: "existing plugin",
-			migratedPlugins: map[string](func() bool){
-				"test": func() bool { return true },
-			},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
-				},
-			},
-			expectModified: false,
-		},
-		{
-			name:            "remove plugin",
-			migratedPlugins: map[string](func() bool){},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{},
-				},
-			},
-			expectModified: true,
-		},
-		{
-			name: "one modified plugin, other annotations stable",
-			migratedPlugins: map[string](func() bool){
-				"test": func() bool { return true },
-			},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{"other": "annotation"},
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
-				},
-			},
-			expectModified: true,
-		},
-		{
-			name: "multiple plugins modified, other annotations stable",
-			migratedPlugins: map[string](func() bool){
-				"test": func() bool { return true },
-				"foo":  func() bool { return false },
-			},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{"other": "annotation", v1.MigratedPluginsAnnotationKey: "foo"},
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
-				},
-			},
-			expectModified: true,
-		},
-		{
-			name: "multiple plugins added, other annotations stable",
-			migratedPlugins: map[string](func() bool){
-				"test": func() bool { return true },
-				"foo":  func() bool { return true },
-			},
-			existingNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{"other": "annotation"},
-				},
-			},
-			expectedNode: &storage.CSINode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "foo,test", "other": "annotation"},
-				},
-			},
-			expectModified: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Logf("test case: %s", tc.name)
-
-		modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
-		if modified != tc.expectModified {
-			t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
-		}
-
-		if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
-			t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
-		}
-	}
-}
-
 func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
@@ -1013,10 +857,10 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 			nil,
 		)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err = nim.(*nodeInfoManager).createCSINode()
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
@@ -1073,10 +917,10 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 			nil,
 			nil,
 		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
 
 		//// Act
-		nim.CreateCSINode()
+		_, _ = nim.(*nodeInfoManager).createCSINode()
 		if addNodeInfo {
 			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {

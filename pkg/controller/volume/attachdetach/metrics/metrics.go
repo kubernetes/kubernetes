@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -167,7 +166,7 @@ func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metr
 func (collector *attachDetachStateCollector) getVolumeInUseCount(logger klog.Logger) volumeCount {
 	pods, err := collector.podLister.List(labels.Everything())
 	if err != nil {
-		logger.Error(errors.New("Error getting pod list"), "Get pod list failed")
+		logger.Error(errors.New("error getting pod list"), "Get pod list failed")
 		return nil
 	}
 
@@ -181,7 +180,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount(logger klog.Log
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpecWithNodeMigration(logger, podVolume, pod, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, pod, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}

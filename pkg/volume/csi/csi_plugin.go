@@ -41,7 +41,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/volume"
@@ -322,32 +321,8 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	var migratedPlugins = map[string](func() bool){
-		csitranslationplugins.GCEPDInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.CinderInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.VSphereInTreePluginName: func() bool {
-			return true
-		},
-		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return true
-		},
-	}
-
 	// Initializing the label management channels
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
+	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 	PluginHandler.csiPlugin = p
 
 	// This function prevents Kubelet from posting Ready status until CSINode
@@ -392,8 +367,7 @@ func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedInd
 			Jitter:   0.1,
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
-			klog.V(4).Infof("Initializing migrated drivers on CSINode")
-			err := nim.InitializeCSINodeWithAnnotation()
+			err := nim.InitializeCSINode()
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("failed to initialize CSINode: %v", err))
 				klog.Errorf("Failed to initialize CSINode: %v", err)

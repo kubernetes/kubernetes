@@ -130,41 +130,12 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]fwk.ClusterEvent
 
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 
-		// We rely on CSI node to translate in-tree PV to CSI.
-		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
-		{Event: fwk.ClusterEvent{Resource: fwk.CSINode, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
-
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
 		{Event: fwk.ClusterEvent{Resource: fwk.CSIDriver, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
 		{Event: fwk.ClusterEvent{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
 	}
 	return events, nil
-}
-
-func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	if oldObj == nil {
-		logger.V(5).Info("CSINode creation could make the pod schedulable")
-		return fwk.Queue, nil
-	}
-	oldCSINode, modifiedCSINode, err := util.As[*storagev1.CSINode](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	logger = klog.LoggerWithValues(
-		logger,
-		"Pod", klog.KObj(pod),
-		"CSINode", klog.KObj(modifiedCSINode),
-	)
-
-	if oldCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] != modifiedCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] {
-		logger.V(5).Info("CSINode's migrated plugins annotation is updated and that may make the pod schedulable")
-		return fwk.Queue, nil
-	}
-
-	logger.V(5).Info("CISNode was created or updated but it doesn't make this pod schedulable")
-	return fwk.QueueSkip, nil
 }
 
 func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
@@ -630,12 +601,11 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	pvcInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumeClaims()
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
-	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
 	capacityCheck := CapacityCheck{
 		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
-	binder, err := NewVolumeBinder(klog.FromContext(ctx), fh.ClientSet(), fts, podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder, err := NewVolumeBinder(klog.FromContext(ctx), fh.ClientSet(), fts, podInformer, nodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build volume binder: %w", err)
 	}

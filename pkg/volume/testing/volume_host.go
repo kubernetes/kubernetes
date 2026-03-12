@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -32,14 +31,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -262,22 +259,7 @@ func (f *fakeAttachDetachVolumeHost) CSINodeLister() storagelistersv1.CSINodeLis
 			Drivers: []storagev1.CSINodeDriver{},
 		},
 	}
-	enableMigrationOnNode(csiNode, csilibplugins.GCEPDInTreePluginName)
 	return getFakeCSINodeLister(csiNode)
-}
-
-func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
-	nodeInfoAnnotations := csiNode.GetAnnotations()
-	if nodeInfoAnnotations == nil {
-		nodeInfoAnnotations = map[string]string{}
-	}
-
-	newAnnotationSet := sets.New[string]()
-	newAnnotationSet.Insert(pluginName)
-	nas := strings.Join(sets.List(newAnnotationSet), ",")
-	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
-
-	csiNode.Annotations = nodeInfoAnnotations
 }
 
 func (f *fakeAttachDetachVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverLister {
