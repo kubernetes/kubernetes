@@ -547,11 +547,7 @@ func newCPUAccumulatorForResize(logger logr.Logger, topo *topology.CPUTopology, 
 					// addition in container[].resources ... which
 					// could be possible to patch ? Esotsal Note This means
 					// modifying API code
-					if !(mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
-						acc.take(mustKeepCPUsForResize.Clone())
-					} else {
-						return acc
-					}
+					acc.take(mustKeepCPUsForResize.Clone())
 				}
 			}
 
@@ -661,12 +657,12 @@ func (a *cpuAccumulator) isFullSocketForResize(socketID int) bool {
 	return a.resultDetails.CPUsInSockets(socketID).Size()+a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
 }
 
-// return true if this Socket only allocated CPUs for this Container
+// return true if this Core only allocated CPUs for this Container
 func (a *cpuAccumulator) isFullCoreForResize(coreID int) bool {
 	return a.resultDetails.CPUsInCores(coreID).Size()+a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
 }
 
-// return true if this Socket only allocated CPUs for this Container
+// return true if this UncoreCache only allocated CPUs for this Container
 func (a *cpuAccumulator) isFullUncoreCacheForResize(uncoreID int) bool {
 	return a.resultDetails.CPUsInUncoreCaches(uncoreID).Size()+a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
 }
@@ -1589,7 +1585,7 @@ func takeByTopologyNUMADistributedForResize(logger logr.Logger, topo *topology.C
 	// If the number of CPUs requested to be retained is not a subset
 	// of reusableCPUs, then we fail early
 	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
-		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+		if mustKeepCPUsForResize.IsSubsetOf(reusableCPUsForResize.Clone()) {
 			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
 		}
 	}
@@ -1835,7 +1831,7 @@ func takeByTopologyNUMAPackedForResize(logger logr.Logger, topo *topology.CPUTop
 	// If the number of CPUs requested to be retained is not a subset
 	// of reusableCPUs, then we fail early
 	if reusableCPUsForResize != nil && mustKeepCPUsForResize != nil {
-		if (mustKeepCPUsForResize.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+		if mustKeepCPUsForResize.IsSubsetOf(reusableCPUsForResize.Clone()) {
 			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForResize.String(), reusableCPUsForResize.String())
 		}
 	}

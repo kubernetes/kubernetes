@@ -99,10 +99,10 @@ func TestString(t *testing.T) {
 }
 
 func TestCloneWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
-	expect := ContainerCPUAllocations{
-		"pod": map[string]ContainerCPUAllocation{
-			"container1": {Original: cpuset.New(4, 5, 6), Resized: cpuset.New()},
-			"container2": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
+	expect := ContainerCPUOriginals{
+		"pod": map[string]ContainerCPUOriginal{
+			"container1": {Original: cpuset.New(4, 5, 6)},
+			"container2": {Original: cpuset.New(1, 2, 3)},
 		},
 	}
 	actual := expect.Clone()
