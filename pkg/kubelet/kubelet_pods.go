@@ -2416,6 +2416,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	}
 
 	convertContainerStatusResources := func(allocatedContainer *v1.Container, status *v1.ContainerStatus, cStatus *kubecontainer.Status, oldStatuses map[string]v1.ContainerStatus) *v1.ResourceRequirements {
+		logger := klog.TODO()
 		cName := allocatedContainer.Name
 		// oldStatus should always exist if container is running
 		oldStatus, oldStatusFound := oldStatuses[cName]
@@ -2454,7 +2455,20 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 				}
 			} else {
-				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				if cStatus.Resources != nil && cStatus.Resources.CPULimit == nil && cStatus.Resources.CPURequest != nil && oldStatus.Resources != nil && oldStatus.Resources.Requests != nil {
+					if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
+						oldCPURequest := oldStatus.Resources.Requests[v1.ResourceCPU]
+						if !oldCPURequest.Equal(*cStatus.Resources.CPURequest) {
+							resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+						} else {
+							preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+						}
+					} else {
+						preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+					}
+				} else {
+					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				}
 			}
 			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()

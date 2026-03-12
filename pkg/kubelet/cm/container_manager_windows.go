@@ -345,6 +345,15 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
+func (cm *containerManagerImpl) IsContainerCPUSetUpdateInProgress(pod *v1.Pod, containerName string) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		if cm.cpuManager != nil {
+			return cm.cpuManager.IsContainerCPUSetUpdateInProgress(string(pod.UID), containerName)
+		}
+	}
+	return false
+}
+
 func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }

@@ -31,7 +31,7 @@ type stateMemory struct {
 	sync.RWMutex
 	logger         logr.Logger
 	assignments    ContainerCPUAssignments
-	allocations    ContainerCPUAllocations
+	originals      ContainerCPUOriginals
 	podAssignments PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
 }
@@ -44,37 +44,12 @@ func NewMemoryState(logger logr.Logger) State {
 	// since we store a checkpoint, we can use the relatively expensive "WithName".
 	logger = klog.LoggerWithName(logger, "CPUManager state memory")
 	logger.Info("Initialized")
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-			return &stateMemory{
-				logger:         logger,
-				allocations:    ContainerCPUAllocations{},
-				podAssignments: PodCPUAssignments{},
-				defaultCPUSet:  cpuset.New(),
-			}
-		} else {
-			return &stateMemory{
-				logger:         logger,
-				assignments:    ContainerCPUAssignments{},
-				podAssignments: PodCPUAssignments{},
-				defaultCPUSet:  cpuset.New(),
-			}
-		}
-	} else {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-			return &stateMemory{
-				logger:        logger,
-				allocations:   ContainerCPUAllocations{},
-				defaultCPUSet: cpuset.New(),
-			}
-		} else {
-			return &stateMemory{
-				logger:        logger,
-				assignments:   ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.New(),
-			}
-		}
+	return &stateMemory{
+		logger:         logger,
+		assignments:    ContainerCPUAssignments{},
+		originals:      ContainerCPUOriginals{},
+		podAssignments: PodCPUAssignments{},
+		defaultCPUSet:  cpuset.New(),
 	}
 }
 
@@ -82,32 +57,16 @@ func (s *stateMemory) GetOriginalCPUSet(podUID string, containerName string) (cp
 	s.RLock()
 	defer s.RUnlock()
 
-	entry, exists := s.allocations[podUID][containerName]
+	entry, exists := s.originals[podUID][containerName]
 	return entry.Original.Clone(), exists
-}
-
-func (s *stateMemory) GetResizedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
-	s.RLock()
-	defer s.RUnlock()
-
-	entry, exists := s.allocations[podUID][containerName]
-	return entry.Resized.Clone(), exists
 }
 
 func (s *stateMemory) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		res, ok := s.assignments[podUID][containerName]
-		return res.Clone(), ok
-	} else {
-		entry, exists := s.allocations[podUID][containerName]
-		if entry.Resized.IsEmpty() {
-			return entry.Original.Clone(), exists
-		}
-		return entry.Resized.Clone(), exists
-	}
+	res, ok := s.assignments[podUID][containerName]
+	return res.Clone(), ok
 }
 
 func (s *stateMemory) GetDefaultCPUSet() cpuset.CPUSet {
@@ -145,37 +104,34 @@ func (s *stateMemory) GetPodCPUAssignments() PodCPUAssignments {
 	return clone
 }
 
-func (s *stateMemory) GetCPUAllocations() ContainerCPUAllocations {
+func (s *stateMemory) GetCPUOriginals() ContainerCPUOriginals {
 	s.RLock()
 	defer s.RUnlock()
-	return s.allocations.Clone()
+	return s.originals.Clone()
 }
 
 func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
+	if _, ok := s.assignments[podUID]; !ok {
+		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
+	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		if _, ok := s.assignments[podUID]; !ok {
-			s.assignments[podUID] = make(map[string]cpuset.CPUSet)
-		}
+	s.assignments[podUID][containerName] = cset
 
-		s.assignments[podUID][containerName] = cset
-		s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
-	} else {
-		if _, ok := s.allocations[podUID]; !ok {
-			s.allocations[podUID] = make(map[string]ContainerCPUAllocation)
-			s.allocations[podUID][containerName] = ContainerCPUAllocation{Original: cset, Resized: cpuset.New()}
-			s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", cset, "Resized cpuSet", cpuset.New())
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if _, ok := s.originals[podUID]; !ok {
+			s.originals[podUID] = make(map[string]ContainerCPUOriginal)
+			s.originals[podUID][containerName] = ContainerCPUOriginal{Original: cset}
+			s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset, "Original cpuSet", cset)
 		} else {
-			if entry, ok := s.allocations[podUID][containerName]; !ok {
-				s.allocations[podUID][containerName] = ContainerCPUAllocation{Original: cset, Resized: cpuset.New()}
-				s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", cset, "Resized cpuSet", cpuset.New())
-			} else {
-				s.allocations[podUID][containerName] = ContainerCPUAllocation{Original: entry.Original, Resized: cset}
-				s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", entry.Original, "Resized cpuSet", cset)
+			if _, ok := s.originals[podUID][containerName]; !ok {
+				s.originals[podUID][containerName] = ContainerCPUOriginal{Original: cset}
+				s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset, "Original cpuSet", cset)
 			}
 		}
+	} else {
+		s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
 	}
 }
 
@@ -214,30 +170,30 @@ func (s *stateMemory) SetPodCPUAssignments(a PodCPUAssignments) {
 	s.logger.Info("Updated pod CPUSet assignments", "assignments", a)
 }
 
-func (s *stateMemory) SetCPUAllocations(a ContainerCPUAllocations) {
+func (s *stateMemory) SetCPUOriginals(a ContainerCPUOriginals) {
 	s.Lock()
 	defer s.Unlock()
 
-	s.allocations = a.Clone()
-	s.logger.Info("Updated CPUSet allocations", "allocations", a)
+	s.originals = a.Clone()
+	s.logger.Info("Updated CPUSet originals", "originals", a)
 }
 
 func (s *stateMemory) Delete(podUID string, containerName string) {
 	s.Lock()
 	defer s.Unlock()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		delete(s.assignments[podUID], containerName)
-		if len(s.assignments[podUID]) == 0 {
-			delete(s.assignments, podUID)
+	delete(s.assignments[podUID], containerName)
+	if len(s.assignments[podUID]) == 0 {
+		delete(s.assignments, podUID)
+	}
+	s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		delete(s.originals[podUID], containerName)
+		if len(s.originals[podUID]) == 0 {
+			delete(s.originals, podUID)
 		}
-		s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
-	} else {
-		delete(s.allocations[podUID], containerName)
-		if len(s.allocations[podUID]) == 0 {
-			delete(s.allocations, podUID)
-		}
-		s.logger.V(2).Info("Deleted CPUSet allocations", "podUID", podUID, "containerName", containerName)
+		s.logger.V(2).Info("Deleted CPUSet original", "podUID", podUID, "containerName", containerName)
 	}
 }
 
@@ -256,10 +212,9 @@ func (s *stateMemory) ClearState() {
 	defer s.Unlock()
 
 	s.defaultCPUSet = cpuset.New()
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		s.assignments = make(ContainerCPUAssignments)
-	} else {
-		s.allocations = make(ContainerCPUAllocations)
+	s.assignments = make(ContainerCPUAssignments)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		s.originals = make(ContainerCPUOriginals)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		s.podAssignments = make(PodCPUAssignments)

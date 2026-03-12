@@ -32,6 +32,7 @@ import (
 )
 
 func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
+	logger := klog.TODO()
 	resources := &runtimeapi.LinuxContainerResources{}
 	if pod.Spec.Overhead != nil {
 		cpu := pod.Spec.Overhead.Cpu()
@@ -39,7 +40,9 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
-		resources = m.calculateLinuxResources(cpu, cpu, memory, false)
+		// If pod has exclusive cpu the sandbox will not have cfs quote enforced
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod)
+		resources = m.calculateLinuxResources(cpu, cpu, memory, disableCPUQuota)
 	}
 
 	return resources

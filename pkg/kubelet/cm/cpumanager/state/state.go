@@ -110,23 +110,26 @@ func (a PodCPUAssignments) Clone() PodCPUAssignments {
 	return clone
 }
 
-// ContainerCPUAllocation and ContainerCPUAllocations types are used in cpu manager state
-// with InPlacePodVerticalScalingExclusiveCPUs to store original and most recents resized
-// CPU allocation, ContainerCPUAllocations replaces ContainerCPUAssignments when
-// InPlacePodVerticalScalingExclusiveCPUs is enabled.
+// ContainerCPUAllocation and ContainerCPUOriginals types are used in cpu manager state
+// with InPlacePodVerticalScalingExclusiveCPUs to store historical data, original
+// CPU allocation, when InPlacePodVerticalScalingExclusiveCPUs is enabled.
 
-type ContainerCPUAllocation struct {
+type ContainerCPUOriginal struct {
 	Original cpuset.CPUSet
-	Resized  cpuset.CPUSet
 }
 
-type ContainerCPUAllocations map[string]map[string]ContainerCPUAllocation
+type ContainerCPUOriginals map[string]map[string]ContainerCPUOriginal
 
-// Clone returns a copy of ContainerCPUAllocations
-func (as ContainerCPUAllocations) Clone() ContainerCPUAllocations {
-	ret := make(ContainerCPUAllocations, len(as))
+// Clone returns a copy of ContainerCPUOriginals
+func (as ContainerCPUOriginals) Clone() ContainerCPUOriginals {
+	ret := make(ContainerCPUOriginals, len(as))
 	for pod := range as {
-		ret[pod] = maps.Clone(as[pod])
+		ret[pod] = make(map[string]ContainerCPUOriginal, len(as[pod]))
+		for container, orig := range as[pod] {
+			ret[pod][container] = ContainerCPUOriginal{
+				Original: orig.Original.Clone(),
+			}
+		}
 	}
 	return ret
 }
@@ -141,12 +144,11 @@ type Reader interface {
 	GetPodCPUSet(podUID string) (cpuset.CPUSet, bool)
 	// GetPodCPUAssignments returns all pod-level CPU assignments
 	GetPodCPUAssignments() PodCPUAssignments
-	// GetCPUAllocations, GetOriginalCPUSet and GetResizedCPUSet are used
+	// GetCPUOriginals, GetOriginalCPUSet are used
 	// with InPlacePodVerticalScalingExclusiveCPUs to checkpoint CPU
-	// original and most recent resize assigments.
-	GetCPUAllocations() ContainerCPUAllocations
+	// original assignments.
+	GetCPUOriginals() ContainerCPUOriginals
 	GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
-	GetResizedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 }
 
 type writer interface {
@@ -161,8 +163,8 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
-	// SetCPUAllocations is used with InPlacePodVerticalScalingExclusiveCPUs
-	SetCPUAllocations(ContainerCPUAllocations)
+	// SetCPUOriginals is used with InPlacePodVerticalScalingExclusiveCPUs
+	SetCPUOriginals(ContainerCPUOriginals)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

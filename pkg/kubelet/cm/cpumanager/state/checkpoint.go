@@ -42,7 +42,6 @@ var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
 // to support In place update pod resources alongside Static CPU Manager policy
 type ContainerCPUs struct {
 	Original string `json:"original"`
-	Resized  string `json:"resized"`
 }
 
 // CPUManagerCheckpointData struct is used to store CPU/pod assignments, which is part of a checkpoint in v4 format
@@ -51,7 +50,7 @@ type CPUManagerCheckpointData struct {
 	DefaultCPUSet string                              `json:"defaultCpuSet"`
 	Entries       map[string]map[string]string        `json:"entries,omitempty"`
 	PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
-	Allocations   map[string]map[string]ContainerCPUs `json:"ResizeEntries,omitempty"`
+	Originals     map[string]map[string]ContainerCPUs `json:"originals,omitempty"`
 }
 
 // CPUManagerCheckpoint represents a structure to store CPU manager checkpoint data.
@@ -118,6 +117,7 @@ func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
 		CheckpointData: CPUManagerCheckpointData{
 			Entries:    make(map[string]map[string]string),
 			PodEntries: make(PodCPUAssignments),
+			Originals:  make(map[string]map[string]ContainerCPUs),
 		},
 	}
 }

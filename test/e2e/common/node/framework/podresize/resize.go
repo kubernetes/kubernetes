@@ -32,8 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/kubernetes/pkg/features"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -63,6 +65,7 @@ type ResizableContainerInfo struct {
 	InitCtr              bool
 	CPUsAllowedListValue string
 	CPUsAllowedList      string
+	HasExclusiveCPUs     bool
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -311,7 +314,8 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	var errs []error
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
-		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2))
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && ci.HasExclusiveCPUs
+		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2, disableCPUQuota))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -486,7 +490,7 @@ func ExpectPodResizePending(ctx context.Context, f *framework.Framework, resizeP
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
 	}
 
-	// Verify Pod Resize conditions are empty.
+	// Verify PodResizePending condition are empty.
 	podResizePendingFound := false
 	for _, condition := range resizePendingPod.Status.Conditions {
 		if condition.Type == v1.PodResizePending {
@@ -560,19 +564,19 @@ func VerifyPodContainersCPUsAllowedListValue(f *framework.Framework, pod *v1.Pod
 		framework.Logf("Namespace %s Pod %s Container %s - looking for Cpus allowed list value %s in /proc/self/status",
 			pod.Namespace, pod.Name, cName, calValue)
 		if err != nil {
-			return fmt.Errorf("failed to find expected value '%s' in container '%s' Cpus allowed list '/proc/self/status'", cName, expectedCPUsAllowedListValue)
+			return fmt.Errorf("failed to find expected value '%s' in container '%s' Cpus allowed list '/proc/self/status'", expectedCPUsAllowedListValue, cName)
 		}
 		c, err := cpuset.Parse(calValue)
-		framework.ExpectNoError(err, "failed parsing Cpus allowed list for container %s in pod %s", cName, pod.Name)
+		framework.ExpectNoError(err, "failed parsing Cpus allowed list '%s' for container %s in pod %s", calValue, cName, pod.Name)
 		cpuTotalValue := strconv.Itoa(c.Size())
 		if cpuTotalValue != expectedCPUsAllowedListValue {
 			return fmt.Errorf("container '%s' cgroup value '%s' results to total CPUs '%s' not equal to expected '%s'", cName, calValue, cpuTotalValue, expectedCPUsAllowedListValue)
 		}
 		if expectedCPUsAllowedList != "" {
 			cExpected, err := cpuset.Parse(expectedCPUsAllowedList)
-			framework.ExpectNoError(err, "failed parsing Cpus allowed list for cexpectedCPUset")
+			framework.ExpectNoError(err, "failed parsing CPUs allowed list for cExpected CPUset '%s'", expectedCPUsAllowedList)
 			if !c.Equals(cExpected) {
-				return fmt.Errorf("container '%s' cgroup value '%s' results to total CPUs '%v' not equal to expected '%v'", cName, calValue, c, cExpected)
+				return fmt.Errorf("container '%s' cgroup value '%s' results to CPU set '%v' not equal to expected '%v'", cName, calValue, c, cExpected)
 			}
 		}
 		return nil

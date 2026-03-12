@@ -93,6 +93,11 @@ func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	return cpuset.New()
 }
 
+func (m *fakeManager) IsContainerCPUSetUpdateInProgress(podUID string, containerName string) bool {
+	m.logger.Info("Is Container CPUSet Update In Progress", "podUID", podUID, "containerName", containerName)
+	return false
+}
+
 func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
 	return cpuset.New()

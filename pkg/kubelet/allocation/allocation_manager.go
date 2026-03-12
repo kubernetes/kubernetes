@@ -18,11 +18,6 @@ package allocation
 
 import (
 	"context"
-	"path/filepath"
-	"slices"
-	"sync"
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,12 +31,15 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"path/filepath"
+	"slices"
+	"sync"
+	"time"
 )
 
 // podStatusManagerStateFile is the file name where status manager stores its state
@@ -566,11 +564,6 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	if reason != "" {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-			if reason == topologymanager.ErrorTopologyAffinity {
-				reason = v1.PodReasonInfeasible
-			}
-		}
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {
@@ -601,7 +594,11 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
-			return false, result.Reason, result.Message
+			if result.Reason == "prohibitedCPUAllocationError" {
+				return false, v1.PodReasonInfeasible, result.Message
+			} else {
+				return false, result.Reason, result.Message
+			}
 		}
 	}
 

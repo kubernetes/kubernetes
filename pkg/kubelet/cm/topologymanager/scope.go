@@ -138,7 +138,7 @@ func (s *scope) RemoveContainer(logger klog.Logger, containerID string) error {
 
 func (s *scope) admitPolicyNone(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(pod, &container, operation)
+		err := s.allocateAlignedResources(ctx, pod, &container, operation)
 		if err != nil {
 			return admission.GetPodAdmitResult(err)
 		}

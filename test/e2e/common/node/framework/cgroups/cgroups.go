@@ -238,13 +238,24 @@ func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *
 	return nil
 }
 
-func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool, disableCPUQuota bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
 	cpuLim := expectedResources.Limits.Cpu()
 	if cpuLim.IsZero() && pod.Spec.Resources != nil {
 		cpuLim = pod.Spec.Resources.Limits.Cpu()
 	}
 	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
+
+	// When disableCPUQuota is true, the CFS quota is set to unlimited.
+	// Set expectedCPULimits to unlimited quota value.
+	if disableCPUQuota {
+		if podOnCgroupv2 {
+			expectedCPULimits = []string{fmt.Sprintf("max %d", kubecm.QuotaPeriod)}
+		} else {
+			expectedCPULimits = []string{"-1"}
+		}
+	}
+
 	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
 	}
@@ -267,10 +278,10 @@ func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod
 	return nil
 }
 
-func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
+func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool, disableCPUQuota bool) error {
 	var errs []error
 	errs = append(errs, VerifyContainerMemoryLimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
+	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2, disableCPUQuota))
 	errs = append(errs, verifyContainerCPUWeight(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
 	return utilerrors.NewAggregate(errs)
 }
