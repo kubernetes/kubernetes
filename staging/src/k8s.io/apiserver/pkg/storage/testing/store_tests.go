@@ -2812,15 +2812,14 @@ const (
 )
 
 // RunTestGetListWithErrorAggregation tests aggregation of errors while the list operation is in progress
-func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T) (context.Context, InterfaceWithCorruptTransformer)) {
-	prefix := "/pods/ns/"
+func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
 	// the test creates n objects and assigns each object unique id i ie. 1 <= i <= n
 	objNameFn := func(id int) string {
 		// pad with leading zeros so that for i, j where i < j, object
 		// foo-{j} follows object foo-{i} in lexicographical order
 		return fmt.Sprintf("foo-%06d", id)
 	}
-	keyFn := func(id int) string {
+	keyFn := func(prefix string, id int) string {
 		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
 	}
 
@@ -2836,7 +2835,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 		// verifies the result from GetList
 		// list: result of GetList operation is saved into list
 		// err: error returned from GetList
-		verifier func(t *testing.T, list *example.PodList, err error)
+		verifier func(t *testing.T, prefix string, list *example.PodList, err error)
 	}{
 		{
 			name: "first error is an unexpected error, no aggregation expected",
@@ -2863,7 +2862,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList encounters an unexpected (not corruptObjErr)
 			//  error while retrieving {2} and immediately aborts
 			//  b) GetList successfully decodes {1}
-			verifier: func(t *testing.T, list *example.PodList, err error) {
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
 				// a) the error returned from GetList should be a bare
 				// storage.InternalError, not wrapped — proves no aggregation
 				// nolint:errorlint // the aggregator should return the error as is
@@ -2896,7 +2895,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			// while retrieving the n objects, we expect the following from GetList:
 			//  a) GetList encounters corruptObjErr while retrieving objects in the corrupt set
 			//  b) GetList successfully decodes object(s) in the good set
-			verifier: func(t *testing.T, list *example.PodList, listErr error) {
+			verifier: func(t *testing.T, prefix string, list *example.PodList, listErr error) {
 				// the error returned from GetList should be an API status object
 				var statusGot apierrors.APIStatus
 				if !errors.As(listErr, &statusGot) {
@@ -2904,7 +2903,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 				}
 
 				details := statusGot.Status().Details
-				corrupt := []string{keyFn(2), keyFn(4), keyFn(6)}
+				corrupt := []string{keyFn(prefix, 2), keyFn(prefix, 4), keyFn(prefix, 6)}
 				// a) all the corruptObjErr errors should be aggregated
 				if details == nil || len(details.Causes) != len(corrupt) {
 					t.Fatalf("expected the API status to include the corrupt object errors, but got: %v", details)
@@ -2956,7 +2955,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  b) GetList encounters an unexpected (not corruptObjErr) error while
 			//  retrieving {4} in the unexpected set, and immediately aborts
 			//  c) GetList successfully decodes {1,3} in the good set before it aborts
-			verifier: func(t *testing.T, list *example.PodList, err error) {
+			verifier: func(t *testing.T, prefix string, list *example.PodList, err error) {
 				// the error returned from GetList should be an API status object
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
@@ -2969,7 +2968,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 				if details == nil || len(details.Causes) != 2 {
 					t.Fatalf("expected 2 causes (1 corrupt + 1 abort), but got: %v", details)
 				}
-				if want, got := keyFn(2), details.Causes[0].Field; want != got {
+				if want, got := keyFn(prefix, 2), details.Causes[0].Field; want != got {
 					t.Errorf("expected corrupt object key %q, but got: %q", want, got)
 				}
 				if want, got := metav1.CauseTypeUnexpectedServerResponse, details.Causes[1].Type; want != got {
@@ -3006,7 +3005,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes the first 100 objects in the good set into list
-			verifier: func(t *testing.T, list *example.PodList, err error) {
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
 				limit := 100
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
@@ -3045,7 +3044,7 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes zero objects
-			verifier: func(t *testing.T, list *example.PodList, err error) {
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
 				limit := 100
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
@@ -3073,21 +3072,22 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, store := newStoreFn(t)
+			ns := fmt.Sprintf("ns-%d", i)
+			prefix := fmt.Sprintf("/pods/%s/", ns)
 
 			// Step 1: add N objects to the store foo-{1 ... n}
 			// we construct the names of the objects in a way that ensures
 			// that the order of creation is also the lexicographical
 			// order by which etcd List operation returns the objects
-			for i := 1; i <= test.n; i++ {
+			for j := 1; j <= test.n; j++ {
 				obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{
-					Name:      objNameFn(i),
-					Namespace: "ns",
+					Name:      objNameFn(j),
+					Namespace: ns,
 				}}
 				// add the annotation that will mark the object to become corrupt
-				if marker := test.corrupter(i); len(marker) > 0 {
+				if marker := test.corrupter(j); len(marker) > 0 {
 					obj.Annotations = map[string]string{
 						marker: "",
 					}
@@ -3121,14 +3121,14 @@ func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T
 			}
 
 			// step 5: verify what we expect from GetList
-			test.verifier(t, out, err)
+			test.verifier(t, prefix, out, err)
 		})
 	}
 }
 
-// RunTestGetListBackwardCompatibility tests that when the AllowUnsafeMalformedObjectDeletion
+// RunTestGetListWithoutErrorAggregation tests that when the AllowUnsafeMalformedObjectDeletion
 // feature is disabled, GetList maintains backward compatibility by aborting on the first error.
-func RunTestGetListBackwardCompatibility(t *testing.T, newStoreFn func(*testing.T) (context.Context, InterfaceWithCorruptTransformer)) {
+func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
 	prefix := "/pods/ns/"
 	objNameFn := func(id int) string {
 		return fmt.Sprintf("foo-%06d", id)
@@ -3136,8 +3136,6 @@ func RunTestGetListBackwardCompatibility(t *testing.T, newStoreFn func(*testing.
 	keyFn := func(id int) string {
 		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
 	}
-
-	ctx, store := newStoreFn(t)
 
 	// Step 1: create 7 objects, where even-numbered ones are corrupt
 	// - good: {1, 3, 5, 7}

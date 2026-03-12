@@ -265,19 +265,15 @@ func TestKeySchema(t *testing.T) {
 
 func TestGetListWithErrorAggregation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-	storagetesting.RunTestGetListWithErrorAggregation(t, func(t *testing.T) (context.Context, storagetesting.InterfaceWithCorruptTransformer) {
-		ctx, s, _ := testSetup(t)
-		store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
-		return ctx, &storeWithCorruptedTransformer{Interface: store, store: s}
-	})
+	ctx, s, _ := testSetup(t)
+	store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
+	storagetesting.RunTestGetListWithErrorAggregation(ctx, t, &storeWithCorruptedTransformer{Interface: store, store: s})
 }
 
-func TestGetListBackwardCompatibility(t *testing.T) {
+func TestGetListWithoutErrorAggregation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, false)
-	storagetesting.RunTestGetListBackwardCompatibility(t, func(t *testing.T) (context.Context, storagetesting.InterfaceWithCorruptTransformer) {
-		ctx, s, _ := testSetup(t)
-		return ctx, &storeWithCorruptedTransformer{Interface: s, store: s}
-	})
+	ctx, s, _ := testSetup(t)
+	storagetesting.RunTestGetListWithoutErrorAggregation(ctx, t, &storeWithCorruptedTransformer{Interface: s, store: s})
 }
 
 type storeWithPrefixTransformer struct {
