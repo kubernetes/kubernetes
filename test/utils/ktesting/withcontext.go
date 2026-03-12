@@ -41,13 +41,13 @@ func (tCtx TContext) WithCancel() TContext {
 }
 
 // WithoutCancel causes the returned context to ignore cancellation of its parent.
-// Calling Cancel will not cancel the parent either.
+// Calling Cancel will only cancel the new context.
 // This matches [context.WithoutCancel].
 func (tCtx TContext) WithoutCancel() TContext {
 	ctx := context.WithoutCancel(tCtx)
 
 	tCtx.Context = ctx
-	tCtx.cancel = nil
+	tCtx = tCtx.WithCancel() // Re-create a cancelable TContext.
 	return tCtx
 }
 

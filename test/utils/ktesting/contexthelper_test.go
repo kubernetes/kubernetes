@@ -23,6 +23,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -131,4 +132,41 @@ func TestCause(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestCancel checks how cancellation propagates or doesn't propagate
+// when setting up child contexts through WithCancel or WithoutCancel.
+func TestCancel(t *testing.T) {
+	tCtx := Init(t)
+	tCtx2 := tCtx.WithoutCancel()
+	tCtx3 := tCtx.WithoutCancel()
+	tCtx4 := tCtx.WithCancel()
+	tCtx5 := tCtx.WithCancel()
+
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.AssertNoError(tCtx2.Err())
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.AssertNoError(tCtx4.Err())
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx2.Cancel("cancel 2")
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.AssertNoError(tCtx4.Err())
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx4.Cancel("cancel 4")
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.Assert(context.Cause(tCtx4)).To(gomega.MatchError(gomega.ContainSubstring("cancel 4")))
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx.Cancel("cancel root")
+	tCtx.Assert(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("cancel root")))
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.Assert(context.Cause(tCtx4)).To(gomega.MatchError(gomega.ContainSubstring("cancel 4")))
+	tCtx.Assert(context.Cause(tCtx5)).To(gomega.MatchError(gomega.ContainSubstring("cancel root")))
 }
