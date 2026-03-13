@@ -21,6 +21,7 @@ import (
 	"slices"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,8 @@ func TestWorkloadExecutor_SelectVictimsOnDomain(t *testing.T) {
 		capacity        int
 		blockingVictims []string
 	}
+
+	currentTime := metav1.Now()
 
 	tests := []struct {
 		name           string
@@ -163,6 +166,23 @@ func TestWorkloadExecutor_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node2", capacity: 1, blockingVictims: []string{"victim-no-pdb"}},
 			},
 			expectedPods:   [][]string{{"victim-no-pdb"}},
+			expectedStatus: []*fwk.Status{fwk.NewStatus(fwk.Success)},
+		},
+		{
+			name:      "Workload aware: all victims have the same priority",
+			nodeNames: []string{"node1"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).StartTime(metav1.NewTime(currentTime.Add(-1 * time.Hour))).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node1").Priority(lowPriority).StartTime(metav1.NewTime(currentTime.Add(-2 * time.Hour))).Obj(),
+				st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).StartTime(metav1.NewTime(currentTime.Add(-3 * time.Hour))).Obj(),
+			},
+			preemptor: NewPodPreemptor(st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(), framework.NewCycleState()),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", blockingVictims: []string{"p1"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p2"}, capacity: 1},
+				{nodeName: "node1", blockingVictims: []string{"p3"}, capacity: 1},
+			},
+			expectedPods:   [][]string{{"p1"}},
 			expectedStatus: []*fwk.Status{fwk.NewStatus(fwk.Success)},
 		},
 	}
