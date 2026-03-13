@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -73,6 +75,7 @@ import (
 	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
@@ -396,6 +399,8 @@ type Driver struct {
 	// Run driver pods. If false, only set up slices and class.
 	WithRealNodes bool
 
+	EnableDeviceMetadata bool
+
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
 	callCounts map[MethodInstance]int64
@@ -691,7 +696,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 			serialize = false
 		}
 
-		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
+		pluginOpts := []any{
 			app.Options{EnableHealthService: true},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -712,7 +717,20 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
 			kubeletplugin.RegistrarListener(d.listen(tCtx, &pod, &listenerPort)),
-		)
+
+			kubeletplugin.EnableDeviceMetadata(d.EnableDeviceMetadata),
+		}
+		if d.EnableDeviceMetadata {
+			pluginOpts = append(pluginOpts,
+				kubeletplugin.MetadataVersions(metadatav1alpha1.SchemeGroupVersion),
+				kubeletplugin.MetadataFileOps(d.buildMetadataFileOps(tCtx, &pod)),
+			)
+			if !d.IsLocal {
+				pluginOpts = append(pluginOpts, kubeletplugin.CDIDirectory("/cdi"))
+			}
+		}
+
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps, pluginOpts...)
 		tCtx.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func(tCtx ktesting.TContext) {
 			// Depends on cancel being called first.
@@ -848,6 +866,70 @@ func (d *Driver) podIO(tCtx ktesting.TContext, pod *v1.Pod) proxy.PodDirIO {
 		PodName:       pod.Name,
 		ContainerName: pod.Spec.Containers[0].Name,
 		Logger:        &logger,
+	}
+}
+
+func (d *Driver) buildMetadataFileOps(tCtx ktesting.TContext, pod *v1.Pod) kubeletplugin.MetadataFileOperations {
+	if d.IsLocal {
+		return kubeletplugin.MetadataFileOperations{
+			WriteFile: os.WriteFile,
+			ReadFile:  os.ReadFile,
+			MkdirAll:  os.MkdirAll,
+			RemoveAll: os.RemoveAll,
+			Remove:    os.Remove,
+			Glob:      filepath.Glob,
+		}
+	}
+
+	execInPod := func(command []string) (string, error) {
+		stdout, stderr, err := e2epod.Exec(tCtx, e2epod.ExecOptions{
+			Command:       command,
+			Namespace:     pod.Namespace,
+			PodName:       pod.Name,
+			ContainerName: pod.Spec.Containers[0].Name,
+			CaptureStdout: true,
+			CaptureStderr: true,
+			Quiet:         true,
+		})
+		if err != nil {
+			return "", fmt.Errorf("%v: stderr=%q, %w", command, stderr, err)
+		}
+		return stdout, nil
+	}
+
+	return kubeletplugin.MetadataFileOperations{
+		WriteFile: func(name string, data []byte, perm os.FileMode) error {
+			return d.createFile(tCtx, pod, name, data)
+		},
+		ReadFile: func(name string) ([]byte, error) {
+			stdout, err := execInPod([]string{"cat", name})
+			if err != nil {
+				return nil, err
+			}
+			return []byte(stdout), nil
+		},
+		MkdirAll: func(p string, perm os.FileMode) error {
+			_, err := execInPod([]string{"mkdir", "-p", p})
+			return err
+		},
+		RemoveAll: func(p string) error {
+			return d.podIO(tCtx, pod).RemoveAll(p)
+		},
+		Remove: func(name string) error {
+			_, err := execInPod([]string{"rm", "-f", name})
+			return err
+		},
+		Glob: func(pattern string) ([]string, error) {
+			stdout, err := execInPod([]string{"sh", "-c", fmt.Sprintf("ls -1d %s 2>/dev/null || true", pattern)})
+			if err != nil {
+				return nil, err
+			}
+			stdout = strings.TrimSpace(stdout)
+			if stdout == "" {
+				return nil, nil
+			}
+			return strings.Split(stdout, "\n"), nil
+		},
 	}
 }
 
