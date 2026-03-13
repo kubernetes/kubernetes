@@ -24,6 +24,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,13 +54,46 @@ type Token struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
-type TokenHandler interface {
-	Token() (Token, error)
+// TokenHandler serves token responses for the test OIDC server.
+// Use SetHandler to configure the response for each test scenario.
+type TokenHandler struct {
+	handler func() (Token, error)
+}
+
+// Token returns the configured token response.
+func (h *TokenHandler) Token() (Token, error) {
+	if h.handler == nil {
+		return Token{}, fmt.Errorf("no token handler configured")
+	}
+	return h.handler()
+}
+
+// SetHandler configures the function that will be called when the token
+// endpoint is hit.
+func (h *TokenHandler) SetHandler(fn func() (Token, error)) {
+	h.handler = fn
+}
+
+// PrependHandler sets a handler that runs for the given number of calls,
+// then falls back to the previously configured handler.
+func (h *TokenHandler) PrependHandler(fn func() (Token, error), times int) {
+	previous := h.handler
+	remaining := times
+	h.handler = func() (Token, error) {
+		if remaining > 0 {
+			remaining--
+			return fn()
+		}
+		if previous != nil {
+			return previous()
+		}
+		return Token{}, fmt.Errorf("no token handler configured")
+	}
 }
 
 type TestServer struct {
 	httpServer   *httptest.Server
-	tokenHandler *MockTokenHandler
+	tokenHandler *TokenHandler
 	publicKeys   []jose.JSONWebKey
 }
 
@@ -83,8 +117,8 @@ func (ts *TestServer) SetPublicKey(t *testing.T, publicKey crypto.PublicKey) {
 	ts.publicKeys = append(ts.publicKeys, key)
 }
 
-// TokenHandler is getter of JWT token handler
-func (ts *TestServer) TokenHandler() *MockTokenHandler {
+// TokenHandler returns the token handler for configuring test responses.
+func (ts *TestServer) TokenHandler() *TokenHandler {
 	return ts.tokenHandler
 }
 
@@ -123,7 +157,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 
 	oidcServer := &TestServer{
 		httpServer:   httpServer,
-		tokenHandler: NewMockTokenHandler(t),
+		tokenHandler: &TokenHandler{},
 	}
 
 	issuer := httpServer.URL
@@ -208,35 +242,42 @@ type JosePrivateKey interface {
 
 // SignToken creates a signed JWT from the given private key and claims,
 // returning the compact-serialized token string.
-func SignToken[K JosePrivateKey](t *testing.T, privateKey K, claims map[string]interface{}) string {
-	t.Helper()
-
+func SignToken[K JosePrivateKey](privateKey K, claims map[string]interface{}) (string, error) {
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
-	require.NoError(t, err)
+	if err != nil {
+		return "", fmt.Errorf("creating signer: %w", err)
+	}
 
 	payloadJSON, err := json.Marshal(claims)
-	require.NoError(t, err)
+	if err != nil {
+		return "", fmt.Errorf("marshaling claims: %w", err)
+	}
 
 	sig, err := signer.Sign(payloadJSON)
-	require.NoError(t, err)
+	if err != nil {
+		return "", fmt.Errorf("signing payload: %w", err)
+	}
 
 	token, err := sig.CompactSerialize()
-	require.NoError(t, err)
-	return token
+	if err != nil {
+		return "", fmt.Errorf("serializing token: %w", err)
+	}
+	return token, nil
 }
 
-// TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
-// This behavior should being applied to the MockTokenHandler.
+// TokenHandlerBehaviorReturningPredefinedJWT returns a handler function that
+// signs the given claims into a JWT and returns it as a Token response.
 func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
-	t *testing.T,
 	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
 ) func() (Token, error) {
-	t.Helper()
-
 	return func() (Token, error) {
+		idToken, err := SignToken(privateKey, claims)
+		if err != nil {
+			return Token{}, fmt.Errorf("signing id token: %w", err)
+		}
 		return Token{
-			IDToken:      SignToken(t, privateKey, claims),
+			IDToken:      idToken,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
 		}, nil
