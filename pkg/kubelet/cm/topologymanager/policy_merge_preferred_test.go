@@ -1,9 +1,11 @@
 package topologymanager
 
 import (
+	"math/rand"
 	"testing"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 func TestHintMergerMergePreferredFound(t *testing.T) {
@@ -177,5 +179,76 @@ func TestHintMergerMergePreferredAggregatesScore(t *testing.T) {
 	}
 	if best.Score != 60 {
 		t.Fatalf("expected score 60, got %d", best.Score)
+	}
+}
+
+// TestHintMergerMergePreferredEquivalentToMerge verifies that the optimized
+// preferred-only search returns the same affinity, preference, and aggregated
+// score as the exhaustive merge for both policies over deterministic inputs.
+func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
+	// Generate 500 reproducible cases per policy. Each case has one to five
+	// dimensions with one to six hints each, bounding exhaustive Merge at 6^5
+	// permutations. One third of hints have nil affinity; otherwise each of
+	// eight NUMA nodes has a 25% chance of inclusion. Preferred is split evenly
+	// and Score spans the inclusive range [0, 100].
+	const (
+		randomSeed           = 1   // Reproduce the same generated cases on every run.
+		iterations           = 500 // Exercise varied tuples per policy without slowing the unit suite.
+		maxDimensions        = 5   // Bound the number of providers or resources in a tuple.
+		maxHintsPerDimension = 6   // Bound candidates per dimension so exhaustive Merge stays tractable.
+		numaNodeCount        = 8   // Match commonNUMAInfoEightNodes.
+		nilAffinityOneIn     = 3   // Generate a nil affinity for one third of hints.
+		nodeSelectedOneIn    = 4   // Include each NUMA node with 25% probability.
+		preferredOneIn       = 2   // Split preferred and non-preferred hints evenly.
+		scoreValueCount      = 101 // Generate every integral score from 0 through 100.
+	)
+
+	numaInfo := commonNUMAInfoEightNodes()
+	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted} {
+		t.Run(policyName, func(t *testing.T) {
+			// Reset the deterministic generator so both policies see identical inputs.
+			r := rand.New(rand.NewSource(randomSeed))
+
+			for range iterations {
+				numDimensions := r.Intn(maxDimensions) + 1
+				hints := make([][]TopologyHint, 0, numDimensions)
+				for range numDimensions {
+					numHints := r.Intn(maxHintsPerDimension) + 1
+					hintsForDim := make([]TopologyHint, 0, numHints)
+					for range numHints {
+						var affinity bitmask.BitMask
+						if r.Intn(nilAffinityOneIn) != 0 {
+							var bits []int
+							for node := range numaNodeCount {
+								if r.Intn(nodeSelectedOneIn) == 0 {
+									bits = append(bits, node)
+								}
+							}
+							affinity = NewTestBitMask(bits...)
+						}
+						hintsForDim = append(hintsForDim, TopologyHint{
+							NUMANodeAffinity: affinity,
+							Preferred:        r.Intn(preferredOneIn) == 0,
+							Score:            int64(r.Intn(scoreValueCount)),
+						})
+					}
+					hints = append(hints, hintsForDim)
+				}
+
+				merger := NewHintMerger(numaInfo, hints, policyName, PolicyOptions{})
+				preferred := merger.mergePreferred(klog.Background())
+				best := merger.Merge(klog.Background())
+				hasPreferred := preferred != nil
+				if hasPreferred != best.Preferred {
+					t.Fatalf("expected mergePreferred found=%v to match Merge Preferred=%v; full=%v hints=%v", hasPreferred, best.Preferred, best, hints)
+				}
+				if !hasPreferred {
+					continue
+				}
+				if !preferred.IsEqual(best) || preferred.Score != best.Score {
+					t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v hints=%v", *preferred, best, hints)
+				}
+			}
+		})
 	}
 }
