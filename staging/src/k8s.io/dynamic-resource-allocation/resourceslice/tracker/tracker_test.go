@@ -19,6 +19,7 @@ package tracker
 import (
 	stdcmp "cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -31,9 +32,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1beta2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -65,6 +70,67 @@ func remove[T any](obj *T) [2]*T {
 
 func update[T any](oldObj, newObj *T) [2]*T {
 	return [2]*T{oldObj, newObj}
+}
+
+func TestStartTrackerTaintRuleListAccess(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		listError               error
+		expectError             bool
+		expectRulesEnabledState bool
+	}{
+		{
+			name:                    "not found falls back to disabled",
+			listError:               apierrors.NewNotFound(schema.GroupResource{Group: resourceapi.GroupName, Resource: "devicetaintrules"}, ""),
+			expectRulesEnabledState: false,
+		},
+		{
+			name: "forbidden falls back to disabled",
+			listError: apierrors.NewForbidden(
+				schema.GroupResource{Group: resourceapi.GroupName, Resource: "devicetaintrules"},
+				"",
+				errors.New("no permission"),
+			),
+			expectRulesEnabledState: false,
+		},
+		{
+			name:                    "other errors are returned",
+			listError:               apierrors.NewInternalError(errors.New("transient failure")),
+			expectError:             true,
+			expectRulesEnabledState: true,
+		},
+		{
+			name:                    "no error keeps rules enabled",
+			expectRulesEnabledState: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			kubeClient := fake.NewSimpleClientset()
+			if tc.listError != nil {
+				kubeClient.PrependReactor("list", "devicetaintrules", func(cgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, tc.listError
+				})
+			}
+			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+
+			tracker, err := StartTracker(ctx, Options{
+				EnableDeviceTaintRules: true,
+				SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+				TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
+				ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
+				KubeClient:             kubeClient,
+			})
+			if tc.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectRulesEnabledState, tracker.enableDeviceTaintRules)
+		})
+	}
 }
 
 func runInputEvents(tCtx *testContext, events []any, permutation []int) {
