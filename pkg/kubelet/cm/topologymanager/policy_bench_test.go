@@ -6,8 +6,9 @@ import (
 	"k8s.io/klog/v2/ktesting"
 )
 
-func BenchmarkHintMergerPreferredExists(b *testing.B) {
+func BenchmarkPolicyMergePreferredExists(b *testing.B) {
 	numaInfo := commonNUMAInfoEightNodes()
+	logger, _ := ktesting.NewTestContext(b)
 	hints := [][]TopologyHint{
 		{
 			{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
@@ -32,16 +33,24 @@ func BenchmarkHintMergerPreferredExists(b *testing.B) {
 			{NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3, 4, 5, 6, 7), Preferred: false},
 		},
 	}
-	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
+	policy := &bestEffortPolicy{numaInfo: numaInfo}
+	providersHints := []map[string][]TopologyHint{
+		{"resource0": hints[0]},
+		{"resource1": hints[1]},
+		{"resource2": hints[2]},
+		{"resource3": hints[3]},
+		{"resource4": hints[4]},
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = merger.Merge()
+		_, _ = policy.Merge(logger, providersHints)
 	}
 }
 
-func BenchmarkHintMergerPreferredMissing(b *testing.B) {
+func BenchmarkPolicyMergePreferredMissing(b *testing.B) {
 	numaInfo := commonNUMAInfoEightNodes()
+	logger, _ := ktesting.NewTestContext(b)
 	hints := [][]TopologyHint{
 		{
 			{NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3), Preferred: false},
@@ -59,11 +68,17 @@ func BenchmarkHintMergerPreferredMissing(b *testing.B) {
 			{NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3, 4, 5, 6, 7), Preferred: false},
 		},
 	}
-	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
+	policy := &bestEffortPolicy{numaInfo: numaInfo}
+	providersHints := []map[string][]TopologyHint{
+		{"resource0": hints[0]},
+		{"resource1": hints[1]},
+		{"resource2": hints[2]},
+		{"resource3": hints[3]},
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = merger.Merge()
+		_, _ = policy.Merge(logger, providersHints)
 	}
 }
 
