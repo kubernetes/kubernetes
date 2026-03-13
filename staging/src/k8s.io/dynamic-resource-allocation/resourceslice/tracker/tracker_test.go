@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	resourcealphaapi "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -553,7 +553,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		opts := Options{
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:          informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
 			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
@@ -961,7 +961,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 		opts := Options{
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:          informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
 			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}

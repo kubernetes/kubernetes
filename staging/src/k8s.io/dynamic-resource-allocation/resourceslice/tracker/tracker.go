@@ -25,13 +25,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	resourcebeta2api "k8s.io/api/resource/v1beta2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
-	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourcebeta2informers "k8s.io/client-go/informers/resource/v1beta2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -119,7 +121,7 @@ type Options struct {
 	EnableConsumableCapacity bool
 
 	SliceInformer resourceinformers.ResourceSliceInformer
-	TaintInformer resourcealphainformers.DeviceTaintRuleInformer
+	TaintInformer resourcebeta2informers.DeviceTaintRuleInformer
 	ClassInformer resourceinformers.DeviceClassInformer
 
 	// KubeClient is used to generate Events when CEL expressions
@@ -129,6 +131,17 @@ type Options struct {
 
 // StartTracker creates and initializes informers for a new [Tracker].
 func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr error) {
+	if opts.EnableDeviceTaintRules && opts.KubeClient != nil {
+		if err := canListDeviceTaintRules(ctx, opts.KubeClient); err != nil {
+			if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+				klog.FromContext(ctx).Info("Disabling DeviceTaintRules processing because list access is unavailable", "err", err)
+				opts.EnableDeviceTaintRules = false
+			} else {
+				return nil, fmt.Errorf("check list access for DeviceTaintRules: %w", err)
+			}
+		}
+	}
+
 	if !opts.EnableDeviceTaintRules {
 		// Minimal wrapper. All public methods shortcut by calling the underlying informer.
 		return &Tracker{
@@ -151,6 +164,11 @@ func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr 
 		return nil, fmt.Errorf("initialize informers: %w", err)
 	}
 	return t, nil
+}
+
+func canListDeviceTaintRules(ctx context.Context, kubeClient kubernetes.Interface) error {
+	_, err := kubeClient.ResourceV1beta2().DeviceTaintRules().List(ctx, metav1.ListOptions{Limit: 1})
+	return err
 }
 
 // newTracker is used in testing to construct a tracker without informer event handlers.
@@ -395,15 +413,15 @@ func sliceDriverPoolDeviceIndexFunc(obj any) ([]string, error) {
 	return indexValues, nil
 }
 
-func driverPoolDeviceIndexPatchKey(patch *resourcealphaapi.DeviceTaintRule) string {
-	deviceSelector := ptr.Deref(patch.Spec.DeviceSelector, resourcealphaapi.DeviceTaintSelector{})
+func driverPoolDeviceIndexPatchKey(patch *resourcebeta2api.DeviceTaintRule) string {
+	deviceSelector := ptr.Deref(patch.Spec.DeviceSelector, resourcebeta2api.DeviceTaintSelector{})
 	driverKey := ptr.Deref(deviceSelector.Driver, anyDriver)
 	poolKey := ptr.Deref(deviceSelector.Pool, anyPool)
 	deviceKey := ptr.Deref(deviceSelector.Device, anyDevice)
 	return deviceID(driverKey, poolKey, deviceKey)
 }
 
-func (t *Tracker) sliceNamesForPatch(ctx context.Context, patch *resourcealphaapi.DeviceTaintRule) []string {
+func (t *Tracker) sliceNamesForPatch(ctx context.Context, patch *resourcebeta2api.DeviceTaintRule) []string {
 	patchKey := driverPoolDeviceIndexPatchKey(patch)
 	sliceNames, err := t.resourceSlices.GetIndexer().IndexKeys(driverPoolDeviceIndexName, patchKey)
 	if err != nil {
@@ -469,7 +487,7 @@ func (t *Tracker) resourceSliceDelete(ctx context.Context) func(obj any) {
 func (t *Tracker) deviceTaintAdd(ctx context.Context) func(obj any) {
 	logger := klog.FromContext(ctx)
 	return func(obj any) {
-		rule, ok := obj.(*resourcealphaapi.DeviceTaintRule)
+		rule, ok := obj.(*resourcebeta2api.DeviceTaintRule)
 		if !ok {
 			return
 		}
@@ -487,11 +505,11 @@ func (t *Tracker) deviceTaintAdd(ctx context.Context) func(obj any) {
 func (t *Tracker) deviceTaintUpdate(ctx context.Context) func(oldObj, newObj any) {
 	logger := klog.FromContext(ctx)
 	return func(oldObj, newObj any) {
-		oldRule, ok := oldObj.(*resourcealphaapi.DeviceTaintRule)
+		oldRule, ok := oldObj.(*resourcebeta2api.DeviceTaintRule)
 		if !ok {
 			return
 		}
-		newRule, ok := newObj.(*resourcealphaapi.DeviceTaintRule)
+		newRule, ok := newObj.(*resourcebeta2api.DeviceTaintRule)
 		if !ok {
 			return
 		}
@@ -519,7 +537,7 @@ func (t *Tracker) deviceTaintDelete(ctx context.Context) func(obj any) {
 		if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 			obj = tombstone.Obj
 		}
-		patch, ok := obj.(*resourcealphaapi.DeviceTaintRule)
+		patch, ok := obj.(*resourcebeta2api.DeviceTaintRule)
 		if !ok {
 			return
 		}
@@ -631,7 +649,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 		return
 	}
 
-	patches := typedSlice[*resourcealphaapi.DeviceTaintRule](t.deviceTaints.GetIndexer().List())
+	patches := typedSlice[*resourcebeta2api.DeviceTaintRule](t.deviceTaints.GetIndexer().List())
 	patchedSlice, err := t.applyPatches(ctx, slice, patches)
 	if err != nil {
 		t.handleError(ctx, err, "failed to apply patches to ResourceSlice", "resourceslice", klog.KObj(slice))
@@ -666,7 +684,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 }
 
-func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule) (*resourceapi.ResourceSlice, error) {
+func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceSlice, taintRules []*resourcebeta2api.DeviceTaintRule) (*resourceapi.ResourceSlice, error) {
 	logger := klog.FromContext(ctx)
 
 	// slice will be DeepCopied just-in-time, only when necessary.

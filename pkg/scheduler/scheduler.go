@@ -336,7 +336,7 @@ func New(ctx context.Context,
 		// If device taint rules are disabled, the additional informers are not needed and
 		// the tracker turns into a simple wrapper around the slice informer.
 		if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 			resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 		}
 		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
