@@ -25,6 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -711,8 +713,10 @@ type testDescriber struct {
 	Err             error
 }
 
-func (t *testDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
+func (t *testDescriber) Describe(object runtime.Object, describerSettings describe.DescriberSettings) (output string, err error) {
+	name, namespace := getNameAndNamespace(object)
+	t.Name = name
+	t.Namespace = namespace
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
@@ -727,8 +731,9 @@ type conditionalDescriber struct {
 	LastSettings describe.DescriberSettings
 }
 
-func (c *conditionalDescriber) Describe(namespace, name string, settings describe.DescriberSettings) (string, error) {
+func (c *conditionalDescriber) Describe(object runtime.Object, settings describe.DescriberSettings) (string, error) {
 	c.LastSettings = settings
+	name, _ := getNameAndNamespace(object)
 	if c.FailNames[name] {
 		return "", fmt.Errorf("describe failed for %s", name)
 	}
@@ -737,4 +742,22 @@ func (c *conditionalDescriber) Describe(namespace, name string, settings describ
 
 func (c *conditionalDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
 	return c, nil
+}
+
+func getNameAndNamespace(object runtime.Object) (name, namespace string) {
+	if accessor, err := meta.Accessor(object); err == nil && accessor.GetName() != "" {
+		name := accessor.GetName()
+		namespace := accessor.GetNamespace()
+		return name, namespace
+	} else if unstruct, ok := object.(*unstructured.Unstructured); ok {
+		var resultName, resultNamespace string
+		if name, ok := unstruct.Object["name"].(string); ok {
+			resultName = name
+		}
+		if ns, ok := unstruct.Object["namespace"].(string); ok {
+			resultNamespace = ns
+		}
+		return resultName, resultNamespace
+	}
+	return "", ""
 }
