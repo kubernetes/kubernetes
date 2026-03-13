@@ -79,7 +79,8 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.AllNamespaces != nil {
 		options.DeleteAllNamespaces = *f.AllNamespaces
 	}
-	if f.CascadingStrategy != nil {
+	// Set CascadingStrategy only when the user explicitly specifies a value other than server.
+	if f.CascadingStrategy != nil && *f.CascadingStrategy != "server" {
 		var err error
 		options.CascadingStrategy, err = parseCascadingFlag(streams, *f.CascadingStrategy)
 		if err != nil {
@@ -135,9 +136,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 		cmd.Flags().StringVar(
 			f.CascadingStrategy,
 			"cascade",
-			*f.CascadingStrategy,
-			`Must be "background", "orphan", or "foreground". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to background.`)
-		cmd.Flags().Lookup("cascade").NoOptDefVal = "background"
+			"server",
+			`Must be "server", "background", "orphan", or "foreground". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to server.`)
+		cmd.Flags().Lookup("cascade").NoOptDefVal = "server"
 	}
 	if f.Now != nil {
 		cmd.Flags().BoolVar(f.Now, "now", *f.Now, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
