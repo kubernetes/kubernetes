@@ -1,0 +1,70 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: schedulerstates.haystack.ostk.ai
+spec:
+  group: haystack.ostk.ai
+  names:
+    kind: SchedulerState
+    listKind: SchedulerStateList
+    plural: schedulerstates
+    singular: schedulerstate
+    shortNames:
+      - ss
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: SchedulerState exposes the scheduler assume-cache as a gen table.
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - podName
+                      - assumedNode
+                      - assumeGen
+                      - etcdGen
+                      - status
+                    properties:
+                      podName:
+                        type: string
+                        description: Name of the pod this entry tracks.
+                      assumedNode:
+                        type: string
+                        description: Node the scheduler assumed for this pod.
+                      assumeGen:
+                        type: integer
+                        format: int64
+                        description: Generation at which the scheduler made the assumption.
+                      etcdGen:
+                        type: integer
+                        format: int64
+                        description: Generation confirmed by etcd after bind.
+                      status:
+                        type: string
+                        enum:
+                          - in-flight
+                          - merged
+                          - conflict
+                          - bound
+                        description: Lifecycle phase of this entry.
+      additionalPrinterColumns:
+        - name: Entries
+          type: integer
+          jsonPath: .spec.entries[*]
+          description: Number of assume-cache entries.
