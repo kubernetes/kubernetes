@@ -139,6 +139,65 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	}
 }
 
+func isPropagationPolicyEmpty(body io.ReadCloser) bool {
+	if body == nil {
+		return false
+	}
+	var parsedBody metav1.DeleteOptions
+	rawBody, _ := io.ReadAll(body)
+	json.Unmarshal(rawBody, &parsedBody)
+	if parsedBody.PropagationPolicy == nil {
+		return true
+	}
+	return false
+}
+
+// TestCascadingStrategyForServer tests that DeleteOptions.DeletionPropagation isn't appropriately set while deleting objects.
+func TestCascadingStrategyForServer(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m, b := req.URL.Path, req.Method, req.Body; {
+
+			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && isPropagationPolicyEmpty(b):
+
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+			default:
+				return nil, nil
+			}
+		}),
+	}
+
+	// DeleteOptions.PropagationPolicy shouldn't be set, when cascading strategy is empty. (default)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdDelete(tf, streams)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	// DeleteOptions.PropagationPolicy shouldn't be set, when cascading strategy is server.
+	streams, _, buf, _ = genericiooptions.NewTestIOStreams()
+	cmd = NewCmdDelete(tf, streams)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "server")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPropagation) bool {
 	if body == nil || policy == nil {
 		return body == nil && policy == nil
@@ -177,12 +236,13 @@ func TestCascadingStrategy(t *testing.T) {
 		}),
 	}
 
-	// DeleteOptions.PropagationPolicy should be Background, when cascading strategy is empty (default).
+	// DeleteOptions.PropagationPolicy should be Background, when cascading strategy is background.
 	backgroundPolicy := metav1.DeletePropagationBackground
 	policy = &backgroundPolicy
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "background")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
 	if buf.String() != "secret/mysecret\n" {

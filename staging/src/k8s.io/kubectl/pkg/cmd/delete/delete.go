@@ -395,8 +395,9 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		options.PropagationPolicy = &o.CascadingStrategy
-
+		if o.CascadingStrategy != "" {
+			options.PropagationPolicy = &o.CascadingStrategy
+		}
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
 			warnClusterScope = false
