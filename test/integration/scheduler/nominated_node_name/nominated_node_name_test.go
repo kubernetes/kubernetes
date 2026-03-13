@@ -491,18 +491,6 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 							return nil, fmt.Errorf("unexpected plugin type %T", p)
 						}
 
-						preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
-						preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
-							// block the preemption goroutine to complete until the test case allows it to proceed.
-							lock.Lock()
-							ch, ok := preemptionDoneChannels[preemptor.Name]
-							lock.Unlock()
-							if ok {
-								<-ch
-							}
-							return preemptPodFn(ctx, c, preemptor, victim, pluginName)
-						}
-
 						return preemptionPlugin, nil
 					})
 					if err != nil {
@@ -541,6 +529,27 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 
 					if preemptionPlugin == nil {
 						t.Fatalf("the preemption plugin should be initialized")
+					}
+
+					v, ok := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName]
+					if !ok {
+						t.Fatalf("unexpected profile type %T", testCtx.Scheduler.Profiles[v1.DefaultSchedulerName])
+					}
+					executor, ok := v.PreemptionExecutor().(*preemption.Executor)
+					if !ok {
+						t.Fatalf("unexpected executor type %T", v.PreemptionExecutor())
+					}
+
+					preemptPodFn := executor.PreemptPod
+					executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+						// block the preemption goroutine to complete until the test case allows it to proceed.
+						lock.Lock()
+						ch, ok := preemptionDoneChannels[preemptor.GetName()]
+						lock.Unlock()
+						if ok {
+							<-ch
+						}
+						return preemptPodFn(ctx, c, preemptor, victim, pluginName)
 					}
 
 					logger, _ := ktesting.NewTestContext(t)

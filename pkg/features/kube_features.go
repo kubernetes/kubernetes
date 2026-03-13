@@ -2563,7 +2563,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	WindowsHostNetwork: {},
 
-	WorkloadAwarePreemption: {GangScheduling},
+	WorkloadAwarePreemption: {GangScheduling, SchedulerAsyncPreemption},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 

@@ -46,6 +46,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -87,6 +88,20 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 		return status, 0
 	}
 	return fwk.NewStatus(fwk.Unschedulable, "default fake permit failure"), 0
+}
+
+type fakeDefaultPreemptionPlugin struct {
+	postFilterResult map[string]*fwk.PostFilterResult
+	postFilterStatus map[string]*fwk.Status
+}
+
+func (mp *fakeDefaultPreemptionPlugin) Name() string { return names.DefaultPreemption }
+
+func (mp *fakeDefaultPreemptionPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	if status, ok := mp.postFilterStatus[pod.Name]; ok {
+		return mp.postFilterResult[pod.Name], status
+	}
+	return &fwk.PostFilterResult{NominatingInfo: clearNominatedNode}, fwk.NewStatus(fwk.Unschedulable, "fake default preemption failure")
 }
 
 func TestPodGroupInfoForPod(t *testing.T) {
@@ -410,10 +425,12 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 	tests := []struct {
 		name                             string
 		plugin                           *fakePodGroupPlugin
+		fakeDefaultPreemptionPlugin      *fakeDefaultPreemptionPlugin
 		expectedGroupStatusCode          fwk.Code
 		expectedGroupWaitingOnPreemption bool
 		expectedPodStatus                map[string]*fwk.Status
 		expectedPreemption               map[string]bool
+		postFilterMode                   podGroupPostFilterMode
 		skipForTAS                       bool
 	}{
 		{
@@ -774,6 +791,57 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				// The algorithm stopped evaluating the pods after an error occurred, so a "p3" status is not expected.
 			},
 		},
+		{
+			name: "Skips default preemption",
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable),
+					"p2": fwk.NewStatus(fwk.Unschedulable),
+					"p3": fwk.NewStatus(fwk.Unschedulable),
+				},
+				postFilterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable, "deallocation of ResourceClaim completed"),
+					"p2": fwk.NewStatus(fwk.Unschedulable, "deallocation of ResourceClaim completed"),
+					"p3": fwk.NewStatus(fwk.Unschedulable, "deallocation of ResourceClaim completed"),
+				},
+				postFilterResult: map[string]*fwk.PostFilterResult{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+				permitStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			fakeDefaultPreemptionPlugin: &fakeDefaultPreemptionPlugin{
+				postFilterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+				postFilterResult: map[string]*fwk.PostFilterResult{
+					"p1": {NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
+					"p2": {NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
+					"p3": {NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
+				},
+			},
+			postFilterMode:                   runWithoutDefaultPreemption,
+			expectedGroupStatusCode:          fwk.Unschedulable,
+			expectedGroupWaitingOnPreemption: false,
+			expectedPodStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable),
+				"p2": fwk.NewStatus(fwk.Unschedulable),
+				"p3": fwk.NewStatus(fwk.Unschedulable),
+			},
+			expectedPreemption: map[string]bool{
+				"p1": false,
+				"p2": false,
+				"p3": false,
+			},
+			skipForTAS: true,
+		},
 	}
 
 	for _, tasEnabled := range []bool{true, false} {
@@ -838,7 +906,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 
-				result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, pgInfo)
+				result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, pgInfo, runAllPostFilter)
 
 				if result.status.Code() != tt.expectedGroupStatusCode {
 					t.Errorf("Expected group status code: %v, got: %v", tt.expectedGroupStatusCode, result.status.Code())

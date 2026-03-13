@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,11 +50,10 @@ type Interface interface {
 	// PodEligibleToPreemptOthers returns one bool and one string. The bool indicates whether this pod should be considered for
 	// preempting other pods or not. The string includes the reason if this pod isn't eligible.
 	PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string)
-	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
-	// for "pod" to be scheduled.
-	// Note that both `state` and `nodeInfo` are deep copied.
-	SelectVictimsOnNode(ctx context.Context, state fwk.CycleState,
-		pod *v1.Pod, nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
+	// SelectVictimsOnDomain finds minimum set of pods on the given domain that should be preempted in order to make enough room
+	// for "pods" from preemptor to be scheduled.
+	// Note that both `preemptor` (with its state) and `nodeInfo` are deep copied.
+	SelectVictimsOnDomain(ctx context.Context, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 	// The ordered score functions will be processed one by one iff we find more than one node with the highest score.
 	// Default score functions will be processed if nil returned here for backwards-compatibility.
@@ -66,25 +66,24 @@ type Evaluator struct {
 	PodLister  corelisters.PodLister
 	PdbLister  policylisters.PodDisruptionBudgetLister
 
-	enableAsyncPreemption bool
-
-	*Executor
+	executor fwk.PreemptionExecutor
 	Interface
 }
 
-func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, e fwk.PreemptionExecutor) *Evaluator {
 	return &Evaluator{
-		PluginName:            pluginName,
-		Handler:               fh,
-		PodLister:             fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		PdbLister:             fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		enableAsyncPreemption: enableAsyncPreemption,
-		Executor:              newExecutor(fh),
-		Interface:             i,
+		PluginName: pluginName,
+		Handler:    fh,
+		PodLister:  fh.SharedInformerFactory().Core().V1().Pods().Lister(),
+		PdbLister:  fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
+		Interface:  i,
+		executor:   e,
 	}
 }
 
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
+// If the Executor inside Evaluator is set, the preemptions are actuated as a part of the Preempt.
+// Otherwise, the preemptions are not actuated and the PostFilterResult is returned as is.
 // The semantics of returned <PostFilterResult, Status> varies on different scenarios:
 //
 //   - <nil, Error>. This denotes it's a transient/rare error that may be self-healed in future cycles.
@@ -126,6 +125,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
+
 	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, pod, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, fwk.AsStatus(err)
@@ -144,7 +144,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		}
 		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
-		return framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
+		return framework.NewPostFilterResult("", nil), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
@@ -161,16 +161,14 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
-	// 5) Perform preparation work before nominating the selected candidate.
-	if ev.enableAsyncPreemption {
-		ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
-	} else {
-		if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
+	// 5) Actuate the preemption if executor is set.
+	if ev.executor != nil {
+		if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate.Name(), bestCandidate.Victims(), pod, ev.PluginName); !status.IsSuccess() {
 			return nil, status
 		}
 	}
 
-	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success)
+	return framework.NewPostFilterResult(bestCandidate.Name(), bestCandidate.Victims().Pods), fwk.NewStatus(fwk.Success)
 }
 
 // FindCandidates calculates a slice of preemption candidates.
@@ -240,7 +238,6 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 				return nil, fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
 			}
 		}
-
 		// Replace victimsMap with new result after preemption. So the
 		// rest of extenders can continue use it as parameter.
 		victimsMap = nodeNameToVictims
@@ -414,6 +411,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	nodeStatuses := framework.NewDefaultNodeToStatus()
+	preemptor := NewPodPreemptor(pod, state)
 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Dry run the preemption", "potentialNodesNumber", len(potentialNodes), "pdbsNumber", len(pdbs), "offset", offset, "candidatesNumber", candidatesNum)
@@ -424,8 +422,9 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
 		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
 
-		stateCopy := state.Clone()
-		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
+		domain := NewDomainForPodByPodPreemption(nodeInfoCopy, nodeInfoCopy.Node().Name)
+		pods, numPDBViolations, status := ev.SelectVictimsOnDomain(ctx, preemptor.Snapshot(), domain, pdbs)
+
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
 				Pods:             pods,
@@ -458,4 +457,107 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+func FilterVictimsWithPDBViolation(victims []Victim, pdbs []*policy.PodDisruptionBudget) (violatingVictims, nonViolatingVictims []Victim) {
+	pdbsAllowed := make([]int32, len(pdbs))
+	podIsViolating := func(pod *v1.Pod) bool {
+		if len(pod.Labels) == 0 {
+			return false
+		}
+
+		for i, pdb := range pdbs {
+			if pdb.Namespace != pod.Namespace {
+				continue
+			}
+			selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+			if err != nil {
+				// This object has an invalid selector, it does not match the pod
+				continue
+			}
+			// A PDB with a nil or empty selector matches nothing.
+			if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+
+			// Existing in DisruptedPods means it has been processed in API server,
+			// we don't treat it as a violating case.
+			if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+				continue
+			}
+			// Only decrement the matched pdb when it's not in its <DisruptedPods>;
+			// otherwise we may over-decrement the budget number.
+			pdbsAllowed[i]--
+			// We have found a matching PDB.
+			if pdbsAllowed[i] < 0 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for i, pdb := range pdbs {
+		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
+	}
+
+	for _, victim := range victims {
+		isUnitViolating := false
+
+		for _, pi := range victim.Pods() {
+			if podIsViolating(pi.GetPod()) {
+				isUnitViolating = true
+			}
+		}
+		if isUnitViolating {
+			violatingVictims = append(violatingVictims, victim)
+		} else {
+			nonViolatingVictims = append(nonViolatingVictims, victim)
+		}
+	}
+
+	return violatingVictims, nonViolatingVictims
+}
+
+// moreImportantVictim decides which of two preemption units is considered more critical.
+//
+// The comparison logic follows this strict hierarchy:
+//
+//  1. Priority: Higher priority units are always more important.
+//
+//  2. Workload Type (if WorkloadAwarePreemption is enabled):
+//     Atomic workloads (PodGroups) are considered more important than individual Pods
+//     of the same priority.
+//
+//  3. Start Time (for Single Pods):
+//     If both units are single Pods, the one with the older StartTime is more important.
+//     This honors "first-come, first-served".
+//
+//  4. Group Size (for PodGroups):
+//     If both units are PodGroups, the one with more members (larger size) is considered
+//     more important. This avoids the high cost of rescheduling massive jobs.
+//
+//  5. Start Time (Tie-breaker for PodGroups):
+//     If sizes are equal, the group that started earlier (has the oldest pod)
+//     is more important.
+func MoreImportantVictim(vi1, vi2 Victim, enableWorkloadAwarePreemption bool) bool {
+	if vi1.Priority() != vi2.Priority() {
+		return vi1.Priority() > vi2.Priority()
+	}
+
+	if enableWorkloadAwarePreemption && vi1.IsPodGroup() != vi2.IsPodGroup() {
+		return vi1.IsPodGroup()
+	}
+
+	if !vi1.IsPodGroup() {
+		return util.GetPodStartTime(vi1.Pods()[0].GetPod()).Before(util.GetPodStartTime(vi2.Pods()[0].GetPod()))
+	}
+
+	if len(vi1.Pods()) != len(vi2.Pods()) {
+		return len(vi1.Pods()) > len(vi2.Pods())
+	}
+
+	t1 := vi1.EarliestStartTime()
+	t2 := vi2.EarliestStartTime()
+	return t1.Before(t2)
 }
