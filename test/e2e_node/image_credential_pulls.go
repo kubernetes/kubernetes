@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"path"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -78,10 +77,10 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 			testNode = registryNodeNames[0]
 			origPod := e2ecommonnode.ImagePullTest(ctx, f, testImage, v1.PullIfNotPresent, testSecret, testNode, v1.PodRunning, false)
 			gomega.Expect(origPod.Spec.NodeName).To(gomega.Equal(testNode), "pod should be scheduled on the expected node")
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				status, err := is.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: testImage}, false)
-				return err == nil && status != nil && status.Image != nil
-			}, time.Minute, time.Second).Should(gomega.BeTrue(), "image %q should become visible in CRI after first pull", testImage)
+			status, err := is.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: testImage}, false)
+			framework.ExpectNoError(err)
+			gomega.Expect(status).NotTo(gomega.BeNil(), "image should be visible in CRI immediately after pull")
+			gomega.Expect(status.Image).NotTo(gomega.BeNil(), "image should have image data in CRI immediately after pull")
 		})
 
 		for _, pullPolicy := range []v1.PullPolicy{v1.PullIfNotPresent, v1.PullNever} {
