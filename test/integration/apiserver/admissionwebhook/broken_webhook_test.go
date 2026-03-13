@@ -152,6 +152,7 @@ func exampleDeployment(name string) *appsv1.Deployment {
 func brokenWebhookConfig(name string) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	var path string
 	failurePolicy := admissionregistrationv1.Fail
+	timeoutSeconds := int32(1)
 	return &admissionregistrationv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -178,6 +179,7 @@ func brokenWebhookConfig(name string) *admissionregistrationv1.ValidatingWebhook
 					CABundle: nil,
 				},
 				FailurePolicy:           &failurePolicy,
+				TimeoutSeconds:          &timeoutSeconds,
 				SideEffects:             &noSideEffects,
 				AdmissionReviewVersions: []string{"v1"},
 			},
