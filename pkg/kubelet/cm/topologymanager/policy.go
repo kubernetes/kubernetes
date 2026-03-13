@@ -321,7 +321,6 @@ func (m HintMerger) Merge() TopologyHint {
 	return *bestHint
 }
 
-
 // mergePreferred searches for the best preferred merged hint.
 // It is intended as an optimization for policies where any preferred merged hint
 // will always beat any non-preferred merged hint according to compare().
