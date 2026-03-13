@@ -1619,6 +1619,18 @@ func (wrapper *PodGroupWrapper) TemplateRef(templateName, workloadName string) *
 	return wrapper
 }
 
+// TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner PodGroup.
+func (wrapper *PodGroupWrapper) TopologyKey(topologyKey string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.SchedulingConstraints = &schedulingapi.PodGroupSchedulingConstraints{
+		Topology: []schedulingapi.TopologyConstraint{
+			{
+				Key: topologyKey,
+			},
+		},
+	}
+	return wrapper
+}
+
 // PodGroupTemplateWrapper wraps a PodGroupTemplate inside.
 type PodGroupTemplateWrapper struct{ schedulingapi.PodGroupTemplate }
 

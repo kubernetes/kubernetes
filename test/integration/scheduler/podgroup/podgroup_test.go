@@ -18,6 +18,7 @@ package podgroup
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -98,8 +99,10 @@ func TestPodGroupScheduling(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		steps []step
+		name string
+		// Enabling TAS disables preemption, therefore tests verifying preemption logic need to be run with TAS disabled.
+		disableTopologyAwareScheduling bool
+		steps                          []step
 	}{
 		{
 			name: "gang schedules when pod group and resources are available",
@@ -268,7 +271,8 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "gang schedules with preemption",
+			name:                           "gang schedules with preemption",
+			disableTopologyAwareScheduling: true,
 			steps: []step{
 				{
 					name:       "Create a low priority pod taking all resources",
@@ -359,7 +363,8 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "basic group schedules with preemption",
+			name:                           "basic group schedules with preemption",
+			disableTopologyAwareScheduling: true,
 			steps: []step{
 				{
 					name:       "Create a low priority pod taking all resources",
@@ -386,118 +391,125 @@ func TestPodGroupScheduling(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
-				features.GangScheduling:  true,
-			})
+		runWithTasFlagSettings := []bool{true, false}
+		if tt.disableTopologyAwareScheduling {
+			runWithTasFlagSettings = []bool{false}
+		}
+		for _, tasEnabled := range runWithTasFlagSettings {
+			t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling enabled: %v)", tt.name, tasEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.GangScheduling:                  true,
+					features.TopologyAwareWorkloadScheduling: tasEnabled,
+				})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
-				// disable backoff
-				scheduler.WithPodMaxBackoffSeconds(0),
-				scheduler.WithPodInitialBackoffSeconds(0))
+				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
+					// disable backoff
+					scheduler.WithPodMaxBackoffSeconds(0),
+					scheduler.WithPodInitialBackoffSeconds(0))
 
-			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-			_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
-			}
+				_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create node: %v", err)
+				}
 
-			for i, step := range tt.steps {
-				t.Logf("Executing step %d: %s", i, step.name)
-				switch {
-				case step.createPods != nil:
-					for _, pod := range step.createPods {
-						p := pod.DeepCopy()
-						p.Namespace = ns
-						if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
-							t.Fatalf("Step %d: Failed to create pod %s: %v", i, p.Name, err)
-						}
-					}
-				case step.createPodGroup != nil:
-					w := step.createPodGroup.DeepCopy()
-					w.Namespace = ns
-					if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Step %d: Failed to create pod group %s: %v", i, w.Name, err)
-					}
-					// Ensure all next steps will see this pod group.
-					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-						func(_ context.Context) (bool, error) {
-							_, err := testCtx.InformerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(ns).Get(w.Name)
-							if err != nil {
-								if apierrors.IsNotFound(err) {
-									return false, nil
-								}
-								return false, err
+				for i, step := range tt.steps {
+					t.Logf("Executing step %d: %s", i, step.name)
+					switch {
+					case step.createPods != nil:
+						for _, pod := range step.createPods {
+							p := pod.DeepCopy()
+							p.Namespace = ns
+							if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+								t.Fatalf("Step %d: Failed to create pod %s: %v", i, p.Name, err)
 							}
-							return true, nil
-						},
-					)
-					if err != nil {
-						t.Fatalf("Step %d: Failed to wait for pod group %s to be discoverable by scheduler: %v", i, w.Name, err)
-					}
-				case step.deletePods != nil:
-					for _, podName := range step.deletePods {
-						if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{}); err != nil {
-							t.Fatalf("Step %d: Failed to delete pod %s: %v", i, podName, err)
 						}
-					}
-				case step.waitForPodsGatedOnPreEnqueue != nil:
-					for _, podName := range step.waitForPodsGatedOnPreEnqueue {
+					case step.createPodGroup != nil:
+						w := step.createPodGroup.DeepCopy()
+						w.Namespace = ns
+						if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
+							t.Fatalf("Step %d: Failed to create pod group %s: %v", i, w.Name, err)
+						}
+						// Ensure all next steps will see this pod group.
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 							func(_ context.Context) (bool, error) {
-								return podInUnschedulablePods(t, testCtx.Scheduler.SchedulingQueue, podName), nil
+								_, err := testCtx.InformerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(ns).Get(w.Name)
+								if err != nil {
+									if apierrors.IsNotFound(err) {
+										return false, nil
+									}
+									return false, err
+								}
+								return true, nil
 							},
 						)
 						if err != nil {
-							t.Fatalf("Step %d: Failed to wait for pod %s to be in unschedulable pods pool: %v", i, podName, err)
+							t.Fatalf("Step %d: Failed to wait for pod group %s to be discoverable by scheduler: %v", i, w.Name, err)
 						}
-					}
-				case step.waitForPodsUnschedulable != nil:
-					for _, podName := range step.waitForPodsUnschedulable {
-						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-							testutils.PodUnschedulable(cs, ns, podName))
-						if err != nil {
-							t.Fatalf("Step %d: Failed to wait for pod %s to be unschedulable: %v", i, podName, err)
-						}
-					}
-				case step.waitForPodsScheduled != nil:
-					for _, podName := range step.waitForPodsScheduled {
-						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-							testutils.PodScheduled(cs, ns, podName))
-						if err != nil {
-							t.Fatalf("Step %d: Failed to wait for pod %s to be scheduled: %v", i, podName, err)
-						}
-					}
-				case step.waitForAnyPodsScheduled != nil:
-					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-						func(ctx context.Context) (bool, error) {
-							scheduledCount := 0
-							unschedulableCount := 0
-							for _, pod := range step.waitForAnyPodsScheduled.pods {
-								if ok, err := testutils.PodScheduled(cs, ns, pod.Name)(ctx); err != nil {
-									return false, err
-								} else if ok {
-									scheduledCount++
-									continue
-								}
-								if ok, err := testutils.PodUnschedulable(cs, ns, pod.Name)(ctx); err != nil {
-									return false, err
-								} else if ok {
-									unschedulableCount++
-								}
+					case step.deletePods != nil:
+						for _, podName := range step.deletePods {
+							if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{}); err != nil {
+								t.Fatalf("Step %d: Failed to delete pod %s: %v", i, podName, err)
 							}
-							t.Logf("Step %d: Waiting for %d pods to be scheduled and %d to be unschedulable, got %d scheduled and %d unschedulable",
-								i, step.waitForAnyPodsScheduled.numScheduled, step.waitForAnyPodsScheduled.numUnschedulable, scheduledCount, unschedulableCount)
-							return scheduledCount == step.waitForAnyPodsScheduled.numScheduled && unschedulableCount == step.waitForAnyPodsScheduled.numUnschedulable, nil
-						},
-					)
-					if err != nil {
-						t.Fatalf("Step %d: Failed to wait for pods to be scheduled or unschedulable: %v", i, err)
+						}
+					case step.waitForPodsGatedOnPreEnqueue != nil:
+						for _, podName := range step.waitForPodsGatedOnPreEnqueue {
+							err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+								func(_ context.Context) (bool, error) {
+									return podInUnschedulablePods(t, testCtx.Scheduler.SchedulingQueue, podName), nil
+								},
+							)
+							if err != nil {
+								t.Fatalf("Step %d: Failed to wait for pod %s to be in unschedulable pods pool: %v", i, podName, err)
+							}
+						}
+					case step.waitForPodsUnschedulable != nil:
+						for _, podName := range step.waitForPodsUnschedulable {
+							err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+								testutils.PodUnschedulable(cs, ns, podName))
+							if err != nil {
+								t.Fatalf("Step %d: Failed to wait for pod %s to be unschedulable: %v", i, podName, err)
+							}
+						}
+					case step.waitForPodsScheduled != nil:
+						for _, podName := range step.waitForPodsScheduled {
+							err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+								testutils.PodScheduled(cs, ns, podName))
+							if err != nil {
+								t.Fatalf("Step %d: Failed to wait for pod %s to be scheduled: %v", i, podName, err)
+							}
+						}
+					case step.waitForAnyPodsScheduled != nil:
+						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+							func(ctx context.Context) (bool, error) {
+								scheduledCount := 0
+								unschedulableCount := 0
+								for _, pod := range step.waitForAnyPodsScheduled.pods {
+									if ok, err := testutils.PodScheduled(cs, ns, pod.Name)(ctx); err != nil {
+										return false, err
+									} else if ok {
+										scheduledCount++
+										continue
+									}
+									if ok, err := testutils.PodUnschedulable(cs, ns, pod.Name)(ctx); err != nil {
+										return false, err
+									} else if ok {
+										unschedulableCount++
+									}
+								}
+								t.Logf("Step %d: Waiting for %d pods to be scheduled and %d to be unschedulable, got %d scheduled and %d unschedulable",
+									i, step.waitForAnyPodsScheduled.numScheduled, step.waitForAnyPodsScheduled.numUnschedulable, scheduledCount, unschedulableCount)
+								return scheduledCount == step.waitForAnyPodsScheduled.numScheduled && unschedulableCount == step.waitForAnyPodsScheduled.numUnschedulable, nil
+							},
+						)
+						if err != nil {
+							t.Fatalf("Step %d: Failed to wait for pods to be scheduled or unschedulable: %v", i, err)
+						}
 					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
