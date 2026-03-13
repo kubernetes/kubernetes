@@ -97,10 +97,10 @@ func (f *fakeLeases) SetKeysWithoutValidation(keys []string) error {
 	return nil
 }
 
-//nolint:kubeapilinter
-func createLegacyEndpoint(ip string) *corev1.Endpoints {
-	return &corev1.Endpoints{ //nolint:kubeapilinter
-		Subsets: []corev1.EndpointSubset{ //nolint:kubeapilinter
+//nolint:staticcheck // SA1019: Endpoints is deprecated but required for legacy storage format
+func createLegacyEndpoint(ip string) *corev1.Endpoints { //nolint:staticcheck // SA1019
+	return &corev1.Endpoints{ //nolint:staticcheck // SA1019
+		Subsets: []corev1.EndpointSubset{ //nolint:staticcheck // SA1019
 			{
 				Addresses: []corev1.EndpointAddress{{IP: ip}},
 			},
@@ -112,8 +112,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:staticcheck // SA1019: required for storage test
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:staticcheck // SA1019: required for storage test
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	reconcileTests := []struct {
@@ -297,12 +297,12 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				&corev1.Endpoints{ //nolint:kubeapilinter
+				&corev1.Endpoints{ //nolint:staticcheck // SA1019: test fixture
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: metav1.NamespaceDefault,
 						Name:      "foo",
 					},
-					Subsets: []corev1.EndpointSubset{ //nolint:kubeapilinter
+					Subsets: []corev1.EndpointSubset{ //nolint:staticcheck // SA1019: test fixture
 						{
 							Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 							Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -515,8 +515,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:staticcheck // SA1019: required for storage test
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:staticcheck // SA1019: required for storage test
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	stopTests := []struct {
@@ -633,8 +633,8 @@ func TestApiserverShutdown(t *testing.T) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	t.Cleanup(func() { server.Terminate(t) })
 
-	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:kubeapilinter
-	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:kubeapilinter
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }         //nolint:staticcheck // SA1019: required for storage test
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} } //nolint:staticcheck // SA1019: required for storage test
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
 	reconcileTests := []struct {
