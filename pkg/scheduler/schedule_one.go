@@ -324,11 +324,14 @@ func (sched *Scheduler) assumeAndReserve(
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
 	err := sched.assume(logger, assumedPodInfo, scheduleResult.SuggestedHost)
 	if err != nil {
-		// This is most probably result of a BUG in retrying logic.
-		// We report an error here so that pod scheduling can be retried.
-		// This relies on the fact that Error will check if the pod has been bound
-		// to a node and if so will not add it back to the unscheduled pods queue
-		// (otherwise this would cause an infinite loop).
+		// The pod may already be assumed from a prior scheduling attempt that
+		// is concurrently completing its bind. Check if the pod has been bound
+		// before re-queuing to prevent duplicate scheduling.
+		if boundNode := assumedPod.Spec.NodeName; boundNode != "" {
+			logger.V(4).Info("Pod already bound during assume retry, skipping re-queue",
+				"pod", klog.KObj(assumedPod), "node", boundNode)
+			return assumedPodInfo, nil
+		}
 		return assumedPodInfo, fwk.AsStatus(err)
 	}
 

@@ -548,19 +548,20 @@ func (sched *Scheduler) Run(ctx context.Context) {
 		sched.APIDispatcher.Run(logger)
 	}
 
-	// We need to start scheduleOne loop in a dedicated goroutine,
-	// because scheduleOne function hangs on getting the next item
-	// from the SchedulingQueue.
-	// If there are no new pods to schedule, it will be hanging there
-	// and if done in this goroutine it will be blocking closing
-	// SchedulingQueue, in effect causing a deadlock on shutdown.
+	// ScheduleOne blocks on SchedulingQueue.Pop(). Run in a dedicated goroutine
+	// so shutdown can proceed. Close the queue FIRST to unblock Pop(), then
+	// wait for the goroutine to drain — prevents the deadlock where Close()
+	// needs the lock that Pop() holds.
 	go wait.UntilWithContext(ctx, sched.ScheduleOne, 0)
 
 	<-ctx.Done()
+	// Close queue first to unblock any goroutine waiting in Pop().
+	// This must happen before APIDispatcher.Close() to prevent the
+	// deadlock described above.
+	sched.SchedulingQueue.Close()
 	if sched.APIDispatcher != nil {
 		sched.APIDispatcher.Close()
 	}
-	sched.SchedulingQueue.Close()
 
 	// If the plugins satisfy the io.Closer interface, they are closed.
 	err := sched.Profiles.Close()
