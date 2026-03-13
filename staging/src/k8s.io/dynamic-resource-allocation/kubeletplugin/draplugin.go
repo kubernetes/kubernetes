@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -580,6 +581,89 @@ func CDIDirectory(path string) Option {
 	}
 }
 
+// MetadataFileOperations allows callers to override how the metadata writer
+// performs filesystem operations. This is used by E2E tests that need to
+// proxy file I/O into a remote node (e.g. via PodDirIO on kind clusters).
+//
+// Any nil field is defaulted to the corresponding os / filepath function.
+type MetadataFileOperations struct {
+	WriteFileAtomic func(path string, data []byte, perm os.FileMode) error
+	ReadFile        func(name string) ([]byte, error)
+	MkdirAll        func(path string, perm os.FileMode) error
+	RemoveAll       func(path string) error
+	Remove          func(path string) error
+	Glob            func(pattern string) ([]string, error)
+}
+
+func withDefaultMetadataFileOperations(ops MetadataFileOperations) MetadataFileOperations {
+	if ops.WriteFileAtomic == nil {
+		ops.WriteFileAtomic = defaultWriteFileAtomic
+	}
+	if ops.ReadFile == nil {
+		ops.ReadFile = os.ReadFile
+	}
+	if ops.MkdirAll == nil {
+		ops.MkdirAll = os.MkdirAll
+	}
+	if ops.RemoveAll == nil {
+		ops.RemoveAll = os.RemoveAll
+	}
+	if ops.Remove == nil {
+		ops.Remove = os.Remove
+	}
+	if ops.Glob == nil {
+		ops.Glob = filepath.Glob
+	}
+	return ops
+}
+
+// defaultWriteFileAtomic atomically writes data to path using the same pattern
+// as the CDI spec writer: create temp in same directory, write, fsync, rename.
+// See https://github.com/cncf-tags/container-device-interface/blob/main/pkg/cdi/spec.go
+func defaultWriteFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".tmp.*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		// if an error occurs, remove the temporary file
+		if err != nil {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err = tmp.Write(data); err != nil {
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		return err
+	}
+	if err = tmp.Chmod(perm); err != nil {
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MetadataFileOps overrides the filesystem operations used by the metadata
+// writer. This is intended for testing environments where the process running
+// the kubelet plugin helper does not share a filesystem with the node
+// (e.g. E2E tests on kind clusters).
+//
+// This option has no effect unless [EnableDeviceMetadata] is also set to true.
+func MetadataFileOps(ops MetadataFileOperations) Option {
+	return func(o *options) error {
+		o.metadataFileOps = ops
+		return nil
+	}
+}
+
 // TODO(KEP #5304): Decide on a version negotiation strategy before exiting alpha
 // so that adding new versions does not break existing consumers, until then
 // defaulting is empty.
@@ -612,6 +696,7 @@ type options struct {
 	enableDeviceMetadata       bool
 	metadataVersions           []schema.GroupVersion
 	cdiDir                     string
+	metadataFileOps            MetadataFileOperations
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -724,7 +809,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		if len(versions) == 0 {
 			versions = defaultMetadataVersions()
 		}
-		mw, err := newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir, versions)
+		mw, err := newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir, versions, withDefaultMetadataFileOperations(o.metadataFileOps))
 		if err != nil {
 			return nil, fmt.Errorf("initialize device metadata: %w", err)
 		}

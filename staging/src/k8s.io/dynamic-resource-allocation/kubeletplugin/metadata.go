@@ -31,6 +31,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/dynamic-resource-allocation/api/metadata"
+	cdispec "tags.cncf.io/container-device-interface/specs-go"
 	"k8s.io/dynamic-resource-allocation/api/metadata/install"
 	"k8s.io/dynamic-resource-allocation/devicemetadata"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -101,7 +102,6 @@ const (
 	// DefaultCDIDir is the default directory for CDI spec files.
 	DefaultCDIDir = "/var/run/cdi"
 
-	cdiVersionStr     = "0.3.0"
 	metadataFilePerms = os.FileMode(0644)
 	metadataDirPerms  = os.FileMode(0755)
 )
@@ -137,13 +137,14 @@ type metadataWriter struct {
 	cdiDir        string
 	versions      []schema.GroupVersion
 	encoders      map[schema.GroupVersion]runtime.Encoder
+	fileOps       MetadataFileOperations
 }
 
 // newMetadataWriter creates a new metadataWriter that writes metadata files
 // for each of the specified API versions. Unsupported versions are silently
 // skipped, but an error is returned if none of the requested versions are
 // supported by the metadata scheme.
-func newMetadataWriter(driverName, pluginDataDir, cdiDir string, versions []schema.GroupVersion) (*metadataWriter, error) {
+func newMetadataWriter(driverName, pluginDataDir, cdiDir string, versions []schema.GroupVersion, fileOps MetadataFileOperations) (*metadataWriter, error) {
 	var supported []schema.GroupVersion
 	encoders := make(map[schema.GroupVersion]runtime.Encoder, len(versions))
 	for _, gv := range versions {
@@ -164,6 +165,7 @@ func newMetadataWriter(driverName, pluginDataDir, cdiDir string, versions []sche
 		cdiDir:        cdiDir,
 		versions:      supported,
 		encoders:      encoders,
+		fileOps:       fileOps,
 	}, nil
 }
 
@@ -207,17 +209,17 @@ func (w *metadataWriter) processPreparedClaim(
 // It is a no-op if no files exist for the given claim.
 func (w *metadataWriter) cleanupClaim(claimNamespace, claimName string, claimUID types.UID) error {
 	metadataDir := w.claimMetadataDir(claimNamespace, claimName)
-	if err := os.RemoveAll(metadataDir); err != nil && !os.IsNotExist(err) {
+	if err := w.fileOps.RemoveAll(metadataDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove metadata directory %s: %w", metadataDir, err)
 	}
 
 	pattern := filepath.Join(w.cdiDir, fmt.Sprintf("%s_metadata_%s_*.json", w.driverName, string(claimUID)))
-	matches, err := filepath.Glob(pattern)
+	matches, err := w.fileOps.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("glob CDI specs %s: %w", pattern, err)
 	}
 	for _, cdiPath := range matches {
-		if err := os.Remove(cdiPath); err != nil && !os.IsNotExist(err) {
+		if err := w.fileOps.Remove(cdiPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove CDI spec %s: %w", cdiPath, err)
 		}
 	}
@@ -241,7 +243,7 @@ func (w *metadataWriter) updateRequestMetadata(
 	baseReq := resourceclaim.BaseRequestRef(requestName)
 	filePath := w.metadataFilePath(ref.namespace, ref.name, baseReq)
 
-	existing, err := os.ReadFile(filePath)
+	existing, err := w.fileOps.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("request %q not found in prepared claim %s/%s", requestName, ref.namespace, ref.name)
@@ -264,7 +266,7 @@ func (w *metadataWriter) updateRequestMetadata(
 		return err
 	}
 
-	if err := os.WriteFile(filePath, data, metadataFilePerms); err != nil {
+	if err := w.writeAtomic(filePath, data); err != nil {
 		return fmt.Errorf("write metadata file: %w", err)
 	}
 
@@ -290,11 +292,11 @@ func (w *metadataWriter) writeMetadataFile(
 	}
 
 	filePath := w.metadataFilePath(ref.namespace, ref.name, baseRequestName)
-	if err := os.MkdirAll(filepath.Dir(filePath), metadataDirPerms); err != nil {
+	if err := w.fileOps.MkdirAll(filepath.Dir(filePath), metadataDirPerms); err != nil {
 		return fmt.Errorf("create metadata directory: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, metadataFilePerms); err != nil {
+	if err := w.writeAtomic(filePath, data); err != nil {
 		return fmt.Errorf("write metadata file: %w", err)
 	}
 
@@ -346,6 +348,13 @@ func (w *metadataWriter) buildDeviceMetadata(
 	}
 }
 
+// writeAtomic writes data to path atomically. It uses WriteFileAtomic from
+// fileOps, which defaults to the CDI spec pattern (temp in same dir, fsync,
+// rename) to avoid races where a consumer reads the file while it is written.
+func (w *metadataWriter) writeAtomic(path string, data []byte) error {
+	return w.fileOps.WriteFileAtomic(path, data, metadataFilePerms)
+}
+
 // encodeMetadataStream encodes the internal metadata object once per
 // configured version and concatenates the results into a JSON stream.
 func (w *metadataWriter) encodeMetadataStream(dm *metadata.DeviceMetadata) ([]byte, error) {
@@ -372,7 +381,7 @@ func (w *metadataWriter) writeCDISpec(
 	deviceName := string(claim.UID) + "_" + requestName
 
 	spec := &cdiSpec{
-		Version: cdiVersionStr,
+		Version: cdispec.CurrentVersion,
 		Kind:    w.driverName + "/metadata",
 		Devices: []cdiDevice{
 			{
@@ -395,12 +404,12 @@ func (w *metadataWriter) writeCDISpec(
 		return "", fmt.Errorf("marshal CDI spec: %w", err)
 	}
 
-	if err := os.MkdirAll(w.cdiDir, metadataDirPerms); err != nil {
+	if err := w.fileOps.MkdirAll(w.cdiDir, metadataDirPerms); err != nil {
 		return "", fmt.Errorf("create CDI directory: %w", err)
 	}
 
 	cdiPath := w.cdiSpecFilePath(claim.UID, requestName)
-	if err := os.WriteFile(cdiPath, data, metadataFilePerms); err != nil {
+	if err := w.writeAtomic(cdiPath, data); err != nil {
 		return "", fmt.Errorf("write CDI spec file: %w", err)
 	}
 
