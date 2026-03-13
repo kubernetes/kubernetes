@@ -177,17 +177,17 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 	numaInfo := commonNUMAInfoEightNodes()
 	r := rand.New(rand.NewSource(1))
 
-	for n := 0; n < 500; n++ {
+	for range 500 {
 		dim := r.Intn(5) + 1
 		hints := make([][]TopologyHint, 0, dim)
-		for i := 0; i < dim; i++ {
+		for range dim {
 			numHints := r.Intn(6) + 1
 			oneDim := make([]TopologyHint, 0, numHints)
-			for j := 0; j < numHints; j++ {
+			for range numHints {
 				var affinity bitmask.BitMask
 				if r.Intn(3) != 0 {
 					var bits []int
-					for k := 0; k < 8; k++ {
+					for k := range 8 {
 						if r.Intn(4) == 0 {
 							bits = append(bits, k)
 						}

@@ -104,7 +104,7 @@ func BenchmarkHintMergerManyHintsPerProvider(b *testing.B) {
 	masks := make([][]int, 0, 255)
 	for mask := 1; mask < 1<<8; mask++ {
 		var bits []int
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			if mask&(1<<i) != 0 {
 				bits = append(bits, i)
 			}
