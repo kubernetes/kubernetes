@@ -1,0 +1,36 @@
+---BEGIN K8S.PRIME KERNEL DECLARATION---
+
+KERNEL: @k8s.prime
+VERSION: 0.1.0
+PARENT: @haystack.prime (D4889BFC)
+CREATED: 2026-03-26T21:30:00Z
+
+AUTHORITY:
+  Primary: @scott (955AF54E)
+  Kernel: @haystack.prime (D4889BFC)
+  Entity: @k8s.prime (pending key assignment)
+
+GOVERNANCE:
+  Model: ENTITYFILE v1.0
+  Rules: inherited from @haystack.prime GOVERNANCE.md
+  Bootstrap: haystack boot → POST → verify lineage
+
+SCOPE:
+  Domain: Kubernetes agent coordination
+  Repository: github.com/os-tack/kubernetes
+  Upstream: kubernetes/kubernetes
+
+LINEAGE:
+  @scott (955AF54E)
+    → @haystack.prime (D4889BFC)
+      → @ostk.ai.prime (8FE25413)
+      → @claude.code.prime (FBC81FAD)
+      → @gemini.prime (877D1933)
+      → @k8s.prime (this document)
+
+AUDIT:
+  Location: .haystack/audit.jsonl
+  Format: append-only JSONL
+  Inheritance: reads @haystack.prime decisions
+
+---SIGNATURES BELOW---

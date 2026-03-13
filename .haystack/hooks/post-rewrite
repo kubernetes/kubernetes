@@ -1,0 +1,6 @@
+#!/bin/bash
+# haystack post-rewrite hook
+cause=$1
+while read old_hash new_hash extra; do
+  haystack audit remap --old "$old_hash" --new "$new_hash" --cause "$cause"
+done
