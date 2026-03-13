@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: "cloud-pvl-admission.k8s.io"
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: cloud-pvl-admission
+webhooks:
+- name: "cloud-pvl-admission.k8s.io"
+  rules:
+  - apiGroups:   [""]
+    apiVersions: ["v1"]
+    operations:  ["CREATE"]
+    resources:   ["persistentvolumes"]
+    scope:       "*"
+  clientConfig:
+    url: "https://127.0.0.1:9001/admit"
+    caBundle: "__CLOUD_PVL_ADMISSION_CA_CERT__"
+  matchConditions:
+  - name: "only-gce"
+    expression: "has(object.spec.gcePersistentDisk)"
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MPL-2.0
+
+# Copyright (C) 2025 Aleksa Sarai <cyphar@cyphar.com>
+# Copyright (C) 2025 SUSE LLC
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+comment:
+  layout: "condensed_header, reach, diff, components, condensed_files, condensed_footer"
+  require_changes: true
+  branches:
+    - main
+
+coverage:
+  range: 60..100
+  status:
+    project:
+      default:
+        target: 85%
+        threshold: 0%
+    patch:
+      default:
+        target: auto
+        informational: true
+
+github_checks:
+  annotations: false

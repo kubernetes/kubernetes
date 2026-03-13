@@ -1,0 +1,11 @@
+apiVersion: resource.k8s.io/v1beta2
+kind: DeviceClass
+metadata:
+  name: scoring-test-class-{{.Index}}
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == "test-driver.cdi.k8s.io"
+  # All device classes expose the same extended resource name
+  # This allows multiple nodes to satisfy the same pod's extended resource request
+  extendedResourceName: example.com/gpu

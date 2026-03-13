@@ -1,0 +1,18 @@
+linters:
+  enable:
+    - bodyclose
+    - dupword # Checks for duplicate words in the source code
+    - gofmt
+    - goimports
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - vet
+  disable:
+    - errcheck
+
+run:
+  deadline: 2m

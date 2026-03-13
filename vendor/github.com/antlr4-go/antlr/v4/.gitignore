@@ -1,0 +1,18 @@
+### Go template
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+
+# Go workspace file
+go.work
+
+# No Goland stuff in this repo
+.idea

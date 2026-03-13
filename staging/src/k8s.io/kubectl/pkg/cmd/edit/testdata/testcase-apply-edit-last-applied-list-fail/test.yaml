@@ -1,0 +1,43 @@
+description: if the user omits an API version, edit will fail
+mode: edit-last-applied
+args:
+- configmaps/cm1
+- service/svc1
+namespace: "myproject"
+expectedStdout:
+- configmap/cm1 edited
+- service/svc1 edited
+expectedExitCode: 0
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/myproject/configmaps/cm1
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/myproject/services/svc1
+  expectedInput: 1.request
+  resultingStatusCode: 200
+  resultingOutput: 1.response
+- type: edit
+  expectedInput: 2.original
+  resultingOutput: 2.edited
+- type: edit
+  expectedInput: 3.original
+  resultingOutput: 3.edited
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /api/v1/namespaces/myproject/configmaps/cm1
+  expectedContentType: application/merge-patch+json
+  expectedInput: 4.request
+  resultingStatusCode: 200
+  resultingOutput: 4.response
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /api/v1/namespaces/myproject/services/svc1
+  expectedContentType: application/merge-patch+json
+  expectedInput: 5.request
+  resultingStatusCode: 200
+  resultingOutput: 5.response

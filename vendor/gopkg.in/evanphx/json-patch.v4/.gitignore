@@ -1,0 +1,6 @@
+# editor and IDE paraphernalia
+.idea
+.vscode
+
+# macOS paraphernalia
+.DS_Store

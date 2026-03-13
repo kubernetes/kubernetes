@@ -1,0 +1,947 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package rest
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"reflect"
+	"regexp"
+	"slices"
+	"strings"
+	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/operation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/validation"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
+)
+
+func TestValidateDeclaratively(t *testing.T) {
+	valid := &Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+	}
+
+	invalidRestartPolicy := &Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		RestartPolicy: "INVALID",
+	}
+
+	invalidRestartPolicyErr := field.Invalid(field.NewPath("spec", "restartPolicy"), "", "Invalid value").WithOrigin("invalid-test")
+	mutatedRestartPolicyErr := field.Invalid(field.NewPath("spec", "restartPolicy"), "", "Immutable field").WithOrigin("immutable-test")
+	invalidStatusErr := field.Invalid(field.NewPath("status", "conditions"), "", "Invalid condition").WithOrigin("invalid-condition")
+	invalidIfOptionErr := field.Invalid(field.NewPath("spec", "restartPolicy"), "", "Invalid when option is set").WithOrigin("invalid-when-option-set")
+	invalidSubresourceErr := field.InternalError(nil, fmt.Errorf("unexpected error parsing subresource path: %w", fmt.Errorf("invalid subresource path: %s", "invalid/status")))
+
+	testCases := []struct {
+		name        string
+		object      runtime.Object
+		oldObject   runtime.Object
+		subresource string
+		options     []string
+		expected    field.ErrorList
+	}{
+		{
+			name:     "create",
+			object:   invalidRestartPolicy,
+			expected: field.ErrorList{invalidRestartPolicyErr},
+		},
+		{
+			name:      "update",
+			object:    invalidRestartPolicy,
+			oldObject: valid,
+			expected:  field.ErrorList{invalidRestartPolicyErr, mutatedRestartPolicyErr},
+		},
+		{
+			name:        "update subresource with declarative validation",
+			subresource: "status",
+			object:      valid,
+			oldObject:   valid,
+			expected:    field.ErrorList{invalidStatusErr},
+		},
+		{
+			name:        "update subresource without declarative validation",
+			subresource: "scale",
+			object:      valid,
+			oldObject:   valid,
+			expected:    field.ErrorList{}, // Expect no errors if there is no registered validation
+		},
+		{
+			name:        "invalid subresource",
+			subresource: "/invalid/status",
+			object:      valid,
+			oldObject:   valid,
+			expected:    field.ErrorList{invalidSubresourceErr},
+		},
+		{
+			name:     "update with option",
+			options:  []string{"option1"},
+			object:   valid,
+			expected: field.ErrorList{invalidIfOptionErr},
+		},
+	}
+
+	ctx := context.Background()
+
+	internalGV := schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
+	v1GV := schema.GroupVersion{Group: "", Version: "v1"}
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(internalGV, &Pod{})
+	scheme.AddKnownTypes(v1GV, &v1.Pod{})
+
+	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList {
+		results := field.ErrorList{}
+		if op.HasOption("option1") {
+			results = append(results, invalidIfOptionErr)
+		}
+		if slices.Equal(op.Request.Subresources, []string{"status"}) {
+			results = append(results, invalidStatusErr)
+		}
+		if op.Type == operation.Update && object.(*v1.Pod).Spec.RestartPolicy != oldObject.(*v1.Pod).Spec.RestartPolicy {
+			results = append(results, mutatedRestartPolicyErr)
+		}
+		if object.(*v1.Pod).Spec.RestartPolicy == "INVALID" {
+			results = append(results, invalidRestartPolicyErr)
+		}
+		return results
+	})
+	err := scheme.AddConversionFunc(&Pod{}, &v1.Pod{}, func(a, b interface{}, scope conversion.Scope) error {
+		if in, ok := a.(*Pod); ok {
+			if out, ok := b.(*v1.Pod); ok {
+				out.APIVersion = in.APIVersion
+				out.Kind = in.Kind
+				out.Spec.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testCases {
+		ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+			APIGroup:    "",
+			APIVersion:  "v1",
+			Subresource: tc.subresource,
+		})
+		t.Run(tc.name, func(t *testing.T) {
+
+			cfg := &validationConfigOption{
+				options: tc.options,
+			}
+			if tc.oldObject == nil {
+				cfg.opType = operation.Create
+			} else {
+				cfg.opType = operation.Update
+			}
+			// takeover is not used here, passing false for shouldFail
+			results := panicSafeValidateFunc(validateDeclaratively, false, cfg.validationIdentifier)(ctx, scheme, tc.object, tc.oldObject, cfg)
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher.Test(t, tc.expected, results)
+		})
+	}
+}
+
+// Fake internal pod type, since core.Pod cannot be imported by this package
+type Pod struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	RestartPolicy     string `json:"restartPolicy"`
+}
+
+func (Pod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+
+func (p Pod) DeepCopyObject() runtime.Object {
+	return &Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: p.APIVersion,
+			Kind:       p.Kind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      p.Name,
+			Namespace: p.Namespace,
+		},
+		RestartPolicy: p.RestartPolicy,
+	}
+}
+
+// TestGatherDeclarativeValidationMismatches tests all mismatch
+// scenarios across imperative and declarative errors for
+// the gatherDeclarativeValidationMismatches function
+func TestGatherDeclarativeValidationMismatches(t *testing.T) {
+	pathStandard := field.NewPath("spec", "standard")
+	pathBeta := field.NewPath("spec", "beta")
+	pathAlpha := field.NewPath("spec", "alpha")
+	pathOther := field.NewPath("spec", "other")
+
+	// Standard Errors
+	errHVStandard := field.Invalid(pathStandard, "val", "impStandard").MarkCoveredByDeclarative().WithOrigin("min")
+	errDVStandard := field.Invalid(pathStandard, "val", "decStandard").WithOrigin("min")
+
+	// Beta Errors
+	errHVBeta := field.Invalid(pathBeta, "val", "impBeta").MarkCoveredByDeclarative().MarkBeta().WithOrigin("min")
+
+	// Alpha Errors
+	errDVAlpha := field.Invalid(pathAlpha, "val", "decAlpha").MarkAlpha().WithOrigin("min")
+	// Note: No HV Alpha by convention, so if it exists it would be a mismatch if DV is missing.
+	// But we usually don't mark HV as covered for Alpha rules.
+
+	// Normalization / Fuzzy match helpers
+	errDVStandardDiffDetail := field.Invalid(pathStandard, "val", "decStandardDiffDetail").WithOrigin("min")
+	errDVStandardDiffPath := field.Invalid(field.NewPath("spec", "standardAliased"), "val", "decStandard").WithOrigin("min")
+
+	const (
+		authoritativeMsg = "This difference should not affect system operation since hand written validation is authoritative."
+		disableBetaMsg   = "Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
+	)
+
+	testCases := []struct {
+		name                    string
+		imperativeErrors        field.ErrorList
+		declarativeErrors       field.ErrorList
+		enforced                bool
+		expectMismatches        bool
+		expectDetailsContaining []string
+		normalizedRules         []field.NormalizationRule
+	}{
+		{
+			name:              "No errors - no mismatch",
+			imperativeErrors:  field.ErrorList{},
+			declarativeErrors: field.ErrorList{},
+			expectMismatches:  false,
+		},
+		{
+			name:              "Clean match - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			expectMismatches:  false,
+		},
+		{
+			name:              "Mismatch: Missing DV (Standard) + Enforced -> Disable Beta Gate",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"unmatched error(s) found",
+				"spec.standard",
+				disableBetaMsg,
+			},
+		},
+		{
+			name:              "Mismatch: Extra DV (Standard) + Not Enforced -> HV Authoritative",
+			imperativeErrors:  field.ErrorList{},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			enforced:          false,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"extra error(s) found",
+				"spec.standard",
+				authoritativeMsg,
+			},
+		},
+		{
+			name:              "Mismatch: Missing DV (Beta) + Enforced -> Disable Beta Gate",
+			imperativeErrors:  field.ErrorList{errHVBeta},
+			declarativeErrors: field.ErrorList{},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"unmatched error(s) found",
+				"spec.beta",
+				disableBetaMsg,
+			},
+		},
+		{
+			name:              "Mismatch: Extra DV (Alpha) + Enforced -> HV Authoritative (Override)",
+			imperativeErrors:  field.ErrorList{},
+			declarativeErrors: field.ErrorList{errDVAlpha},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"extra error(s) found",
+				"spec.alpha",
+				authoritativeMsg,
+			},
+		},
+		{
+			name:              "Fuzzy matching (different detail) - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandardDiffDetail},
+			expectMismatches:  false,
+		},
+		{
+			name:              "Field normalization - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandardDiffPath},
+			normalizedRules: []field.NormalizationRule{
+				{
+					Regexp:      regexp.MustCompile(`spec.standardAliased`),
+					Replacement: "spec.standard",
+				},
+			},
+			expectMismatches: false,
+		},
+		{
+			name:              "Multiple mismatches - combined log info",
+			imperativeErrors:  field.ErrorList{errHVBeta},
+			declarativeErrors: field.ErrorList{errDVAlpha},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"unmatched error(s) found",
+				"spec.beta",
+				disableBetaMsg,
+				"extra error(s) found",
+				"spec.alpha",
+				authoritativeMsg,
+			},
+		},
+		{
+			name: "Uncovered HV error - no mismatch (ignored)",
+			imperativeErrors: field.ErrorList{
+				field.Invalid(pathOther, "val", "other").WithOrigin("min"),
+			},
+			declarativeErrors: field.ErrorList{},
+			expectMismatches:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.enforced, tc.normalizedRules)
+			// Check if mismatches were found if expected
+			if tc.expectMismatches && len(details) == 0 {
+				t.Errorf("Expected mismatches but got none")
+			}
+			// Check if details contain expected text
+			detailsStr := strings.Join(details, " ")
+			for _, expectedContent := range tc.expectDetailsContaining {
+				if !strings.Contains(detailsStr, expectedContent) {
+					t.Errorf("Expected details to contain: %q, but they didn't.\nDetails were:\n%s",
+						expectedContent, strings.Join(details, "\n"))
+				}
+			}
+			// If we don't expect any details, make sure none provided
+			if len(tc.expectDetailsContaining) == 0 && len(details) > 0 {
+				t.Errorf("Expected no details, but got %d details: %v", len(details), details)
+			}
+		})
+	}
+}
+
+// TestCompareDeclarativeErrorsAndEmitMismatches tests expected
+// logging of mismatch information given match & mismatch error conditions.
+func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
+	replicasPath := field.NewPath("spec").Child("replicas")
+	minReadySecondsPath := field.NewPath("spec").Child("minReadySeconds")
+
+	errA := field.Invalid(replicasPath, nil, "regular error A")
+	errB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
+	coveredErrB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
+	coveredErrB.CoveredByDeclarative = true
+
+	testCases := []struct {
+		name            string
+		imperativeErrs  field.ErrorList
+		declarativeErrs field.ErrorList
+		enforced        bool
+		expectLogs      bool
+		expectedRegex   string
+	}{
+		{
+			name:            "mismatched errors, log info",
+			imperativeErrs:  field.ErrorList{coveredErrB},
+			declarativeErrs: field.ErrorList{errA},
+			enforced:        true,
+			expectLogs:      true,
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectedRegex: "E.*Unexpected difference between hand written validation and declarative validation error results.*Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
+		},
+		{
+			name:            "matching errors, don't log info",
+			imperativeErrs:  field.ErrorList{coveredErrB},
+			declarativeErrs: field.ErrorList{errB},
+			enforced:        true,
+			expectLogs:      false,
+			expectedRegex:   "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			klog.SetOutput(&buf)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+			ctx := context.Background()
+
+			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.enforced, "test_validationIdentifier", nil)
+
+			klog.Flush()
+			logOutput := buf.String()
+
+			if tc.expectLogs {
+				matched, err := regexp.MatchString(tc.expectedRegex, logOutput)
+				if err != nil {
+					t.Fatalf("Bad regex: %v", err)
+				}
+				if !matched {
+					t.Errorf("Expected log output to match %q, but got:\n%s", tc.expectedRegex, logOutput)
+				}
+			} else if len(logOutput) > 0 {
+				t.Errorf("Expected no mismatch logs, but found: %s", logOutput)
+			}
+		})
+	}
+}
+
+func TestWithRecover(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	var options []string
+	obj := &runtime.Unknown{}
+
+	testCases := []struct {
+		name               string
+		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
+		enforcementEnabled bool
+		wantErrs           field.ErrorList
+		expectLogRegex     string
+	}{
+		{
+			name: "no panic",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				return field.ErrorList{
+					field.Invalid(field.NewPath("field"), "value", "reason"),
+				}
+			},
+			enforcementEnabled: false,
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("field"), "value", "reason"),
+			},
+			expectLogRegex: "",
+		},
+		{
+			name: "panic with enforcement disabled",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				panic("test panic")
+			},
+			enforcementEnabled: false,
+			wantErrs:           nil,
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectLogRegex: "E.*panic during declarative validation: test panic",
+		},
+		{
+			name: "panic with enforcement enabled",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				panic("test panic")
+			},
+			enforcementEnabled: true,
+			wantErrs: field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("panic during declarative validation: test panic")),
+			},
+			expectLogRegex: "",
+		},
+		{
+			name: "nil return, no panic",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				return nil
+			},
+			enforcementEnabled: false,
+			wantErrs:           nil,
+			expectLogRegex:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			klog.SetOutput(&buf)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+
+			// Pass the enforcement flag to panicSafeValidateFunc
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.enforcementEnabled, "test_validationIdentifier")
+			gotErrs := wrapped(ctx, scheme, obj, nil, &validationConfigOption{opType: operation.Create, options: options})
+
+			klog.Flush()
+			logOutput := buf.String()
+
+			// Compare gotErrs vs. tc.wantErrs
+			if !equalErrorLists(gotErrs, tc.wantErrs) {
+				t.Errorf("panicSafeValidateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+			}
+
+			// Check logs if needed
+			if tc.expectLogRegex != "" {
+				matched, err := regexp.MatchString(tc.expectLogRegex, logOutput)
+				if err != nil {
+					t.Fatalf("Bad regex: %v", err)
+				}
+				if !matched {
+					t.Errorf("Expected log output %q, but got:\n%s", tc.expectLogRegex, logOutput)
+				}
+			} else if strings.Contains(logOutput, "panic during declarative validation") {
+				t.Errorf("Unexpected panic log found: %s", logOutput)
+			}
+		})
+	}
+}
+
+func TestWithRecoverUpdate(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	var options []string
+	obj := &runtime.Unknown{}
+	oldObj := &runtime.Unknown{}
+
+	testCases := []struct {
+		name               string
+		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
+		enforcementEnabled bool
+		wantErrs           field.ErrorList
+		expectLogRegex     string
+	}{
+		{
+			name: "no panic",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				return field.ErrorList{
+					field.Invalid(field.NewPath("field"), "value", "reason"),
+				}
+			},
+			enforcementEnabled: false,
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("field"), "value", "reason"),
+			},
+			expectLogRegex: "",
+		},
+		{
+			name: "panic with enforcement disabled",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				panic("test update panic")
+			},
+			enforcementEnabled: false,
+			wantErrs:           nil,
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectLogRegex: "E.*panic during declarative validation: test update panic",
+		},
+		{
+			name: "panic with enforcement enabled",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				panic("test update panic")
+			},
+			enforcementEnabled: true,
+			wantErrs: field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("panic during declarative validation: test update panic")),
+			},
+			expectLogRegex: "",
+		},
+		{
+			name: "nil return, no panic",
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+				return nil
+			},
+			enforcementEnabled: false,
+			wantErrs:           nil,
+			expectLogRegex:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			klog.SetOutput(&buf)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
+
+			// Pass the enforcement flag to panicSafeValidateUpdateFunc
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.enforcementEnabled, "test_validationIdentifier")
+			gotErrs := wrapped(ctx, scheme, obj, oldObj, &validationConfigOption{opType: operation.Update, options: options})
+
+			klog.Flush()
+			logOutput := buf.String()
+
+			// Compare gotErrs with wantErrs
+			if !equalErrorLists(gotErrs, tc.wantErrs) {
+				t.Errorf("panicSafeValidateUpdateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+			}
+
+			// Verify log output
+			if tc.expectLogRegex != "" {
+				matched, err := regexp.MatchString(tc.expectLogRegex, logOutput)
+				if err != nil {
+					t.Fatalf("Bad regex: %v", err)
+				}
+				if !matched {
+					t.Errorf("Expected log pattern %q, but got:\n%s", tc.expectLogRegex, logOutput)
+				}
+			} else if strings.Contains(logOutput, "panic during declarative validation") {
+				t.Errorf("Unexpected panic log found: %s", logOutput)
+			}
+		})
+	}
+}
+
+func TestRecordDuplicateValidationErrors(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name           string
+		qualifiedKind  schema.GroupKind
+		errs           field.ErrorList
+		expectedMetric string
+	}{
+		{
+			name:          "detect duplicates and increment metric",
+			qualifiedKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+			},
+			expectedMetric: `
+			# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+			# TYPE apiserver_validation_duplicate_validation_error_total counter
+			apiserver_validation_duplicate_validation_error_total 2
+			`,
+		},
+		{
+			name:          "detect duplicates with all fields but origin being equal",
+			qualifiedKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("min"),
+			},
+			expectedMetric: `
+			# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+			# TYPE apiserver_validation_duplicate_validation_error_total counter
+			apiserver_validation_duplicate_validation_error_total 1
+			`,
+		},
+		{
+			name:          "no duplicates",
+			qualifiedKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+			},
+			expectedMetric: `
+			# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+			# TYPE apiserver_validation_duplicate_validation_error_total counter
+			apiserver_validation_duplicate_validation_error_total 0
+			`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer legacyregistry.Reset()
+			defer validation.ResetValidationMetricsInstance()
+			RecordDuplicateValidationErrors(ctx, tc.qualifiedKind, tc.errs)
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetric), "apiserver_validation_duplicate_validation_error_total"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func equalErrorLists(a, b field.ErrorList) bool {
+	// If both are nil, consider them equal
+	if a == nil && b == nil {
+		return true
+	}
+	// If one is nil and the other not, they're different
+	if (a == nil && b != nil) || (a != nil && b == nil) {
+		return false
+	}
+	// Both non-nil: do a normal DeepEqual
+	return reflect.DeepEqual(a, b)
+}
+
+func TestMetricIdentifier(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+
+	testCases := []struct {
+		name        string
+		opType      operation.Type
+		obj         runtime.Object
+		scheme      *runtime.Scheme
+		subresource string
+		expected    string
+		expectErr   bool
+	}{
+		{
+			name:        "with subresource",
+			opType:      operation.Create,
+			obj:         &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:      scheme,
+			subresource: "status",
+			expected:    "pod_status_create",
+			expectErr:   false,
+		},
+		{
+			name:      "without subresource",
+			opType:    operation.Update,
+			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:    scheme,
+			expected:  "pod_update",
+			expectErr: false,
+		},
+		{
+			name:      "unknown operation",
+			opType:    3, // not a valid operation.Type
+			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:    scheme,
+			expected:  "pod_unknown_op",
+			expectErr: true,
+		},
+		{
+			name:      "no request info and no kind",
+			opType:    operation.Create,
+			obj:       nil,
+			expected:  "unknown_resource_create",
+			expectErr: true,
+		},
+		{
+			name:      "known type without kind",
+			opType:    operation.Update,
+			obj:       &v1.Pod{},
+			scheme:    scheme,
+			expected:  "pod_update",
+			expectErr: false,
+		},
+		{
+			name:      "unknown type with scheme",
+			opType:    operation.Create,
+			obj:       &runtime.Unknown{}, // Not registered in the scheme
+			scheme:    scheme,
+			expected:  "unknown_resource_create",
+			expectErr: true,
+		},
+		{
+			name:      "unknown type without scheme",
+			opType:    operation.Type(4),
+			obj:       &runtime.Unknown{}, // Not registered in the scheme
+			expected:  "unknown_resource_unknown_op",
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tc.obj != nil {
+				ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+					Subresource: tc.subresource,
+				})
+			}
+
+			result, err := metricIdentifier(ctx, tc.scheme, tc.obj, tc.opType)
+			if (err != nil) != tc.expectErr {
+				t.Errorf("expected error: %v, got: %v", tc.expectErr, err)
+			}
+			if result != tc.expected {
+				t.Errorf("expected: %s, got: %s", tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
+	// Standard Lifecycle (Enforced by default in explicit strategy)
+	// Standard HV error marked as covered. In a fully migrated state, this should be deleted from source.
+	// We include it here to verify it persists (duplicate) if not deleted, rather than being implicitly filtered.
+	errHVStandardCovered := field.Forbidden(field.NewPath("spec", "standard"), "imperative standard").MarkCoveredByDeclarative()
+	errDVStandard := field.Forbidden(field.NewPath("spec", "standard"), "decStandard")
+
+	// Additional Declarative (No HV counterpart)
+	errDVAdditional := field.Invalid(field.NewPath("spec", "additional"), "decAdditional", "declarative additional")
+
+	// Beta Lifecycle (Gated by DeclarativeValidationBeta)
+	errHVBetaCovered := field.Forbidden(field.NewPath("spec", "beta"), "imperative beta").MarkCoveredByDeclarative().MarkBeta()
+	errDVBeta := field.Invalid(field.NewPath("spec", "beta"), "decBeta", "declarative beta").MarkBeta()
+
+	// Alpha Lifecycle (Shadowed)
+	// Alpha rules should NOT mark HV as covered, so HV remains authoritative.
+	errHVAlpha := field.Forbidden(field.NewPath("spec", "alpha"), "imperative alpha")
+	errDVAlpha := field.Invalid(field.NewPath("spec", "alpha"), "decAlpha", "declarative alpha").MarkAlpha()
+
+	testCases := []struct {
+		name                   string
+		dvFeatureEnabled       bool
+		declarativeEnforcement bool
+		betaGateEnabled        bool
+		imperativeErrors       field.ErrorList
+		declarativeErrors      field.ErrorList
+		expectedErrors         field.ErrorList
+		shouldPanic            bool
+	}{
+		{
+			name:              "Feature Disabled, Not Enforced -> Skips declarative, Returns HV",
+			imperativeErrors:  field.ErrorList{errHVStandardCovered},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			expectedErrors:    field.ErrorList{errHVStandardCovered},
+		},
+		{
+			name:                   "Feature Disabled, Enforced -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
+			declarativeEnforcement: true,
+			imperativeErrors:       field.ErrorList{errHVStandardCovered},
+			declarativeErrors:      field.ErrorList{errDVStandard, errDVAdditional},
+			expectedErrors:         field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
+		},
+		{
+			name:              "Feature Enabled, Not Enforced -> Returns imperative (Shadow Mode)",
+			dvFeatureEnabled:  true,
+			imperativeErrors:  field.ErrorList{errHVStandardCovered},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			expectedErrors:    field.ErrorList{errHVStandardCovered},
+		},
+		{
+			name:                   "Feature Enabled, Enforced -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
+			dvFeatureEnabled:       true,
+			declarativeEnforcement: true,
+			imperativeErrors:       field.ErrorList{errHVStandardCovered},
+			declarativeErrors:      field.ErrorList{errDVStandard, errDVAdditional},
+			expectedErrors:         field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
+		},
+		{
+			name:                   "Feature Disabled, Enforced, Panics -> Returns InternalError",
+			declarativeEnforcement: true,
+			imperativeErrors:       field.ErrorList{errHVStandardCovered},
+			shouldPanic:            true,
+			// Standard HV is kept. Panic error appended.
+			expectedErrors: append(field.ErrorList{errHVStandardCovered}, field.InternalError(nil, fmt.Errorf("panic during declarative validation: test panic"))),
+		},
+		{
+			name:                   "Feature Enabled, Enforced, InternalError -> Returns InternalError",
+			dvFeatureEnabled:       true,
+			declarativeEnforcement: true,
+			imperativeErrors:       field.ErrorList{errHVStandardCovered},
+			declarativeErrors:      field.ErrorList{field.InternalError(nil, fmt.Errorf("internal error"))},
+			// Standard HV kept. Internal error appended.
+			expectedErrors: field.ErrorList{errHVStandardCovered, field.InternalError(nil, fmt.Errorf("internal error"))},
+		},
+		{
+			name:                   "Enforced, Beta Gate Enabled -> Enforces Beta (HV removed, DV returned)",
+			dvFeatureEnabled:       true,
+			declarativeEnforcement: true,
+			betaGateEnabled:        true,
+			imperativeErrors:       field.ErrorList{errHVBetaCovered},
+			declarativeErrors:      field.ErrorList{errDVBeta},
+			expectedErrors:         field.ErrorList{errDVBeta},
+		},
+		{
+			name:                   "Enforced, Beta Gate Disabled -> Shadows Beta (HV kept, DV hidden)",
+			dvFeatureEnabled:       true,
+			declarativeEnforcement: true,
+			betaGateEnabled:        false,
+			imperativeErrors:       field.ErrorList{errHVBetaCovered},
+			declarativeErrors:      field.ErrorList{errDVBeta},
+			expectedErrors:         field.ErrorList{errHVBetaCovered},
+		},
+		{
+			name:                   "Enforced, Alpha -> Shadows Alpha (HV kept, DV hidden)",
+			dvFeatureEnabled:       true,
+			declarativeEnforcement: true,
+			betaGateEnabled:        true,
+			imperativeErrors:       field.ErrorList{errHVAlpha},
+			declarativeErrors:      field.ErrorList{errDVAlpha},
+			expectedErrors:         field.ErrorList{errHVAlpha},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set feature gate
+			if !tc.dvFeatureEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			} else {
+				// Only set Beta gate if we are not emulating an older version where it doesn't exist
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationBeta, tc.betaGateEnabled)
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, tc.dvFeatureEnabled)
+
+			// Setup scheme for this run
+			localScheme := runtime.NewScheme()
+			localScheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &v1.Pod{})
+			localScheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
+				if tc.shouldPanic {
+					panic("test panic")
+				}
+				return tc.declarativeErrors
+			})
+
+			// Setup context
+			ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
+				APIGroup:   "",
+				APIVersion: "v1",
+				Resource:   "pods",
+			})
+
+			obj := &v1.Pod{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			}
+
+			// Copy imperative errors because they might be modified/appended to
+			inputErrs := make(field.ErrorList, len(tc.imperativeErrors))
+			copy(inputErrs, tc.imperativeErrors)
+
+			opts := []ValidationConfig{}
+			if tc.declarativeEnforcement {
+				opts = append(opts, WithDeclarativeEnforcement())
+			}
+
+			gotErrs := ValidateDeclarativelyWithMigrationChecks(ctx, localScheme, obj, nil, inputErrs, operation.Create, opts...)
+
+			if !equalErrorLists(gotErrs, tc.expectedErrors) {
+				t.Errorf("Expected errors: %v, got: %v", tc.expectedErrors, gotErrs)
+			}
+		})
+	}
+}

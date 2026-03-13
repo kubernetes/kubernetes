@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Disable inheritance as code changes under this package should be known to sig-autoscaling team.
+options:
+  no_parent_owners: true
+approvers:
+  - sig-autoscaling-maintainers
+  - x13n
+reviewers:
+  - sig-autoscaling-maintainers
+  - x13n

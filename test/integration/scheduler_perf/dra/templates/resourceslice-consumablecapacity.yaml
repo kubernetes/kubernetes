@@ -1,0 +1,27 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1beta2
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-with-dra
+        operator: In
+        values:
+        - "true"
+  devices:
+  - name: shareable-device
+    allowMultipleAllocations: true
+    capacity:
+      memory:
+        value: 80Gi
+        requestPolicy:
+          default: 1Gi
+          validRange:
+            min: 1Gi

@@ -1,0 +1,19 @@
+{
+  "apiVersion": "v1",
+  "kind": "APIGroup",
+  "name": "autoscaling",
+  "preferredVersion": {
+    "groupVersion": "autoscaling/v2",
+    "version": "v2"
+  },
+  "versions": [
+    {
+      "groupVersion": "autoscaling/v2",
+      "version": "v2"
+    },
+    {
+      "groupVersion": "autoscaling/v1",
+      "version": "v1"
+    }
+  ]
+}

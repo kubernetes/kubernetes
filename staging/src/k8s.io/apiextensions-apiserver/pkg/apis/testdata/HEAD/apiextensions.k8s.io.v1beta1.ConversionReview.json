@@ -1,0 +1,61 @@
+{
+  "kind": "ConversionReview",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "request": {
+    "uid": "uidValue",
+    "desiredAPIVersion": "desiredAPIVersionValue",
+    "objects": [
+      {
+        "apiVersion": "example.com/v1",
+        "kind": "CustomType",
+        "spec": {
+          "replicas": 1
+        },
+        "status": {
+          "available": 1
+        }
+      }
+    ]
+  },
+  "response": {
+    "uid": "uidValue",
+    "convertedObjects": [
+      {
+        "apiVersion": "example.com/v1",
+        "kind": "CustomType",
+        "spec": {
+          "replicas": 1
+        },
+        "status": {
+          "available": 1
+        }
+      }
+    ],
+    "result": {
+      "metadata": {
+        "selfLink": "selfLinkValue",
+        "resourceVersion": "resourceVersionValue",
+        "continue": "continueValue",
+        "remainingItemCount": 4
+      },
+      "status": "statusValue",
+      "message": "messageValue",
+      "reason": "reasonValue",
+      "details": {
+        "name": "nameValue",
+        "group": "groupValue",
+        "kind": "kindValue",
+        "uid": "uidValue",
+        "causes": [
+          {
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "field": "fieldValue"
+          }
+        ],
+        "retryAfterSeconds": 5
+      },
+      "code": 6
+    }
+  }
+}

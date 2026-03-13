@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: l7-lb-controller
+  namespace: kube-system
+  labels:
+    k8s-app: gcp-lb-controller
+    kubernetes.io/name: "GLBC"
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  priorityClassName: system-node-critical
+  priority: 2000001000
+  terminationGracePeriodSeconds: 600
+  hostNetwork: true
+  containers:
+  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.23.1
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8086
+        scheme: HTTP
+      initialDelaySeconds: 30
+      # healthz reaches out to GCE
+      periodSeconds: 30
+      timeoutSeconds: 15
+      successThreshold: 1
+      failureThreshold: 5
+    name: l7-lb-controller
+    volumeMounts:
+    - mountPath: /etc/gce.conf
+      name: cloudconfig
+      readOnly: true
+    - mountPath: /var/log/glbc.log
+      name: logfile
+      readOnly: false
+    - mountPath: /etc/srv/kubernetes/l7-lb-controller
+      name: srvkube
+      readOnly: true
+    resources:
+      # Request is set to accommodate this pod alongside the other
+      # master components on a single core master.
+      requests:
+        cpu: 10m
+        memory: 50Mi
+    args:
+    - --v=3
+    - --logtostderr=false
+    - --log_file=/var/log/glbc.log
+    - --enable-finalizer-remove
+    - --enable-finalizer-add
+    - --default-backend-service=kube-system/default-http-backend
+    - --kubeconfig=/etc/srv/kubernetes/l7-lb-controller/kubeconfig
+    - --sync-period=600s
+    - --running-in-cluster=false
+    - --config-file-path=/etc/gce.conf
+    - --healthz-port=8086
+    - --gce-ratelimit=ga.Operations.Get,qps,10,100
+    - --gce-ratelimit=alpha.Operations.Get,qps,10,100
+    - --gce-ratelimit=beta.Operations.Get,qps,10,100
+    - --gce-ratelimit=ga.BackendServices.Get,qps,1.8,1
+    - --gce-ratelimit=beta.BackendServices.Get,qps,1.8,1
+    - --gce-ratelimit=ga.HealthChecks.Get,qps,1.8,1
+    - --gce-ratelimit=alpha.HealthChecks.Get,qps,1.8,1
+    - --gce-ratelimit=beta.NetworkEndpointGroups.Get,qps,1.8,1
+    - --gce-ratelimit=beta.NetworkEndpointGroups.AttachNetworkEndpoints,qps,1.8,1
+    - --gce-ratelimit=beta.NetworkEndpointGroups.DetachNetworkEndpoints,qps,1.8,1
+    - --gce-ratelimit=beta.NetworkEndpointGroups.ListNetworkEndpoints,qps,1.8,1
+    - --gce-ratelimit=ga.NetworkEndpointGroups.Get,qps,1.8,1
+    - --gce-ratelimit=ga.NetworkEndpointGroups.AttachNetworkEndpoints,qps,1.8,1
+    - --gce-ratelimit=ga.NetworkEndpointGroups.DetachNetworkEndpoints,qps,1.8,1
+    - --gce-ratelimit=ga.NetworkEndpointGroups.ListNetworkEndpoints,qps,1.8,1
+  volumes:
+  - hostPath:
+      path: /etc/gce.conf
+      type: FileOrCreate
+    name: cloudconfig
+  - hostPath:
+      path: /var/log/glbc.log
+      type: FileOrCreate
+    name: logfile
+  - hostPath:
+      path: /etc/srv/kubernetes/l7-lb-controller
+    name: srvkube

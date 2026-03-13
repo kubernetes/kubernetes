@@ -1,0 +1,52 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "scheduling.k8s.io/v1alpha2",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "PodGroup",
+      "name": "podgroups",
+      "namespaced": true,
+      "singularName": "podgroup",
+      "storageVersionHash": "YYgX3v5V204=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodGroup",
+      "name": "podgroups/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Workload",
+      "name": "workloads",
+      "namespaced": true,
+      "singularName": "workload",
+      "storageVersionHash": "vSX7gJe5Mx8=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

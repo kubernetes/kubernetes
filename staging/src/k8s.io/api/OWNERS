@@ -1,0 +1,24 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Disable inheritance as this is an api owners file
+options:
+  no_parent_owners: true
+filters:
+  # to use filters all entries must be under filters https://go.k8s.io/owners/#filters
+  # use .* for approvers that should have all files
+  ".*":
+    approvers:
+      - api-approvers
+    reviewers:
+      - api-reviewers
+  # go.{mod,sum,work,work.sum} files relate to go dependencies,
+  # and should be reviewed by the dep-approvers
+  "go\\.(mod|sum|work|work\\.sum)$":
+    approvers:
+      - dep-approvers
+    reviewers:
+      - dep-reviewers
+  # only auto-label go file changes as kind/api-change
+  "\\.go$":
+    labels:
+      - kind/api-change

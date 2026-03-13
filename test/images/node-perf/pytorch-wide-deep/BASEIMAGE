@@ -1,0 +1,2 @@
+linux/amd64=python:3.13-slim-bookworm
+linux/arm64=arm64v8/python:3.13-slim-bookworm

@@ -1,0 +1,116 @@
+{
+  "components": {
+    "schemas": {
+      "io.k8s.apimachinery.pkg.version.Info": {
+        "description": "Info contains versioning information. how we'll want to distribute that information.",
+        "properties": {
+          "buildDate": {
+            "default": "",
+            "type": "string"
+          },
+          "compiler": {
+            "default": "",
+            "type": "string"
+          },
+          "emulationMajor": {
+            "description": "EmulationMajor is the major version of the emulation version",
+            "type": "string"
+          },
+          "emulationMinor": {
+            "description": "EmulationMinor is the minor version of the emulation version",
+            "type": "string"
+          },
+          "gitCommit": {
+            "default": "",
+            "type": "string"
+          },
+          "gitTreeState": {
+            "default": "",
+            "type": "string"
+          },
+          "gitVersion": {
+            "default": "",
+            "type": "string"
+          },
+          "goVersion": {
+            "default": "",
+            "type": "string"
+          },
+          "major": {
+            "default": "",
+            "description": "Major is the major version of the binary version",
+            "type": "string"
+          },
+          "minCompatibilityMajor": {
+            "description": "MinCompatibilityMajor is the major version of the minimum compatibility version",
+            "type": "string"
+          },
+          "minCompatibilityMinor": {
+            "description": "MinCompatibilityMinor is the minor version of the minimum compatibility version",
+            "type": "string"
+          },
+          "minor": {
+            "default": "",
+            "description": "Minor is the minor version of the binary version",
+            "type": "string"
+          },
+          "platform": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "major",
+          "minor",
+          "gitVersion",
+          "gitCommit",
+          "gitTreeState",
+          "buildDate",
+          "goVersion",
+          "compiler",
+          "platform"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/version/": {
+      "get": {
+        "description": "get the version information for this server",
+        "operationId": "getCodeVersion",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.version.Info"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "version"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
+approvers:
+  - release-engineering-approvers
+  - release-managers
+  - release-team-subproject-leads
+  - satyampsoni # 1.32 Release Notes Lead
+reviewers:
+  - release-managers
+  - release-team-subproject-leads
+  - satyampsoni # 1.32 Release Notes Lead
+labels:
+  - sig/release
+  - area/release-eng

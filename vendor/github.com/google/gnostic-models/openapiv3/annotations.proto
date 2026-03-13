@@ -1,0 +1,56 @@
+// Copyright 2022 Google LLC. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package openapi.v3;
+
+import "google/protobuf/descriptor.proto";
+import "openapiv3/OpenAPIv3.proto";
+
+// The Go package name.
+option go_package = "./openapiv3;openapi_v3";
+// This option lets the proto compiler generate Java code inside the package
+// name (see below) instead of inside an outer class. It creates a simpler
+// developer experience by reducing one-level of name nesting and be
+// consistent with most programming languages that don't support outer classes.
+option java_multiple_files = true;
+// The Java outer classname should be the filename in UpperCamelCase. This
+// class is only used to hold proto descriptor, so developers don't need to
+// work with it directly.
+option java_outer_classname = "AnnotationsProto";
+// The Java package name must be proto package name with proper prefix.
+option java_package = "org.openapi_v3";
+// A reasonable prefix for the Objective-C symbols generated from the package.
+// It should at a minimum be 3 characters long, all uppercase, and convention
+// is to use an abbreviation of the package name. Something short, but
+// hopefully unique enough to not conflict with things that may come along in
+// the future. 'GPB' is reserved for the protocol buffer implementation itself.
+option objc_class_prefix = "OAS";
+
+extend google.protobuf.FileOptions {
+  Document document = 1143;
+}
+
+extend google.protobuf.MethodOptions {
+  Operation operation = 1143;
+}
+
+extend google.protobuf.MessageOptions {
+  Schema schema = 1143;
+}
+
+extend google.protobuf.FieldOptions {
+  Schema property = 1143;
+}

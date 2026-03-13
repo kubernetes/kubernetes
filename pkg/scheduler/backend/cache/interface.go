@@ -1,0 +1,116 @@
+/*
+Copyright 2015 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cache
+
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
+// Cache collects pods' information and provides node-level aggregated information.
+// It's intended for generic scheduler to do efficient lookup.
+// Cache's operations are pod centric. It does incremental updates based on pod events.
+// Pod events are sent via network. We don't have guaranteed delivery of all events:
+// We use Reflector to list and watch from remote.
+// Reflector might be slow and do a relist, which would lead to missing events.
+//
+// State Machine of a pod's events in scheduler's cache:
+//
+//	+-------------------------------------------+  +----+
+//	|                            Add            |  |    |
+//	|                                           |  |    | Update
+//	+      Assume                Add            v  v    |
+//
+// Initial +--------> Assumed +----------- ---> Added <--+
+//
+//	^                    +                        +
+//	|                    |                        |
+//	|                    |                        | Remove
+//	|                    |                        |
+//	|                    |                        v
+//	+--------------------+                     Deleted
+//	      Forget
+//
+// Note that "Initial" and "Deleted" pods do not actually exist in cache.
+// Based on existing use cases, we are making the following assumptions:
+//   - No pod would be assumed twice
+//   - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
+//   - If a pod wasn't added, it wouldn't be removed or updated.
+type Cache interface {
+	// NodeCount returns the number of nodes in the cache.
+	// DO NOT use outside of tests.
+	NodeCount() int
+
+	// PodCount returns the number of pods in the cache (including those from deleted nodes).
+	// DO NOT use outside of tests.
+	PodCount() (int, error)
+
+	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
+	AssumePod(logger klog.Logger, pod *v1.Pod) error
+
+	// ForgetPod removes an assumed pod from cache.
+	ForgetPod(logger klog.Logger, pod *v1.Pod) error
+
+	// AddPod confirms an assumed pod, or adds a newly assigned pod to the cache.
+	AddPod(logger klog.Logger, pod *v1.Pod) error
+
+	// UpdatePod removes oldPod's information and adds newPod's information.
+	UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error
+
+	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
+	RemovePod(logger klog.Logger, pod *v1.Pod) error
+
+	// GetPod returns the pod from the cache with the same namespace and the
+	// same name of the specified pod.
+	GetPod(pod *v1.Pod) (*v1.Pod, error)
+
+	// IsAssumedPod returns true if the pod is assumed.
+	IsAssumedPod(pod *v1.Pod) (bool, error)
+
+	// AddNode adds overall information about node.
+	// It returns a clone of added NodeInfo object.
+	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
+
+	// UpdateNode updates overall information about node.
+	// It returns a clone of updated NodeInfo object.
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
+
+	// RemoveNode removes overall information about node.
+	RemoveNode(logger klog.Logger, node *v1.Node) error
+
+	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
+	// The node info contains aggregated information of pods scheduled (including assumed to be)
+	// on this node.
+	// The snapshot only includes Nodes that are not deleted at the time this function is called.
+	// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+	UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapshot) error
+
+	// Dump produces a dump of the current cache.
+	Dump() *Dump
+
+	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	BindPod(binding *v1.Binding) (<-chan error, error)
+}
+
+// Dump is a dump of the cache state.
+type Dump struct {
+	AssumedPods sets.Set[string]
+	Nodes       map[string]*framework.NodeInfo
+}

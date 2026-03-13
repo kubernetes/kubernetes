@@ -1,0 +1,104 @@
+# Do not delete linter settings. Linters like gocritic can be enabled on the command line.
+
+linters-settings:
+  depguard:
+    rules:
+      prevent_unmaintained_packages:
+        list-mode: strict
+        files:
+          - $all
+          - "!$test"
+        allow:
+          - $gostd
+          - github.com/x448/float16
+        deny:
+          - pkg: io/ioutil
+            desc: "replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil"
+  dupl:
+    threshold: 100
+  funlen:
+    lines: 100
+    statements: 50
+  goconst:
+    ignore-tests: true
+    min-len: 2
+    min-occurrences: 3
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - octalLiteral
+      - paramTypeCombine
+      - whyNoLint
+  gofmt:
+    simplify: false
+  goimports:
+    local-prefixes: github.com/fxamacker/cbor
+  golint:
+    min-confidence: 0
+  govet:
+    check-shadowing: true
+  lll:
+    line-length: 140
+  maligned:
+    suggest-new: true
+  misspell:
+    locale: US
+  staticcheck:
+    checks: ["all"]
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bidichk
+    - depguard
+    - errcheck
+    - exportloopref
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - revive
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unused
+
+issues:
+  # max-issues-per-linter default is 50.  Set to 0 to disable limit.
+  max-issues-per-linter: 0
+  # max-same-issues default is 3.  Set to 0 to disable limit.
+  max-same-issues: 0
+
+  exclude-rules:
+    - path: decode.go
+      text: "string ` overflows ` has (\\d+) occurrences, make it a constant"
+    - path: decode.go
+      text: "string ` \\(range is \\[` has (\\d+) occurrences, make it a constant"
+    - path: decode.go
+      text: "string `, ` has (\\d+) occurrences, make it a constant"
+    - path: decode.go
+      text: "string ` overflows Go's int64` has (\\d+) occurrences, make it a constant"
+    - path: decode.go
+      text: "string `\\]\\)` has (\\d+) occurrences, make it a constant"
+    - path: valid.go
+      text: "string ` for type ` has (\\d+) occurrences, make it a constant"
+    - path: valid.go
+      text: "string `cbor: ` has (\\d+) occurrences, make it a constant"

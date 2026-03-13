@@ -1,0 +1,44 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: pause-template
+  namespace: default
+spec:
+  metadata:
+    labels:
+      app: inline-resource
+  spec:
+    devices:
+      requests:
+      - name: my-device
+        exactly:
+          deviceClassName: example
+      config:
+      - opaque:
+          driver: test-driver.cdi.k8s.io
+          parameters:
+            a: b
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pause
+  labels:
+    name: pause
+spec:
+  containers:
+  - name: pause1
+    image: "registry.k8s.io/pause:3.6"
+    resources:
+      claims:
+      - name: resource1
+  - name: pause2
+    image: "registry.k8s.io/pause:3.6"
+    resources:
+      claims:
+      - name: resource2
+  resourceClaims:
+  - name: resource1
+    resourceClaimTemplateName: pause-template
+  - name: resource2
+    resourceClaimTemplateName: pause-template

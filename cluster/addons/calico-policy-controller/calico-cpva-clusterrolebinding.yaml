@@ -1,0 +1,14 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: calico-cpva
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: calico-cpva
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: calico-cpva
+  apiGroup: rbac.authorization.k8s.io

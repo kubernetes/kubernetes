@@ -1,0 +1,110 @@
+{
+  "*pointers.T1": {
+    "pt1.pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt3": [
+      "type T3"
+    ],
+    "t2.pt1.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "t2.pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "t2.pt1.t2.pt2.pt3": [
+      "type T3"
+    ],
+    "t2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "t2.pt2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "t2.pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "t2.pt2.pt3": [
+      "type T3"
+    ],
+    "t2.pt3": [
+      "type T3"
+    ]
+  },
+  "*pointers.T2": {
+    "pt1.pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt1.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt1.t2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt2.pt3": [
+      "type T3"
+    ],
+    "pt2.pt3": [
+      "type T3"
+    ],
+    "pt3": [
+      "type T3"
+    ]
+  },
+  "*pointers.T3": {
+    "": [
+      "type T3"
+    ]
+  }
+}

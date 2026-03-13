@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+# Filter out any files with a !golint build tag.
+LINTABLE=$( go list -tags=golint -f '
+  {{- range $i, $file := .GoFiles -}}
+    {{ $file }} {{ end }}
+  {{ range $i, $file := .TestGoFiles -}}
+    {{ $file }} {{ end }}' github.com/coreos/go-oidc )
+
+go test -v -i -race github.com/coreos/go-oidc/...
+go test -v -race github.com/coreos/go-oidc/...
+golint -set_exit_status $LINTABLE
+go vet github.com/coreos/go-oidc/...
+go build -v ./example/...

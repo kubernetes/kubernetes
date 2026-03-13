@@ -1,0 +1,3 @@
+exemptions:
+  - check: artifacthub_badge
+    reason: "Artifact Hub doesn't support Go packages"

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: List
+items:
+- kind: Foo
+  apiVersion: company.com/v1
+  metadata:
+    name: test-list
+    labels:
+      pruneGroup: "true"
+  someField: field1
+  otherField: field2
+- kind: Bar
+  apiVersion: company.com/v1
+  metadata:
+    name: test-list
+    labels:
+      pruneGroup: "true"
+  someField: field1
+  otherField: field2

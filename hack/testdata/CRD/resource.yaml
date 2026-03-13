@@ -1,0 +1,6 @@
+apiVersion: mygroup.example.com/v1alpha1
+kind: Kind
+metadata:
+  name: myobj
+spec:
+  key: value

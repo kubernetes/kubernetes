@@ -1,0 +1,87 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+# ConsumableCapacity is a variant of
+# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice that have two devices, 
+# one preallocate device slice and one basic device. Both allows multiple allocations and contain consumable capacity.
+# And, it creates a resource claim template with two requests.
+# Each requests half of this capacity for two count.
+# The first request checks distinctAttribute which the other checks matchAttribute.
+- name: ConsumableCapacity
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAConsumableCapacity: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-consumablecapacity.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: ../templates/deviceclass-consumablecapacity.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-consumablecapacity.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+      maxClaimsPerNode: 2
+  - name: fast_with_DRAPartitionableDevices
+    featureGates:
+      DRAPartitionableDevices: true
+      DRAResourceClaimDeviceStatus: true
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+      maxClaimsPerNode: 2
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      resourceSlices: 2000
+      measurePods: 2000
+      steadyState: true
+      duration: 10s
+      maxClaimsPerNode: 20

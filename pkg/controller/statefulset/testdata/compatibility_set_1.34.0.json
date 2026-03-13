@@ -1,0 +1,102 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "StatefulSet",
+  "metadata": {
+    "creationTimestamp": "2025-10-31T18:19:02Z",
+    "generation": 1,
+    "labels": {
+      "sslabel": "value"
+    },
+    "name": "test",
+    "namespace": "default",
+    "resourceVersion": "16319",
+    "uid": "ec335e25-1045-4216-8634-50cfbe05f3d6"
+  },
+  "spec": {
+    "persistentVolumeClaimRetentionPolicy": {
+      "whenDeleted": "Retain",
+      "whenScaled": "Retain"
+    },
+    "podManagementPolicy": "OrderedReady",
+    "replicas": 1,
+    "revisionHistoryLimit": 10,
+    "selector": {
+      "matchLabels": {
+        "app": "foo"
+      }
+    },
+    "serviceName": "",
+    "template": {
+      "metadata": {
+        "annotations": {
+          "test": "value"
+        },
+        "labels": {
+          "app": "foo"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "image": "test",
+            "imagePullPolicy": "Always",
+            "name": "test",
+            "resources": {},
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File"
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "restartPolicy": "Always",
+        "schedulerName": "default-scheduler",
+        "securityContext": {},
+        "terminationGracePeriodSeconds": 30
+      }
+    },
+    "updateStrategy": {
+      "rollingUpdate": {
+        "partition": 0
+      },
+      "type": "RollingUpdate"
+    },
+    "volumeClaimTemplates": [
+      {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "metadata": {
+          "annotations": {
+            "key": "value"
+          },
+          "labels": {
+            "key": "value"
+          },
+          "name": "test"
+        },
+        "spec": {
+          "accessModes": [
+            "ReadWriteOnce"
+          ],
+          "resources": {
+            "requests": {
+              "storage": "1Gi"
+            }
+          },
+          "volumeMode": "Filesystem"
+        },
+        "status": {
+          "phase": "Pending"
+        }
+      }
+    ]
+  },
+  "status": {
+    "availableReplicas": 1,
+    "collisionCount": 0,
+    "currentReplicas": 1,
+    "currentRevision": "test-776999688b",
+    "observedGeneration": 1,
+    "replicas": 1,
+    "updateRevision": "test-776999688b",
+    "updatedReplicas": 1
+  }
+}

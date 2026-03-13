@@ -1,0 +1,31 @@
+# For documentation, see https://golangci-lint.run/usage/configuration/
+version: "2"
+
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    generated: strict
+
+linters:
+  enable:
+    - errorlint
+    - nolintlint
+    - unconvert
+    - unparam
+  settings:
+    govet:
+      enable:
+        - nilness
+    staticcheck:
+      checks:
+        - all
+        - -ST1000 # https://staticcheck.dev/docs/checks/#ST1000 Incorrect or missing package comment.
+        - -ST1003 # https://staticcheck.dev/docs/checks/#ST1003 Poorly chosen identifier.
+        - -ST1005 # https://staticcheck.dev/docs/checks/#ST1005 Incorrectly formatted error string.
+        - -QF1008 # https://staticcheck.dev/docs/checks/#QF1008 Omit embedded fields from selector expression.
+  exclusions:
+    generated: strict
+    presets:
+      - comments
+      - std-error-handling

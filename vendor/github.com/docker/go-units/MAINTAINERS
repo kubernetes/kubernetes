@@ -1,0 +1,46 @@
+# go-units maintainers file
+#
+# This file describes who runs the docker/go-units project and how.
+# This is a living document - if you see something out of date or missing, speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant parser.
+#
+# This file is compiled into the MAINTAINERS file in docker/opensource.
+#
+[Org]
+	[Org."Core maintainers"]
+		people = [
+			"akihirosuda",
+			"dnephin",
+			"thajeztah",
+			"vdemeester",
+		]
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.akihirosuda]
+	Name = "Akihiro Suda"
+	Email = "akihiro.suda.cz@hco.ntt.co.jp"
+	GitHub = "AkihiroSuda"
+
+	[people.dnephin]
+	Name = "Daniel Nephin"
+	Email = "dnephin@gmail.com"
+	GitHub = "dnephin"
+	
+	[people.thajeztah]
+	Name = "Sebastiaan van Stijn"
+	Email = "github@gone.nl"
+	GitHub = "thaJeztah"
+
+	[people.vdemeester]
+	Name = "Vincent Demeester"
+	Email = "vincent@sbr.pm"
+	GitHub = "vdemeester"
