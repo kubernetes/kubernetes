@@ -291,7 +291,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
