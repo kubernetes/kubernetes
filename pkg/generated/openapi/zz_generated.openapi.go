@@ -34270,7 +34270,6 @@ func schema_k8sio_api_events_v1beta1_EventSeries(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"count", "lastObservedTime"},
 			},
 		},
 		Dependencies: []string{

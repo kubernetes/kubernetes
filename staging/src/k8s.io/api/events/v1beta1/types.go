@@ -108,10 +108,10 @@ type Event struct {
 // continuously for some time.
 type EventSeries struct {
 	// count is the number of occurrences in this series up to the last heartbeat time.
-	// +required
+	// +optional
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// lastObservedTime is the time when last Event from the series was seen before last heartbeat.
-	// +required
+	// +optional
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime" protobuf:"bytes,2,opt,name=lastObservedTime"`
 
 	// +k8s:deprecated=state,protobuf=3

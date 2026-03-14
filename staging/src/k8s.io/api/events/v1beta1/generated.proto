@@ -123,11 +123,11 @@ message EventList {
 // continuously for some time.
 message EventSeries {
   // count is the number of occurrences in this series up to the last heartbeat time.
-  // +required
+  // +optional
   optional int32 count = 1;
 
   // lastObservedTime is the time when last Event from the series was seen before last heartbeat.
-  // +required
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 }
 
