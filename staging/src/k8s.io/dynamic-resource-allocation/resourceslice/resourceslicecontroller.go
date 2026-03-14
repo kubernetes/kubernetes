@@ -102,9 +102,9 @@ type Controller struct {
 	lastAddByPool map[string]time.Time
 
 	// Must use atomic access...
-	numCreates int64
-	numUpdates int64
-	numDeletes int64
+	numCreates atomic.Int64
+	numUpdates atomic.Int64
+	numDeletes atomic.Int64
 
 	mutex sync.RWMutex
 
@@ -376,9 +376,9 @@ func roundTaintTimeAdded(resources *DriverResources) {
 // GetStats provides some insights into operations of the controller.
 func (c *Controller) GetStats() Stats {
 	s := Stats{
-		NumCreates: atomic.LoadInt64(&c.numCreates),
-		NumUpdates: atomic.LoadInt64(&c.numUpdates),
-		NumDeletes: atomic.LoadInt64(&c.numDeletes),
+		NumCreates: c.numCreates.Load(),
+		NumUpdates: c.numUpdates.Load(),
+		NumDeletes: c.numDeletes.Load(),
 	}
 	return s
 }
@@ -792,7 +792,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			return fmt.Errorf("update resource slice: %w", err)
 		}
 		logger.V(5).Info("Updated existing resource slice", "slice", klog.KObj(slice))
-		atomic.AddInt64(&c.numUpdates, 1)
+		c.numUpdates.Add(1)
 		c.sliceStored(ctx, "update ResourceSlice", poolName, pool, i, slice, actualSlice)
 	}
 
@@ -850,7 +850,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			return fmt.Errorf("create resource slice: %w", err)
 		}
 		logger.V(5).Info("Created new resource slice", "slice", klog.KObj(actualSlice))
-		atomic.AddInt64(&c.numCreates, 1)
+		c.numCreates.Add(1)
 		added = true
 		c.sliceStored(ctx, "create ResourceSlice", poolName, pool, i, slice, actualSlice)
 	}
@@ -905,7 +905,7 @@ func (c *Controller) removeSlices(ctx context.Context, slices []*resourceapi.Res
 		switch {
 		case err == nil:
 			logger.V(5).Info("Deleted obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
-			atomic.AddInt64(&c.numDeletes, 1)
+			c.numDeletes.Add(1)
 		case apierrors.IsNotFound(err):
 			logger.V(5).Info("Resource slice was already deleted earlier", "slice", klog.KObj(slice))
 		default:

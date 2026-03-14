@@ -27,11 +27,11 @@ import (
 )
 
 func TestLazy(t *testing.T) {
-	var reality int64
+	var reality atomic.Int64
 	var z synctrack.Lazy[int64]
 
 	z.Evaluate = func() (int64, error) {
-		return atomic.LoadInt64(&reality), nil
+		return reality.Load(), nil
 	}
 
 	var wg sync.WaitGroup
@@ -42,7 +42,7 @@ func TestLazy(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < 100; i++ {
 				t.Helper()
-				set := atomic.AddInt64(&reality, 1)
+				set := reality.Add(1)
 				z.Notify()
 				got, err := z.Get()
 				if err != nil {
@@ -60,11 +60,11 @@ func TestLazy(t *testing.T) {
 }
 
 func TestLazyThroughput(t *testing.T) {
-	var reality int64
+	var reality atomic.Int64
 	var z synctrack.Lazy[int64]
-	var totalWait int64
+	var totalWait atomic.Int64
 	z.Evaluate = func() (int64, error) {
-		got := atomic.LoadInt64(&reality)
+		got := reality.Load()
 		time.Sleep(11 * time.Millisecond)
 		return got, nil
 	}
@@ -78,7 +78,7 @@ func TestLazyThroughput(t *testing.T) {
 		tt := time.NewTicker(10 * time.Millisecond)
 		for {
 			<-tt.C
-			atomic.AddInt64(&reality, 1)
+			reality.Add(1)
 			z.Notify()
 			notifies++
 			if notifies >= 100 {
@@ -92,14 +92,14 @@ func TestLazyThroughput(t *testing.T) {
 				start := time.Now()
 				z.Get()
 				d := time.Since(start)
-				atomic.AddInt64(&totalWait, int64(d))
+				totalWait.Add(int64(d))
 			}()
 		}
 	}()
 
 	wg.Wait()
 
-	twd := time.Duration(totalWait)
+	twd := time.Duration(totalWait.Load())
 
 	if twd > 3*time.Second {
 		t.Errorf("total wait was: %v; par would be ~1s", twd)
@@ -155,11 +155,11 @@ func TestLazySlowEval(t *testing.T) {
 
 	seq := newSequence(10)
 
-	var getCount int64
+	var getCount atomic.Int64
 	var z synctrack.Lazy[int64]
 
 	z.Evaluate = func() (int64, error) {
-		count := atomic.AddInt64(&getCount, 1)
+		count := getCount.Add(1)
 		if count == 1 {
 			seq.Step(1)
 			seq.Step(6)
@@ -200,11 +200,11 @@ func TestLazySlowEval2(t *testing.T) {
 
 	seq := newSequence(11)
 
-	var getCount int64
+	var getCount atomic.Int64
 	var z synctrack.Lazy[int64]
 
 	z.Evaluate = func() (int64, error) {
-		count := atomic.AddInt64(&getCount, 1)
+		count := getCount.Add(1)
 		if count == 1 {
 			seq.Step(1)
 			seq.Step(5)
@@ -244,11 +244,11 @@ func TestLazyOnlyOnce(t *testing.T) {
 
 	seq := newSequence(8)
 
-	var getCount int64
+	var getCount atomic.Int64
 	var z synctrack.Lazy[int64]
 
 	z.Evaluate = func() (int64, error) {
-		count := atomic.AddInt64(&getCount, 1)
+		count := getCount.Add(1)
 		if count == 1 {
 			seq.Step(1)
 			seq.Step(4)

@@ -2130,11 +2130,11 @@ func TestStoreDeletionPropagation(t *testing.T) {
 type storageWithCounter struct {
 	storage.Interface
 
-	listCounter int64
+	listCounter atomic.Int64
 }
 
 func (s *storageWithCounter) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	atomic.AddInt64(&s.listCounter, 1)
+	s.listCounter.Add(1)
 	return s.Interface.GetList(ctx, key, opts, listObj)
 }
 
@@ -2171,7 +2171,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		t.Errorf("Unexpected number of pods deleted: %d, expected: %d", len(deletedPods.Items), numPods)
 	}
 	expectedCalls := (int64(numPods) + deleteCollectionPageSize - 1) / deleteCollectionPageSize
-	if listCalls := atomic.LoadInt64(&storeWithCounter.listCounter); listCalls != expectedCalls {
+	if listCalls := storeWithCounter.listCounter.Load(); listCalls != expectedCalls {
 		t.Errorf("Unexpected number of list calls: %d, expected: %d", listCalls, expectedCalls)
 	}
 

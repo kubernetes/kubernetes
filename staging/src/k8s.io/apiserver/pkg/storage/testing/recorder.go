@@ -28,7 +28,7 @@ import (
 type KVRecorder struct {
 	clientv3.KV
 
-	reads uint64
+	reads atomic.Uint64
 }
 
 func NewKVRecorder(kv clientv3.KV) *KVRecorder {
@@ -36,12 +36,12 @@ func NewKVRecorder(kv clientv3.KV) *KVRecorder {
 }
 
 func (r *KVRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	atomic.AddUint64(&r.reads, 1)
+	r.reads.Add(1)
 	return r.KV.Get(ctx, key, opts...)
 }
 
 func (r *KVRecorder) GetReadsAndReset() uint64 {
-	return atomic.SwapUint64(&r.reads, 0)
+	return r.reads.Swap(0)
 }
 
 type KubernetesRecorder struct {

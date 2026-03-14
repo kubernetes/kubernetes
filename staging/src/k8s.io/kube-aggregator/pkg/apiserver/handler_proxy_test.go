@@ -617,10 +617,10 @@ func TestProxyUpgrade(t *testing.T) {
 		tcName := k
 		t.Run(tcName, func(t *testing.T) {
 			path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
-			timesCalled := int32(0)
+			var timesCalled atomic.Int32
 			backendHandler := http.NewServeMux()
 			backendHandler.Handle(path, websocket.Handler(func(ws *websocket.Conn) {
-				atomic.AddInt32(&timesCalled, 1)
+				timesCalled.Add(1)
 				defer ws.Close()
 				req := ws.Request()
 				user := req.Header.Get("X-Remote-User")
@@ -647,7 +647,7 @@ func TestProxyUpgrade(t *testing.T) {
 			defer backendServer.Close()
 
 			defer func() {
-				if called := atomic.LoadInt32(&timesCalled) > 0; called != tc.ExpectCalled {
+				if called := timesCalled.Load() > 0; called != tc.ExpectCalled {
 					t.Errorf("%s: expected called=%v, got %v", tcName, tc.ExpectCalled, called)
 				}
 			}()
@@ -1126,15 +1126,15 @@ func TestProxyCertReload(t *testing.T) {
 }
 
 type fcInitSignal struct {
-	nSignals int32
+	nSignals atomic.Int32
 }
 
 func (s *fcInitSignal) SignalCount() int {
-	return int(atomic.SwapInt32(&s.nSignals, 0))
+	return int(s.nSignals.Swap(0))
 }
 
 func (s *fcInitSignal) Signal() {
-	atomic.AddInt32(&s.nSignals, 1)
+	s.nSignals.Add(1)
 }
 
 func (s *fcInitSignal) Wait() {
@@ -1203,12 +1203,12 @@ func TestFlowControlSignal(t *testing.T) {
 
 			var sig fcInitSignal
 
-			var signalCountOnAccept int32
+			var signalCountOnAccept atomic.Int32
 			backend := httptest.NewUnstartedServer(okh)
 			backend.Listener = &hookedListener{
 				l: backend.Listener,
 				onAccept: func() {
-					atomic.StoreInt32(&signalCountOnAccept, int32(sig.SignalCount()))
+					signalCountOnAccept.Store(int32(sig.SignalCount()))
 				},
 			}
 			backend.Start()
@@ -1251,7 +1251,7 @@ func TestFlowControlSignal(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if fired := (atomic.LoadInt32(&signalCountOnAccept) > 0); tc.SignalExpected && !fired {
+			if fired := (signalCountOnAccept.Load() > 0); tc.SignalExpected && !fired {
 				t.Errorf("flow control signal expected but not fired")
 			} else if fired && !tc.SignalExpected {
 				t.Errorf("flow control signal fired but not expected")

@@ -69,19 +69,26 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 
 // HighWaterMark is a thread-safe object for tracking the maximum value seen
 // for some quantity.
-type HighWaterMark int64
+type HighWaterMark struct {
+	val atomic.Int64
+}
 
 // Update returns true if and only if 'current' is the highest value ever seen.
 func (hwm *HighWaterMark) Update(current int64) bool {
 	for {
-		old := atomic.LoadInt64((*int64)(hwm))
+		old := hwm.val.Load()
 		if current <= old {
 			return false
 		}
-		if atomic.CompareAndSwapInt64((*int64)(hwm), old, current) {
+		if hwm.val.CompareAndSwap(old, current) {
 			return true
 		}
 	}
+}
+
+// Load returns the current high water mark value.
+func (hwm *HighWaterMark) Load() int64 {
+	return hwm.val.Load()
 }
 
 // AnnotateInitialEventsEndBookmark adds a special annotation to the given object

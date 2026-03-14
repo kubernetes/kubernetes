@@ -406,12 +406,16 @@ func shuffleAndTakeDigests(t *testing.T, rng *rand.Rand, rule *flowcontrol.Polic
 	return ans
 }
 
-var uCounter uint32 = 1
+var uCounter atomic.Uint32
+
+func init() {
+	uCounter.Store(1)
+}
 
 func uniqify(in RequestDigest) RequestDigest {
 	u1 := in.User.(*user.DefaultInfo)
 	u2 := *u1
-	u2.Extra = map[string][]string{"u": {fmt.Sprintf("z%d", atomic.AddUint32(&uCounter, 1))}}
+	u2.Extra = map[string][]string{"u": {fmt.Sprintf("z%d", uCounter.Add(1))}}
 	return RequestDigest{User: &u2, RequestInfo: in.RequestInfo}
 }
 
