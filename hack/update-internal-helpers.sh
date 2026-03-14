@@ -35,6 +35,7 @@ cd "${KUBE_ROOT}"
 HELPERS=(
   "staging/src/k8s.io/component-helpers/resource:pkg/apis/core/helper/resource"
   "pkg/apis/core/v1/helper/qos:pkg/apis/core/helper/qos"
+  "pkg/api/v1/pod:pkg/api/pod"
 )
 
 for entry in "${HELPERS[@]}"; do
