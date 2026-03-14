@@ -40,7 +40,6 @@ import (
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
@@ -108,10 +107,10 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	resizeStore := *store
 	resizeStore.UpdateStrategy = registrypod.ResizeStrategy
 
-	bindingREST := &BindingREST{store: store}
+	bindingREST := &BindingREST{store: store, strategy: registrypod.BindingStrategy}
 	return PodStorage{
 		Pod:                 &REST{store, proxyTransport},
-		Binding:             &BindingREST{store: store},
+		Binding:             bindingREST,
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
@@ -149,9 +148,9 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-// BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
-	store *genericregistry.Store
+	store    *genericregistry.Store
+	strategy rest.RESTCreateStrategy
 }
 
 // NamespaceScoped fulfill rest.Scoper
@@ -184,8 +183,7 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
 	}
 
-	// TODO: move me to a binding strategy
-	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
+	if errs := r.strategy.Validate(ctx, binding); len(errs) != 0 {
 		return nil, errs.ToAggregate()
 	}
 

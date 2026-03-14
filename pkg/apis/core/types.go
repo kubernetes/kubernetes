@@ -5982,6 +5982,8 @@ type Binding struct {
 	metav1.ObjectMeta
 
 	// Target is the object to bind to.
+	// +k8s:alpha(since: "1.36")=+k8s:rule="self.target.name != ''",message="name: Required value"
+	// +k8s:alpha(since: "1.36")=+k8s:rule="self.target.kind == 'Node' || self.target.kind == ''",message="supported values: \"Node\", \"<empty>\""
 	Target ObjectReference
 }
 
