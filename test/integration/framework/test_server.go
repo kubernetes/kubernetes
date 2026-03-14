@@ -237,7 +237,9 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	kubeAPIServerClientConfig.ServerName = ""
 
 	// wait for health
-	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	// Allow slower environments more time to finish etcd/apiserver startup
+	// before the integration framework gives up on the test server.
+	err = wait.PollImmediate(100*time.Millisecond, 60*time.Second, func() (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err
