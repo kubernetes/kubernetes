@@ -34,6 +34,7 @@ cd "${KUBE_ROOT}"
 # Define directories to translate: [input_dir]:[output_dir]
 HELPERS=(
   "staging/src/k8s.io/component-helpers/resource:pkg/apis/core/helper/resource"
+  "pkg/apis/core/v1/helper/qos:pkg/apis/core/helper/qos"
 )
 
 for entry in "${HELPERS[@]}"; do
