@@ -33,9 +33,11 @@ import (
 )
 
 const (
-	Name      = "unversioned-helper-gen"
-	TagName   = "+k8s:unversioned-gen"
-	TagPrefix = TagName + "="
+	Name         = "unversioned-helper-gen"
+	TagName      = "+k8s:unversioned-gen"
+	TagPrefix    = TagName + "="
+	PkgTagName   = "+k8s:unversioned-pkg"
+	PkgTagPrefix = PkgTagName + "="
 )
 
 // Code generator for generating helper utilities for unversioned (internal) Kubernetes types from
@@ -50,6 +52,14 @@ const (
 //	  // +k8s:unversioned-gen=k8s.io/kubernetes/PATH
 //	where PATH is the package path for the unversioned helper (e.g., `pkg/apis/core`).
 //	The generator will remove this tag from the generated output.
+//
+//	Tag imports that need redirection to unversioned equivalents with:
+//	  // +k8s:unversioned-pkg=TARGET_PATH
+//	where TARGET_PATH is the import path of the unversioned package.
+//	The tag can be placed on the line before the import spec or on the same line.
+//	The generator will replace the import path with TARGET_PATH, force the original
+//	alias (or the original package name if no alias was present) to keep code references valid,
+//	and remove the tag from the generated output.
 //
 // Output:
 //
@@ -164,7 +174,7 @@ func extractAndRemoveTag(f *ast.File) (string, error) {
 	for _, group := range f.Comments {
 		var newList []*ast.Comment
 		for _, comment := range group.List {
-			if trimmed, found := parseTag(comment.Text); found {
+			if trimmed, found := parseTag(comment.Text, TagPrefix); found {
 				if tagFound {
 					return "", fmt.Errorf("multiple %s tags found", TagName)
 				}
@@ -190,16 +200,72 @@ func extractAndRemoveTag(f *ast.File) (string, error) {
 	return tagValue, nil
 }
 
-// parseTag checks if a comment line contains the generator tag and returns its value.
-func parseTag(commentText string) (string, bool) {
+// parseTag checks if a comment line contains the generator tag with given prefix and returns its value.
+func parseTag(commentText string, prefix string) (string, bool) {
 	if !strings.HasPrefix(commentText, "//") {
 		return "", false
 	}
 	trimmed := strings.TrimSpace(strings.TrimPrefix(commentText, "//"))
-	if !strings.HasPrefix(trimmed, TagPrefix) {
+	if !strings.HasPrefix(trimmed, prefix) {
 		return "", false
 	}
-	return strings.TrimPrefix(trimmed, TagPrefix), true
+	return strings.TrimPrefix(trimmed, prefix), true
+}
+
+// extractAndRemovePkgTag extracts the target package path from the comment group
+// and removes the comment line containing the tag.
+// It returns an error if multiple tags are found in the same group.
+func (g *generator) extractAndRemovePkgTag(group *ast.CommentGroup) (string, bool, error) {
+	if group == nil {
+		return "", false, nil
+	}
+	var newList []*ast.Comment
+	var tagValue string
+	var found bool
+	for _, comment := range group.List {
+		if trimmed, ok := parseTag(comment.Text, PkgTagPrefix); ok {
+			if found {
+				return "", false, fmt.Errorf("multiple %s tags found in comment group", PkgTagName)
+			}
+			tagValue = trimmed
+			found = true
+			continue // remove it
+		}
+		newList = append(newList, comment)
+	}
+	group.List = newList
+	return tagValue, found, nil
+}
+
+// checkAndRemoveAnnotation checks both Doc and Comment of the import for the redirection tag,
+// removes it, and registers the group for removal if it becomes empty.
+func (g *generator) checkAndRemoveAnnotation(imp *ast.ImportSpec) (string, bool, error) {
+	targetDoc, foundDoc, err := g.extractAndRemovePkgTag(imp.Doc)
+	if err != nil {
+		return "", false, err
+	}
+	if foundDoc && imp.Doc != nil && len(imp.Doc.List) == 0 {
+		g.commentsToRemove[imp.Doc] = true
+		imp.Doc = nil
+	}
+
+	targetComment, foundComment, err := g.extractAndRemovePkgTag(imp.Comment)
+	if err != nil {
+		return "", false, err
+	}
+	if foundComment && imp.Comment != nil && len(imp.Comment.List) == 0 {
+		g.commentsToRemove[imp.Comment] = true
+		imp.Comment = nil
+	}
+
+	if foundDoc && foundComment {
+		return "", false, fmt.Errorf("duplicate %s tag on import %s (found in both doc and comment)", PkgTagName, imp.Path.Value)
+	}
+
+	if foundDoc {
+		return targetDoc, true, nil
+	}
+	return targetComment, foundComment, nil
 }
 
 // validateTag checks if the tag value is a valid destination path.
@@ -219,7 +285,9 @@ func validateTag(tag string) (string, error) {
 func (g *generator) translateAST(fset *token.FileSet, f *ast.File, input, output, pkg, outputImport string) error {
 	f.Name.Name = pkg
 
-	selfAlias, err := updateImports(f, outputImport)
+	g.commentsToRemove = make(map[*ast.CommentGroup]bool)
+
+	selfAlias, err := g.updateImports(f, outputImport)
 	if err != nil {
 		return err
 	}
@@ -230,6 +298,17 @@ func (g *generator) translateAST(fset *token.FileSet, f *ast.File, input, output
 
 	rewriteReferences(f, selfAlias)
 
+	// Filter out empty comment groups
+	if len(g.commentsToRemove) > 0 {
+		var newComments []*ast.CommentGroup
+		for _, group := range f.Comments {
+			if !g.commentsToRemove[group] {
+				newComments = append(newComments, group)
+			}
+		}
+		f.Comments = newComments
+	}
+
 	return g.writeGeneratedFile(fset, f, input, output, pkg)
 }
 
@@ -237,7 +316,7 @@ func (g *generator) translateAST(fset *token.FileSet, f *ast.File, input, output
 // It translates versioned API imports (currently only v1 core) to their internal counterparts.
 // It returns the alias used for the outputImport, if it was imported, which is used later
 // to remove self-references.
-func updateImports(f *ast.File, outputImport string) (string, error) {
+func (g *generator) updateImports(f *ast.File, outputImport string) (string, error) {
 	var selfAlias string
 	for _, imp := range f.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
@@ -250,6 +329,23 @@ func updateImports(f *ast.File, outputImport string) (string, error) {
 				// which matches the target package name we set.
 				selfAlias = f.Name.Name
 			}
+			continue
+		}
+
+		// Check for unversioned-pkg redirection annotation
+		targetPkg, found, err := g.checkAndRemoveAnnotation(imp)
+		if err != nil {
+			return "", err
+		}
+		if found {
+			var origAlias string
+			if imp.Name != nil {
+				origAlias = imp.Name.Name
+			} else {
+				origAlias = filepath.Base(path)
+			}
+			imp.Path.Value = `"` + targetPkg + `"`
+			imp.Name = &ast.Ident{Name: origAlias}
 			continue
 		}
 
@@ -343,7 +439,8 @@ func (g *generator) getRelativeSourcePath(inputPath string) string {
 }
 
 type generator struct {
-	kubeRoot string
+	kubeRoot         string
+	commentsToRemove map[*ast.CommentGroup]bool
 }
 
 // findKubeRoot returns the root of the kubernetes source tree.
