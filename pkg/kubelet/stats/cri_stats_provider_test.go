@@ -100,6 +100,7 @@ const testPodLogDirectory = "/var/log/kube/pods/" // Use non-default path to ens
 
 func TestCRIListPodStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
 	tCtx := ktesting.Init(t)
 	var (
 		imageFsMountpoint = "/test/mount/point"
@@ -353,6 +354,7 @@ func TestCRIListPodStats(t *testing.T) {
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
 	if runtime.GOOS == "windows" {
 		// TODO: remove skip once the failing test has been fixed.
 		t.Skip("Skip failing test on Windows.")
@@ -552,6 +554,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 }
 func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
 	tCtx := ktesting.Init(t)
 
 	var (
@@ -1026,6 +1029,7 @@ func makeFakeContainerStatsStrictlyFromCRI(seed int, container *critest.FakeCont
 			UsageBytes:      &runtimeapi.UInt64Value{Value: uint64(seed + offsetCRI + offsetMemUsageBytes)},
 			RssBytes:        &runtimeapi.UInt64Value{Value: uint64(seed + offsetCRI + offsetMemRSSBytes)},
 			Psi:             getCRITestPSIStats(seed),
+			Events:          getCRITestMemoryEvents(seed),
 		}
 		containerStats.Io = &runtimeapi.IoUsage{
 			Timestamp: timestamp.UnixNano(),
@@ -1060,6 +1064,7 @@ func makeFakePodSandboxStatsStrictlyFromCRI(seed int, podSandbox *critest.FakePo
 			UsageBytes:      &runtimeapi.UInt64Value{Value: uint64(seed + offsetCRI + offsetMemUsageBytes)},
 			RssBytes:        &runtimeapi.UInt64Value{Value: uint64(seed + offsetCRI + offsetMemRSSBytes)},
 			Psi:             getCRITestPSIStats(seed),
+			Events:          getCRITestMemoryEvents(seed),
 		}
 		podSandboxStats.Linux.Io = &runtimeapi.IoUsage{
 			Timestamp: timestamp.UnixNano(),
@@ -1082,6 +1087,20 @@ func getCRITestPSIData(seed int) *runtimeapi.PsiData {
 		Avg10:  float64(10),
 		Avg60:  float64(10),
 		Avg300: float64(10),
+	}
+}
+
+func getCRITestMemoryEvents(seed int) *runtimeapi.MemoryEvents {
+	return &runtimeapi.MemoryEvents{
+		High: uint64(seed + 1),
+		Max:  uint64(seed + 2),
+	}
+}
+
+func getExpectedMemoryEventsStats(seed int) *statsapi.MemoryEventsStats {
+	return &statsapi.MemoryEventsStats{
+		High: uint64(seed + 1),
+		Max:  uint64(seed + 2),
 	}
 }
 
@@ -1113,6 +1132,7 @@ func getPodSandboxStatsStrictlyFromCRI(seed int, podSandbox *critest.FakePodSand
 			UsageBytes:      ptr.To(uint64(seed + offsetCRI + offsetMemUsageBytes)),
 			RSSBytes:        ptr.To(uint64(seed + offsetCRI + offsetMemRSSBytes)),
 			PSI:             cadvisorPSIToStatsPSI(&psi),
+			Events:          getExpectedMemoryEventsStats(seed),
 		}
 		podStats.IO = &statsapi.IOStats{
 			Time: metav1.NewTime(timestamp),
@@ -1191,6 +1211,9 @@ func checkCRICPUAndMemoryStatsForStrictlyFromCRI(assert *assert.Assertions, actu
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		checkCRIPSIStatsStrictlyFromCRI(assert, expected.CPU.PSI, actual.CPU.PSI)
 		checkCRIPSIStatsStrictlyFromCRI(assert, expected.Memory.PSI, actual.Memory.PSI)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+		checkMemoryEventsStats(assert, expected.Memory.Events, actual.Memory.Events)
 	}
 }
 
@@ -1322,6 +1345,13 @@ func checkCRIPSIDataStrictlyFromCRI(assert *assert.Assertions, want, got statsap
 	assert.InDelta(want.Avg300, got.Avg300, 0.01)
 }
 
+func checkMemoryEventsStats(assert *assert.Assertions, want, got *statsapi.MemoryEventsStats) {
+	assert.NotNil(want)
+	assert.NotNil(got)
+	assert.Equal(want.High, got.High)
+	assert.Equal(want.Max, got.Max)
+}
+
 func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
 	if runtime.GOOS != "linux" {
 		return
@@ -1342,6 +1372,9 @@ func checkCRIPodCPUAndMemoryStatsStrictlyFromCRI(assert *assert.Assertions, actu
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		checkCRIPSIStatsStrictlyFromCRI(assert, expected.CPU.PSI, actual.CPU.PSI)
 		checkCRIPSIStatsStrictlyFromCRI(assert, expected.Memory.PSI, actual.Memory.PSI)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+		checkMemoryEventsStats(assert, expected.Memory.Events, actual.Memory.Events)
 	}
 }
 
@@ -1581,6 +1614,7 @@ func getCRIContainerStatsStrictlyFromCRI(seed int, containerName string) statsap
 	result.Memory.UsageBytes = ptr.To(uint64(seed + offsetCRI + offsetMemUsageBytes))
 	result.Memory.RSSBytes = ptr.To(uint64(seed + offsetCRI + offsetMemRSSBytes))
 	result.Memory.PSI = cadvisorPSIToStatsPSI(&psi)
+	result.Memory.Events = getExpectedMemoryEventsStats(seed)
 
 	result.IO.Time = metav1.NewTime(timestamp)
 	result.IO.PSI = cadvisorPSIToStatsPSI(&psi)

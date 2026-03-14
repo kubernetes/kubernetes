@@ -107,6 +107,7 @@ func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandb
 		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
 		MajorPageFaults: valueOfUInt64Value(criMemory.MajorPageFaults),
 		PSI:             makePSIStats(criMemory.Psi),
+		Events:          makeMemoryEventsStats(criMemory.Events),
 	}
 }
 

@@ -117,6 +117,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 1e9),
 						"PSI":             psiExpectation(),
+						"Events":          gomega.BeNil(),
 					}),
 					"IO":                 ioExpectation(maxStatsAge),
 					"Swap":               swapExpectation(memoryLimit),
@@ -146,6 +147,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				"PSI":             psiExpectation(),
+				"Events":          gomega.BeNil(),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 			systemContainers := gstruct.Elements{
@@ -168,6 +170,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 1e9),
 					"PSI":             psiExpectation(),
+					"Events":          gomega.BeNil(),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -194,6 +197,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 							"PSI":             psiExpectation(),
+							"Events":          gomega.BeNil(),
 						}),
 						"IO":           ioExpectation(maxStatsAge),
 						"Swap":         swapExpectation(memoryLimit),
@@ -245,6 +249,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 					"PSI":             psiExpectation(),
+					"Events":          gomega.BeNil(),
 				}),
 				"IO":   ioExpectation(maxStatsAge),
 				"Swap": swapExpectation(memoryLimit),
@@ -299,6 +304,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 1e9),
 						"PSI":             psiExpectation(),
+						"Events":          gomega.BeNil(),
 					}),
 					"IO":   ioExpectation(maxStatsAge),
 					"Swap": swapExpectation(memoryLimit),

@@ -267,6 +267,18 @@ type MemoryStats struct {
 	// Memory PSI stats.
 	// +optional
 	PSI *PSIStats `json:"psi,omitempty"`
+	// Memory events from cgroup v2 memory.events.
+	// +optional
+	Events *MemoryEventsStats `json:"events,omitempty"`
+}
+
+// MemoryEventsStats contains cumulative counters from the cgroup v2 memory.events file.
+type MemoryEventsStats struct {
+	// Number of times processes were throttled and routed to perform direct memory
+	// reclaim because the high boundary (memory.high) was exceeded.
+	High uint64 `json:"high"`
+	// Number of times the cgroup hit the max boundary (memory.max) limit.
+	Max uint64 `json:"max"`
 }
 
 // IOStats contains data about IO usage.

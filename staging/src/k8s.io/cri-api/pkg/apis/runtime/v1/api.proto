@@ -1959,6 +1959,17 @@ message MemoryUsage {
     UInt64Value major_page_faults = 7;
     // Memory PSI statistics.
     PsiStats psi = 8;
+    // Memory events from the cgroup memory controller (cgroup v2 memory.events).
+    MemoryEvents events = 9;
+}
+
+// MemoryEvents contains cumulative counters from the cgroup v2 memory.events file.
+message MemoryEvents {
+    // Number of times processes in the cgroup were throttled and routed to perform
+    // direct memory reclaim because the high boundary (memory.high) was exceeded.
+    uint64 high = 1;
+    // Number of times the cgroup hit the max boundary (memory.max) limit.
+    uint64 max = 2;
 }
 
 message IoUsage {

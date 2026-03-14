@@ -822,6 +822,7 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Memory.MajorPageFaults = &stats.Memory.MajorPageFaults.Value
 		}
 		result.Memory.PSI = makePSIStats(stats.Memory.Psi)
+		result.Memory.Events = makeMemoryEventsStats(stats.Memory.Events)
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
@@ -935,6 +936,7 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 			PageFaults:      getUint64(stats.Memory.PageFaults),
 			MajorPageFaults: getUint64(stats.Memory.MajorPageFaults),
 			PSI:             makePSIStats(stats.Memory.Psi),
+			Events:          makeMemoryEventsStats(stats.Memory.Events),
 		}
 	} else if zeroMissingValues {
 		result.Memory = &statsapi.MemoryStats{
@@ -962,6 +964,19 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	}
 
 	return result
+}
+
+func makeMemoryEventsStats(events *runtimeapi.MemoryEvents) *statsapi.MemoryEventsStats {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+		return nil
+	}
+	if events == nil {
+		return nil
+	}
+	return &statsapi.MemoryEventsStats{
+		High: events.High,
+		Max:  events.Max,
+	}
 }
 
 func makePSIStats(stats *runtimeapi.PsiStats) *statsapi.PSIStats {
