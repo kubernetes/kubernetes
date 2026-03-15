@@ -55,19 +55,28 @@ func TestConditionsAwareDecision(t *testing.T) {
 		tooManyConditions[i] = authorizer.GenericCondition{ID: fmt.Sprintf("cond-%d", i), Effect: authorizer.ConditionEffectAllow}
 	}
 
+	condMapAllow := authorizer.ConditionsAwareDecisionConditionsMap(
+		authorizer.GenericCondition{ID: "allow-cond", Condition: "something", Effect: authorizer.ConditionEffectAllow, Type: "test-type"},
+	)
+	condMapDeny := authorizer.ConditionsAwareDecisionConditionsMap(
+		authorizer.GenericCondition{ID: "deny-cond", Condition: "something", Effect: authorizer.ConditionEffectDeny, Type: "test-type"},
+	)
+
 	tests := []struct {
-		name                 string
-		testDecisions        []authorizer.ConditionsAwareDecision
-		wantIsAllowed        bool
-		wantIsNoOpinion      bool
-		wantIsDenied         bool
-		wantIsConditionsMap  bool
-		wantIsUnconditional  bool
-		wantFailClosedIsDeny bool
-		wantReason           string
-		wantAnyError         bool
-		wantErrorIs          error
-		wantString           string
+		name                    string
+		testDecisions           []authorizer.ConditionsAwareDecision
+		wantIsAllowed           bool
+		wantIsNoOpinion         bool
+		wantIsDenied            bool
+		wantIsConditionsMap     bool
+		wantIsUnion             bool
+		wantIsUnconditional     bool
+		wantContainsAllowOrDeny bool
+		wantFailClosedIsDeny    bool
+		wantReason              string
+		wantAnyError            bool
+		wantErrorIs             error
+		wantString              string
 	}{
 		{
 			name: "zero value",
@@ -78,12 +87,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "",
-			wantErrorIs:          nil,
-			wantString:           `Deny`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "",
+			wantErrorIs:             nil,
+			wantString:              `Deny`,
 		},
 		{
 			name: "deny constructor",
@@ -94,12 +104,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionDeny, "foo", unexpectedErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "foo",
-			wantErrorIs:          unexpectedErr,
-			wantString:           `Deny(reason="foo", err="unexpected things happened")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "foo",
+			wantErrorIs:             unexpectedErr,
+			wantString:              `Deny(reason="foo", err="unexpected things happened")`,
 		},
 		{
 			name: "allow constructor",
@@ -110,11 +121,12 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionAllow, "ok", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsAllowed:       true,
-			wantIsUnconditional: true,
-			wantReason:          "ok",
-			wantErrorIs:         nil,
-			wantString:          `Allow(reason="ok")`,
+			wantIsAllowed:           true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantReason:              "ok",
+			wantErrorIs:             nil,
+			wantString:              `Allow(reason="ok")`,
 		},
 		{
 			name: "noopinion constructor",
@@ -139,12 +151,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "",
-			wantAnyError:         true,
-			wantString:           `Deny(err="unknown unconditional decision type: 42")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "",
+			wantAnyError:            true,
+			wantString:              `Deny(err="unknown unconditional decision type: 42")`,
 		},
 		{
 			name: "from parts: unsupported mode with other error",
@@ -154,12 +167,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "foo", otherErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "foo",
-			wantErrorIs:          otherErr,
-			wantString:           `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "foo",
+			wantErrorIs:             otherErr,
+			wantString:              `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
 		},
 		{
 			name: "construct valid conditionsmap",
@@ -175,12 +189,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 			testDecisions: []authorizer.ConditionsAwareDecision{
 				authorizer.ConditionsAwareDecisionConditionsMap(tooManyConditions...),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "failed closed",
-			wantAnyError:         true,
-			wantString:           `Deny(reason="failed closed", err="too many conditions: 129 exceeds maximum of 128")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "failed closed",
+			wantAnyError:            true,
+			wantString:              `Deny(reason="failed closed", err="too many conditions: 129 exceeds maximum of 128")`,
 		},
 		{
 			name: "construct valid conditionsmap",
@@ -204,12 +219,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					authorizer.GenericCondition{ID: "foo", Effect: authorizer.ConditionEffectDeny},
 				),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "failed closed",
-			wantAnyError:         true,
-			wantString:           `Deny(reason="failed closed", err="duplicate condition ID \"foo\"")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "failed closed",
+			wantAnyError:            true,
+			wantString:              `Deny(reason="failed closed", err="duplicate condition ID \"foo\"")`,
 		},
 		{
 			name: "invalid effect",
@@ -218,12 +234,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					authorizer.GenericCondition{ID: "foo", Effect: authorizer.ConditionEffect("nonexistent")},
 				),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "failed closed",
-			wantAnyError:         true,
-			wantString:           `Deny(reason="failed closed", err="condition effect \"nonexistent\" not supported. Supported effects are: [Deny, NoOpinion, Allow]")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "failed closed",
+			wantAnyError:            true,
+			wantString:              `Deny(reason="failed closed", err="condition effect \"nonexistent\" not supported. Supported effects are: [Deny, NoOpinion, Allow]")`,
 		},
 		{
 			name: "condition ID must be a Kubernetes label, one condition error enough to fail closed",
@@ -233,12 +250,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					authorizer.GenericCondition{ID: "not a kubernetes label", Effect: authorizer.ConditionEffectDeny},
 				),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "failed closed",
-			wantAnyError:         true,
-			wantString:           `Deny(reason="failed closed", err="invalid condition ID \"not a kubernetes label\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")`,
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "failed closed",
+			wantAnyError:            true,
+			wantString:              `Deny(reason="failed closed", err="invalid condition ID \"not a kubernetes label\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")`,
 		},
 		{
 			name: "condition type must be a Kubernetes label",
@@ -264,6 +282,242 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantReason:          "empty ConditionsMap",
 			wantString:          `NoOpinion(reason="empty ConditionsMap")`,
 		},
+		// Union constructor simplification cases
+		{
+			name: "union: empty yields NoOpinion",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(),
+			},
+			wantIsNoOpinion:         true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    false,
+			wantReason:              "",
+			wantString:              `NoOpinion`,
+		},
+		{
+			name: "union: single Allow returned as-is",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(authorizer.ConditionsAwareDecisionAllow("ok", nil)),
+			},
+			wantIsAllowed:           true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    false,
+			wantReason:              "ok",
+			wantString:              `Allow(reason="ok")`,
+		},
+		{
+			name: "union: single Deny returned as-is",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(authorizer.ConditionsAwareDecisionDeny("denied", nil)),
+			},
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "denied",
+			wantString:              `Deny(reason="denied")`,
+		},
+		{
+			name: "union: single NoOpinion returned as-is",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(authorizer.ConditionsAwareDecisionNoOpinion("noop", nil)),
+			},
+			wantIsNoOpinion:         true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    false,
+			wantReason:              "noop",
+			wantString:              `NoOpinion(reason="noop")`,
+		},
+		{
+			name: "union: single ConditionsMap wrapped",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapAllow),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    false,
+			wantReason:              `[""]`,
+			wantString:              `Union[ConditionsMap(len=1)]`,
+		},
+		{
+			name: "union: single Union wrapped",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(authorizer.ConditionsAwareDecisionUnion(condMapDeny, authorizer.ConditionsAwareDecisionAllow("", nil))),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              `[["", ""]]`,
+			wantString:              `Union[Union[ConditionsMap(len=1), Allow]]`,
+		},
+		{
+			name: "union: all NoOpinion yields merged NoOpinion",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					authorizer.ConditionsAwareDecisionNoOpinion("a", nil),
+					authorizer.ConditionsAwareDecisionNoOpinion("", unexpectedErr),
+					authorizer.ConditionsAwareDecisionNoOpinion("c", otherErr),
+				),
+			},
+			wantIsNoOpinion:         true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    false,
+			wantReason:              "0: a, 2: c",
+			wantErrorIs:             unexpectedErr,
+			wantString:              `NoOpinion(reason="0: a, 2: c", err="[1: unexpected things happened, 2: other error]")`,
+		},
+		{
+			name: "union: Allow before Deny returns Allow, NoOpinions are ignored",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					authorizer.ConditionsAwareDecisionNoOpinion("skip", nil),
+					authorizer.ConditionsAwareDecisionNoOpinion("skip", nil),
+					authorizer.ConditionsAwareDecisionAllow("first", nil),
+					authorizer.ConditionsAwareDecisionDeny("second", nil),
+				),
+			},
+			wantIsAllowed:           true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    false,
+			wantReason:              "first",
+			wantString:              `Allow(reason="first")`,
+		},
+		{
+			name: "union: Deny before Allow returns Deny, NoOpinions are ignored",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					authorizer.ConditionsAwareDecisionNoOpinion("skip", nil),
+					authorizer.ConditionsAwareDecisionNoOpinion("skip", nil),
+					authorizer.ConditionsAwareDecisionDeny("first", nil),
+					authorizer.ConditionsAwareDecisionAllow("second", nil),
+				),
+			},
+			wantIsDenied:            true,
+			wantIsUnconditional:     true,
+			wantContainsAllowOrDeny: true,
+			wantFailClosedIsDeny:    true,
+			wantReason:              "first",
+			wantString:              `Deny(reason="first")`,
+		},
+		// Actual union decisions (not simplified)
+		{
+			name: "union: noopinion + conditionsmap(allow) + noopinion",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					authorizer.ConditionsAwareDecisionNoOpinion("no-op1", nil),
+					condMapAllow,
+					authorizer.ConditionsAwareDecisionNoOpinion("no-op2", nil)),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    false,
+			wantReason:              `[no-op1, "", no-op2]`,
+			wantString:              `Union[NoOpinion(reason="no-op1"), ConditionsMap(len=1), NoOpinion(reason="no-op2")]`,
+		},
+		{
+			name: "union: conditionsmap(allow) + allow",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapAllow, authorizer.ConditionsAwareDecisionAllow("allowed", nil)),
+			},
+			// TODO: This could be simplified to an Allow in the future, if we stick with this "eager" evaluation mode (as opposed to the "lazy" one, as described in the Conditional Authorization KEP)
+			// That is, a ConditionsMap of _only_ Allow/NoOpinion effects, followed by an unconditional Allow => Allow, no matter what the data is, and likewise
+			// A ConditionsMap of _only_ Deny/NoOpinion effects, followed by an unconditional Deny => Deny, no matter what the data is
+			// However, to avoid complicating things too much in the beginning, this is not yet implemented. However, if we choose the Lazy evaluation mode, this optimization cannot be done.
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantFailClosedIsDeny:    false,
+			wantReason:              `["", allowed]`,
+			wantString:              `Union[ConditionsMap(len=1), Allow(reason="allowed")]`,
+		},
+		{
+			name: "union: conditionsmap(allow) + deny",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapAllow, authorizer.ConditionsAwareDecisionDeny("no", nil)),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true, // There is an inner Deny
+			wantFailClosedIsDeny:    true,
+			wantReason:              `["", no]`,
+			wantString:              `Union[ConditionsMap(len=1), Deny(reason="no")]`,
+		},
+		{
+			name: "union: conditionsmap(deny) + noopinion",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapDeny, authorizer.ConditionsAwareDecisionNoOpinion("noop", nil)),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    true, // There are Deny conditions
+			wantReason:              `["", noop]`,
+			wantString:              `Union[ConditionsMap(len=1), NoOpinion(reason="noop")]`,
+		},
+		{
+			name: "union: conditionsmap(deny) + allow with error",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapDeny, authorizer.ConditionsAwareDecisionAllow("allowed", unexpectedErr)),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantFailClosedIsDeny:    true, // There are Deny conditions
+			wantReason:              `["", allowed]`,
+			wantErrorIs:             unexpectedErr,
+			wantString:              `Union[ConditionsMap(len=1), Allow(reason="allowed", err="unexpected things happened")]`,
+		},
+		{
+			name: "union: conditionsmap(allow) + conditionsmap(deny)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapAllow, condMapDeny),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    true, // There are Deny conditions
+			wantReason:              `["", ""]`,
+			wantString:              `Union[ConditionsMap(len=1), ConditionsMap(len=1)]`,
+		},
+		{
+			name: "union: nested with allow",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapAllow,
+					authorizer.ConditionsAwareDecisionUnion(condMapAllow, authorizer.ConditionsAwareDecisionAllow("ok", nil)),
+					// Note: NoOpinions after a decision for which ContainsAllowOrDeny() == true won't ever affect the decision outcome, and could thus be trimmed in the union constructor.
+					// This is implicitly done in the union authorizer, as it short-circuits after it found some decision for which ContainsAllowOrDeny() == true, so this input would not
+					// be yielded by Kubernetes own components, but someone else using this library could invoke the union constructor on this input. However, this optimization is skipped
+					// as the impact is minor, and the code would get quite a bit more complicated.
+					authorizer.ConditionsAwareDecisionNoOpinion("don't care", nil),
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantFailClosedIsDeny:    false,
+			wantReason:              `["", ["", ok], don't care]`,
+			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), Allow(reason="ok")], NoOpinion(reason="don't care")]`,
+		},
+		{
+			name: "union: deep nesting without anything unconditional",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapAllow,
+					authorizer.ConditionsAwareDecisionUnion(
+						condMapAllow,
+						authorizer.ConditionsAwareDecisionNoOpinion("inner", nil),
+						authorizer.ConditionsAwareDecisionUnion(
+							condMapDeny,
+							authorizer.ConditionsAwareDecisionNoOpinion("inner2", nil)),
+					),
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantFailClosedIsDeny:    true,
+			wantReason:              `["", ["", inner, ["", inner2]]]`,
+			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), NoOpinion(reason="inner"), Union[ConditionsMap(len=1), NoOpinion(reason="inner2")]]]`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -285,9 +539,17 @@ func TestConditionsAwareDecision(t *testing.T) {
 					if isConditionsMap != tt.wantIsConditionsMap {
 						t.Errorf("IsConditionsMap() = %v, want %v", isConditionsMap, tt.wantIsConditionsMap)
 					}
+					isUnion := d.IsUnion()
+					if isUnion != tt.wantIsUnion {
+						t.Errorf("IsUnion() = %v, want %v", isUnion, tt.wantIsUnion)
+					}
 					isUnconditional := d.IsUnconditional()
 					if isUnconditional != tt.wantIsUnconditional {
 						t.Errorf("IsUnconditional() = %v, want %v", isUnconditional, tt.wantIsUnconditional)
+					}
+					containsAllowOrDeny := d.ContainsAllowOrDeny()
+					if containsAllowOrDeny != tt.wantContainsAllowOrDeny {
+						t.Errorf("ContainsAllowOrDeny() = %v, want %v", containsAllowOrDeny, tt.wantContainsAllowOrDeny)
 					}
 					gotReason := d.Reason()
 					if gotReason != tt.wantReason {
@@ -1524,4 +1786,62 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 		return nil, err
 	}
 	return ret, nil
+}
+
+func TestConditionsAwareDecisionUnionedDecisions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	condMap := authorizer.ConditionsAwareDecisionConditionsMap(
+		authorizer.GenericCondition{ID: "test", Condition: "true", Effect: authorizer.ConditionEffectAllow, Type: "test-type"},
+	)
+	noOp := authorizer.ConditionsAwareDecisionNoOpinion("noop", nil)
+
+	t.Run("non-union has empty iterator", func(t *testing.T) {
+		noUnionTestcases := []authorizer.ConditionsAwareDecision{
+			condMap,
+			noOp,
+			authorizer.ConditionsAwareDecisionAllow("ok", nil),
+			authorizer.ConditionsAwareDecisionDeny("not ok", nil),
+		}
+		for i, tc := range noUnionTestcases {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				count := 0
+				for range tc.UnionedDecisions() {
+					count++
+				}
+				if count != 0 {
+					t.Errorf("expected 0 unioned decisions for %s, got %d", tc, count)
+				}
+			})
+		}
+	})
+
+	t.Run("union iterates sub-decisions in order", func(t *testing.T) {
+		union := authorizer.ConditionsAwareDecisionUnion(condMap, noOp)
+		var got []string
+		for _, sub := range union.UnionedDecisions() {
+			got = append(got, sub.Reason())
+		}
+		want := []string{"", "noop"}
+		if len(got) != len(want) {
+			t.Fatalf("expected %d sub-decisions, got %d", len(want), len(got))
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				t.Errorf("sub-decision[%d].Reason() = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("early break in iterator", func(t *testing.T) {
+		union := authorizer.ConditionsAwareDecisionUnion(condMap, noOp)
+		count := 0
+		for range union.UnionedDecisions() {
+			count++
+			break
+		}
+		if count != 1 {
+			t.Errorf("expected early break after 1 iteration, got %d", count)
+		}
+	})
 }
