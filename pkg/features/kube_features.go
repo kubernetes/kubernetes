@@ -2442,7 +2442,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	PLEGOnDemandRelist: {},
 
-	PSINodeCondition: {},
+	PSINodeCondition: {KubeletPSI},
 
 	PodAndContainerStatsFromCRI: {},
 

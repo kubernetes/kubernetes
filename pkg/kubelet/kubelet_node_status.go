@@ -724,7 +724,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 
 // getSystemMemoryPSI returns the system memory PSI stats.
 func (kl *Kubelet) getSystemMemoryPSI(ctx context.Context) (*statsapi.PSIData, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.SystemMemoryContentionThreshold == 0.0 {
+	if goruntime.GOOS != "linux" || !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) || kl.kubeletConfiguration.SystemMemoryContentionThreshold == 0.0 {
 		return nil, nil
 	}
 	summary, err := kl.resourceAnalyzer.Get(ctx, false)
@@ -736,7 +736,7 @@ func (kl *Kubelet) getSystemMemoryPSI(ctx context.Context) (*statsapi.PSIData, e
 
 // getSystemDiskPSI returns the system disk PSI stats.
 func (kl *Kubelet) getSystemDiskPSI(ctx context.Context) (*statsapi.PSIData, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.SystemDiskContentionThreshold == 0.0 {
+	if goruntime.GOOS != "linux" || !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) || kl.kubeletConfiguration.SystemDiskContentionThreshold == 0.0 {
 		return nil, nil
 	}
 	summary, err := kl.resourceAnalyzer.Get(ctx, false)
@@ -748,7 +748,7 @@ func (kl *Kubelet) getSystemDiskPSI(ctx context.Context) (*statsapi.PSIData, err
 
 // getKubepodsMemoryPSI returns the kubepods memory PSI stats.
 func (kl *Kubelet) getKubepodsMemoryPSI(ctx context.Context) (*statsapi.PSIData, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.KubepodsMemoryContentionThreshold == 0.0 {
+	if goruntime.GOOS != "linux" || !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) || kl.kubeletConfiguration.KubepodsMemoryContentionThreshold == 0.0 {
 		return nil, nil
 	}
 	summary, err := kl.resourceAnalyzer.Get(ctx, false)
@@ -768,7 +768,7 @@ func (kl *Kubelet) getKubepodsMemoryPSI(ctx context.Context) (*statsapi.PSIData,
 
 // getKubepodsDiskPSI returns the kubepods disk PSI stats.
 func (kl *Kubelet) getKubepodsDiskPSI(ctx context.Context) (*statsapi.PSIData, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || kl.kubeletConfiguration.KubepodsDiskContentionThreshold == 0.0 {
+	if goruntime.GOOS != "linux" || !utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) || !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) || kl.kubeletConfiguration.KubepodsDiskContentionThreshold == 0.0 {
 		return nil, nil
 	}
 	summary, err := kl.resourceAnalyzer.Get(ctx, false)
