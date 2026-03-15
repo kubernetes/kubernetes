@@ -97,7 +97,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(ctx context.Contex
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	preemptionMsg := fmt.Sprintf("%s: %s", message, klog.KObj(admitPod))
+	preemptionMsg := fmt.Sprintf("%s: %s", message, admitPod.UID)
 	for _, pod := range podsToPreempt {
 		// record that we are evicting the pod
 		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, preemptionMsg)

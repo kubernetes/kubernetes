@@ -23,8 +23,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -221,7 +221,7 @@ func TestHandleAdmissionFailure(t *testing.T) {
 
 			// Verify status message
 			if !r.expectErr && len(outputPods) > 0 {
-				expectedCurrentMsg := fmt.Sprintf("%s: %s", message, klog.KObj(admitPodRef))
+				expectedCurrentMsg := fmt.Sprintf("%s: %s", message, admitPodRef.UID)
 				for _, p := range outputPods {
 					if status, ok := podKiller.podStatus[p.Name]; ok {
 						if status.Message != expectedCurrentMsg {
@@ -617,6 +617,7 @@ func getPodWithResources(name string, requests v1.ResourceRequirements) *v1.Pod 
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name,
+			UID:          types.UID(name + "-uid"),
 			Annotations:  map[string]string{},
 		},
 		Spec: v1.PodSpec{
