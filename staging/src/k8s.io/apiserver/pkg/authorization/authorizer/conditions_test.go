@@ -61,6 +61,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 	condMapDeny := authorizer.ConditionsAwareDecisionConditionsMap(
 		authorizer.GenericCondition{ID: "deny-cond", Condition: "something", Effect: authorizer.ConditionEffectDeny, Type: "test-type"},
 	)
+	condMapNoOpinionOnly := authorizer.ConditionsAwareDecisionConditionsMap(
+		authorizer.GenericCondition{ID: "noop-cond", Condition: "something", Effect: authorizer.ConditionEffectNoOpinion, Type: "test-type"},
+	)
+	condMapMixed := authorizer.ConditionsAwareDecisionConditionsMap(
+		authorizer.GenericCondition{ID: "allow-cond", Condition: "something", Effect: authorizer.ConditionEffectAllow, Type: "test-type"},
+		authorizer.GenericCondition{ID: "deny-cond", Condition: "something", Effect: authorizer.ConditionEffectDeny, Type: "test-type"},
+	)
 
 	tests := []struct {
 		name                    string
@@ -72,6 +79,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 		wantIsUnion             bool
 		wantIsUnconditional     bool
 		wantContainsAllowOrDeny bool
+		wantCanBecomeAllowed    bool
 		wantFailClosedIsDeny    bool
 		wantReason              string
 		wantAnyError            bool
@@ -124,6 +132,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsAllowed:           true,
 			wantIsUnconditional:     true,
 			wantContainsAllowOrDeny: true,
+			wantCanBecomeAllowed:    true,
 			wantReason:              "ok",
 			wantErrorIs:             nil,
 			wantString:              `Allow(reason="ok")`,
@@ -180,9 +189,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 			testDecisions: []authorizer.ConditionsAwareDecision{
 				authorizer.ConditionsAwareDecisionConditionsMap(okAmountOfConditions...),
 			},
-			wantIsConditionsMap: true,
-			wantIsUnconditional: false,
-			wantString:          `ConditionsMap(len=128)`,
+			wantIsConditionsMap:  true,
+			wantIsUnconditional:  false,
+			wantCanBecomeAllowed: true,
+			wantString:           `ConditionsMap(len=128)`,
 		},
 		{
 			name: "too many conditions",
@@ -207,9 +217,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					authorizer.GenericCondition{ID: "baz", Effect: authorizer.ConditionEffectAllow},
 				),
 			},
-			wantIsConditionsMap: true,
-			wantIsUnconditional: false,
-			wantString:          `ConditionsMap(len=2)`,
+			wantIsConditionsMap:  true,
+			wantIsUnconditional:  false,
+			wantCanBecomeAllowed: true,
+			wantString:           `ConditionsMap(len=2)`,
 		},
 		{
 			name: "duplicate IDs, ignores nil",
@@ -303,6 +314,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsAllowed:           true,
 			wantIsUnconditional:     true,
 			wantContainsAllowOrDeny: true,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              "ok",
 			wantString:              `Allow(reason="ok")`,
@@ -338,6 +350,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              `[""]`,
 			wantString:              `Union[ConditionsMap(len=1)]`,
@@ -349,6 +362,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: true,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    true,
 			wantReason:              `[["", ""]]`,
 			wantString:              `Union[Union[ConditionsMap(len=1), Allow]]`,
@@ -383,6 +397,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsAllowed:           true,
 			wantIsUnconditional:     true,
 			wantContainsAllowOrDeny: true,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              "first",
 			wantString:              `Allow(reason="first")`,
@@ -415,6 +430,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              `[no-op1, "", no-op2]`,
 			wantString:              `Union[NoOpinion(reason="no-op1"), ConditionsMap(len=1), NoOpinion(reason="no-op2")]`,
@@ -430,6 +446,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			// However, to avoid complicating things too much in the beginning, this is not yet implemented. However, if we choose the Lazy evaluation mode, this optimization cannot be done.
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              `["", allowed]`,
 			wantString:              `Union[ConditionsMap(len=1), Allow(reason="allowed")]`,
@@ -441,6 +458,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: true, // There is an inner Deny
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    true,
 			wantReason:              `["", no]`,
 			wantString:              `Union[ConditionsMap(len=1), Deny(reason="no")]`,
@@ -463,6 +481,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    true, // There are Deny conditions
 			wantReason:              `["", allowed]`,
 			wantErrorIs:             unexpectedErr,
@@ -475,6 +494,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    true, // There are Deny conditions
 			wantReason:              `["", ""]`,
 			wantString:              `Union[ConditionsMap(len=1), ConditionsMap(len=1)]`,
@@ -494,6 +514,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: true, // There is an inner Allow
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    false,
 			wantReason:              `["", ["", ok], don't care]`,
 			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), Allow(reason="ok")], NoOpinion(reason="don't care")]`,
@@ -514,9 +535,141 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:             true,
 			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true,
 			wantFailClosedIsDeny:    true,
 			wantReason:              `["", ["", inner, ["", inner2]]]`,
 			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), NoOpinion(reason="inner"), Union[ConditionsMap(len=1), NoOpinion(reason="inner2")]]]`,
+		},
+		// CanBecomeAllowed-focused test cases
+		{
+			name: "conditionsmap: noopinion only, CanBecomeAllowed is false",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				condMapNoOpinionOnly,
+			},
+			wantIsConditionsMap:     true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    false, // no Allow effect
+			wantReason:              "",
+			wantString:              `ConditionsMap(len=1)`,
+		},
+		{
+			name: "conditionsmap: mixed allow+deny, CanBecomeAllowed is true",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				condMapMixed,
+			},
+			wantIsConditionsMap:     true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true, // has Allow effect despite also having Deny
+			wantFailClosedIsDeny:    true, // has Deny effect
+			wantReason:              "",
+			wantString:              `ConditionsMap(len=2)`,
+		},
+		{
+			name: "union: conditionsmap(deny) + conditionsmap(deny), CanBecomeAllowed is false",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapDeny, condMapDeny),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    false, // neither condMapDeny has Allow effect
+			wantFailClosedIsDeny:    true,
+			wantReason:              `["", ""]`,
+			wantString:              `Union[ConditionsMap(len=1), ConditionsMap(len=1)]`,
+		},
+		{
+			name: "union: conditionsmap(deny) + conditionsmap(allow), CanBecomeAllowed is true",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapDeny, condMapAllow),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true, // condMapDeny skipped (no Allow), condMapAllow has Allow
+			wantFailClosedIsDeny:    true, // condMapDeny has Deny effect
+			wantReason:              `["", ""]`,
+			wantString:              `Union[ConditionsMap(len=1), ConditionsMap(len=1)]`,
+		},
+		{
+			name: "union: conditionsmap(noopinion) + conditionsmap(deny), CanBecomeAllowed is false",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(condMapNoOpinionOnly, condMapDeny),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    false, // no Allow effect anywhere
+			wantFailClosedIsDeny:    true,  // condMapDeny has Deny effect
+			wantReason:              `["", ""]`,
+			wantString:              `Union[ConditionsMap(len=1), ConditionsMap(len=1)]`,
+		},
+		{
+			name: "union: deep nesting, all deny-only conditionsmaps, CanBecomeAllowed is false",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapDeny,
+					authorizer.ConditionsAwareDecisionUnion(
+						condMapDeny,
+						condMapDeny,
+					),
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    false, // no Allow effect at any depth
+			wantFailClosedIsDeny:    true,
+			wantReason:              `["", ["", ""]]`,
+			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), ConditionsMap(len=1)]]`,
+		},
+		{
+			name: "union: deep nesting, allow at deepest level, CanBecomeAllowed is true",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapDeny,
+					authorizer.ConditionsAwareDecisionUnion(
+						condMapDeny,
+						authorizer.ConditionsAwareDecisionUnion(
+							condMapDeny,
+							condMapAllow,
+						),
+					),
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true, // condMapAllow at deepest level propagates up
+			wantFailClosedIsDeny:    true,
+			wantReason:              `["", ["", ["", ""]]]`,
+			wantString:              `Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), Union[ConditionsMap(len=1), ConditionsMap(len=1)]]]`,
+		},
+		{
+			name: "union: mixed conditionsmap at first position, CanBecomeAllowed is true",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapMixed,
+					authorizer.ConditionsAwareDecisionNoOpinion("noop", nil),
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: false,
+			wantCanBecomeAllowed:    true, // condMapMixed has Allow effect
+			wantFailClosedIsDeny:    true, // condMapMixed has Deny effect
+			wantReason:              `["", noop]`,
+			wantString:              `Union[ConditionsMap(len=2), NoOpinion(reason="noop")]`,
+		},
+		{
+			name: "union: unconditional Deny before conditional Allow can never become Allow",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionUnion(
+					condMapDeny,
+					authorizer.ConditionsAwareDecisionDeny("not ok", nil),
+					// TODO(luxas): We should trim all decisions after an Allow or Deny, they are not relevant.
+					condMapAllow,
+				),
+			},
+			wantIsUnion:             true,
+			wantContainsAllowOrDeny: true,
+			wantCanBecomeAllowed:    false, // The unconditional Deny trumps the later conditional Allow
+			wantFailClosedIsDeny:    true,  // condMapDeny has Deny effect
+			wantReason:              `["", not ok, ""]`,
+			wantString:              `Union[ConditionsMap(len=1), Deny(reason="not ok"), ConditionsMap(len=1)]`,
 		},
 	}
 	for _, tt := range tests {
@@ -550,6 +703,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					containsAllowOrDeny := d.ContainsAllowOrDeny()
 					if containsAllowOrDeny != tt.wantContainsAllowOrDeny {
 						t.Errorf("ContainsAllowOrDeny() = %v, want %v", containsAllowOrDeny, tt.wantContainsAllowOrDeny)
+					}
+					canBecomeAllowed := d.CanBecomeAllowed()
+					if canBecomeAllowed != tt.wantCanBecomeAllowed {
+						t.Errorf("CanBecomeAllowed() = %v, want %v", canBecomeAllowed, tt.wantCanBecomeAllowed)
 					}
 					gotReason := d.Reason()
 					if gotReason != tt.wantReason {
