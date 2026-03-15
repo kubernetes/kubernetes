@@ -102,6 +102,16 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion, "deny by default", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (i impersonateAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(i.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (impersonateAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonationFilter(t *testing.T) {
 	testCases := []struct {
 		name                    string

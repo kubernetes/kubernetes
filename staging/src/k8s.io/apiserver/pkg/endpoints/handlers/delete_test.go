@@ -661,8 +661,18 @@ type fakeAuthorizer struct {
 	err      error
 }
 
-func (authorizer fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.decision, authorizer.reason, authorizer.err
+func (authz fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	return authz.decision, authz.reason, authz.err
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (authz fakeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(authz.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (fakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {

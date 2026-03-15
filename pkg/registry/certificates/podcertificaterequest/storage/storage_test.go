@@ -54,6 +54,16 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return f.decision, f.reason, f.err
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (f *fakeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*fakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, certificates.SchemeGroupVersion.WithResource("podcertificaterequests").GroupResource())
 	restOptions := generic.RESTOptions{

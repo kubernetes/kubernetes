@@ -33,6 +33,16 @@ func (alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionAllow, "", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (a alwaysAllowAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(a.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (alwaysAllowAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (alwaysAllowAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{
 			&authorizer.DefaultResourceRuleInfo{
@@ -61,6 +71,16 @@ func (alwaysDenyAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 	return authorizer.DecisionNoOpinion, "Everything is forbidden.", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (d alwaysDenyAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(d.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (alwaysDenyAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (alwaysDenyAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{}, []authorizer.NonResourceRuleInfo{}, false, nil
 }
@@ -71,6 +91,16 @@ func NewAlwaysDenyAuthorizer() *alwaysDenyAuthorizer {
 
 type privilegedGroupAuthorizer struct {
 	groups []string
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (r *privilegedGroupAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, attr))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (r *privilegedGroupAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, string, error) {

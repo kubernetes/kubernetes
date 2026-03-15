@@ -814,6 +814,16 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (i impersonateAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(i.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (impersonateAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonateIsForbidden(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -1830,6 +1840,16 @@ type trackingAuthorizer struct {
 func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	a.requestAttributes = append(a.requestAttributes, attributes)
 	return authorizer.DecisionAllow, "", nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (a *trackingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attributes authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(a.Authorize(ctx, attributes))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (a *trackingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly

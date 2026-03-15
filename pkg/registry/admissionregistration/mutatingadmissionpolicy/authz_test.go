@@ -34,7 +34,7 @@ func TestAuthorization(t *testing.T) {
 		name             string
 		userInfo         user.Info
 		obj              *admissionregistration.MutatingAdmissionPolicy
-		auth             AuthFunc
+		auth             authorizer.AuthorizerFunc
 		resourceResolver resolver.ResourceResolverFunc
 		expectErr        bool
 	}{
@@ -122,10 +122,4 @@ func TestAuthorization(t *testing.T) {
 			})
 		})
 	}
-}
-
-type AuthFunc func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
-
-func (f AuthFunc) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return f(ctx, a)
 }

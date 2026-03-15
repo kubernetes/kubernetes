@@ -1514,3 +1514,13 @@ type alwaysAllowAuthorizer struct{}
 func (f alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	return authorizer.DecisionAllow, "", nil
 }
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (f alwaysAllowAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (alwaysAllowAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
