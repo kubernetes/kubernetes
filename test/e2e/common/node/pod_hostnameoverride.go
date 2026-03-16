@@ -44,7 +44,7 @@ func newTestPod(namespace string) *v1.Pod {
 				{
 					Name:    "test-pod-hostname-override",
 					Image:   imageutils.GetE2EImage(imageutils.GlibcDnsTesting),
-					Command: []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"},
+					Command: []string{"sh", "-c", `short=$(hostname); set -- $(dig +noall +answer +search "$short"); fqdn=${1%.}; [ -n "$fqdn" ] || fqdn=$short; echo ${short}';'${fqdn}';'`},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
