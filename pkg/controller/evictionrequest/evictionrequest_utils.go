@@ -21,22 +21,24 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/clock"
 )
 
 // setCondition creates or updates a condition in the apply configuration,
 // preserving the LastTransitionTime when the status has not changed.
 // Inspired by k8s.io/apimachinery/pkg/api/meta.SetStatusCondition.
 func setCondition(
+	clock clock.PassiveClock,
 	existingConditions []metav1.Condition,
 	conditionType coordinationv1alpha1.EvictionRequestConditionType,
 	status metav1.ConditionStatus,
-	reason, message string,
+	reason coordinationv1alpha1.EvictionRequestConditionReason,
+	message string,
 ) *metav1ac.ConditionApplyConfiguration {
-	now := metav1.Now()
-	transitionTime := now
+	transitionTime := metav1.Time{Time: clock.Now()}
 
 	existing := meta.FindStatusCondition(existingConditions, string(conditionType))
-	if existing != nil && existing.Status == status {
+	if existing != nil && existing.Status == status && !existing.LastTransitionTime.IsZero() {
 		// Status unchanged, so we preserve the original transition time
 		transitionTime = existing.LastTransitionTime
 	}
@@ -44,14 +46,14 @@ func setCondition(
 	return metav1ac.Condition().
 		WithType(string(conditionType)).
 		WithStatus(status).
-		WithReason(reason).
+		WithReason(string(reason)).
 		WithMessage(message).
 		WithLastTransitionTime(transitionTime)
 }
 
-// isTerminal returns true if the EvictionRequest has reached
+// hasCompleted returns true if the EvictionRequest has reached
 // a terminal state (Canceled or Evicted condition is True).
-func isTerminal(evictionRequest *coordinationv1alpha1.EvictionRequest) bool {
+func hasCompleted(evictionRequest *coordinationv1alpha1.EvictionRequest) bool {
 	return meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionFailed)) ||
 		meta.IsStatusConditionTrue(evictionRequest.Status.Conditions, string(coordinationv1alpha1.EvictionRequestConditionEvicted))
 }

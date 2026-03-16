@@ -26,7 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func podTarget(name, uid string) coordinationv1alpha1.EvictionTarget {
+func makePodTarget(name, uid string) coordinationv1alpha1.EvictionTarget {
 	return coordinationv1alpha1.EvictionTarget{
 		Pod: &coordinationv1alpha1.PodReference{
 			Name: name,
@@ -53,12 +53,12 @@ func TestGetObjectMeta(t *testing.T) {
 	}{
 		{
 			name:     "pod found",
-			target:   newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target:   newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			wantName: "my-pod",
 		},
 		{
 			name:    "pod not found",
-			target:  newTargetInfo(podTarget("my-pod", "uid-1"), nil),
+			target:  newTargetInfo(makePodTarget("my-pod", "uid-1"), nil),
 			wantNil: true,
 		},
 		{
@@ -94,17 +94,17 @@ func TestIsGone(t *testing.T) {
 	}{
 		{
 			name:   "pod found with matching UID",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   false,
 		},
 		{
 			name:   "pod not found",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), nil),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), nil),
 			want:   true,
 		},
 		{
 			name:   "pod found with different UID",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-2")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-2")),
 			want:   true,
 		},
 		{
@@ -122,59 +122,6 @@ func TestIsGone(t *testing.T) {
 	}
 }
 
-func TestIsValidTarget(t *testing.T) {
-	tests := []struct {
-		name      string
-		target    targetInfo
-		wantValid bool
-		wantMsg   string
-	}{
-		{
-			name:      "valid pod",
-			target:    newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
-			wantValid: true,
-		},
-		{
-			name:      "pod not found",
-			target:    newTargetInfo(podTarget("my-pod", "uid-1"), nil),
-			wantValid: false,
-			wantMsg:   "Target pod not found",
-		},
-		{
-			name:      "UID mismatch",
-			target:    newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-2")),
-			wantValid: false,
-			wantMsg:   "Pod UID mismatch: expected uid-1, got uid-2",
-		},
-		{
-			name: "pod with PodGroup",
-			target: func() targetInfo {
-				pod := testPod("my-pod", "uid-1")
-				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
-				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
-			}(),
-			wantValid: false,
-			wantMsg:   "Target pod my-pod is part of a PodGroup. Eviction of such pods is currently not supported.",
-		},
-		{
-			name:      "empty target",
-			target:    newTargetInfo(coordinationv1alpha1.EvictionTarget{}, nil),
-			wantValid: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			valid, msg := tt.target.isValidTarget()
-			if valid != tt.wantValid {
-				t.Errorf("isValidTarget() valid = %v, want %v", valid, tt.wantValid)
-			}
-			if msg != tt.wantMsg {
-				t.Errorf("isValidTarget() msg = %q, want %q", msg, tt.wantMsg)
-			}
-		})
-	}
-}
-
 func TestIsPartOfPodGroup(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -183,7 +130,7 @@ func TestIsPartOfPodGroup(t *testing.T) {
 	}{
 		{
 			name:   "pod without PodGroup",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   false,
 		},
 		{
@@ -191,13 +138,13 @@ func TestIsPartOfPodGroup(t *testing.T) {
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
 				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
-				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
+				return newTargetInfo(makePodTarget("my-pod", "uid-1"), pod)
 			}(),
 			want: true,
 		},
 		{
 			name:   "pod not found",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), nil),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), nil),
 			want:   false,
 		},
 	}
@@ -218,7 +165,7 @@ func TestIsTerminal(t *testing.T) {
 	}{
 		{
 			name:   "running pod",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   false,
 		},
 		{
@@ -226,7 +173,7 @@ func TestIsTerminal(t *testing.T) {
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
 				pod.Status.Phase = v1.PodSucceeded
-				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
+				return newTargetInfo(makePodTarget("my-pod", "uid-1"), pod)
 			}(),
 			want: true,
 		},
@@ -235,20 +182,20 @@ func TestIsTerminal(t *testing.T) {
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
 				pod.Status.Phase = v1.PodFailed
-				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
+				return newTargetInfo(makePodTarget("my-pod", "uid-1"), pod)
 			}(),
 			want: true,
 		},
 		{
 			name:   "pod not found",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), nil),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), nil),
 			want:   false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.target.isTerminal(); got != tt.want {
-				t.Errorf("isTerminal() = %v, want %v", got, tt.want)
+				t.Errorf("hasCompleted() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -262,7 +209,7 @@ func TestTargetType(t *testing.T) {
 	}{
 		{
 			name:   "pod target",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   "pod",
 		},
 		{
@@ -273,7 +220,7 @@ func TestTargetType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.target.targetType(); got != tt.want {
+			if got := tt.target.targetType(); got.String() != tt.want {
 				t.Errorf("targetType() = %q, want %q", got, tt.want)
 			}
 		})
@@ -294,7 +241,7 @@ func TestEvictionInterceptors(t *testing.T) {
 					{Name: "interceptor-a"},
 					{Name: "interceptor-b"},
 				}
-				return newTargetInfo(podTarget("my-pod", "uid-1"), pod)
+				return newTargetInfo(makePodTarget("my-pod", "uid-1"), pod)
 			}(),
 			want: []v1.EvictionInterceptor{
 				{Name: "interceptor-a"},
@@ -303,12 +250,12 @@ func TestEvictionInterceptors(t *testing.T) {
 		},
 		{
 			name:   "pod without interceptors",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   nil,
 		},
 		{
 			name:   "pod not found",
-			target: newTargetInfo(podTarget("my-pod", "uid-1"), nil),
+			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), nil),
 			want:   nil,
 		},
 	}

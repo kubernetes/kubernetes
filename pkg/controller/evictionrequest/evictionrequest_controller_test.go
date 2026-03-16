@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -1383,6 +1384,99 @@ func TestDeletePod_HandlesAllObjectTypes(t *testing.T) {
 				if finalLen != initialLen {
 					t.Errorf("expected queue length to remain %d, got %d", initialLen, finalLen)
 				}
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	clock := testingclock.NewFakePassiveClock(time.Now())
+	tests := []struct {
+		name      string
+		target    coordinationv1alpha1.EvictionTarget
+		pod       *v1.Pod
+		wantValid bool
+		expected  []metav1ac.ConditionApplyConfiguration
+	}{
+		{
+			name:     "valid pod",
+			target:   makePodTarget("my-pod", "uid-1"),
+			pod:      testPod("my-pod", "uid-1"),
+			expected: []metav1ac.ConditionApplyConfiguration{},
+		},
+		{
+			name:   "pod not found",
+			target: makePodTarget("my-pod", "uid-1"),
+			pod:    nil,
+			expected: []metav1ac.ConditionApplyConfiguration{
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionFailed,
+					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
+					"Target pod not found"),
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
+					metav1.ConditionFalse, "UnableToPerform", ""),
+			},
+		},
+		{
+			name:   "UID mismatch",
+			target: makePodTarget("my-pod", "uid-1"),
+			pod:    testPod("my-pod", "uid-2"),
+			expected: []metav1ac.ConditionApplyConfiguration{
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionFailed,
+					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
+					"Target pod UID mismatch: expected uid-1, got uid-2"),
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
+					metav1.ConditionFalse, "UnableToPerform", ""),
+			},
+		},
+		{
+			name:   "pod with PodGroup",
+			target: makePodTarget("my-pod", "uid-1"),
+			pod: func() *v1.Pod {
+				pod := testPod("my-pod", "uid-1")
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To("my-podgroup")}
+				return pod
+			}(),
+			expected: []metav1ac.ConditionApplyConfiguration{
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionFailed,
+					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
+					"Target pod references a SchedulingGroup. Eviction is currently not supported."),
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
+					metav1.ConditionFalse, "UnableToPerform", ""),
+			},
+		},
+		{
+			name:   "empty target",
+			target: coordinationv1alpha1.EvictionTarget{},
+			pod:    nil,
+			expected: []metav1ac.ConditionApplyConfiguration{
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionFailed,
+					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
+					"Unsupported target type"),
+				*setCondition(clock, nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
+					metav1.ConditionFalse, "UnableToPerform", ""),
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			request := coordinationv1alpha1.EvictionRequest{
+				Spec: coordinationv1alpha1.EvictionRequestSpec{
+					Requesters: []coordinationv1alpha1.Requester{
+						{Name: "foo.example.com"},
+					},
+					Target: tc.target,
+				},
+			}
+			failed, evicted := validate(clock, &request, newTargetInfo(tc.target, tc.pod))
+			got := []metav1ac.ConditionApplyConfiguration{}
+			if failed != nil {
+				got = append(got, *failed)
+			}
+			if evicted != nil {
+				got = append(got, *evicted)
+			}
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("unexpected conditions update (-want +got):\n%s", diff)
 			}
 		})
 	}
