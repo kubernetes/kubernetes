@@ -409,6 +409,24 @@ type Validations struct {
 	// validated is opaque, and that any validations defined on it should not
 	// be emitted.
 	OpaqueValType bool
+
+	// GateChecks holds feature gate checks for this field. When the emitter
+	// sees a GateCheck, it wraps the field's validations in an
+	// "if op.HasOption(gate)" block, and emits a forbidden check in the
+	// else branch.
+	GateChecks []GateCheck
+}
+
+// GateCheck describes a feature gate that guards a field. When present,
+// the emitter wraps the field's validation in a gate-enabled check and
+// emits a forbidden-when-disabled fallback.
+type GateCheck struct {
+	// GateName is the feature gate option name.
+	GateName string
+
+	// ForbiddenFunctions are the validation functions to call when the gate
+	// is disabled (the forbidden + optional short-circuit pair).
+	ForbiddenFunctions []FunctionGen
 }
 
 func (v *Validations) Empty() bool {
@@ -416,7 +434,7 @@ func (v *Validations) Empty() bool {
 }
 
 func (v *Validations) Len() int {
-	return len(v.Functions) + len(v.Variables) + len(v.Comments)
+	return len(v.Functions) + len(v.Variables) + len(v.Comments) + len(v.GateChecks)
 }
 
 func (v *Validations) AddFunction(fn FunctionGen) {
@@ -438,6 +456,7 @@ func (v *Validations) Add(o Validations) {
 	v.OpaqueType = v.OpaqueType || o.OpaqueType
 	v.OpaqueKeyType = v.OpaqueKeyType || o.OpaqueKeyType
 	v.OpaqueValType = v.OpaqueValType || o.OpaqueValType
+	v.GateChecks = append(v.GateChecks, o.GateChecks...)
 }
 
 // FunctionFlags define optional properties of a validator.  Most validators
