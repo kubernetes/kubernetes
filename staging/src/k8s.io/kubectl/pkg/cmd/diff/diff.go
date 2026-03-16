@@ -17,6 +17,7 @@ limitations under the License.
 package diff
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -32,10 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi3"
+	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -121,6 +124,12 @@ type DiffOptions struct {
 
 	pruner  *pruner
 	tracker *tracker
+
+	// ApplySetRef captures the --applyset flag value for ApplySet-based pruning
+	ApplySetRef string
+	// ApplySet tracks the set of objects that have been applied, for the purposes of pruning.
+	// See git.k8s.io/enhancements/keps/sig-cli/3659-kubectl-apply-prune
+	ApplySet *apply.ApplySet
 }
 
 func NewDiffOptions(ioStreams genericiooptions.IOStreams) *DiffOptions {
@@ -142,7 +151,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckDiffErr(options.Complete(f, cmd, args))
-			cmdutil.CheckDiffErr(options.Validate())
+			cmdutil.CheckDiffErr(options.ValidateWithCommand(cmd))
 			// `kubectl diff` propagates the error code from
 			// diff or `KUBECTL_EXTERNAL_DIFF`. Also, we
 			// don't want to print an error if diff returns
@@ -167,8 +176,13 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	})
 
 	usage := "contains the configuration to diff"
-	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default allowlist with <group/version/kind> for --prune")
-	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
+
+	// Variables for AddPruningFlags
+	var prune bool
+	var pruneAllowlist []string
+	var all bool
+
+	cmdutil.AddPruningFlags(cmd, &prune, &pruneAllowlist, &all, &options.ApplySetRef)
 	cmd.Flags().BoolVar(&options.ShowManagedFields, "show-managed-fields", options.ShowManagedFields, "If true, include managed fields in the diff.")
 	cmd.Flags().BoolVar(&options.ShowSecrets, "show-secrets", false, "If true, do not mask secret values in the diff.")
 	cmd.Flags().IntVar(&options.Concurrency, "concurrency", 1, "Number of objects to process in parallel when diffing against the live version. Larger number = faster, but more memory, I/O and CPU over that shorter period of time.")
@@ -676,6 +690,38 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
 	}
 
+	// Initialize ApplySet if --applyset flag is provided
+	if o.ApplySetRef != "" {
+		mapper, err := f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
+
+		parent, err := apply.ParseApplySetParentRef(o.ApplySetRef, mapper)
+		if err != nil {
+			return err
+		}
+
+		// ApplySet uses the namespace value from the flag, but not from the kubeconfig or defaults
+		// This means the namespace flag is required when using a namespaced parent.
+		if o.EnforceNamespace && parent.IsNamespaced() {
+			parent.Namespace = o.CmdNamespace
+		}
+
+		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+		if err != nil {
+			return fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+		}
+		if restClient == nil {
+			return fmt.Errorf("could not build RESTClient for ApplySet")
+		}
+
+		o.ApplySet = apply.NewApplySet(parent, apply.ApplySetTooling{
+			Name:    "kubectl",
+			Version: fmt.Sprintf("%s/%s", version.Get().GitVersion, "diff"),
+		}, mapper, restClient)
+	}
+
 	o.Builder = f.NewBuilder()
 	return nil
 }
@@ -704,11 +750,31 @@ func (o *DiffOptions) Run() error {
 		return err
 	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
+	// Collect all resource.Info objects first (single-pass to avoid stdin re-read issues)
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	// Initialize ApplySet and apply labels if enabled
+	var visitedUIDs sets.Set[types.UID]
+	if o.ApplySet != nil {
+		visitedUIDs = sets.New[types.UID]()
+
+		// Initialize ApplySet state needed for pruning by calling BeforeApply with dry-run
+		// This fetches parent state without actually modifying the parent object
+		if err := o.ApplySet.BeforeApply(infos, cmdutil.DryRunClient, "strict"); err != nil {
+			return fmt.Errorf("failed to initialize ApplySet state for diff: %w", err)
 		}
 
+		// Apply ApplySet labels to resources for diff comparison
+		if err := o.ApplySet.AddLabels(infos...); err != nil {
+			return err
+		}
+	}
+
+	// Process each Info object for diffing
+	for _, info := range infos {
 		local := info.Object.DeepCopyObject()
 		for i := 1; i <= maxRetries; i++ {
 			if err = info.Get(); err != nil {
@@ -743,6 +809,13 @@ func (o *DiffOptions) Run() error {
 				o.tracker.MarkVisited(info)
 			}
 
+			// Track visited UIDs for ApplySet pruning
+			if o.ApplySet != nil && info.Object != nil {
+				if accessor, err := meta.Accessor(info.Object); err == nil {
+					visitedUIDs.Insert(accessor.GetUID())
+				}
+			}
+
 			err = differ.Diff(obj, printer, o.ShowManagedFields, o.ShowSecrets)
 			if !isConflict(err) {
 				break
@@ -751,10 +824,31 @@ func (o *DiffOptions) Run() error {
 
 		apply.WarnIfDeleting(info.Object, o.Diff.ErrOut)
 
-		return err
-	})
+		if err != nil {
+			return err
+		}
+	}
 
-	if o.pruner != nil {
+	// Handle pruning - use ApplySet if available, otherwise use legacy pruning
+	if o.ApplySet != nil {
+		prunedObjs, err := o.applySetPrune(visitedUIDs)
+		if err != nil {
+			klog.Warningf("ApplySet pruning failed: %v", err)
+		} else {
+			// Print pruned objects into old file and thus, diff
+			// command will show them as pruned.
+			for _, p := range prunedObjs {
+				name, err := getObjectName(p)
+				if err != nil {
+					klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
+					continue
+				}
+				if err := differ.From.Print(name, p, printer); err != nil {
+					return err
+				}
+			}
+		}
+	} else if o.pruner != nil {
 		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
@@ -774,16 +868,62 @@ func (o *DiffOptions) Run() error {
 		}
 	}
 
-	if err != nil {
-		return err
-	}
-
 	return differ.Run(o.Diff)
 }
 
 // Validate makes sure provided values for DiffOptions are valid
 func (o *DiffOptions) Validate() error {
+	return o.ValidateWithCommand(nil)
+}
+
+// ValidateWithCommand validates with access to command flags for ApplySet validation
+func (o *DiffOptions) ValidateWithCommand(cmd *cobra.Command) error {
+	if o.ApplySetRef != "" {
+		// ApplySet validation requirements - match apply command patterns
+		if o.pruner == nil {
+			return fmt.Errorf("--applyset requires --prune")
+		}
+		// Only validate command flags if cmd is provided
+		if cmd != nil {
+			if cmdutil.GetFlagBool(cmd, "all") {
+				return fmt.Errorf("--applyset is incompatible with --all")
+			}
+			if len(cmdutil.GetFlagStringArray(cmd, "prune-allowlist")) > 0 {
+				return fmt.Errorf("--applyset is incompatible with --prune-allowlist")
+			}
+		}
+		if o.Selector != "" {
+			return fmt.Errorf("--applyset is incompatible with --selector")
+		}
+		// Validate ApplySet parent object exists and permissions
+		if o.ApplySet != nil {
+			if err := o.ApplySet.Validate(context.TODO(), o.DynamicClient); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
+}
+
+// applySetPrune identifies objects that would be pruned by ApplySet
+func (o *DiffOptions) applySetPrune(visitedUIDs sets.Set[types.UID]) ([]runtime.Object, error) {
+	if o.ApplySet == nil {
+		return nil, nil
+	}
+
+	// Find objects that would be pruned by ApplySet
+	pruneObjects, err := o.ApplySet.FindAllObjectsToPrune(context.TODO(), o.DynamicClient, visitedUIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert PruneObject slice to runtime.Object slice
+	var result []runtime.Object
+	for _, pruneObj := range pruneObjects {
+		result = append(result, pruneObj.Object)
+	}
+
+	return result, nil
 }
 
 func getObjectName(obj runtime.Object) (string, error) {
