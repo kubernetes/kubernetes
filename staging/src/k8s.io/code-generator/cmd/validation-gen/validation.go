@@ -1103,6 +1103,18 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false
+
+			// If the field has gate checks, wrap the entire validation block
+			// in a gate-enabled check with a forbidden fallback.
+			hasGateCheck := len(validations.GateChecks) > 0
+			if hasGateCheck {
+				var conds []string
+				for _, gc := range validations.GateChecks {
+					conds = append(conds, fmt.Sprintf("op.HasOption(%q)", gc.GateName))
+				}
+				bufsw.Do(fmt.Sprintf("if %s {\n", strings.Join(conds, " && ")), nil)
+			}
+
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
 				if len(validations.Functions) > 0 {
@@ -1176,6 +1188,22 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
 				}
+			}
+
+			// Close the gate check block and emit the forbidden fallback.
+			if hasGateCheck {
+				var gateNames []string
+				for _, gc := range validations.GateChecks {
+					gateNames = append(gateNames, gc.GateName)
+				}
+				bufsw.Do("} else {\n", nil)
+				verb := "is"
+				if len(gateNames) > 1 {
+					verb = "are"
+				}
+				bufsw.Do(fmt.Sprintf("// field is forbidden when %s %s disabled\n", strings.Join(gateNames, ", "), verb), nil)
+				emitCallsToValidators(c, validations.GateChecks[0].ForbiddenFunctions, bufsw)
+				bufsw.Do("}\n", nil)
 			}
 
 			if buf.Len() > 0 {
