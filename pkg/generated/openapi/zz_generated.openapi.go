@@ -71480,6 +71480,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "double",
 						},
 					},
+					"psiPressureTransitionPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "psiPressureTransitionPeriod is the duration for which the kubelet has to wait before transitioning out of a PSI-related contention pressure condition. A duration of 0s will be converted to the default value of 5m. Default: \"5m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"maxOpenFiles": {
 						SchemaProps: spec.SchemaProps{
 							Description: "maxOpenFiles is Number of files that can be opened by Kubelet process. The value must be a non-negative number. Default: 1000000",

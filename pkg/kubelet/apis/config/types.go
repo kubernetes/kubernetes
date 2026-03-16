@@ -332,6 +332,9 @@ type KubeletConfiguration struct {
 	KubepodsMemoryContentionThreshold float64
 	// kubepodsDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods disk contention pressure.
 	KubepodsDiskContentionThreshold float64
+	// psiPressureTransitionPeriod is the duration for which the kubelet has to wait
+	// before transitioning out of a PSI-related contention pressure condition.
+	PSIPressureTransitionPeriod metav1.Duration
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver

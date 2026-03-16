@@ -474,6 +474,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(float64)
 		**out = **in
 	}
+	out.PSIPressureTransitionPeriod = in.PSIPressureTransitionPeriod
 	if in.KubeAPIQPS != nil {
 		in, out := &in.KubeAPIQPS, &out.KubeAPIQPS
 		*out = new(int32)

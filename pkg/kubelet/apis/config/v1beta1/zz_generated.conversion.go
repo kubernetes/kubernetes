@@ -676,6 +676,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_float64_To_float64(&in.KubepodsDiskContentionThreshold, &out.KubepodsDiskContentionThreshold, s); err != nil {
 		return err
 	}
+	out.PSIPressureTransitionPeriod = in.PSIPressureTransitionPeriod
 	out.MaxOpenFiles = in.MaxOpenFiles
 	out.ContentType = in.ContentType
 	if err := v1.Convert_Pointer_int32_To_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
@@ -898,6 +899,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_float64_To_Pointer_float64(&in.KubepodsDiskContentionThreshold, &out.KubepodsDiskContentionThreshold, s); err != nil {
 		return err
 	}
+	out.PSIPressureTransitionPeriod = in.PSIPressureTransitionPeriod
 	out.ContentType = in.ContentType
 	if err := v1.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err

@@ -702,10 +702,10 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PSINodeCondition) {
 		setters = append(setters,
-			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemMemoryContentionPressure, kl.getSystemMemoryPSI, kl.kubeletConfiguration.SystemMemoryContentionThreshold, kl.kubeletConfiguration.EvictionPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
-			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemDiskContentionPressure, kl.getSystemDiskPSI, kl.kubeletConfiguration.SystemDiskContentionThreshold, kl.kubeletConfiguration.EvictionPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
-			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsMemoryContentionPressure, kl.getKubepodsMemoryPSI, kl.kubeletConfiguration.KubepodsMemoryContentionThreshold, kl.kubeletConfiguration.EvictionPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
-			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsDiskContentionPressure, kl.getKubepodsDiskPSI, kl.kubeletConfiguration.KubepodsDiskContentionThreshold, kl.kubeletConfiguration.EvictionPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemMemoryContentionPressure, kl.getSystemMemoryPSI, kl.kubeletConfiguration.SystemMemoryContentionThreshold, kl.kubeletConfiguration.PSIPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeSystemDiskContentionPressure, kl.getSystemDiskPSI, kl.kubeletConfiguration.SystemDiskContentionThreshold, kl.kubeletConfiguration.PSIPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsMemoryContentionPressure, kl.getKubepodsMemoryPSI, kl.kubeletConfiguration.KubepodsMemoryContentionThreshold, kl.kubeletConfiguration.PSIPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
+			nodestatus.PSICondition(kl.clock.Now, v1.NodeKubepodsDiskContentionPressure, kl.getKubepodsDiskPSI, kl.kubeletConfiguration.KubepodsDiskContentionThreshold, kl.kubeletConfiguration.PSIPressureTransitionPeriod.Duration, kl.recordNodeStatusEvent),
 		)
 	}
 

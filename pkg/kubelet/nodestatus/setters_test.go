@@ -1808,12 +1808,7 @@ func TestPSICondition(t *testing.T) {
 			},
 			psiData:          &statsapi.PSIData{Avg10: 100, Avg60: 100},
 			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
-			expectEvents: []testEvent{
-				{
-					eventType: v1.EventTypeNormal,
-					event:     fmt.Sprintf("NodeHas%s", condType),
-				},
-			},
+			expectEvents:     []testEvent{},
 		},
 		{
 			desc: "trending lower",
@@ -1823,6 +1818,7 @@ func TestPSICondition(t *testing.T) {
 				},
 			},
 			psiData:          &statsapi.PSIData{Avg10: 50, Avg60: 100},
+			transitionPeriod: 5 * time.Minute,
 			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
 			expectEvents:     []testEvent{},
 		},

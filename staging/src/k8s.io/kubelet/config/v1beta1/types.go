@@ -544,6 +544,12 @@ type KubeletConfiguration struct {
 	// Default: 0.9
 	// +optional
 	KubepodsDiskContentionThreshold *float64 `json:"kubepodsDiskContentionThreshold,omitempty"`
+	// psiPressureTransitionPeriod is the duration for which the kubelet has to wait
+	// before transitioning out of a PSI-related contention pressure condition.
+	// A duration of 0s will be converted to the default value of 5m.
+	// Default: "5m"
+	// +optional
+	PSIPressureTransitionPeriod metav1.Duration `json:"psiPressureTransitionPeriod,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// The value must be a non-negative number.
 	// Default: 1000000

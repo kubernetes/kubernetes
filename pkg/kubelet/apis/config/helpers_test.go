@@ -312,5 +312,6 @@ var (
 		"KubepodsMemoryContentionThreshold",
 		"SystemDiskContentionThreshold",
 		"SystemMemoryContentionThreshold",
+		"PSIPressureTransitionPeriod.Duration",
 	)
 )

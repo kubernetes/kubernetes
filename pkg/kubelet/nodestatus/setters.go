@@ -787,7 +787,7 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 
 		psi, err := getPSIFunc(ctx)
 		if err != nil || psi == nil {
-			if condition.Status != v1.ConditionUnknown {
+			if newCondition || condition.Status != v1.ConditionUnknown {
 				condition.Status = v1.ConditionUnknown
 				condition.Reason = "KubeletUnableToGetPSI"
 				condition.Message = "kubelet is unable to get PSI"
@@ -813,11 +813,12 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
 			}
 		} else {
-			if condition.Status == v1.ConditionUnknown {
+			if newCondition || condition.Status == v1.ConditionUnknown {
 				condition.Status = v1.ConditionFalse
 				condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
 				condition.Message = fmt.Sprintf("Node has no %s", conditionType)
 				condition.LastTransitionTime = currentTime
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
 			} else if condition.Status == v1.ConditionTrue {
 				if timeBelowThreshold == nil {
 					t := currentTime.Time
