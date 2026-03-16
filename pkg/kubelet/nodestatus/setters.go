@@ -785,7 +785,12 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 
 		psi, err := getPSIFunc(ctx)
 		if err != nil || psi == nil {
-			// If we fail to get PSI stats, preserve the existing condition and do nothing.
+			if condition.Status != v1.ConditionUnknown {
+				condition.Status = v1.ConditionUnknown
+				condition.Reason = "KubeletUnableToGetPSI"
+				condition.Message = "kubelet is unable to get PSI"
+				condition.LastTransitionTime = currentTime
+			}
 			if newCondition {
 				node.Status.Conditions = append(node.Status.Conditions, *condition)
 			}
@@ -794,26 +799,20 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 
 		thresholdPercentage := threshold * 100
 
-		if psi.Avg60 >= thresholdPercentage {
-			if psi.Avg10 >= thresholdPercentage {
-				// Record an event indicating high resource pressure (ongoing or new)
-				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
+		if psi.Avg10 >= thresholdPercentage && psi.Avg60 >= thresholdPercentage {
+			// Record an event indicating high resource pressure (ongoing or new)
+			recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
 
-				// trending higher or consistently high, set condition for high resource contention pressure
-				if condition.Status != v1.ConditionTrue {
-					condition.Status = v1.ConditionTrue
-					condition.Reason = fmt.Sprintf("KubeletHas%s", conditionType)
-					condition.Message = fmt.Sprintf("kubelet has %s", conditionType)
-					condition.LastTransitionTime = currentTime
-				}
-			} else if condition.Status == v1.ConditionTrue {
-				// trending lower, record an event mentioning the resource contention pressure is trending lower
-				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%sTrendingLower", conditionType))
+			if condition.Status != v1.ConditionTrue {
+				condition.Status = v1.ConditionTrue
+				condition.Reason = fmt.Sprintf("NodeHas%s", conditionType)
+				condition.Message = fmt.Sprintf("Node has %s", conditionType)
+				condition.LastTransitionTime = currentTime
 			}
 		} else if condition.Status != v1.ConditionFalse {
 			condition.Status = v1.ConditionFalse
-			condition.Reason = fmt.Sprintf("KubeletHasNo%s", conditionType)
-			condition.Message = fmt.Sprintf("kubelet has no %s", conditionType)
+			condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
+			condition.Message = fmt.Sprintf("Node has no %s", conditionType)
 			condition.LastTransitionTime = currentTime
 			recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
 		}
