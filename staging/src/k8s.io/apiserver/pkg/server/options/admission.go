@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
@@ -38,7 +40,9 @@ import (
 	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverapiv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -92,8 +96,12 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
-		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      sets.Set[string]{},
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, conditionsenforcer.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      sets.New[string](),
+	}
+	// keep the AuthorizationConditionsEnforcer off by default when feature gate is off.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		options.DefaultOffPlugins.Insert(conditionsenforcer.PluginName)
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -220,6 +228,16 @@ func (a *AdmissionOptions) Validate() []error {
 		// Developer error, this should never run in.
 		errs = append(errs, fmt.Errorf("plugins %v registered are not in RecommendedPluginOrder",
 			registeredPlugins.Difference(intersections).List()))
+	}
+
+	// Whenever the ConditionalAuthorization feature is on, the admission-time enforcer must be
+	// enabled, such that the rest of the code (e.g. the WithAuthorization filter) can rely on
+	// that conditionally-authorized requests are properly enforced later by this plugin, just
+	// by checking whether the feature gate is enabled.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		if !slices.Contains(a.enabledPluginNames(), conditionsenforcer.PluginName) {
+			errs = append(errs, fmt.Errorf("the conditional authorization feature is enabled, but the mandatory admission plugin %s is not registered", conditionsenforcer.PluginName))
+		}
 	}
 
 	return errs

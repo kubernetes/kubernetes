@@ -18,12 +18,15 @@ package server
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates/ctbattest"
@@ -49,6 +52,11 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
 		mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
 	)
+
+	// On by default whenever the feature gate is on
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		defaultOnPlugins.Insert(conditionsenforcer.PluginName)
+	}
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)
 }
