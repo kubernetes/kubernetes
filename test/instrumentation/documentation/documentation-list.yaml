@@ -4439,7 +4439,7 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: webhook_rejection_count
+- name: webhook_rejections_total
   subsystem: admission
   namespace: apiserver
   help: Admission webhook rejection count, identified by name and broken out for each
@@ -4895,7 +4895,7 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: dial_failure_count
+- name: dial_failures_total
   subsystem: egress_dialer
   namespace: apiserver
   help: Dial failure count, labeled by the protocol (http-connect or grpc), transport

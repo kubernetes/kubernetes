@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -525,5 +526,64 @@ func TestCleanListScope(t *testing.T) {
 				t.Errorf("unexpected scope = %s, expected = %s", actualScope, scenario.expectedScope)
 			}
 		})
+	}
+}
+
+func TestRequestFilterDuration(t *testing.T) {
+	Register()
+	Reset()
+
+	RecordFilterLatency(context.Background(), "test-filter", 10*time.Millisecond)
+
+	want := `
+		# HELP apiserver_request_filter_duration_seconds [BETA] Request filter latency distribution in seconds, for each filter type
+		# TYPE apiserver_request_filter_duration_seconds histogram
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.0001"} 0
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.0003"} 0
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.001"} 0
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.003"} 0
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.01"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.03"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.1"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="0.3"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="1"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="5"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="10"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="15"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="30"} 1
+		apiserver_request_filter_duration_seconds_bucket{filter="test-filter",le="+Inf"} 1
+		apiserver_request_filter_duration_seconds_count{filter="test-filter"} 1
+		apiserver_request_filter_duration_seconds_sum{filter="test-filter"} 0.01
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_request_filter_duration_seconds"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRequestSLIDuration(t *testing.T) {
+	Register()
+	requestSliLatencies.Reset()
+
+	ctx := request.WithLatencyTrackers(context.Background())
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+	req = req.WithContext(ctx)
+
+	MonitorRequest(req, "LIST", "", "v1", "pods", "", "cluster", "apiserver", false, "", 200, 0, 100*time.Millisecond)
+
+	gathered, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	var count uint64
+	for _, mf := range gathered {
+		if mf.GetName() == "apiserver_request_sli_duration_seconds" {
+			for _, m := range mf.GetMetric() {
+				count += m.GetHistogram().GetSampleCount()
+			}
+		}
+	}
+	if count != 1 {
+		t.Errorf("Expected 1 sample in apiserver_request_sli_duration_seconds, got %d", count)
 	}
 }

@@ -30,9 +30,6 @@ import (
 // We setup this list for allow and not fail on the current violations.
 // Generally speaking, you need to fix the problem for a new metric rather than add it into the list.
 var exceptionMetrics = []string{
-	// k8s.io/apiserver/pkg/server/egressselector
-	"apiserver_egress_dialer_dial_failure_count", // counter metrics should have "_total" suffix
-
 	// k8s.io/apiserver/pkg/server/healthz
 	"apiserver_request_total", // label names should be written in 'snake_case' not 'camelCase'
 
@@ -42,7 +39,6 @@ var exceptionMetrics = []string{
 
 	// kube-apiserver
 	"aggregator_openapi_v2_regeneration_count",
-	"apiserver_admission_webhook_rejection_count", // counter metrics should have "_total" suffix,apiserver_admission_webhook_rejection_count:non-histogram and non-summary metrics should not have "_count" suffix
 	"apiserver_admission_step_admission_duration_seconds_summary",
 	"apiserver_current_inflight_requests",
 	"apiserver_longrunning_gauge",

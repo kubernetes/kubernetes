@@ -153,10 +153,10 @@ func TestObserveWebhookRejection(t *testing.T) {
 		"error_type":     "apiserver_internal_error",
 		"rejection_code": "0",
 	}
-	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
-	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
-	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsCallingWebhookError, 1)
-	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsAPIServerInternalError, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejections_total", wantLabels, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejections_total", wantLabels600, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejections_total", wantLabelsCallingWebhookError, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejections_total", wantLabelsAPIServerInternalError, 1)
 }
 
 func TestObserveWebhookFailOpen(t *testing.T) {
