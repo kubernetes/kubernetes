@@ -375,10 +375,10 @@ func TestNodeConditionFromSummaryAPI(t *testing.T) {
 	// kl.containerManager, kl.cadvisor, and kl.imageManager, which are intentionally left
 	// as nil in this mock &Kubelet{} to isolate the testing of the PSI node condition logic.
 	kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
-		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeSystemMemoryContentionPressure, kubelet.getSystemMemoryPSI, kubelet.kubeletConfiguration.SystemMemoryContentionThreshold, kubelet.recordNodeStatusEvent),
-		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeSystemDiskContentionPressure, kubelet.getSystemDiskPSI, kubelet.kubeletConfiguration.SystemDiskContentionThreshold, kubelet.recordNodeStatusEvent),
-		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeKubepodsMemoryContentionPressure, kubelet.getKubepodsMemoryPSI, kubelet.kubeletConfiguration.KubepodsMemoryContentionThreshold, kubelet.recordNodeStatusEvent),
-		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeKubepodsDiskContentionPressure, kubelet.getKubepodsDiskPSI, kubelet.kubeletConfiguration.KubepodsDiskContentionThreshold, kubelet.recordNodeStatusEvent),
+		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeSystemMemoryContentionPressure, kubelet.getSystemMemoryPSI, kubelet.kubeletConfiguration.SystemMemoryContentionThreshold, 0, kubelet.recordNodeStatusEvent),
+		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeSystemDiskContentionPressure, kubelet.getSystemDiskPSI, kubelet.kubeletConfiguration.SystemDiskContentionThreshold, 0, kubelet.recordNodeStatusEvent),
+		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeKubepodsMemoryContentionPressure, kubelet.getKubepodsMemoryPSI, kubelet.kubeletConfiguration.KubepodsMemoryContentionThreshold, 0, kubelet.recordNodeStatusEvent),
+		nodestatus.PSICondition(kubelet.clock.Now, v1.NodeKubepodsDiskContentionPressure, kubelet.getKubepodsDiskPSI, kubelet.kubeletConfiguration.KubepodsDiskContentionThreshold, 0, kubelet.recordNodeStatusEvent),
 	}
 
 	ctx := context.Background()

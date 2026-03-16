@@ -756,8 +756,10 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	conditionType v1.NodeConditionType,
 	getPSIFunc func(context.Context) (*statsapi.PSIData, error),
 	threshold float64,
+	transitionPeriod time.Duration,
 	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
+	var timeBelowThreshold *time.Time
 	return func(ctx context.Context, node *v1.Node) error {
 		logger := klog.FromContext(ctx)
 		currentTime := metav1.NewTime(nowFunc())
@@ -798,23 +800,40 @@ func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 		}
 
 		thresholdPercentage := threshold * 100
+		isPressured := psi.Avg10 >= thresholdPercentage && psi.Avg60 >= thresholdPercentage
 
-		if psi.Avg10 >= thresholdPercentage && psi.Avg60 >= thresholdPercentage {
-			// Record an event indicating high resource pressure (ongoing or new)
-			recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
-
+		if isPressured {
+			timeBelowThreshold = nil
 			if condition.Status != v1.ConditionTrue {
 				condition.Status = v1.ConditionTrue
 				condition.Reason = fmt.Sprintf("NodeHas%s", conditionType)
 				condition.Message = fmt.Sprintf("Node has %s", conditionType)
 				condition.LastTransitionTime = currentTime
+				// Record an event indicating high resource pressure (ongoing or new)
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
 			}
-		} else if condition.Status != v1.ConditionFalse {
-			condition.Status = v1.ConditionFalse
-			condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
-			condition.Message = fmt.Sprintf("Node has no %s", conditionType)
-			condition.LastTransitionTime = currentTime
-			recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
+		} else {
+			if condition.Status == v1.ConditionUnknown {
+				condition.Status = v1.ConditionFalse
+				condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
+				condition.Message = fmt.Sprintf("Node has no %s", conditionType)
+				condition.LastTransitionTime = currentTime
+			} else if condition.Status == v1.ConditionTrue {
+				if timeBelowThreshold == nil {
+					t := currentTime.Time
+					timeBelowThreshold = &t
+				}
+				if currentTime.Time.Sub(*timeBelowThreshold) >= transitionPeriod {
+					condition.Status = v1.ConditionFalse
+					condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
+					condition.Message = fmt.Sprintf("Node has no %s", conditionType)
+					condition.LastTransitionTime = currentTime
+					timeBelowThreshold = nil
+					recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
+				}
+			} else if condition.Status == v1.ConditionFalse {
+				timeBelowThreshold = nil
+			}
 		}
 
 		if newCondition {

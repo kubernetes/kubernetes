@@ -1738,6 +1738,8 @@ func TestPSICondition(t *testing.T) {
 		desc             string
 		node             *v1.Node
 		psiData          *statsapi.PSIData
+		psiError         error
+		transitionPeriod time.Duration
 		expectConditions []v1.NodeCondition
 		expectEvents     []testEvent
 	}{
@@ -1822,12 +1824,27 @@ func TestPSICondition(t *testing.T) {
 			},
 			psiData:          &statsapi.PSIData{Avg10: 50, Avg60: 100},
 			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
-			expectEvents: []testEvent{
-				{
-					eventType: v1.EventTypeNormal,
-					event:     fmt.Sprintf("NodeHas%sTrendingLower", condType),
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "transition to no pressure delayed by transitionPeriod",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, true, before, before)},
 				},
 			},
+			psiData:          &statsapi.PSIData{Avg10: 0, Avg60: 0},
+			transitionPeriod: 5 * time.Minute,
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc:             "transition to ConditionUnknown on nil PSI",
+			node:             &v1.Node{},
+			psiData:          nil,
+			psiError:         fmt.Errorf("failed to get psi"),
+			expectConditions: []v1.NodeCondition{*makePSIConditionUnknown(condType, now, now)},
+			expectEvents:     []testEvent{},
 		},
 		{
 			desc: "no pressure, no transition",
@@ -1852,11 +1869,11 @@ func TestPSICondition(t *testing.T) {
 				})
 			}
 			getPSIFunc := func(ctx context.Context) (*statsapi.PSIData, error) {
-				return tc.psiData, nil
+				return tc.psiData, tc.psiError
 			}
 			threshold := 0.9
 			// construct setter
-			setter := PSICondition(nowFunc, condType, getPSIFunc, threshold, recordEventFunc)
+			setter := PSICondition(nowFunc, condType, getPSIFunc, threshold, tc.transitionPeriod, recordEventFunc)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -2108,8 +2125,8 @@ func makePSICondition(condType v1.NodeConditionType, pressure bool, transition, 
 		return &v1.NodeCondition{
 			Type:               condType,
 			Status:             v1.ConditionTrue,
-			Reason:             fmt.Sprintf("KubeletHas%s", condType),
-			Message:            fmt.Sprintf("kubelet has %s", condType),
+			Reason:             fmt.Sprintf("NodeHas%s", condType),
+			Message:            fmt.Sprintf("Node has %s", condType),
 			LastTransitionTime: metav1.NewTime(transition),
 			LastHeartbeatTime:  metav1.NewTime(heartbeat),
 		}
@@ -2117,8 +2134,19 @@ func makePSICondition(condType v1.NodeConditionType, pressure bool, transition, 
 	return &v1.NodeCondition{
 		Type:               condType,
 		Status:             v1.ConditionFalse,
-		Reason:             fmt.Sprintf("KubeletHasNo%s", condType),
-		Message:            fmt.Sprintf("kubelet has no %s", condType),
+		Reason:             fmt.Sprintf("NodeHasNo%s", condType),
+		Message:            fmt.Sprintf("Node has no %s", condType),
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func makePSIConditionUnknown(condType v1.NodeConditionType, transition, heartbeat time.Time) *v1.NodeCondition {
+	return &v1.NodeCondition{
+		Type:               condType,
+		Status:             v1.ConditionUnknown,
+		Reason:             "KubeletUnableToGetPSI",
+		Message:            "kubelet is unable to get PSI",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
 	}
