@@ -71933,6 +71933,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"containerRuntimeMetricsAddress": {
+						SchemaProps: spec.SchemaProps{
+							Description: "containerRuntimeMetricsAddress is the address (host:port) of the container runtime metrics endpoint that serves CRI Stats metrics. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"imageServiceEndpoint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ImageServiceEndpoint is the endpoint of container image service. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'. If not specified, the value in containerRuntimeEndpoint is used.",

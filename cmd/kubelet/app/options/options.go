@@ -377,6 +377,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletCon
 
 	// runtime flags
 	fs.StringVar(&c.ContainerRuntimeEndpoint, "container-runtime-endpoint", c.ContainerRuntimeEndpoint, "The endpoint of container runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
+	fs.StringVar(&c.ContainerRuntimeMetricsAddress, "container-runtime-metrics-address", c.ContainerRuntimeMetricsAddress, "The address (host:port) of the container runtime metrics endpoint from which CRI Stats metrics are served. If not specified, CRI metrics are not fetched.")
 	fs.StringVar(&c.ImageServiceEndpoint, "image-service-endpoint", c.ImageServiceEndpoint, "The endpoint of container image service. If not specified, it will be the same with --container-runtime-endpoint by default. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
 
 	// Authentication

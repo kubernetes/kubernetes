@@ -18,6 +18,8 @@ package validation
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 	"unicode"
 
@@ -353,6 +355,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	if kc.ContainerRuntimeEndpoint == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: the containerRuntimeEndpoint was not specified or empty"))
+	}
+	if kc.ContainerRuntimeMetricsAddress != "" {
+		_, port, err := net.SplitHostPort(kc.ContainerRuntimeMetricsAddress)
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerRuntimeMetricsAddress %q must be host:port", kc.ContainerRuntimeMetricsAddress))
+		} else if p, err := strconv.Atoi(port); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerRuntimeMetricsAddress port %q must be a valid port", port))
+		} else if p < 1 || p > 65535 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerRuntimeMetricsAddress port %q must be a valid port", port))
+		}
 	}
 
 	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {

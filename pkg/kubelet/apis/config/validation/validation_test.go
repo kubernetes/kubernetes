@@ -80,10 +80,11 @@ var (
 			Format:         "text",
 			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
-		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
-		ContainerLogMaxWorkers:      1,
-		ContainerLogMaxFiles:        5,
-		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
+		ContainerRuntimeEndpoint:       "unix:///run/containerd/containerd.sock",
+		ContainerRuntimeMetricsAddress: "127.0.0.1:1234",
+		ContainerLogMaxWorkers:         1,
+		ContainerLogMaxFiles:           5,
+		ContainerLogMonitorInterval:    metav1.Duration{Duration: 10 * time.Second},
 		SingleProcessOOMKill: func() *bool {
 			if goruntime.GOOS == "linux" {
 				return ptr.To(!kubeletutil.IsCgroup2UnifiedMode())
@@ -153,6 +154,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: healthzPort (--healthz-port) 65536 must be between 1 and 65535, inclusive",
+	}, {
+		name: "invalid ContainerRuntimeMetricsAddress",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.ContainerRuntimeMetricsAddress = "not-a-host-port"
+			return conf
+		},
+		errMsg: "invalid configuration: containerRuntimeMetricsAddress",
 	}, {
 		name: "specify CPUCFSQuotaPeriod without enabling CPUCFSQuotaPeriod",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

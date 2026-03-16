@@ -301,6 +301,7 @@ var (
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
 		"ContainerRuntimeEndpoint",
+		"ContainerRuntimeMetricsAddress",
 		"ImageServiceEndpoint",
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",

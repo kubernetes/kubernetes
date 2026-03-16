@@ -532,11 +532,15 @@ type KubeletConfiguration struct {
 	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'
 	ContainerRuntimeEndpoint string
 
+	// ContainerRuntimeMetricsAddress is the address of the container runtime
+	// metrics endpoint that serves CRI stats metrics.
+	// +optional
+	ContainerRuntimeMetricsAddress string
+
 	// ImageServiceEndpoint is the endpoint of container image service.
 	// If not specified the default value is ContainerRuntimeEndpoint
 	// +optional
 	ImageServiceEndpoint string
-
 	// FailCgroupV1 prevents the kubelet from starting on hosts
 	// that use cgroup v1. By default, this is set to 'false', meaning
 	// the kubelet is allowed to start on cgroup v1 hosts unless this

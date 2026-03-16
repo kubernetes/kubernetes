@@ -122,14 +122,15 @@ const (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	flagz                flagz.Reader
-	auth                 AuthInterface
-	host                 HostInterface
-	restfulCont          containerInterface
-	metricsBuckets       sets.Set[string]
-	metricsMethodBuckets sets.Set[string]
-	resourceAnalyzer     stats.ResourceAnalyzer
-	extendedCheckers     []healthz.HealthChecker
+	flagz                          flagz.Reader
+	auth                           AuthInterface
+	host                           HostInterface
+	restfulCont                    containerInterface
+	metricsBuckets                 sets.Set[string]
+	metricsMethodBuckets           sets.Set[string]
+	resourceAnalyzer               stats.ResourceAnalyzer
+	extendedCheckers               []healthz.HealthChecker
+	containerRuntimeMetricsAddress string
 }
 
 // TLSOptions holds the TLS options.
@@ -306,15 +307,20 @@ func NewServer(
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
 	logger := klog.FromContext(ctx)
+	var criMetricsAddr string
+	if kubeCfg != nil {
+		criMetricsAddr = kubeCfg.ContainerRuntimeMetricsAddress
+	}
 	server := Server{
-		flagz:                flagz,
-		host:                 host,
-		resourceAnalyzer:     resourceAnalyzer,
-		auth:                 auth,
-		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
-		metricsBuckets:       sets.New[string](),
-		metricsMethodBuckets: sets.New[string]("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
-		extendedCheckers:     checkers,
+		flagz:                          flagz,
+		host:                           host,
+		resourceAnalyzer:               resourceAnalyzer,
+		auth:                           auth,
+		restfulCont:                    &filteringContainer{Container: restful.NewContainer()},
+		metricsBuckets:                 sets.New[string](),
+		metricsMethodBuckets:           sets.New[string]("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		extendedCheckers:               checkers,
+		containerRuntimeMetricsAddress: criMetricsAddr,
 	}
 	if auth != nil {
 		server.InstallAuthFilter(ctx)
@@ -490,9 +496,10 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	registryHandler := compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError})
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
-		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
+		s.restfulCont.Handle(cadvisorMetricsPath, collectors.CRIStatsHandler(logger, registryHandler, s.containerRuntimeMetricsAddress))
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
 			IdType:    cadvisorv2.TypeName,
@@ -501,10 +508,8 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 		}
 		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
 		servermetrics.SetMetricsProvider(servermetrics.CAdvisorMetricsProvider)
+		s.restfulCont.Handle(cadvisorMetricsPath, registryHandler)
 	}
-	s.restfulCont.Handle(cadvisorMetricsPath,
-		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
-	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()

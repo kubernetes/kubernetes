@@ -920,6 +920,12 @@ type KubeletConfiguration struct {
 	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'
 	ContainerRuntimeEndpoint string `json:"containerRuntimeEndpoint"`
 
+	// containerRuntimeMetricsAddress is the address (host:port) of the container
+	// runtime metrics endpoint that serves CRI Stats metrics.
+	// Default: ""
+	// +optional
+	ContainerRuntimeMetricsAddress string `json:"containerRuntimeMetricsAddress,omitempty"`
+
 	// ImageServiceEndpoint is the endpoint of container image service.
 	// Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows.
 	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'.
