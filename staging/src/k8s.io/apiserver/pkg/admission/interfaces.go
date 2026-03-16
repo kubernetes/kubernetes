@@ -24,20 +24,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
-	// GetName returns the name of the object as presented in the request.  On a CREATE operation, the client
-	// may omit name and rely on the server to generate the name.  If that is the case, this method will return
+	// GetName returns the name of the object as presented in the request. On a CREATE operation, the client
+	// may omit name and rely on the server to generate the name. If that is the case, this method will return
 	// the empty string
 	GetName() string
 	// GetNamespace is the namespace associated with the request (if any)
 	GetNamespace() string
-	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
+	// GetResource is the name of the resource being requested. This is not the kind. For example: pods
 	GetResource() schema.GroupVersionResource
-	// GetSubresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
+	// GetSubresource is the name of the subresource being requested. This is a different resource, scoped to the parent resource, but it may have a different kind.
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
 	GetSubresource() string
@@ -144,7 +145,8 @@ type ValidationInterface interface {
 }
 
 // Operation is the type of resource operation being checked for admission control
-type Operation string
+// This type is sourced from the authorizer package to avoid import cycles.
+type Operation = authorizer.AdmissionOperation
 
 // Operation constants
 const (
