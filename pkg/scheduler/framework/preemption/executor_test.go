@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1272,7 +1273,7 @@ func TestPreemptPod(t *testing.T) {
 				}
 				fwk.AddWaitingPod(victimPod, pluginsWaitTime)
 			}
-			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, &FakePreemptionScorePostFilterPlugin{}, false)
+			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, &FakePreemptionScorePostFilterPlugin{}, feature.Features{})
 
 			err = pe.PreemptPod(ctx, &candidate{}, preemptorPod, victimPod, "test-plugin")
 			if err != nil {

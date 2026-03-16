@@ -65,10 +65,11 @@ type FakePostFilterPlugin struct {
 	numViolatingVictim int
 }
 
-func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.GetPods()[0].GetPod()), pl.numViolatingVictim, nil
+func (pl *FakePostFilterPlugin) SelectVictimsOnDomain(ctx context.Context, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	for _, node := range domain.Nodes() {
+		victims = append(victims, node.GetPods()[0].GetPod())
+	}
+	return victims, pl.numViolatingVictim, nil
 }
 
 func (pl *FakePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -83,16 +84,21 @@ func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(_ context.Context, po
 	return true, ""
 }
 
+func (pl *FakePostFilterPlugin) PodGroupEligibleToPreemptOthers(_ context.Context, podGroupInfo *framework.PodGroupInfo) (bool, string) {
+	return true, ""
+}
+
 func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
 	return nil
 }
 
 type FakePreemptionScorePostFilterPlugin struct{}
 
-func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.GetPods()[0].GetPod()), 1, nil
+func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnDomain(ctx context.Context, preemptor Preemptor, domain Domain, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	for _, node := range domain.Nodes() {
+		victims = append(victims, node.GetPods()[0].GetPod())
+	}
+	return victims, 1, nil
 }
 
 func (pl *FakePreemptionScorePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -108,6 +114,10 @@ func (pl *FakePreemptionScorePostFilterPlugin) CandidatesToVictimsMap(candidates
 }
 
 func (pl *FakePreemptionScorePostFilterPlugin) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+	return true, ""
+}
+
+func (pl *FakePreemptionScorePostFilterPlugin) PodGroupEligibleToPreemptOthers(_ context.Context, podGroupInfo *framework.PodGroupInfo) (bool, string) {
 	return true, ""
 }
 
@@ -128,7 +138,7 @@ func TestDryRunPreemption(t *testing.T) {
 	tests := []struct {
 		name               string
 		nodes              []*v1.Node
-		testPods           []*v1.Pod
+		preemptors         []*v1.Pod
 		initPods           []*v1.Pod
 		numViolatingVictim int
 		expected           [][]Candidate
@@ -139,7 +149,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
 				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
 			},
-			testPods: []*v1.Pod{
+			preemptors: []*v1.Pod{
 				st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -169,7 +179,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
 				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
 			},
-			testPods: []*v1.Pod{
+			preemptors: []*v1.Pod{
 				st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -206,9 +216,11 @@ func TestDryRunPreemption(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			var objs []runtime.Object
-			for _, p := range append(tt.testPods, tt.initPods...) {
+
+			for _, p := range append(tt.preemptors, tt.initPods...) {
 				objs = append(objs, p)
 			}
+
 			for _, n := range tt.nodes {
 				objs = append(objs, n)
 			}
@@ -222,7 +234,7 @@ func TestDryRunPreemption(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.preemptors, tt.nodes)),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
@@ -242,14 +254,14 @@ func TestDryRunPreemption(t *testing.T) {
 
 			fakePostPlugin := &FakePostFilterPlugin{numViolatingVictim: tt.numViolatingVictim}
 
-			for cycle, pod := range tt.testPods {
+			for cycle, preemptor := range tt.preemptors {
 				state := framework.NewCycleState()
 				pe := Evaluator{
 					PluginName: "FakePostFilter",
 					Handler:    fwk,
 					Interface:  fakePostPlugin,
 				}
-				got, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
