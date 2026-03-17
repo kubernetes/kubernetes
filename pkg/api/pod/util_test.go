@@ -2714,6 +2714,239 @@ func TestDropHostUsers(t *testing.T) {
 
 }
 
+func TestDropGRPCContainerProbeTLS(t *testing.T) {
+	grpcProbeModeTLS := func() *api.GRPCProbeMode {
+		mode := api.GRPCProbeModeTLS
+		return &mode
+	}
+	grpcTLSProbe := func() *api.Probe {
+		return &api.Probe{
+			ProbeHandler: api.ProbeHandler{
+				GRPC: &api.GRPCAction{Port: 8443, Mode: grpcProbeModeTLS()},
+			},
+		}
+	}
+	grpcNoTLSProbe := func() *api.Probe {
+		return &api.Probe{
+			ProbeHandler: api.ProbeHandler{
+				GRPC: &api.GRPCAction{Port: 8443},
+			},
+		}
+	}
+	podWithGRPCTLS := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:           "container1",
+						Image:          "image",
+						LivenessProbe:  grpcTLSProbe(),
+						ReadinessProbe: grpcTLSProbe(),
+						StartupProbe:   grpcTLSProbe(),
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:           "initcontainer1",
+						Image:          "image",
+						LivenessProbe:  grpcTLSProbe(),
+						ReadinessProbe: grpcTLSProbe(),
+						StartupProbe:   grpcTLSProbe(),
+					},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Name:           "ephemeral1",
+							Image:          "image",
+							LivenessProbe:  grpcTLSProbe(),
+							ReadinessProbe: grpcTLSProbe(),
+							StartupProbe:   grpcTLSProbe(),
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithGRPCNoTLS := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:           "container1",
+						Image:          "image",
+						LivenessProbe:  grpcNoTLSProbe(),
+						ReadinessProbe: grpcNoTLSProbe(),
+						StartupProbe:   grpcNoTLSProbe(),
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:           "initcontainer1",
+						Image:          "image",
+						LivenessProbe:  grpcNoTLSProbe(),
+						ReadinessProbe: grpcNoTLSProbe(),
+						StartupProbe:   grpcNoTLSProbe(),
+					},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Name:           "ephemeral1",
+							Image:          "image",
+							LivenessProbe:  grpcNoTLSProbe(),
+							ReadinessProbe: grpcNoTLSProbe(),
+							StartupProbe:   grpcNoTLSProbe(),
+						},
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasTLS      bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "with gRPC TLS",
+			hasTLS:      true,
+			pod:         podWithGRPCTLS,
+		},
+		{
+			description: "without gRPC TLS",
+			hasTLS:      false,
+			pod:         podWithGRPCNoTLS,
+		},
+		{
+			description: "nil pod",
+			hasTLS:      false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasTLS, oldPod := oldPodInfo.hasTLS, oldPodInfo.pod()
+				newPodHasTLS, newPod := newPodInfo.hasTLS, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GRPCContainerProbeTLS, enabled)
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasTLS:
+						// new pod should not be changed if the feature is enabled, or if the old pod had TLS
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasTLS:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have TLS
+						if exp := podWithGRPCNoTLS(); !reflect.DeepEqual(newPod, exp) {
+							t.Errorf("new pod had TLS: %v", cmp.Diff(newPod, exp))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestGRPCContainerProbeTLSValidationOptions(t *testing.T) {
+	podSpecWithGRPCTLS := &api.PodSpec{
+		Containers: []api.Container{
+			{
+				LivenessProbe: &api.Probe{
+					ProbeHandler: api.ProbeHandler{
+						GRPC: &api.GRPCAction{Port: 8443, Mode: func() *api.GRPCProbeMode { m := api.GRPCProbeModeTLS; return &m }()},
+					},
+				},
+			},
+		},
+	}
+
+	podSpecWithoutGRPCTLS := &api.PodSpec{
+		Containers: []api.Container{
+			{
+				LivenessProbe: &api.Probe{
+					ProbeHandler: api.ProbeHandler{
+						GRPC: &api.GRPCAction{Port: 8443},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		enabled   bool
+		oldSpec   *api.PodSpec
+		wantAllow bool
+	}{
+		{
+			name:      "gate enabled, no old pod: allow",
+			enabled:   true,
+			oldSpec:   nil,
+			wantAllow: true,
+		},
+		{
+			name:      "gate enabled, old pod has TLS: allow",
+			enabled:   true,
+			oldSpec:   podSpecWithGRPCTLS,
+			wantAllow: true,
+		},
+		{
+			name:      "gate disabled, old pod has TLS: allow (backward compat)",
+			enabled:   false,
+			oldSpec:   podSpecWithGRPCTLS,
+			wantAllow: true,
+		},
+		{
+			name:      "gate disabled, old pod without TLS: disallow",
+			enabled:   false,
+			oldSpec:   podSpecWithoutGRPCTLS,
+			wantAllow: false,
+		},
+		{
+			name:      "gate disabled, no old pod: disallow",
+			enabled:   false,
+			oldSpec:   nil,
+			wantAllow: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GRPCContainerProbeTLS, tc.enabled)
+
+			opts := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldSpec, nil, nil)
+			if opts.AllowGRPCContainerProbeTLS != tc.wantAllow {
+				t.Errorf("AllowGRPCContainerProbeTLS = %v, want %v", opts.AllowGRPCContainerProbeTLS, tc.wantAllow)
+			}
+		})
+	}
+}
+
 func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	testCases := []struct {
 		name       string
