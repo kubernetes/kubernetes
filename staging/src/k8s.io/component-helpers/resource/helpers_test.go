@@ -84,8 +84,9 @@ func TestPodRequestsAndLimits(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests := PodRequests(tc.pod, PodResourcesOptions{})
-		resLimits := PodLimits(tc.pod, PodResourcesOptions{})
+		pod := tc.pod.DeepCopy()
+		resRequests := PodRequests(pod, PodResourcesOptions{})
+		resLimits := PodLimits(pod, PodResourcesOptions{})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedRequests, resRequests)
@@ -93,6 +94,10 @@ func TestPodRequestsAndLimits(t *testing.T) {
 
 		if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
 			t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedLimits, resLimits)
+		}
+
+		if !equality.Semantic.DeepEqual(tc.pod, pod) {
+			t.Errorf("test case failure[%d]: %v, pod was modified!\nexpected:\n%v\n got:\n%v", idx, tc.cName, tc.pod, pod)
 		}
 	}
 }
@@ -271,8 +276,9 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests := PodRequests(tc.pod, PodResourcesOptions{ExcludeOverhead: true})
-		resLimits := PodLimits(tc.pod, PodResourcesOptions{ExcludeOverhead: true})
+		pod := tc.pod.DeepCopy()
+		resRequests := PodRequests(pod, PodResourcesOptions{ExcludeOverhead: true})
+		resLimits := PodLimits(pod, PodResourcesOptions{ExcludeOverhead: true})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedRequests, resRequests)
@@ -280,6 +286,10 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 
 		if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
 			t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedLimits, resLimits)
+		}
+
+		if !equality.Semantic.DeepEqual(tc.pod, pod) {
+			t.Errorf("test case failure[%d]: %v, pod was modified!\nexpected:\n%v\n got:\n%v", idx, tc.name, tc.pod, pod)
 		}
 	}
 }

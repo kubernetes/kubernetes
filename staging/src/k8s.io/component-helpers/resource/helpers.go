@@ -147,41 +147,44 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 // those pod-level values are used in calculating Pod Requests.
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	reqs := v1.ResourceList{}
-	if !opts.SkipContainerLevelResources {
-		reqs = AggregateContainerRequests(pod, opts)
-	}
-
-	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-
-		var effectiveReqs v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
-					Spec:      pod.Spec.Resources.Requests,
-					Actuated:  pod.Status.Resources.Requests,
-					Allocated: pod.Status.AllocatedResources,
-				})
-			}
+	return PodRequestsV2(pod, opts)
+	/*
+		reqs := v1.ResourceList{}
+		if !opts.SkipContainerLevelResources {
+			reqs = AggregateContainerRequests(pod, opts)
 		}
 
-		for resourceName, quantity := range pod.Spec.Resources.Requests {
-			if IsSupportedPodLevelResource(resourceName) {
-				reqs[resourceName] = quantity
-				if effectiveReqs != nil {
-					reqs[resourceName] = effectiveReqs[resourceName]
+		if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
+
+			var effectiveReqs v1.ResourceList
+			if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
+				if pod.Status.Resources != nil {
+					effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
+						Spec:      pod.Spec.Resources.Requests,
+						Actuated:  pod.Status.Resources.Requests,
+						Allocated: pod.Status.AllocatedResources,
+					})
 				}
+			}
 
+			for resourceName, quantity := range pod.Spec.Resources.Requests {
+				if IsSupportedPodLevelResource(resourceName) {
+					reqs[resourceName] = quantity
+					if effectiveReqs != nil {
+						reqs[resourceName] = effectiveReqs[resourceName]
+					}
+
+				}
 			}
 		}
-	}
 
-	// Add overhead for running a pod to the sum of requests if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		addResourceList(reqs, pod.Spec.Overhead)
-	}
+		// Add overhead for running a pod to the sum of requests if requested:
+		if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+			addResourceList(reqs, pod.Spec.Overhead)
+		}
 
-	return reqs
+		return reqs
+	*/
 }
 
 // AggregateContainerRequests computes the total resource requests of all the containers
@@ -191,91 +194,102 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
-	var containerStatuses map[string]*v1.ContainerStatus
-	if opts.UseStatusResources {
-		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-		for i := range pod.Status.InitContainerStatuses {
-			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
-		}
+
+	for res := range allRequestResources(pod, opts) {
+		reqs[res] = AggregateContainerResourceRequest(pod, res, opts)
 	}
-
-	for _, container := range pod.Spec.Containers {
-		containerReqs := container.Resources.Requests
-		if opts.UseStatusResources {
-			cs, found := containerStatuses[container.Name]
-			if found && cs.Resources != nil {
-				containerReqs = determineEffectiveRequests(pod, &ResourceState{
-					Spec:      container.Resources.Requests,
-					Actuated:  cs.Resources.Requests,
-					Allocated: cs.AllocatedResources,
-				})
-			}
-		}
-
-		if len(opts.NonMissingContainerRequests) > 0 {
-			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
-		}
-
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerReqs, Containers)
-		}
-
-		addResourceList(reqs, containerReqs)
-	}
-
-	restartableInitContainerReqs := v1.ResourceList{}
-	initContainerReqs := v1.ResourceList{}
-	// init containers define the minimum of any resource
-	//
-	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
-	// init container is initializing, then
-	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
-	//
-	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
-	for _, container := range pod.Spec.InitContainers {
-		containerReqs := container.Resources.Requests
-		if opts.UseStatusResources {
-			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				cs, found := containerStatuses[container.Name]
-				if found && cs.Resources != nil {
-					containerReqs = determineEffectiveRequests(pod, &ResourceState{
-						Spec:      container.Resources.Requests,
-						Actuated:  cs.Resources.Requests,
-						Allocated: cs.AllocatedResources,
-					})
-				}
-			}
-		}
-
-		if len(opts.NonMissingContainerRequests) > 0 {
-			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
-		}
-
-		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			// and add them to the resulting cumulative container requests
-			addResourceList(reqs, containerReqs)
-
-			// track our cumulative restartable init container resources
-			addResourceList(restartableInitContainerReqs, containerReqs)
-			containerReqs = restartableInitContainerReqs
-		} else {
-			tmp := v1.ResourceList{}
-			addResourceList(tmp, containerReqs)
-			addResourceList(tmp, restartableInitContainerReqs)
-			containerReqs = tmp
-		}
-
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerReqs, InitContainers)
-		}
-		maxResourceList(initContainerReqs, containerReqs)
-	}
-
-	maxResourceList(reqs, initContainerReqs)
 	return reqs
+
+	/*
+	   // attempt to reuse the maps if passed, or allocate otherwise
+
+	   	reqs := reuseOrClearResourceList(opts.Reuse)
+	   	var containerStatuses map[string]*v1.ContainerStatus
+	   	if opts.UseStatusResources {
+	   		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	   		for i := range pod.Status.ContainerStatuses {
+	   			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
+	   		}
+	   		for i := range pod.Status.InitContainerStatuses {
+	   			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
+	   		}
+	   	}
+
+	   	for _, container := range pod.Spec.Containers {
+	   		containerReqs := container.Resources.Requests
+	   		if opts.UseStatusResources {
+	   			cs, found := containerStatuses[container.Name]
+	   			if found && cs.Resources != nil {
+	   				containerReqs = determineEffectiveRequests(pod, &ResourceState{
+	   					Spec:      container.Resources.Requests,
+	   					Actuated:  cs.Resources.Requests,
+	   					Allocated: cs.AllocatedResources,
+	   				})
+	   			}
+	   		}
+
+	   		if len(opts.NonMissingContainerRequests) > 0 {
+	   			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
+	   		}
+
+	   		if opts.ContainerFn != nil {
+	   			opts.ContainerFn(containerReqs, Containers)
+	   		}
+
+	   		addResourceList(reqs, containerReqs)
+	   	}
+
+	   	restartableInitContainerReqs := v1.ResourceList{}
+	   	initContainerReqs := v1.ResourceList{}
+	   	// init containers define the minimum of any resource
+	   	//
+	   	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
+	   	// init container is initializing, then
+	   	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
+	   	//
+	   	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
+	   	for _, container := range pod.Spec.InitContainers {
+	   		containerReqs := container.Resources.Requests
+	   		if opts.UseStatusResources {
+	   			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+	   				cs, found := containerStatuses[container.Name]
+	   				if found && cs.Resources != nil {
+	   					containerReqs = determineEffectiveRequests(pod, &ResourceState{
+	   						Spec:      container.Resources.Requests,
+	   						Actuated:  cs.Resources.Requests,
+	   						Allocated: cs.AllocatedResources,
+	   					})
+	   				}
+	   			}
+	   		}
+
+	   		if len(opts.NonMissingContainerRequests) > 0 {
+	   			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
+	   		}
+
+	   		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+	   			// and add them to the resulting cumulative container requests
+	   			addResourceList(reqs, containerReqs)
+
+	   			// track our cumulative restartable init container resources
+	   			addResourceList(restartableInitContainerReqs, containerReqs)
+	   			containerReqs = restartableInitContainerReqs
+	   		} else {
+	   			tmp := v1.ResourceList{}
+	   			addResourceList(tmp, containerReqs)
+	   			addResourceList(tmp, restartableInitContainerReqs)
+	   			containerReqs = tmp
+	   		}
+
+	   		if opts.ContainerFn != nil {
+	   			opts.ContainerFn(containerReqs, InitContainers)
+	   		}
+	   		maxResourceList(initContainerReqs, containerReqs)
+	   	}
+
+	   	maxResourceList(reqs, initContainerReqs)
+	   	return reqs
+	*/
 }
 
 type ResourceState struct {

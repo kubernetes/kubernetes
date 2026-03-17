@@ -1,0 +1,76 @@
+goos: linux
+goarch: amd64
+pkg: k8s.io/component-helpers/resource
+cpu: AMD EPYC 7B13
+BenchmarkPodRequests/func=PodRequests/pod=SimplePod/opts=Default-64         	 1702802	       693.0 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=SimplePod/opts=Default-64         	 1874990	       636.3 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=SimplePod/opts=WithStatus-64                     	 1682055	       722.5 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=SimplePod/opts=WithStatus-64      	 1797746	       672.0 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=SimplePod/opts=WithReuse-64                      	 4155774	       288.2 ns/op	      96 B/op	       2 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=SimplePod/opts=WithReuse-64       	 5210478	       231.2 ns/op	      48 B/op	       1 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=SimplePod/opts=WithNonMissing-64                 	 1000000	      1367 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=SimplePod/opts=WithNonMissing-64  	  894606	      1301 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=SimplePod/opts=WithAll-64                        	 1279316	       934.6 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=SimplePod/opts=WithAll-64         	 1368147	       875.5 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=ManyContainers/opts=Default-64                   	  340789	      3582 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=ManyContainers/opts=Default-64    	  353208	      3388 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=ManyContainers/opts=WithStatus-64                	   59265	     19846 ns/op	   15480 B/op	      47 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=ManyContainers/opts=WithStatus-64 	   61243	     19604 ns/op	   15432 B/op	      46 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=ManyContainers/opts=WithReuse-64                 	  396506	      3069 ns/op	      96 B/op	       2 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=ManyContainers/opts=WithReuse-64  	  407751	      2943 ns/op	      48 B/op	       1 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=ManyContainers/opts=WithNonMissing-64            	   69260	     16295 ns/op	   14544 B/op	      44 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=ManyContainers/opts=WithNonMissing-64         	   72829	     16113 ns/op	   14496 B/op	      43 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=ManyContainers/opts=WithAll-64                               	   36864	     32569 ns/op	   28552 B/op	      85 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=ManyContainers/opts=WithAll-64                	   37620	     32053 ns/op	   28504 B/op	      84 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=InitContainers/opts=Default-64                               	  518899	      2319 ns/op	    2160 B/op	       8 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=InitContainers/opts=Default-64                	  538527	      2231 ns/op	    2112 B/op	       7 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=InitContainers/opts=WithStatus-64                            	  546968	      2320 ns/op	    2160 B/op	       8 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=InitContainers/opts=WithStatus-64             	  550543	      2253 ns/op	    2112 B/op	       7 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=InitContainers/opts=WithReuse-64                             	  627354	      1879 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=InitContainers/opts=WithReuse-64              	  644079	      1809 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=InitContainers/opts=WithNonMissing-64                        	  286938	      4260 ns/op	    4224 B/op	      14 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=InitContainers/opts=WithNonMissing-64         	  288856	      4157 ns/op	    4176 B/op	      13 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=InitContainers/opts=WithAll-64                               	  314521	      3829 ns/op	    3536 B/op	      12 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=InitContainers/opts=WithAll-64                	  308653	      3792 ns/op	    3488 B/op	      11 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=Sidecars/opts=Default-64                                     	  782349	      1609 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=Sidecars/opts=Default-64                      	  811711	      1541 ns/op	    1376 B/op	       4 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=Sidecars/opts=WithStatus-64                                  	  716304	      1632 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=Sidecars/opts=WithStatus-64                   	  786813	      1544 ns/op	    1376 B/op	       4 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=Sidecars/opts=WithReuse-64                                   	  921204	      1178 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=Sidecars/opts=WithReuse-64                    	 1000000	      1106 ns/op	     688 B/op	       2 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=Sidecars/opts=WithNonMissing-64                              	  417775	      2899 ns/op	    2800 B/op	       9 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=Sidecars/opts=WithNonMissing-64               	  424737	      2881 ns/op	    2752 B/op	       8 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=Sidecars/opts=WithAll-64                                     	  496146	      2477 ns/op	    2112 B/op	       7 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=Sidecars/opts=WithAll-64                      	  510655	      2406 ns/op	    2064 B/op	       6 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=PodLevelResources/opts=Default-64                            	 1336986	       890.9 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=PodLevelResources/opts=Default-64             	 1825135	       651.2 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=PodLevelResources/opts=WithStatus-64                         	 1334799	       907.3 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=PodLevelResources/opts=WithStatus-64          	 1785727	       688.3 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=PodLevelResources/opts=WithReuse-64                          	 2599107	       462.7 ns/op	      96 B/op	       2 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=PodLevelResources/opts=WithReuse-64           	 5225178	       230.3 ns/op	      48 B/op	       1 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=PodLevelResources/opts=WithNonMissing-64                     	  782492	      1513 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=PodLevelResources/opts=WithNonMissing-64      	  925582	      1313 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=PodLevelResources/opts=WithAll-64                            	 1000000	      1119 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=PodLevelResources/opts=WithAll-64             	 1385332	       864.4 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=WithStatus/opts=Default-64                                   	 1671921	       718.6 ns/op	     784 B/op	       4 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=WithStatus/opts=Default-64                    	 1835814	       652.5 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=WithStatus/opts=WithStatus-64                                	  814832	      1476 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=WithStatus/opts=WithStatus-64                 	  890589	      1413 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=WithStatus/opts=WithReuse-64                                 	 4186294	       287.7 ns/op	      96 B/op	       2 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=WithStatus/opts=WithReuse-64                  	 5220067	       231.3 ns/op	      48 B/op	       1 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=WithStatus/opts=WithNonMissing-64                            	  945496	      1374 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=WithStatus/opts=WithNonMissing-64             	  957040	      1274 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=WithStatus/opts=WithAll-64                                   	  709417	      1677 ns/op	    1472 B/op	       6 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=WithStatus/opts=WithAll-64                    	  738506	      1627 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=FullHouse/opts=Default-64                                    	  340754	      3529 ns/op	    1424 B/op	       5 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=FullHouse/opts=Default-64                     	  376770	      3057 ns/op	    1376 B/op	       4 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=FullHouse/opts=WithStatus-64                                 	  123430	      9695 ns/op	    7880 B/op	      31 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=FullHouse/opts=WithStatus-64                  	  151072	      8197 ns/op	    6880 B/op	      20 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=FullHouse/opts=WithReuse-64                                  	  382531	      3123 ns/op	     736 B/op	       3 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=FullHouse/opts=WithReuse-64                   	  450474	      2642 ns/op	     688 B/op	       2 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=FullHouse/opts=WithNonMissing-64                             	  123177	      8777 ns/op	    6928 B/op	      21 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=FullHouse/opts=WithNonMissing-64              	  147434	      8308 ns/op	    6880 B/op	      20 allocs/op
+BenchmarkPodRequests/func=PodRequests/pod=FullHouse/opts=WithAll-64                                    	   82969	     14718 ns/op	   12696 B/op	      45 allocs/op
+BenchmarkPodRequests/func=AggregateContainerRequests/pod=FullHouse/opts=WithAll-64                     	   91524	     12810 ns/op	   11696 B/op	      34 allocs/op
+PASS
+ok  	k8s.io/component-helpers/resource	84.181s
