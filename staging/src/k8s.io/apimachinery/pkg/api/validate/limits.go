@@ -98,6 +98,14 @@ func MinItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Pa
 	return nil
 }
 
+// MinProperties verifies that the specified map is not shorter than min properties.
+func MinProperties[K comparable, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, min int) field.ErrorList {
+	if len(value) < min {
+		return field.ErrorList{field.TooFew(fldPath, len(value), min).WithOrigin("minProperties")}
+	}
+	return nil
+}
+
 // Minimum verifies that the specified value is greater than or equal to min.
 func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min T) field.ErrorList {
 	if value == nil {

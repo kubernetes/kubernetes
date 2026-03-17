@@ -34,11 +34,13 @@ const (
 	maxLengthTagName     = "k8s:maxLength"
 	maxBytesTagName      = "k8s:maxBytes"
 	maxPropertiesTagName = "k8s:maxProperties"
+	minPropertiesTagName = "k8s:minProperties"
 )
 
 func init() {
 	RegisterTagValidator(minItemsTagValidator{})
 	RegisterTagValidator(maxItemsTagValidator{})
+	RegisterTagValidator(minPropertiesTagValidator{})
 	RegisterTagValidator(maxPropertiesTagValidator{})
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maximumTagValidator{})
@@ -202,6 +204,67 @@ func (mitv minItemsTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This list must be at least X items long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type minPropertiesTagValidator struct{}
+
+func (minPropertiesTagValidator) Init(_ Config) {}
+
+func (minPropertiesTagValidator) TagName() string {
+	return minPropertiesTagName
+}
+
+var minPropertiesTagValidScopes = sets.New(
+	ScopeType,
+	ScopeField,
+)
+
+func (minPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
+	return minPropertiesTagValidScopes
+}
+
+var minPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MinProperties"}
+
+func (minPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Map {
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
+	}
+	keyType := util.NativeType(t.Key)
+	if keyType.Kind != types.Builtin || keyType.Name.Name != "string" {
+		return Validations{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal < 0 {
+		return result, fmt.Errorf("must be greater than or equal to zero")
+	}
+	if intVal > 100000 {
+		return result, fmt.Errorf("must be less than or equal to 100000")
+	}
+	result.AddFunction(Function(minPropertiesTagName, DefaultFlags, minPropertiesValidator, intVal))
+	return result, nil
+}
+
+func (mptv minPropertiesTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mptv.TagName(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(mptv.ValidScopes()),
+		Description:    "minProperties provides a limit on properties of an object as defined by JSON schema. In Kubernetes it may only be used to constrain the number of elements on a field defined as a golang map.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<non-negative integer>",
+			Docs:        "This map must have at least X properties (where X <= 100000).",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
