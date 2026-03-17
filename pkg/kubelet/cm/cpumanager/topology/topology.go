@@ -167,24 +167,25 @@ func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, cpusPerCore int
 // If SMT/hyperthreading is enabled, only fully available cores are returned
 // to prevent any possible SMT/hyperthreading misalignment
 func (d CPUDetails) coresInUncoreCache(cpusPerCore int, ids ...int) cpuset.CPUSet {
-	var coreIDs []int
-	for _, id := range ids {
-		for _, info := range d {
-			if info.UncoreCacheID == id {
-				if cpusPerCore == 1 {
-					// SMT/hyperthreading disabled case, return the available cores
-					coreIDs = append(coreIDs, info.CoreID)
-				} else {
-					// SMT/hyperthreading enabled case, return only the cores that have all their cpus available
-					cpusInCore := d.CPUsInCores(info.CoreID)
-					if cpusInCore.Size() == cpusPerCore {
-						coreIDs = append(coreIDs, info.CoreID)
-					}
-				}
-			}
+	// Get all CPUs in the requested uncore caches using existing helper
+	cpusInUncore := d.CPUsInUncoreCaches(ids...)
+
+	// Get unique cores from those CPUs
+	coresInUncore := d.KeepOnly(cpusInUncore).Cores()
+
+	if cpusPerCore == 1 {
+		// SMT/hyperthreading disabled case, return all cores
+		return coresInUncore
+	}
+
+	// return only cores that have all CPUs available when SMT/hyperthreading enabled
+	var fullCores []int
+	for _, coreID := range coresInUncore.List() {
+		if d.CPUsInCores(coreID).Size() == cpusPerCore {
+			fullCores = append(fullCores, coreID)
 		}
 	}
-	return cpuset.New(coreIDs...)
+	return cpuset.New(fullCores...)
 }
 
 // CPUsInUncoreCaches returns all the logical CPU IDs associated with the given
