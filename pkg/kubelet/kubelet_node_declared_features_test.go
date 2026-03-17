@@ -25,9 +25,11 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/containerulimits"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
@@ -136,6 +138,52 @@ func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
 				assert.Contains(t, features, "ExtendWebSocketsToKubelet")
 			} else {
 				assert.NotContains(t, features, "ExtendWebSocketsToKubelet")
+			}
+		})
+	}
+}
+
+func TestContainerUlimitsFeatureDiscovery(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, true)
+
+	testcases := []struct {
+		name          string
+		runtimeStatus *kubecontainer.RuntimeStatus
+		expectFeature bool
+	}{
+		{
+			name: "runtime supports container ulimits",
+			runtimeStatus: &kubecontainer.RuntimeStatus{
+				Features: &kubecontainer.RuntimeFeatures{ContainerUlimits: true},
+			},
+			expectFeature: true,
+		},
+		{
+			name: "runtime does not support container ulimits",
+			runtimeStatus: &kubecontainer.RuntimeStatus{
+				Features: &kubecontainer.RuntimeFeatures{ContainerUlimits: false},
+			},
+			expectFeature: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			testKubelet.fakeRuntime.RuntimeStatus = tc.runtimeStatus
+			kubelet.runtimeState.setRuntimeFeatures(tc.runtimeStatus.Features)
+
+			framework := ndf.New(ndffeatures.AllFeatures)
+			kubelet.nodeDeclaredFeaturesFramework = framework
+
+			discoveredFeatures := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expectFeature {
+				assert.Contains(t, discoveredFeatures, containerulimits.ContainerUlimits)
+			} else {
+				assert.NotContains(t, discoveredFeatures, containerulimits.ContainerUlimits)
 			}
 		})
 	}
