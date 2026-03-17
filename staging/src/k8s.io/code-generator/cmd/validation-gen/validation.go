@@ -1104,19 +1104,15 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false
 
-			// If the field has gate checks, wrap the entire validation block
-			// in a gate-enabled check with a forbidden fallback.
-			hasGateCheck := len(validations.GateChecks) > 0
-			if hasGateCheck {
-				// Emit ratcheting before the gate check so it applies to
+			// If the field has conditions, wrap the entire validation block
+			// in a condition check with a fallback.
+			hasConditions := validations.Conditions != nil && !validations.Conditions.Empty()
+			if hasConditions {
+				// Emit ratcheting before the condition check so it applies to
 				// both branches and is not duplicated.
 				emitRatchetingCheck(c, fld.childType, bufsw)
 				fldRatchetingChecked = true
-				var conds []string
-				for _, gc := range validations.GateChecks {
-					conds = append(conds, fmt.Sprintf("op.HasOption(%q)", gc.GateName))
-				}
-				bufsw.Do(fmt.Sprintf("if %s {\n", strings.Join(conds, " && ")), nil)
+				bufsw.Do(fmt.Sprintf("if %s {\n", emitConditionsExpr(validations.Conditions)), nil)
 			}
 
 			if !validations.Empty() {
@@ -1196,19 +1192,18 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				}
 			}
 
-			// Close the gate check block and emit the forbidden fallback.
-			if hasGateCheck {
-				var gateNames []string
-				for _, gc := range validations.GateChecks {
-					gateNames = append(gateNames, gc.GateName)
-				}
+			// Close the condition block and emit the fallback.
+			if hasConditions {
 				bufsw.Do("} else {\n", nil)
-				verb := "is"
-				if len(gateNames) > 1 {
-					verb = "are"
+				opts := validations.Conditions.OptionsEnabled
+				if len(opts) > 0 {
+					verb := "is"
+					if len(opts) > 1 {
+						verb = "are"
+					}
+					bufsw.Do(fmt.Sprintf("// %s %s not enabled\n", strings.Join(opts, ", "), verb), nil)
 				}
-				bufsw.Do(fmt.Sprintf("// field is forbidden when %s %s disabled\n", strings.Join(gateNames, ", "), verb), nil)
-				emitCallsToValidators(c, validations.GateChecks[0].ForbiddenFunctions, bufsw)
+				emitCallsToValidators(c, validations.FallbackFunctions, bufsw)
 				bufsw.Do("}\n", nil)
 			}
 
@@ -1290,6 +1285,18 @@ func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typ
 	}
 	sw.Do("// call the type's validation function\n", nil)
 	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
+}
+
+// emitConditionsExpr returns a Go expression string for the given Conditions.
+func emitConditionsExpr(cond *validators.Conditions) string {
+	var parts []string
+	for _, opt := range cond.OptionsEnabled {
+		parts = append(parts, fmt.Sprintf("op.HasOption(%q)", opt))
+	}
+	for _, opt := range cond.OptionsDisabled {
+		parts = append(parts, fmt.Sprintf("!op.HasOption(%q)", opt))
+	}
+	return strings.Join(parts, " && ")
 }
 
 // emitRatchetingCheck emits an equivalence check for default ratcheting.
@@ -1394,19 +1401,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				emitBaseFunction := emitCall
 				emitCall = func() {
 					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
-					sw.Do("  if ", nil)
-					firstCondition := true
-					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
-						firstCondition = false
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						if !firstCondition {
-							sw.Do(" && ", nil)
-						}
-						sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
-					}
-					sw.Do(" {\n", nil)
+					sw.Do(fmt.Sprintf("  if %s {\n", emitConditionsExpr(&v.Conditions)), nil)
 					sw.Do("    return ", nil)
 					emitBaseFunction()
 					sw.Do("\n", nil)

@@ -62,10 +62,10 @@ func (fgtv *featureGateTagValidator) GetValidations(context Context, tag codetag
 	}
 
 	return Validations{
-		GateChecks: []GateCheck{{
-			GateName:           tag.Value,
-			ForbiddenFunctions: forbiddenFns,
-		}},
+		Conditions: &Conditions{
+			OptionsEnabled: []string{tag.Value},
+		},
+		FallbackFunctions: forbiddenFns,
 	}, nil
 }
 

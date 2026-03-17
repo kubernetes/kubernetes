@@ -117,7 +117,7 @@ func Validate_MultiGateStruct(ctx context.Context, op operation.Operation, fldPa
 					return // do not proceed
 				}
 			} else {
-				// field is forbidden when GateA, GateB are disabled
+				// GateA, GateB are not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
@@ -160,7 +160,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 					return // do not proceed
 				}
 			} else {
-				// field is forbidden when MyGate is disabled
+				// MyGate is not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
@@ -201,7 +201,7 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 					return // do not proceed
 				}
 			} else {
-				// field is forbidden when SliceGate is disabled
+				// SliceGate is not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
@@ -234,7 +234,7 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 					return // do not proceed
 				}
 			} else {
-				// field is forbidden when MapGate is disabled
+				// MapGate is not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
@@ -267,7 +267,7 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 					return // do not proceed
 				}
 			} else {
-				// field is forbidden when ValueGate is disabled
+				// ValueGate is not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
@@ -302,7 +302,7 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 				// call the type's validation function
 				errs = append(errs, Validate_InnerStruct(ctx, op, fldPath, obj, oldObj)...)
 			} else {
-				// field is forbidden when StructPtrGate is disabled
+				// StructPtrGate is not enabled
 				earlyReturn := false
 				if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)

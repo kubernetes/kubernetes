@@ -410,23 +410,14 @@ type Validations struct {
 	// be emitted.
 	OpaqueValType bool
 
-	// GateChecks holds feature gate checks for this field. When the emitter
-	// sees a GateCheck, it wraps the field's validations in an
-	// "if op.HasOption(gate)" block, and emits a forbidden check in the
-	// else branch.
-	GateChecks []GateCheck
-}
+	// Conditions wraps ALL validations in a condition check. When the
+	// conditions are met, normal validation functions run. When not met,
+	// FallbackFunctions run instead.
+	Conditions *Conditions
 
-// GateCheck describes a feature gate that guards a field. When present,
-// the emitter wraps the field's validation in a gate-enabled check and
-// emits a forbidden-when-disabled fallback.
-type GateCheck struct {
-	// GateName is the feature gate option name.
-	GateName string
-
-	// ForbiddenFunctions are the validation functions to call when the gate
-	// is disabled (the forbidden + optional short-circuit pair).
-	ForbiddenFunctions []FunctionGen
+	// FallbackFunctions are the validation functions to call when
+	// Conditions are not met.
+	FallbackFunctions []FunctionGen
 }
 
 func (v *Validations) Empty() bool {
@@ -434,7 +425,11 @@ func (v *Validations) Empty() bool {
 }
 
 func (v *Validations) Len() int {
-	return len(v.Functions) + len(v.Variables) + len(v.Comments) + len(v.GateChecks)
+	n := len(v.Functions) + len(v.Variables) + len(v.Comments) + len(v.FallbackFunctions)
+	if v.Conditions != nil {
+		n++
+	}
+	return n
 }
 
 func (v *Validations) AddFunction(fn FunctionGen) {
@@ -456,7 +451,17 @@ func (v *Validations) Add(o Validations) {
 	v.OpaqueType = v.OpaqueType || o.OpaqueType
 	v.OpaqueKeyType = v.OpaqueKeyType || o.OpaqueKeyType
 	v.OpaqueValType = v.OpaqueValType || o.OpaqueValType
-	v.GateChecks = append(v.GateChecks, o.GateChecks...)
+	if o.Conditions != nil {
+		if v.Conditions == nil {
+			v.Conditions = o.Conditions
+		} else {
+			v.Conditions.OptionsEnabled = append(v.Conditions.OptionsEnabled, o.Conditions.OptionsEnabled...)
+			v.Conditions.OptionsDisabled = append(v.Conditions.OptionsDisabled, o.Conditions.OptionsDisabled...)
+		}
+	}
+	if len(v.FallbackFunctions) == 0 {
+		v.FallbackFunctions = o.FallbackFunctions
+	}
 }
 
 // FunctionFlags define optional properties of a validator.  Most validators
@@ -487,15 +492,19 @@ const (
 // Conditions defines what conditions must be true for a resource to be validated.
 // If any of the conditions are not true, the resource is not validated.
 type Conditions struct {
-	// OptionEnabled specifies an option name that must be set to true for the condition to be true.
-	OptionEnabled string
+	// OptionsEnabled specifies option names that must ALL be enabled for the
+	// condition to be true.
+	// Generated as: op.HasOption("A") && op.HasOption("B")
+	OptionsEnabled []string
 
-	// OptionDisabled specifies an option name that must be set to false for the condition to be true.
-	OptionDisabled string
+	// OptionsDisabled specifies option names that must ALL be disabled for
+	// the condition to be true.
+	// Generated as: !op.HasOption("A") && !op.HasOption("B")
+	OptionsDisabled []string
 }
 
 func (c Conditions) Empty() bool {
-	return len(c.OptionEnabled) == 0 && len(c.OptionDisabled) == 0
+	return len(c.OptionsEnabled) == 0 && len(c.OptionsDisabled) == 0
 }
 
 // Identifier is a name that the generator will output as an identifier.
