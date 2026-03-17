@@ -79,6 +79,11 @@ type watchCacheEvent struct {
 	Key             string
 	ResourceVersion uint64
 	RecordTime      time.Time
+	// IsInitialEvent indicates this event is part of the initial state sent
+	// for sendInitialEvents requests. Such events must always be delivered as
+	// ADDED events regardless of PrevObject or filtering logic to maintain the
+	// API contract that only ADDED events precede the initial BOOKMARK.
+	IsInitialEvent  bool
 }
 
 // watchCache implements a Store interface.
@@ -933,6 +938,19 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
+	// Use snapshot if available to ensure we get a consistent view of the store
+	// without concurrent modifications leaking in. This prevents ongoing events
+	// from appearing in the initial events list before the BOOKMARK (issue #134831).
+	if w.snapshots != nil && w.snapshottingEnabled.Load() {
+		// Get the snapshot at the current resourceVersion
+		snapshot, ok := w.snapshots.GetLessOrEqual(w.resourceVersion)
+		if ok {
+			// Create interval from snapshot using the ordered lister
+			return newCacheIntervalFromSnapshot(w.resourceVersion, snapshot, key, matchesSingle)
+		}
+	}
+
+	// Fallback to live store if snapshot not available or feature disabled
 	ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, key, matchesSingle)
 	if err != nil {
 		return nil, err
