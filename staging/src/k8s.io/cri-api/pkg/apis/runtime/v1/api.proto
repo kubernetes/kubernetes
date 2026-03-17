@@ -1092,8 +1092,42 @@ message LinuxContainerSecurityContext {
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
+    // Ulimits specifies the ulimits for the container.
+    // Each element maps to a Linux ulimit (RLIMIT_*) setting.
+    // All ulimit names supported by the container runtime/host kernel are allowed.
+    // Duplicate ulimit names are not allowed.
+    // For all ulimits, setting "hard" or "soft" to -1 means unlimited.
+    // The maximum allowed value is the maximum int64 value.
+    repeated Ulimit ulimits = 18;
 }
 
+// Ulimit corresponds to a ulimit setting on a Linux system.
+message Ulimit {
+    // Name of the ulimit to be set.
+    // Must be a valid Linux ulimit name supported by the runtime
+    // (for example: "core", "cpu", "data", "fsize", "locks", "memlock",
+    // "msgqueue", "nice", "nofile", "nproc", "rss", "rtprio", "rttime",
+    // "sigpending", "stack", "as").
+    // Names must be unique within LinuxContainerSecurityContext.ulimits.
+    string name = 1;
+
+    // Hard is the hard limit for the ulimit type.
+    // The hard limit acts as a ceiling for the soft limit.
+    // A process without CAP_SYS_RESOURCE may only set its soft limit to a value
+    // between 0 and the hard limit, and may only lower (never raise) its hard limit.
+    // A value of -1 means unlimited.
+    // The maximum allowed value is the maximum int64 value.
+    // Both hard and soft must be set together; hard must be >= soft, unless either is -1 (unlimited).
+    Int64Value hard = 2;
+
+    // Soft is the soft limit for the ulimit type.
+    // The soft limit is the value that the kernel enforces for the corresponding resource.
+    // The soft limit can be increased by the process up to the hard limit value.
+    // A value of -1 means unlimited.
+    // The maximum allowed value is the maximum int64 value.
+    // Soft must not exceed hard, unless either is -1 (unlimited).
+    Int64Value soft = 3;
+}
 // LinuxContainerConfig contains platform-specific configuration for
 // Linux-based containers.
 message LinuxContainerConfig {
@@ -1875,6 +1909,8 @@ message RuntimeFeatures {
     // user_namespaces_host_network is set to true if the runtime supports containers using both
     // host network and user namespace simultaneously.
     bool user_namespaces_host_network = 2;
+    // Container_ulimits is set to true if the runtime supports Ulimit.
+    bool Container_ulimits = 3;
 }
 
 message StatusResponse {
