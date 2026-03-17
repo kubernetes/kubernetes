@@ -123,6 +123,17 @@ func (l *linter) lintType(t *types.Type) error {
 	return nil
 }
 
+// requiredPairRule creates a lintRule which fires when modifierTag is present
+// but requiredTag is absent from the same tag set.
+func requiredPairRule(msg string, modifierTag, requiredTag string) lintRule {
+	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+		if hasTag(tags, modifierTag) && !hasTag(tags, requiredTag) {
+			return fmt.Sprintf("tag +%s requires tag +%s: %s", modifierTag, requiredTag, msg), nil
+		}
+		return "", nil
+	}
+}
+
 // lintComments runs all registered rules on a slice of comments.
 func (l *linter) lintComments(container *types.Type, t *types.Type, comments []string) ([]string, error) {
 	var lintErrs []string

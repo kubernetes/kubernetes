@@ -251,10 +251,20 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 	}
 }
 
+// zeroValueAllowedRequiresRequired checks that +k8s:zeroValueAllowed is only
+// used in combination with +k8s:required.
+func zeroValueAllowedRequiresRequired() lintRule {
+	return requiredPairRule(
+		"+k8s:zeroValueAllowed modifies +k8s:required; it has no effect without it",
+		"k8s:zeroValueAllowed", "k8s:required",
+	)
+}
+
 func lintRules(extractor validators.ValidationExtractor) []lintRule {
 	return []lintRule{
 		alphaBetaPrefix(),
 		validationStability(),
 		requiredAndOptional(extractor),
+		zeroValueAllowedRequiresRequired(),
 	}
 }
