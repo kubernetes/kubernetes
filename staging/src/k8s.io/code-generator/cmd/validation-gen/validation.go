@@ -1108,6 +1108,10 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			// in a gate-enabled check with a forbidden fallback.
 			hasGateCheck := len(validations.GateChecks) > 0
 			if hasGateCheck {
+				// Emit ratcheting before the gate check so it applies to
+				// both branches and is not duplicated.
+				emitRatchetingCheck(c, fld.childType, bufsw)
+				fldRatchetingChecked = true
 				var conds []string
 				for _, gc := range validations.GateChecks {
 					conds = append(conds, fmt.Sprintf("op.HasOption(%q)", gc.GateName))
@@ -1118,7 +1122,9 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
 				if len(validations.Functions) > 0 {
-					emitRatchetingCheck(c, fld.childType, bufsw)
+					if !fldRatchetingChecked {
+						emitRatchetingCheck(c, fld.childType, bufsw)
+					}
 					fldRatchetingChecked = true
 					bufsw.Do("// call field-attached validations\n", nil)
 					emitCallsToValidators(c, validations.Functions, bufsw)

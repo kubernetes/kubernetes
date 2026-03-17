@@ -41,8 +41,26 @@ func Test(t *testing.T) {
 	// Gate disabled + field nil: valid (forbidden passes, optional short-circuits)
 	st.Value(&Struct{}).ExpectValid()
 
-	// Gate disabled + field set: forbidden error
+	// Gate disabled + field set (create): forbidden error
 	st.Value(&Struct{
+		StringPtrField: ptr.To("Pod"),
+	}).ExpectMatches(
+		field.ErrorMatcher{}.ByType().ByField(),
+		field.ErrorList{
+			field.Forbidden(field.NewPath("stringPtrField"), ""),
+		})
+
+	// Gate was enabled (field was set), now disabled, value unchanged on update: ratcheted, valid
+	st.Value(&Struct{
+		StringPtrField: ptr.To("Pod"),
+	}).OldValue(&Struct{
+		StringPtrField: ptr.To("Pod"),
+	}).ExpectValid()
+
+	// Gate was enabled (field was set), now disabled, value changed on update: forbidden error
+	st.Value(&Struct{
+		StringPtrField: ptr.To("Changed"),
+	}).OldValue(&Struct{
 		StringPtrField: ptr.To("Pod"),
 	}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField(),

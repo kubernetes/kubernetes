@@ -101,11 +101,11 @@ func Validate_MultiGateStruct(ctx context.Context, op operation.Operation, fldPa
 	// field MultiGateStruct.MultiGatedField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			if op.HasOption("GateA") && op.HasOption("GateB") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				// optional fields with default values are effectively required
@@ -144,11 +144,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.StringPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			if op.HasOption("MyGate") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				// optional fields with default values are effectively required
@@ -187,11 +187,11 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 	// field TypesStruct.SliceField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			if op.HasOption("SliceGate") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
@@ -220,11 +220,11 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 	// field TypesStruct.MapField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			if op.HasOption("MapGate") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
@@ -253,11 +253,11 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 	// field TypesStruct.ValueField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			if op.HasOption("ValueGate") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
@@ -286,11 +286,11 @@ func Validate_TypesStruct(ctx context.Context, op operation.Operation, fldPath *
 	// field TypesStruct.StructPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *InnerStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			if op.HasOption("StructPtrGate") {
-				// don't revalidate unchanged data
-				if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-					return nil
-				}
 				// call field-attached validations
 				earlyReturn := false
 				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
