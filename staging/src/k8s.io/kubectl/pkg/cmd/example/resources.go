@@ -384,6 +384,117 @@ func buildNetworkPolicy(name string) *networkingv1.NetworkPolicy {
 	}
 }
 
+// buildGateway returns a Gateway API Gateway resource using an unstructured map
+// because sigs.k8s.io/gateway-api types are not vendored in kubectl.
+// This demonstrates the Gateway API approach to traffic ingress — the modern,
+// role-oriented successor to Ingress resources.
+func buildGateway(name string) map[string]interface{} {
+	return map[string]interface{}{
+		"apiVersion": "gateway.networking.k8s.io/v1",
+		"kind":       "Gateway",
+		"metadata": map[string]interface{}{
+			"name": name,
+			"labels": map[string]interface{}{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		"spec": map[string]interface{}{
+			"gatewayClassName": "example",
+			"listeners": []interface{}{
+				map[string]interface{}{
+					"name":     "http",
+					"protocol": "HTTP",
+					"port":     int64(80),
+					"allowedRoutes": map[string]interface{}{
+						"namespaces": map[string]interface{}{
+							"from": "Same",
+						},
+					},
+				},
+				map[string]interface{}{
+					"name":     "https",
+					"protocol": "HTTPS",
+					"port":     int64(443),
+					"tls": map[string]interface{}{
+						"mode": "Terminate",
+						"certificateRefs": []interface{}{
+							map[string]interface{}{
+								"name": "example-cert",
+							},
+						},
+					},
+					"allowedRoutes": map[string]interface{}{
+						"namespaces": map[string]interface{}{
+							"from": "Same",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// buildHTTPRoute returns a Gateway API HTTPRoute resource using an unstructured map
+// because sigs.k8s.io/gateway-api types are not vendored in kubectl.
+// This demonstrates how HTTPRoute attaches to a Gateway to define routing rules —
+// a cleaner separation of concerns compared to the monolithic Ingress resource.
+func buildHTTPRoute(name string) map[string]interface{} {
+	return map[string]interface{}{
+		"apiVersion": "gateway.networking.k8s.io/v1",
+		"kind":       "HTTPRoute",
+		"metadata": map[string]interface{}{
+			"name": name,
+			"labels": map[string]interface{}{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		"spec": map[string]interface{}{
+			"parentRefs": []interface{}{
+				map[string]interface{}{
+					"name": "example-gateway",
+				},
+			},
+			"hostnames": []interface{}{
+				"example.com",
+			},
+			"rules": []interface{}{
+				map[string]interface{}{
+					"matches": []interface{}{
+						map[string]interface{}{
+							"path": map[string]interface{}{
+								"type":  "PathPrefix",
+								"value": "/api",
+							},
+						},
+					},
+					"backendRefs": []interface{}{
+						map[string]interface{}{
+							"name": "api-service",
+							"port": int64(80),
+						},
+					},
+				},
+				map[string]interface{}{
+					"matches": []interface{}{
+						map[string]interface{}{
+							"path": map[string]interface{}{
+								"type":  "PathPrefix",
+								"value": "/",
+							},
+						},
+					},
+					"backendRefs": []interface{}{
+						map[string]interface{}{
+							"name": "frontend-service",
+							"port": int64(80),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func int32Ptr(i int32) *int32 {
 	return &i
 }

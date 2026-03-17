@@ -84,7 +84,7 @@ func TestExampleList(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, expected := range []string{"pod", "deployment", "service", "persistentvolumeclaim", "secret", "customresourcedefinition", "configmap", "job", "cronjob", "ingress", "networkpolicy"} {
+	for _, expected := range []string{"pod", "deployment", "service", "persistentvolumeclaim", "secret", "customresourcedefinition", "configmap", "job", "cronjob", "ingress", "networkpolicy", "gateway", "httproute"} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected %q in --list output, got:\n%s", expected, output)
 		}
@@ -262,6 +262,34 @@ func TestExampleFallbackAliases(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:  "gtw alias",
+			alias: "gtw",
+			assertKind: func(t *testing.T, output string) {
+				t.Helper()
+				var gw map[string]interface{}
+				if err := yaml.Unmarshal([]byte(output), &gw); err != nil {
+					t.Fatalf("failed to unmarshal gateway: %v", err)
+				}
+				if kind, ok := gw["kind"].(string); !ok || kind != "Gateway" {
+					t.Fatalf("expected Gateway kind, got %#v", gw["kind"])
+				}
+			},
+		},
+		{
+			name:  "httproute alias",
+			alias: "httproute",
+			assertKind: func(t *testing.T, output string) {
+				t.Helper()
+				var hr map[string]interface{}
+				if err := yaml.Unmarshal([]byte(output), &hr); err != nil {
+					t.Fatalf("failed to unmarshal httproute: %v", err)
+				}
+				if kind, ok := hr["kind"].(string); !ok || kind != "HTTPRoute" {
+					t.Fatalf("expected HTTPRoute kind, got %#v", hr["kind"])
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -423,5 +451,98 @@ func TestExampleNetworkPolicy(t *testing.T) {
 	}
 	if len(np.Spec.Egress) == 0 {
 		t.Fatalf("expected at least one egress rule")
+	}
+}
+
+func TestExampleGateway(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "web-gateway"
+
+	output, err := runExample(t, []string{"gateway"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var gw map[string]interface{}
+	if err := yaml.Unmarshal([]byte(output), &gw); err != nil {
+		t.Fatalf("failed to unmarshal gateway yaml: %v", err)
+	}
+
+	if kind, ok := gw["kind"].(string); !ok || kind != "Gateway" {
+		t.Fatalf("expected kind Gateway, got %#v", gw["kind"])
+	}
+	if apiVersion, ok := gw["apiVersion"].(string); !ok || apiVersion != "gateway.networking.k8s.io/v1" {
+		t.Fatalf("expected apiVersion gateway.networking.k8s.io/v1, got %#v", gw["apiVersion"])
+	}
+
+	metadata, ok := gw["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected metadata map")
+	}
+	if name, ok := metadata["name"].(string); !ok || name != "web-gateway" {
+		t.Fatalf("expected metadata.name web-gateway, got %#v", metadata["name"])
+	}
+
+	spec, ok := gw["spec"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected spec map")
+	}
+	if className, ok := spec["gatewayClassName"].(string); !ok || className != "example" {
+		t.Fatalf("expected gatewayClassName example, got %#v", spec["gatewayClassName"])
+	}
+
+	listeners, ok := spec["listeners"].([]interface{})
+	if !ok || len(listeners) < 2 {
+		t.Fatalf("expected at least 2 listeners, got %d", len(listeners))
+	}
+}
+
+func TestExampleHTTPRoute(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "web-route"
+
+	output, err := runExample(t, []string{"httproute"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var hr map[string]interface{}
+	if err := yaml.Unmarshal([]byte(output), &hr); err != nil {
+		t.Fatalf("failed to unmarshal httproute yaml: %v", err)
+	}
+
+	if kind, ok := hr["kind"].(string); !ok || kind != "HTTPRoute" {
+		t.Fatalf("expected kind HTTPRoute, got %#v", hr["kind"])
+	}
+	if apiVersion, ok := hr["apiVersion"].(string); !ok || apiVersion != "gateway.networking.k8s.io/v1" {
+		t.Fatalf("expected apiVersion gateway.networking.k8s.io/v1, got %#v", hr["apiVersion"])
+	}
+
+	metadata, ok := hr["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected metadata map")
+	}
+	if name, ok := metadata["name"].(string); !ok || name != "web-route" {
+		t.Fatalf("expected metadata.name web-route, got %#v", metadata["name"])
+	}
+
+	spec, ok := hr["spec"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected spec map")
+	}
+
+	parentRefs, ok := spec["parentRefs"].([]interface{})
+	if !ok || len(parentRefs) == 0 {
+		t.Fatalf("expected at least one parentRef")
+	}
+
+	rules, ok := spec["rules"].([]interface{})
+	if !ok || len(rules) < 2 {
+		t.Fatalf("expected at least 2 routing rules, got %d", len(rules))
+	}
+
+	hostnames, ok := spec["hostnames"].([]interface{})
+	if !ok || len(hostnames) == 0 {
+		t.Fatalf("expected at least one hostname")
 	}
 }

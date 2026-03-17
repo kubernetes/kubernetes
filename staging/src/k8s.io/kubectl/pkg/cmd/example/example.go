@@ -144,6 +144,21 @@ var buildersByKind = map[string]func(string, string, int) ([]byte, error){
 	"netpol": func(name, _ string, _ int) ([]byte, error) {
 		return yaml.Marshal(buildNetworkPolicy(name))
 	},
+	"gateway": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildGateway(name))
+	},
+	"gateways": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildGateway(name))
+	},
+	"gtw": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildGateway(name))
+	},
+	"httproute": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildHTTPRoute(name))
+	},
+	"httproutes": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildHTTPRoute(name))
+	},
 }
 
 // Flags represent CLI flags for the command.
@@ -288,7 +303,7 @@ func printSupported(out io.Writer) error {
 		// Only print singular canonical kinds once
 		switch k {
 		case "pods", "deployments", "services", "persistentvolumeclaims", "secrets", "customresourcedefinitions",
-			"configmaps", "jobs", "cronjobs", "ingresses", "networkpolicies":
+			"configmaps", "jobs", "cronjobs", "ingresses", "networkpolicies", "gateways", "httproutes":
 			// skip plurals in listing to avoid duplicates
 			continue
 		}
@@ -377,6 +392,10 @@ func fallbackResolve(token string) (schema.GroupVersionKind, string, bool) {
 		return schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}, "ingress", true
 	case "netpol", "networkpolicy", "networkpolicies":
 		return schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicy", true
+	case "gtw", "gateway", "gateways":
+		return schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "Gateway"}, "gateway", true
+	case "httproute", "httproutes":
+		return schema.GroupVersionKind{Group: "gateway.networking.k8s.io", Version: "v1", Kind: "HTTPRoute"}, "httproute", true
 	default:
 		return schema.GroupVersionKind{}, "", false
 	}
