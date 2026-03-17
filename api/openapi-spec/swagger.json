@@ -11942,15 +11942,8 @@
           "description": "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows."
         },
         "ulimits": {
-          "description": "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. Supported names and behavior: - \"nofile\": maximum number of open file descriptors. - \"memlock\": maximum bytes of memory that may be locked into RAM. - \"core\": maximum size of a core dump file, in bytes. - \"nice\": maximum nice priority adjustment a process may apply. - \"rtprio\": maximum real-time scheduling priority. - \"stack\": maximum process stack size, in bytes. If unspecified, the container runtime default ulimits will be used. Pod Security Standards (PSS) integration: only the Privileged profile may set this field. Pods under Baseline or Restricted profiles must not include this field, and setting it under those profiles will cause Pod creation to be rejected. Note that this field cannot be set when spec.os.name is windows.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "name"
-          ],
-          "x-kubernetes-list-type": "map"
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimits",
+          "description": "The ulimits to be applied to the container. Note that this field cannot be set when spec.os.name is windows."
         },
         "windowsOptions": {
           "$ref": "#/definitions/io.k8s.api.core.v1.WindowsSecurityContextOptions",
@@ -12609,28 +12602,53 @@
       "type": "object"
     },
     "io.k8s.api.core.v1.Ulimit": {
-      "description": "Ulimit corresponds to a ulimit setting on a Linux system.",
+      "description": "Ulimit corresponds to a single Linux system ulimit setting.",
       "properties": {
         "hard": {
-          "description": "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. A process without CAP_SYS_RESOURCE may only set its soft limit to a value between 0 and the hard limit, and may only lower (never raise) its hard limit. Valid values depend on Name: - \"nofile\": -1 or 256-65536 (-1 is converted to 1048576). - \"nice\": -1 or 0-40 (-1 means unlimited). - \"rtprio\": -1 or 0-99 (-1 means unlimited). - \"stack\": -1 or 262144-17179869184 (256KiB-16GiB) (-1 means unlimited). - \"memlock\": -1 or 8192-17179869184 (8KiB-16GiB) (-1 means unlimited). - \"core\": -1 or 0-17179869184 (-1 means unlimited).",
+          "description": "Hard is the hard limit for the ulimit. The hard limit acts as a ceiling for the soft limit. A process without CAP_SYS_RESOURCE may only set its soft limit to a value between 0 and the hard limit, and may only lower (never raise) its hard limit. This field must be specified when the Ulimit is set.",
           "format": "int64",
           "type": "integer"
         },
-        "name": {
-          "description": "Name of the ulimit to be set. Must be one of: \"nofile\", \"memlock\", \"core\", \"nice\", \"rtprio\", or \"stack\". Duplicate ulimit names are not allowed.",
-          "type": "string"
-        },
         "soft": {
-          "description": "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value. Valid values depend on Name: - \"nofile\": -1 or 256-65536 (-1 is converted to 1048576). - \"nice\": -1 or 0-40 (-1 means unlimited). - \"rtprio\": -1 or 0-99 (-1 means unlimited). - \"stack\": -1 or 262144-17179869184 (256KiB-16GiB) (-1 means unlimited). - \"memlock\": -1 or 8192-17179869184 (8KiB-16GiB) (-1 means unlimited). - \"core\": -1 or 0-17179869184 (-1 means unlimited).",
+          "description": "Soft is the soft limit for the ulimit. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value. This field must be specified when the Ulimit is set.",
           "format": "int64",
           "type": "integer"
         }
       },
       "required": [
-        "name",
         "hard",
         "soft"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.Ulimits": {
+      "description": "Ulimits corresponds to Linux system ulimit settings.",
+      "properties": {
+        "core": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "core configures the \"core\" ulimit, which controls the maximum size of a core dump file, in bytes. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 means core dumps are disabled."
+        },
+        "memlock": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid."
+        },
+        "nice": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment."
+        },
+        "nofile": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "nofile configures the \"nofile\" ulimit, which controls the maximum number of open file descriptors. Valid values are -1 or 256 through 65536. A value of -1 means unlimited; 0 is not valid."
+        },
+        "rtprio": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "rtprio configures the \"rtprio\" ulimit, which controls the maximum real-time scheduling priority. Valid values are -1 or 0 through 99. A value of -1 means unlimited; 0 means real-time scheduling priority is not allowed."
+        },
+        "stack": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "stack configures the \"stack\" ulimit, which controls the maximum process stack size, in bytes. Valid values are -1 or 262144 through 17179869184. A value of -1 means unlimited; 0 is not valid."
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.core.v1.Volume": {
