@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	yaml "sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +52,60 @@ var (
         # Parameterize name/replicas where applicable
         kubectl example deployment --replicas=3 --name=web`))
 )
+
+var buildersByKind = map[string]func(string, string, int) ([]byte, error){
+	"pod": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPod(name, image))
+	},
+	"pods": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPod(name, image))
+	},
+	"po": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPod(name, image))
+	},
+	"deployment": func(name, image string, replicas int) ([]byte, error) {
+		return yaml.Marshal(buildDeployment(name, image, replicas))
+	},
+	"deployments": func(name, image string, replicas int) ([]byte, error) {
+		return yaml.Marshal(buildDeployment(name, image, replicas))
+	},
+	"deploy": func(name, image string, replicas int) ([]byte, error) {
+		return yaml.Marshal(buildDeployment(name, image, replicas))
+	},
+	"service": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildService(name))
+	},
+	"services": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildService(name))
+	},
+	"svc": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildService(name))
+	},
+	"persistentvolumeclaim": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPVC(name))
+	},
+	"persistentvolumeclaims": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPVC(name))
+	},
+	"pvc": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildPVC(name))
+	},
+	"secret": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildSecret(name))
+	},
+	"secrets": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildSecret(name))
+	},
+	"customresourcedefinition": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildCRD(name))
+	},
+	"customresourcedefinitions": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildCRD(name))
+	},
+	"crd": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildCRD(name))
+	},
+}
 
 // Flags represent CLI flags for the command.
 type Flags struct {
@@ -119,25 +174,16 @@ func (o *Options) Run() error {
 
 	userToken := o.rawArgs[0]
 	// First, attempt static offline fallback without any discovery.
-	if fg, fk, ok := fallbackResolve(userToken); ok {
-		gvk := fg
-		key := fk
-		content := examplesByKind[key]
-		rendered, err := render(content, renderData{
-			Name:       defaultNameFor(key, o.Name),
-			Image:      o.Image,
-			Replicas:   o.Replicas,
-			APIVersion: apiVersionFor(gvk),
-			Kind:       gvk.Kind,
-		})
+	if _, key, ok := fallbackResolve(userToken); ok {
+		builder := buildersByKind[key]
+		rendered, err := builder(defaultNameFor(key, o.Name), o.Image, o.Replicas)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(o.Out, strings.TrimSpace(rendered))
+		_, err = fmt.Fprintln(o.Out, strings.TrimSpace(string(rendered)))
 		return err
 	}
 
-	// Otherwise, resolve via RESTMapper and discovery like 'kubectl explain'.
 	// Otherwise, resolve via RESTMapper and discovery like 'kubectl explain'.
 	// If no usable kubeconfig is present, avoid discovery to prevent noisy errors.
 	if !hasUsableConfig(o.Factory) {
@@ -151,55 +197,38 @@ func (o *Options) Run() error {
 		}
 	}
 	fullySpecifiedGVR, _, err := explain.SplitAndParseResourceRequestWithMatchingPrefix(userToken, o.Mapper)
-	var gvk schema.GroupVersionKind
 	var key string
-	var content string
 	if err == nil {
-		gvk, err = o.Mapper.KindFor(fullySpecifiedGVR)
-		if err != nil || gvk.Empty() {
-			gvk, err = o.Mapper.KindFor(fullySpecifiedGVR.GroupResource().WithVersion(""))
+		gvk, kindErr := o.Mapper.KindFor(fullySpecifiedGVR)
+		if kindErr != nil || gvk.Empty() {
+			gvk, kindErr = o.Mapper.KindFor(fullySpecifiedGVR.GroupResource().WithVersion(""))
 		}
-		if err == nil && !gvk.Empty() {
-			key = strings.ToLower(gvk.Kind)
-			if c, ok := examplesByKind[key]; ok {
-				content = c
-			} else {
-				// fallback to canonical resource name
-				resKey := fullySpecifiedGVR.Resource
-				if c2, ok2 := examplesByKind[resKey]; ok2 {
-					content = c2
-					key = resKey
-				}
+		if kindErr == nil && !gvk.Empty() {
+			kindKey := strings.ToLower(gvk.Kind)
+			if _, ok := buildersByKind[kindKey]; ok {
+				key = kindKey
+			}
+		}
+		if key == "" {
+			resKey := fullySpecifiedGVR.Resource
+			if _, ok := buildersByKind[resKey]; ok {
+				key = resKey
 			}
 		}
 	}
 
-	if content == "" {
+	if key == "" {
 		return fmt.Errorf("no example available for %q. Try --list or 'kubectl explain %s'", userToken, userToken)
 	}
 
-	rendered, err := render(content, renderData{
-		Name:       defaultNameFor(key, o.Name),
-		Image:      o.Image,
-		Replicas:   o.Replicas,
-		APIVersion: apiVersionFor(gvk),
-		Kind:       gvk.Kind,
-	})
+	builder := buildersByKind[key]
+	rendered, err := builder(defaultNameFor(key, o.Name), o.Image, o.Replicas)
 	if err != nil {
 		return err
 	}
 
-	_, err = fmt.Fprintln(o.Out, strings.TrimSpace(rendered))
+	_, err = fmt.Fprintln(o.Out, strings.TrimSpace(string(rendered)))
 	return err
-}
-
-// renderData is the data model for templates.
-type renderData struct {
-	Name       string
-	Image      string
-	Replicas   int
-	APIVersion string
-	Kind       string
 }
 
 func defaultNameFor(kindLower, override string) string {
@@ -213,24 +242,13 @@ func defaultNameFor(kindLower, override string) string {
 	return "example-" + base
 }
 
-func apiVersionFor(gvk schema.GroupVersionKind) string {
-	if gvk.Group == "" {
-		return gvk.Version
-	}
-	return gvk.Group + "/" + gvk.Version
-}
-
-func render(tmpl string, data renderData) (string, error) {
-	return tmpl, nil
-}
-
 func printSupported(out io.Writer) error {
 	var keys []string
 	seen := map[string]struct{}{}
-	for k := range examplesByKind {
+	for k := range buildersByKind {
 		// Only print singular canonical kinds once
 		switch k {
-		case "pods", "deployments", "services", "persistentvolumeclaims":
+		case "pods", "deployments", "services", "persistentvolumeclaims", "secrets", "customresourcedefinitions":
 			// skip plurals in listing to avoid duplicates
 			continue
 		}
@@ -293,7 +311,7 @@ func hasUsableConfig(f cmdutil.Factory) bool {
 }
 
 // fallbackResolve attempts to resolve common resource tokens offline without discovery.
-// Returns a synthetic GroupVersionKind and the examplesByKind key if successful.
+// Returns a synthetic GroupVersionKind and the buildersByKind key if successful.
 func fallbackResolve(token string) (schema.GroupVersionKind, string, bool) {
 	t := strings.ToLower(strings.TrimSpace(token))
 	switch t {
