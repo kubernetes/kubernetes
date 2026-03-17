@@ -117,7 +117,7 @@ type Controller struct {
 	pvcProcessingStore *pvcProcessingStore
 }
 
-var unusedSinceNowFunc = metav1.Now
+var pvcInUseConditionNowFunc = metav1.Now
 
 type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
@@ -261,11 +261,11 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && pvc.DeletionTimestamp == nil {
-		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForUnusedSince)
+		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForInUseCondition)
 		if err != nil {
 			return err
 		}
-		if err := c.updateUnusedSinceStatus(ctx, pvc, isUsed); err != nil {
+		if err := c.updateInUseConditionStatus(ctx, pvc, isUsed); err != nil {
 			return err
 		}
 	}
@@ -319,33 +319,46 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 	return nil
 }
 
-func (c *Controller) updateUnusedSinceStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, isUsed bool) error {
-	switch {
-	case isUsed && pvc.Status.UnusedSince != nil:
-		return c.updateUnusedSince(ctx, pvc, nil)
-	case !isUsed && pvc.Status.UnusedSince == nil:
-		now := unusedSinceNowFunc()
-		return c.updateUnusedSince(ctx, pvc, &now)
-	default:
-		return nil
+func (c *Controller) updateInUseConditionStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, isUsed bool) error {
+	targetStatus := v1.ConditionFalse
+	if isUsed {
+		targetStatus = v1.ConditionTrue
 	}
+
+	claimClone := pvc.DeepCopy()
+	now := pvcInUseConditionNowFunc()
+	conditionIndex := -1
+	for i := range claimClone.Status.Conditions {
+		if claimClone.Status.Conditions[i].Type == v1.PersistentVolumeClaimInUse {
+			conditionIndex = i
+			break
+		}
+	}
+
+	if conditionIndex == -1 {
+		claimClone.Status.Conditions = append(claimClone.Status.Conditions, v1.PersistentVolumeClaimCondition{
+			Type:               v1.PersistentVolumeClaimInUse,
+			Status:             targetStatus,
+			LastTransitionTime: now,
+		})
+	} else if claimClone.Status.Conditions[conditionIndex].Status == targetStatus {
+		return nil
+	} else {
+		claimClone.Status.Conditions[conditionIndex].Status = targetStatus
+		claimClone.Status.Conditions[conditionIndex].LastTransitionTime = now
+	}
+
+	return c.updateInUseCondition(ctx, pvc, claimClone)
 }
 
-func (c *Controller) updateUnusedSince(ctx context.Context, pvc *v1.PersistentVolumeClaim, ts *metav1.Time) error {
-	claimClone := pvc.DeepCopy()
-	claimClone.Status.UnusedSince = ts
+func (c *Controller) updateInUseCondition(ctx context.Context, pvc, claimClone *v1.PersistentVolumeClaim) error {
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(ctx, claimClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
-		logger.Error(err, "Error updating unusedSince in PVC status", "PVC", klog.KObj(pvc))
+		logger.Error(err, "Error updating in-use condition in PVC status", "PVC", klog.KObj(pvc))
 		return err
 	}
-
-	if ts == nil {
-		logger.V(3).Info("Cleared unusedSince in PVC status", "PVC", klog.KObj(pvc))
-	} else {
-		logger.V(3).Info("Updated unusedSince in PVC status", "PVC", klog.KObj(pvc), "unusedSince", ts.UTC().Format(time.RFC3339Nano))
-	}
+	logger.V(3).Info("Updated in-use condition in PVC status", "PVC", klog.KObj(pvc))
 	return nil
 }
 
@@ -441,7 +454,7 @@ func (c *Controller) podUsesPVCForDeletion(logger klog.Logger, pod *v1.Pod, pvc 
 	return false
 }
 
-func (c *Controller) podUsesPVCForUnusedSince(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
+func (c *Controller) podUsesPVCForInUseCondition(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
 	if volumeutil.IsPodTerminated(pod, pod.Status) {
 		return false
 	}
@@ -449,7 +462,7 @@ func (c *Controller) podUsesPVCForUnusedSince(logger klog.Logger, pod *v1.Pod, p
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
 			volume.Ephemeral != nil && ephemeral.VolumeClaimName(pod, &volume) == pvc.Name && ephemeral.VolumeIsForPod(pod, pvc) == nil {
-			logger.V(4).Info("Pod references PVC for unusedSince tracking", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+			logger.V(4).Info("Pod references PVC for in-use condition tracking", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 			return true
 		}
 	}

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -620,76 +619,6 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 	}
 }
 
-func TestDropDisabledUnusedSinceFieldFromStatus(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
-
-	timestamp1 := metav1.NewTime(time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC))
-	timestamp2 := metav1.NewTime(time.Date(2026, time.March, 15, 12, 0, 0, 0, time.UTC))
-
-	tests := []struct {
-		name               string
-		featuregateEnabled bool
-		newPVC             *core.PersistentVolumeClaim
-		oldPVC             *core.PersistentVolumeClaim
-		expected           *core.PersistentVolumeClaim
-	}{
-		{
-			name:               "for:newPVC=hasUnusedSince,oldPVC=nil,featuregate=false; should drop field",
-			featuregateEnabled: false,
-			newPVC:             withUnusedSinceTime(timestamp1),
-			oldPVC:             nil,
-			expected:           getPVC(),
-		},
-		{
-			name:               "for:newPVC=hasUnusedSince,oldPVC=doesnot,featuregate=true; should keep field",
-			featuregateEnabled: true,
-			newPVC:             withUnusedSinceTime(timestamp1),
-			oldPVC:             getPVC(),
-			expected:           withUnusedSinceTime(timestamp1),
-		},
-		{
-			name:               "for:newPVC=hasUnusedSince,oldPVC=hasUnusedSince,featuregate=false; should keep newPVC field",
-			featuregateEnabled: false,
-			newPVC:             withUnusedSinceTime(timestamp2),
-			oldPVC:             withUnusedSinceTime(timestamp1),
-			expected:           withUnusedSinceTime(timestamp2),
-		},
-		{
-			name:               "for:newPVC=noUnusedSince,oldPVC=hasUnusedSince,featuregate=true; should keep newPVC field as nil",
-			featuregateEnabled: true,
-			newPVC:             getPVC(),
-			oldPVC:             withUnusedSinceTime(timestamp1),
-			expected:           getPVC(),
-		},
-		{
-			name:               "for:newPVC=noUnusedSince,oldPVC=hasUnusedSince,featuregate=false; should keep newPVC field as nil",
-			featuregateEnabled: false,
-			newPVC:             getPVC(),
-			oldPVC:             withUnusedSinceTime(timestamp1),
-			expected:           getPVC(),
-		},
-		{
-			name:               "for:newPVC=noUnusedSince,oldPVC=noUnusedSince,featuregate=false; should be no-op",
-			featuregateEnabled: false,
-			newPVC:             getPVC(),
-			oldPVC:             getPVC(),
-			expected:           getPVC(),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeClaimUnusedSinceTime, test.featuregateEnabled)
-
-			DropDisabledFieldsFromStatus(test.newPVC, test.oldPVC)
-
-			if !reflect.DeepEqual(*test.expected, *test.newPVC) {
-				t.Errorf("Unexpected change: %+v", cmp.Diff(test.expected, test.newPVC))
-			}
-		})
-	}
-}
-
 func getPVC() *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{}
 }
@@ -729,14 +658,6 @@ func withVolumeAttributesModifyStatus(target string, status core.PersistentVolum
 				TargetVolumeAttributesClassName: target,
 				Status:                          status,
 			},
-		},
-	}
-}
-
-func withUnusedSinceTime(ts metav1.Time) *core.PersistentVolumeClaim {
-	return &core.PersistentVolumeClaim{
-		Status: core.PersistentVolumeClaimStatus{
-			UnusedSince: &ts,
 		},
 	}
 }

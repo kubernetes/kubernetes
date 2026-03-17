@@ -669,6 +669,19 @@ const (
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
 	// Volume is being modified
 	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
+
+	// Indicates that persistentvolumeclaim is in use.
+	// LastTransitionTime  on this condition represents the timestamp since when a PVC has been in-use,
+	// as known to the kube-controller-manager.
+	// When the PVC is currently in use, this condition will be set to true. It is updated when a pod
+	// starts referencing this PVC and is set to false when last pod using this PVC is deleted or
+	// reaches terminal state.
+	//
+	// Both in-use time and unused time duration indicated by this condition may be shorter than actual
+	// in-use time or unused time because of processing delays or when this feature was enabled in the cluster.
+	//
+	// Requires PersistentVolumeClaimUnusedSinceTime featuregate
+	PersistentVolumeClaimInUse PersistentVolumeClaimConditionType = "PersistentVolumeClaimInUse"
 )
 
 // +enum
@@ -846,18 +859,6 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
-	// UnusedSince represents the timestamp since when a PVC has not been in-use, as known to the kube-controller-manager.
-	// When the PVC is currently in use, this field is nil. It is updated when the last Pod referencing this PVC is
-	// deleted or reaches a terminal state, and cleared when a new Pod starts referencing the PVC.
-	//
-	// The unused since time duration indicated by this field may be shorter than actual unused-since time because
-	// of processing delays or when this feature was enabled in the cluster.
-	//
-	// This is an alpha field, and requires enabling the PersistentVolumeClaimUnusedSinceTime feature gate.
-	//
-	// +featureGate=PersistentVolumeClaimUnusedSinceTime
-	// +optional
-	UnusedSince *metav1.Time `json:"unusedSince,omitempty" protobuf:"bytes,10,opt,name=unusedSince"`
 }
 
 // +enum

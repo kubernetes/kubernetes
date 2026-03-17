@@ -117,11 +117,6 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) {
-		if oldPVC == nil || oldPVC.Status.UnusedSince == nil {
-			pvc.Status.UnusedSince = nil
-		}
-	}
 }
 
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
