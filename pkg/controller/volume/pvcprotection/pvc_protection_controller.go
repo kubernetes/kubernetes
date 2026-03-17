@@ -327,14 +327,7 @@ func (c *Controller) updateInUseConditionStatus(ctx context.Context, pvc *v1.Per
 
 	claimClone := pvc.DeepCopy()
 	now := pvcInUseConditionNowFunc()
-	conditionIndex := -1
-	for i := range claimClone.Status.Conditions {
-		if claimClone.Status.Conditions[i].Type == v1.PersistentVolumeClaimInUse {
-			conditionIndex = i
-			break
-		}
-	}
-
+	conditionIndex := getInUseConditionIndex(claimClone)
 	if conditionIndex == -1 {
 		claimClone.Status.Conditions = append(claimClone.Status.Conditions, v1.PersistentVolumeClaimCondition{
 			Type:               v1.PersistentVolumeClaimInUse,
@@ -513,7 +506,7 @@ func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 	}
 	logger.V(4).Info("Got event on PVC", "pvc", klog.KObj(pvc))
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && getInUseConditionIndex(pvc) == -1 {
 		c.queue.Add(key)
 	}
 
@@ -576,4 +569,13 @@ func (c *Controller) enqueuePVCs(logger klog.Logger, pod *v1.Pod, deleted bool) 
 			c.queue.Add(pod.Namespace + "/" + ephemeral.VolumeClaimName(pod, &volume))
 		}
 	}
+}
+
+func getInUseConditionIndex(pvc *v1.PersistentVolumeClaim) int {
+	for i := range pvc.Status.Conditions {
+		if pvc.Status.Conditions[i].Type == v1.PersistentVolumeClaimInUse {
+			return i
+		}
+	}
+	return -1
 }

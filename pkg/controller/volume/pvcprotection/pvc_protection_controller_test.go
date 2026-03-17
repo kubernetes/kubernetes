@@ -431,9 +431,7 @@ func TestPVCProtectionController(t *testing.T) {
 			name:                     "feature enabled: PVC already has in-use condition false and is still unused -> no update",
 			enablePVCUnusedSinceTime: true,
 			updatedPVCs:              []*v1.PersistentVolumeClaim{withInUseCondition(v1.ConditionFalse, metav1.Unix(100, 0), withProtectionFinalizer(pvc()))},
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-			},
+			expectedActions:          []clienttesting.Action{},
 		},
 		{
 			name:                     "feature enabled: running pod references PVC with in-use condition false -> condition flips to true",
