@@ -80,6 +80,8 @@ type RuntimeFeatures struct {
 	UserNamespacesHostNetwork bool
 	// MountOptions indicates if the runtime supports additional bind mount options on container mounts.
 	MountOptions bool
+	// ContainerUlimits indicates runtime support for per-container ulimits.
+	ContainerUlimits bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
