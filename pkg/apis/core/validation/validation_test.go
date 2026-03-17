@@ -8526,6 +8526,50 @@ func TestValidateHTTPGetActionProtocol(t *testing.T) {
 	}
 }
 
+func TestValidateGRPCAction(t *testing.T) {
+	fldPath := field.NewPath("probe")
+
+	testCases := []struct {
+		name      string
+		grpc      *core.GRPCAction
+		expectErr field.ErrorList
+	}{
+		{
+			name: "mode TLS allowed",
+			grpc: &core.GRPCAction{Port: 8443, Mode: ptr.To(core.GRPCProbeModeTLS)},
+		},
+		{
+			name: "mode Plaintext allowed",
+			grpc: &core.GRPCAction{Port: 8443, Mode: ptr.To(core.GRPCProbeModePlaintext)},
+		},
+		{
+			name: "nil mode passes",
+			grpc: &core.GRPCAction{Port: 8443},
+		},
+		{
+			name:      "unsupported mode rejected",
+			grpc:      &core.GRPCAction{Port: 8443, Mode: ptr.To(core.GRPCProbeMode("Verify"))},
+			expectErr: field.ErrorList{field.NotSupported(fldPath.Child("grpc").Child("mode"), core.GRPCProbeMode("Verify"), []string{string(core.GRPCProbeModePlaintext), string(core.GRPCProbeModeTLS)})},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := commonHandler{GRPC: tc.grpc}
+			errs := validateHandler(handler, nil, fldPath)
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Expected error %v, got %v", tc.expectErr[0], errs[0])
+				}
+			}
+		})
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      core.Container

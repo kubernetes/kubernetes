@@ -3517,6 +3517,8 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
 var supportedHTTPProtocols = sets.New(core.HTTPProtocolHTTP1, core.HTTPProtocolHTTP2)
 
+var supportedGRPCProbeModes = sets.New(core.GRPCProbeModePlaintext, core.GRPCProbeModeTLS)
+
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
@@ -3562,9 +3564,15 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
+
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+	allErrors := ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+	if grpc.Mode != nil && !supportedGRPCProbeModes.Has(*grpc.Mode) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("mode"), *grpc.Mode, sets.List(supportedGRPCProbeModes)))
+	}
+	return allErrors
 }
+
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
