@@ -3299,6 +3299,9 @@ func validateProbe(probe *core.Probe, gracePeriod *int64, fldPath *field.Path, o
 		return allErrs
 	}
 	allErrs = append(allErrs, validateHandler(handlerFromProbe(&probe.ProbeHandler), gracePeriod, fldPath)...)
+	if probe.GRPC != nil {
+		allErrs = append(allErrs, validateGRPCAction(probe.GRPC, fldPath.Child("grpc"), opts)...)
+	}
 
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
@@ -3451,6 +3454,8 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
 
+var supportedGRPCProbeModes = sets.New(core.GRPCProbeModePlaintext, core.GRPCProbeModeTLS)
+
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
@@ -3487,8 +3492,16 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
-func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
+func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrors field.ErrorList
+	if grpc.Mode != nil {
+		if !opts.AllowGRPCContainerProbeTLS {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("mode"), "setting mode on a gRPC probe requires the GRPCContainerProbeTLS feature gate to be enabled"))
+		} else if !supportedGRPCProbeModes.Has(*grpc.Mode) {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("mode"), *grpc.Mode, sets.List(supportedGRPCProbeModes)))
+		}
+	}
+	return allErrors
 }
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
@@ -3522,7 +3535,7 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("grpc"), "may not specify more than 1 handler type"))
 		} else {
 			numHandlers++
-			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
+			allErrors = append(allErrors, ValidatePortNumOrName(intstr.FromInt32(handler.GRPC.Port), fldPath.Child("grpc").Child("port"))...)
 		}
 	}
 	if handler.Sleep != nil {
@@ -4504,6 +4517,8 @@ type PodValidationOptions struct {
 	AllowImageVolumeWithDigest bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
+	// Allows TLS configuration on gRPC probe actions
+	AllowGRPCContainerProbeTLS bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
