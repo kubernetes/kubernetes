@@ -668,16 +668,16 @@ const (
 	// Enables ordered namespace deletion.
 	OrderedNamespaceDeletion featuregate.Feature = "OrderedNamespaceDeletion"
 
+	// owner: @tallclair
+	//
+	// Enables relisting individual pods on-demand.
+	PLEGOnDemandRelist featuregate.Feature = "PLEGOnDemandRelist"
+
 	// owner: @ArvindParekh
 	// kep: https://kep.k8s.io/5541
 	//
 	// Adds a new `UnusedSince` status field to `PersistentVolumeClaim` that indicates the time since the PVC was last used by a pod.
 	PersistentVolumeClaimUnusedSinceTime featuregate.Feature = "PersistentVolumeClaimUnusedSinceTime"
-
-	// owner: @tallclair
-	//
-	// Enables relisting individual pods on-demand.
-	PLEGOnDemandRelist featuregate.Feature = "PLEGOnDemandRelist"
 
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
@@ -1638,12 +1638,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
-	PersistentVolumeClaimUnusedSinceTime: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	PLEGOnDemandRelist: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PersistentVolumeClaimUnusedSinceTime: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PodAndContainerStatsFromCRI: {
@@ -2439,9 +2439,9 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	OrderedNamespaceDeletion: {},
 
-	PersistentVolumeClaimUnusedSinceTime: {},
-
 	PLEGOnDemandRelist: {},
+
+	PersistentVolumeClaimUnusedSinceTime: {},
 
 	PodAndContainerStatsFromCRI: {},
 
