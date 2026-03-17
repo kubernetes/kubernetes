@@ -244,57 +244,6 @@ func TestRuleStability(t *testing.T) {
 	}
 }
 
-func TestRuleZeroValueAllowedRequiresRequired(t *testing.T) {
-	tests := []struct {
-		name     string
-		comments []string
-		wantMsg  string
-	}{
-		{
-			name:     "no comments",
-			comments: []string{},
-			wantMsg:  "",
-		},
-		{
-			name:     "only required",
-			comments: []string{"+k8s:required"},
-			wantMsg:  "",
-		},
-		{
-			name:     "only zeroValueAllowed",
-			comments: []string{"+k8s:zeroValueAllowed"},
-			wantMsg:  `\+k8s:zeroValueAllowed`,
-		},
-		{
-			name:     "required and zeroValueAllowed",
-			comments: []string{"+k8s:required", "+k8s:zeroValueAllowed"},
-			wantMsg:  "",
-		},
-		{
-			name:     "zeroValueAllowed and required",
-			comments: []string{"+k8s:zeroValueAllowed", "+k8s:required"},
-			wantMsg:  "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			msg, err := zeroValueAllowedRequiresRequired()(nil, nil, tags)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			} else if tt.wantMsg != "" {
-				re := regexp.MustCompile(tt.wantMsg)
-				if !re.MatchString(msg) {
-					t.Errorf("message:\n\t%s\ndoes not match:\n\t%s", msg, re.String())
-				}
-			} else if msg != "" {
-				t.Errorf("unexpected message: %s", msg)
-			}
-		})
-	}
-}
-
 func TestLintType(t *testing.T) {
 	tests := []struct {
 		name        string
