@@ -20,17 +20,43 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
-	// In windows, with long file name support enabled, file names can have up to 32,767 characters.
-	oversizeFileName := fmt.Sprintf("%032768s", "a")
-	normalFileName := fmt.Sprintf("%0255s", "a")
+	// in linux file paths can be up to 4096 bytes
+	// and one filename 255 bytes
+
+	// in macos file paths can be up to 1024 bytes
+	// and one filename 255 bytes
+
+	// in windows realtive file paths can have up to 260 bytes
+	// and one filename 255 bytes
+	// https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+
+	// endpoint in logs.go takes relative path to log
+	// logFileNameIsTooLong uses os.Stat which on os level adds cwd to relative path ( cwd + relative )
+
+	// oversizeFileName won't work on any os
+	oversizeFileName := fmt.Sprintf("%256s", "a")
+
+	// oversizeFilePath is a relative path, that is 2097 itself + pwd also can't work on any system
+	oversizeFilePath := "." + strings.Repeat("/a", 2048)
+	oversizeFilePath, err := filepath.Abs(oversizeFilePath)
+	if err != nil {
+		t.Error("error getting abs path")
+	}
+
+	normalFileName := fmt.Sprintf("%255s", "a")
 
 	// check file with oversize name.
 	if !logFileNameIsTooLong(oversizeFileName) {
 		t.Error("failed to check oversize filename")
+	}
+
+	if !logFileNameIsTooLong(oversizeFilePath) {
+		t.Error("failed to check oversize for relative path")
 	}
 
 	// check file with normal name which doesn't exist.
