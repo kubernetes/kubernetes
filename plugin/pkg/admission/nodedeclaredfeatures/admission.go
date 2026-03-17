@@ -132,9 +132,9 @@ func (p *Plugin) validatePod(a admission.Attributes) error {
 	}
 
 	// Only validate updates to the main pod spec (subresource == "")
-	// or the custom "resize" subresource.
+	// or subresources that can introduce new node feature requirements.
 	subresource := a.GetSubresource()
-	if subresource != "" && subresource != "resize" {
+	if subresource != "" && subresource != "resize" && subresource != "ephemeralcontainers" {
 		return nil
 	}
 	pod, ok := a.GetObject().(*core.Pod)

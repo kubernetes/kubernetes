@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -30,6 +32,17 @@ import (
 func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username string) (*runtimeapi.LinuxContainerSecurityContext, error) {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
+	if len(synthesized.GetUlimits()) > 0 {
+		// Pod updates can bypass scheduling and initial kubelet admission.
+		// Do not let older runtimes silently ignore the requested limits.
+		status, err := m.runtimeService.Status(ctx, false)
+		if err != nil {
+			return nil, fmt.Errorf("check runtime support for container ulimits: %w", err)
+		}
+		if !status.GetFeatures().GetContainerUlimits() {
+			return nil, fmt.Errorf("container %q requests ulimits, but the runtime does not support ContainerUlimits", container.Name)
+		}
+	}
 	if synthesized == nil {
 		synthesized = &runtimeapi.LinuxContainerSecurityContext{
 			MaskedPaths:   securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount),
@@ -117,8 +130,43 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 	if securityContext.ReadOnlyRootFilesystem != nil {
 		sc.ReadonlyRootfs = *securityContext.ReadOnlyRootFilesystem
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) && securityContext.Ulimits != nil {
+		sc.Ulimits = convertToRuntimeUlimits(securityContext.Ulimits)
+	}
 
 	return sc
+}
+
+// convertToRuntimeUlimits converts v1.Ulimits to runtimeapi.Ulimit.
+func convertToRuntimeUlimits(ulimits *v1.Ulimits) []*runtimeapi.Ulimit {
+	if ulimits == nil {
+		return nil
+	}
+
+	runtimeUlimits := make([]*runtimeapi.Ulimit, 0, 6)
+	appendUlimit := func(name string, ulimit *v1.Ulimit) {
+		if ulimit == nil || ulimit.Hard == nil || ulimit.Soft == nil {
+			return
+		}
+		runtimeUlimits = append(runtimeUlimits, &runtimeapi.Ulimit{
+			Name: name,
+			Hard: &runtimeapi.Int64Value{Value: *ulimit.Hard},
+			Soft: &runtimeapi.Int64Value{Value: *ulimit.Soft},
+		})
+	}
+
+	appendUlimit("nofile", ulimits.Nofile)
+	appendUlimit("memlock", ulimits.Memlock)
+	appendUlimit("core", ulimits.Core)
+	appendUlimit("nice", ulimits.Nice)
+	appendUlimit("rtprio", ulimits.Rtprio)
+	appendUlimit("stack", ulimits.Stack)
+
+	if len(runtimeUlimits) == 0 {
+		return nil
+	}
+
+	return runtimeUlimits
 }
 
 // convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.

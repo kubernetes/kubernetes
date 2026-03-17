@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/containerulimits"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -735,6 +736,54 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 				if tc.errContains != "" {
 					assert.Contains(t, err.Error(), tc.errContains)
 				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestContainerUlimitsEphemeralAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		supported, setUlimits bool
+		wantError             bool
+	}{
+		{name: "unsupported runtime", setUlimits: true, wantError: true},
+		{name: "supported runtime", supported: true, setUlimits: true},
+		{name: "no ulimits requested"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+			if tc.supported {
+				node.Status.DeclaredFeatures = []string{containerulimits.ContainerUlimits}
+			}
+			factory := informers.NewSharedInformerFactory(fake.NewClientset(node), 0)
+			target, err := NewPlugin()
+			require.NoError(t, err)
+			target.nodeDeclaredFeatureGateEnabled = true
+			target.version = version.MustParse("1.37")
+			target.nodeDeclaredFeatureFramework = ndf.New([]ndf.Feature{containerulimits.Feature})
+			target.SetExternalKubeInformerFactory(factory)
+			require.NoError(t, target.ValidateInitialization())
+			stop := make(chan struct{})
+			defer close(stop)
+			factory.Start(stop)
+			factory.WaitForCacheSync(stop)
+
+			oldPod := &core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", Generation: 1}, Spec: core.PodSpec{NodeName: node.Name}}
+			newPod := oldPod.DeepCopy()
+			newPod.Generation++
+			debug := core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image"}}
+			if tc.setUlimits {
+				limit := int64(1024)
+				debug.SecurityContext = &core.SecurityContext{Ulimits: &core.Ulimits{Nofile: &core.Ulimit{Soft: &limit, Hard: &limit}}}
+			}
+			newPod.Spec.EphemeralContainers = []core.EphemeralContainer{debug}
+			attrs := admission.NewAttributesRecord(newPod, oldPod, core.Kind("Pod").WithVersion("v1"), newPod.Namespace, newPod.Name, core.Resource("pods").WithVersion("v1"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			err = target.Validate(context.Background(), attrs, nil)
+			if tc.wantError {
+				require.ErrorContains(t, err, "ContainerUlimits")
 			} else {
 				require.NoError(t, err)
 			}
