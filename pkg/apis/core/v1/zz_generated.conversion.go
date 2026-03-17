@@ -4359,6 +4359,7 @@ func Convert_core_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSou
 func autoConvert_v1_GRPCAction_To_core_GRPCAction(in *corev1.GRPCAction, out *core.GRPCAction, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Service = (*string)(unsafe.Pointer(in.Service))
+	out.Mode = (*core.GRPCProbeMode)(unsafe.Pointer(in.Mode))
 	return nil
 }
 
@@ -4370,6 +4371,7 @@ func Convert_v1_GRPCAction_To_core_GRPCAction(in *corev1.GRPCAction, out *core.G
 func autoConvert_core_GRPCAction_To_v1_GRPCAction(in *core.GRPCAction, out *corev1.GRPCAction, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Service = (*string)(unsafe.Pointer(in.Service))
+	out.Mode = (*corev1.GRPCProbeMode)(unsafe.Pointer(in.Mode))
 	return nil
 }
 

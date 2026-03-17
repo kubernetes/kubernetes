@@ -2001,6 +2001,14 @@ message GRPCAction {
   // +optional
   // +default=""
   optional string service = 2;
+
+  // mode specifies the connection mode for the gRPC health probe.
+  // Set to "TLS" to use TLS without certificate verification.
+  // Set to "Plaintext" to use a plaintext (insecure) connection explicitly.
+  // If not specified, the probe uses a plaintext (insecure) connection.
+  // +featureGate=GRPCContainerProbeTLS
+  // +optional
+  optional string mode = 3;
 }
 
 // Represents a volume that is populated with the contents of a git repository.

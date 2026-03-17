@@ -648,7 +648,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -681,7 +682,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -714,7 +716,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -962,7 +965,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -995,7 +999,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -1028,7 +1033,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -1276,7 +1282,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -1309,7 +1316,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,
@@ -1342,7 +1350,8 @@
               },
               "grpc": {
                 "port": 1,
-                "service": "serviceValue"
+                "service": "serviceValue",
+                "mode": "modeValue"
               },
               "initialDelaySeconds": 2,
               "timeoutSeconds": 3,

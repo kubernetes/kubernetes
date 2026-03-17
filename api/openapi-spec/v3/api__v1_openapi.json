@@ -2620,6 +2620,10 @@
       "io.k8s.api.core.v1.GRPCAction": {
         "description": "GRPCAction specifies an action involving a GRPC service.",
         "properties": {
+          "mode": {
+            "description": "mode specifies the connection mode for the gRPC health probe. Set to \"TLS\" to use TLS without certificate verification. Set to \"Plaintext\" to use a plaintext (insecure) connection explicitly. If not specified, the probe uses a plaintext (insecure) connection.",
+            "type": "string"
+          },
           "port": {
             "default": 0,
             "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",

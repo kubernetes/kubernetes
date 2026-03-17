@@ -1931,6 +1931,11 @@ func (in *GRPCAction) DeepCopyInto(out *GRPCAction) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Mode != nil {
+		in, out := &in.Mode, &out.Mode
+		*out = new(GRPCProbeMode)
+		**out = **in
+	}
 	return
 }
 
