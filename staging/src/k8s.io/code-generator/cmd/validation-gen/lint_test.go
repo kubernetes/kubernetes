@@ -18,7 +18,6 @@ package main
 
 import (
 	"errors"
-	"regexp"
 	"testing"
 
 	"k8s.io/code-generator/cmd/validation-gen/validators"
@@ -234,11 +233,8 @@ func TestRuleStability(t *testing.T) {
 			msg, err := rule(nil, dummyType, tags)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
-			} else if tt.wantMsg != "" {
-				re := regexp.MustCompile(tt.wantMsg)
-				if !re.MatchString(msg) {
-					t.Errorf("message:\n\t%s\ndoes not match:\n\t%s", msg, re.String())
-				}
+			} else if msg != tt.wantMsg {
+				t.Errorf("got %q, want %q", msg, tt.wantMsg)
 			}
 		})
 	}
