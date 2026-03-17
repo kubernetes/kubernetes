@@ -63,6 +63,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 			int64(podCPURequest), 200,
 			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			nil)
+		ginkgo.DeferCleanup(rc.CleanUp)
 		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
 
 		metricName := "queue_messages_ready"
@@ -76,6 +77,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 		}
 		// since queue_messages_ready default is 100 this will cause the HPA to scale out till max replicas
 		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscalerWithBehavior(ctx, rc, metricName, nil, v2.ValueMetricType, 50, int32(initPods), 3, behavior)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 		ginkgo.By("Waiting for HPA to scale up to max replicas")
 		rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxResourceConsumerDelay+waitBuffer)
@@ -86,7 +88,181 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 
 		ginkgo.By("Waiting for HPA to scale down to min replicas")
 		rc.WaitForReplicas(ctx, int(*hpa.Spec.MinReplicas), maxResourceConsumerDelay+waitBuffer)
-		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+	})
+
+	ginkgo.It("should scale based on the highest recommendation across multiple external metrics", func(ctx context.Context) {
+		ginkgo.By("Creating the resource consumer deployment")
+		initPods := 1
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		ginkgo.DeferCleanup(rc.CleanUp)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		metricA := "orders_backlog"
+		metricB := "priority_orders_backlog"
+		targetAverageValue := int64(25)
+		scaleDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+
+		ginkgo.By("Creating two external metrics used by one HPA")
+		err := metricsController.CreateMetric(ctx, metricA, 10, nil, false)
+		framework.ExpectNoError(err)
+		err = metricsController.CreateMetric(ctx, metricB, 10, nil, false)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating an HPA with both external metrics")
+		hpa := e2eautoscaling.CreateMultiMetricHorizontalPodAutoscaler(
+			ctx,
+			rc,
+			[]v2.MetricSpec{
+				e2eautoscaling.CreateExternalMetricSpec(metricA, nil, v2.AverageValueMetricType, targetAverageValue),
+				e2eautoscaling.CreateExternalMetricSpec(metricB, nil, v2.AverageValueMetricType, targetAverageValue),
+			},
+			int32(initPods),
+			4,
+		)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+		ginkgo.By(fmt.Sprintf("Increasing %s to drive scale up to 3 replicas", metricA))
+		err = metricsController.SetMetricValue(ctx, metricA, 60, nil)
+		framework.ExpectNoError(err)
+		err = metricsController.SetMetricValue(ctx, metricB, 10, nil)
+		framework.ExpectNoError(err)
+		rc.WaitForReplicas(ctx, 3, scaleDeadline)
+
+		ginkgo.By(fmt.Sprintf("Lowering %s and increasing %s to drive scale up to 4 replicas", metricA, metricB))
+		err = metricsController.SetMetricValue(ctx, metricA, 10, nil)
+		framework.ExpectNoError(err)
+		err = metricsController.SetMetricValue(ctx, metricB, 100, nil)
+		framework.ExpectNoError(err)
+		rc.WaitForReplicas(ctx, 4, scaleDeadline)
+	})
+
+	ginkgo.It("should respect downscale stabilization window when external metric fluctuates", func(ctx context.Context) {
+		ginkgo.By("Creating the resource consumer deployment")
+		initPods := 1
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		ginkgo.DeferCleanup(rc.CleanUp)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		metricName := "fluctuating_queue_depth"
+		targetAverageValue := int64(30)
+		highValue := int64(120)
+		lowValue := int64(20)
+		downscaleStabilization := 1 * time.Minute
+
+		ginkgo.By(fmt.Sprintf("Creating external metric %s", metricName))
+		err := metricsController.CreateMetric(ctx, metricName, highValue, nil, false)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating an HPA with a downscale stabilization window")
+		behavior := e2eautoscaling.HPABehaviorWithStabilizationWindows(0*time.Second, downscaleStabilization)
+		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscalerWithBehavior(
+			ctx,
+			rc,
+			metricName,
+			nil,
+			v2.AverageValueMetricType,
+			targetAverageValue,
+			int32(initPods),
+			4,
+			behavior,
+		)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+		ginkgo.By("Waiting for initial scale up to 4 replicas")
+		scaleDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+		rc.WaitForReplicas(ctx, 4, scaleDeadline)
+
+		ginkgo.By("Fluctuating metric value quickly")
+		err = metricsController.SetMetricValue(ctx, metricName, lowValue, nil)
+		framework.ExpectNoError(err)
+		time.Sleep(10 * time.Second)
+		err = metricsController.SetMetricValue(ctx, metricName, highValue, nil)
+		framework.ExpectNoError(err)
+		time.Sleep(10 * time.Second)
+
+		waitStart := time.Now()
+		err = metricsController.SetMetricValue(ctx, metricName, lowValue, nil)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying HPA does not scale down aggressively during stabilization window")
+		rc.EnsureDesiredReplicasInRange(ctx, 4, 4, downscaleStabilization-20*time.Second, hpa.Name)
+
+		ginkgo.By("Waiting for scale down after stabilization window has passed")
+		scaleDownDeadline := downscaleStabilization + maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+		rc.WaitForReplicas(ctx, 1, scaleDownDeadline)
+		timeWaited := time.Since(waitStart)
+
+		ginkgo.By("Verifying scale down happened only after stabilization window")
+		gomega.Expect(timeWaited).To(gomega.BeNumerically(">", downscaleStabilization), "waited %s, wanted more than %s", timeWaited, downscaleStabilization)
+		gomega.Expect(timeWaited).To(gomega.BeNumerically("<", scaleDownDeadline), "waited %s, wanted less than %s", timeWaited, scaleDownDeadline)
+	})
+
+	ginkgo.It("should enforce configured scale up and scale down pod limits for external metrics", func(ctx context.Context) {
+		ginkgo.By("Creating the resource consumer deployment")
+		initPods := 2
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		ginkgo.DeferCleanup(rc.CleanUp)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		metricName := "rate_limited_queue_depth"
+		targetAverageValue := int64(20)
+		limitWindowLength := 1 * time.Minute
+		scaleDeadline := limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+		podsLimitPerWindow := int32(1)
+
+		ginkgo.By(fmt.Sprintf("Creating external metric %s", metricName))
+		err := metricsController.CreateMetric(ctx, metricName, 80, nil, false)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating an HPA with scaleUp and scaleDown pod limits")
+		scaleUpRule := e2eautoscaling.HPAScalingRuleWithScalingPolicy(v2.PodsScalingPolicy, podsLimitPerWindow, int32(limitWindowLength.Seconds()))
+		scaleDownRule := e2eautoscaling.HPAScalingRuleWithScalingPolicy(v2.PodsScalingPolicy, podsLimitPerWindow, int32(limitWindowLength.Seconds()))
+		behavior := e2eautoscaling.HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule)
+		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscalerWithBehavior(
+			ctx,
+			rc,
+			metricName,
+			nil,
+			v2.AverageValueMetricType,
+			targetAverageValue,
+			int32(initPods),
+			4,
+			behavior,
+		)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+		ginkgo.By("Triggering scale up to the maximum replicas")
+		rc.WaitForReplicas(ctx, 3, scaleDeadline)
+		waitStart := time.Now()
+		rc.WaitForReplicas(ctx, 4, scaleDeadline)
+		timeWaitedFor4 := time.Since(waitStart)
+		gomega.Expect(timeWaitedFor4).To(gomega.BeNumerically(">", limitWindowLength), "waited %s, wanted more than %s", timeWaitedFor4, limitWindowLength)
+		gomega.Expect(timeWaitedFor4).To(gomega.BeNumerically("<", scaleDeadline), "waited %s, wanted less than %s", timeWaitedFor4, scaleDeadline)
+
+		ginkgo.By("Lowering metric to trigger scale down")
+		err = metricsController.SetMetricValue(ctx, metricName, 40, nil)
+		framework.ExpectNoError(err)
+		rc.WaitForReplicas(ctx, 3, scaleDeadline)
+		waitStart = time.Now()
+		rc.WaitForReplicas(ctx, 2, scaleDeadline)
+		timeWaitedFor2 := time.Since(waitStart)
+		gomega.Expect(timeWaitedFor2).To(gomega.BeNumerically(">", limitWindowLength), "waited %s, wanted more than %s", timeWaitedFor2, limitWindowLength)
+		gomega.Expect(timeWaitedFor2).To(gomega.BeNumerically("<", scaleDeadline), "waited %s, wanted less than %s", timeWaitedFor2, scaleDeadline)
 	})
 })
 
