@@ -6494,9 +6494,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
-    - name: unusedSince
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
 - name: io.k8s.api.core.v1.PersistentVolumeClaimTemplate
   map:
     fields:
