@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"text/template"
 	"time"
 
@@ -163,7 +164,8 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		} else if z, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			zone = z
 		}
-		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+		nodeName, _, _ := strings.Cut(node.Name, ".")
+		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], nodeName)
 	}
 
 	// Reboot the nodes.
