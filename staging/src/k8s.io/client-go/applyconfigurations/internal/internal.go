@@ -5684,6 +5684,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.GRPCAction
   map:
     fields:
+    - name: mode
+      type:
+        scalar: string
     - name: port
       type:
         scalar: numeric

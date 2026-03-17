@@ -330,6 +330,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -362,6 +363,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -434,6 +436,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -563,6 +566,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -595,6 +599,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -667,6 +672,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -799,6 +805,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -831,6 +838,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
@@ -903,6 +911,7 @@ spec:
             - commandValue
           failureThreshold: 6
           grpc:
+            mode: modeValue
             port: 1
             service: serviceValue
           httpGet:
