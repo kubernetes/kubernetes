@@ -2791,7 +2791,28 @@ type GRPCAction struct {
 	// If this is not specified, the default behavior is to probe the server's overall health status.
 	// +optional
 	Service *string
+
+	// mode specifies the connection mode for the gRPC health probe.
+	// Set to "TLS" to use TLS without certificate verification.
+	// Set to "Plaintext" to use a plaintext (insecure) connection explicitly.
+	// If not specified, the probe uses a plaintext (insecure) connection.
+	// +featureGate=GRPCContainerProbeTLS
+	// +optional
+	Mode *GRPCProbeMode
 }
+
+// GRPCProbeMode describes the connection mode for a gRPC probe.
+// +enum
+type GRPCProbeMode string
+
+const (
+	// GRPCProbeModePlaintext indicates that the probe should use a plaintext
+	// (insecure) gRPC connection.
+	GRPCProbeModePlaintext GRPCProbeMode = "Plaintext"
+	// GRPCProbeModeTLS indicates that the probe should connect using TLS
+	// without certificate verification.
+	GRPCProbeModeTLS GRPCProbeMode = "TLS"
+)
 
 // Signal defines the stop signal of containers
 // +enum
