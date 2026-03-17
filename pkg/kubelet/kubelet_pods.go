@@ -2152,11 +2152,17 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
+		resources := kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
+		if resources != nil && (len(resources.Requests) > 0 || len(resources.Limits) > 0) {
+			apiPodStatus.Resources = resources
+		}
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		}
-		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
+		allocatedResources := resourcehelper.PodRequests(pod, opts)
+		if len(allocatedResources) > 0 {
+			apiPodStatus.AllocatedResources = allocatedResources
+		}
 	}
 
 	return &apiPodStatus
@@ -2241,7 +2247,9 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		}
 		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
-		resources.Requests[v1.ResourceMemory] = aggregatedResources[v1.ResourceMemory]
+		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
+			resources.Requests[v1.ResourceMemory] = val
+		}
 	}
 
 	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
