@@ -3606,9 +3606,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			if test.podLevelResizeEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.podLevelResizeEnabled)
 			pod, status := makeBasePodAndStatus()
 			for idx := range pod.Spec.Containers {
 				// default resize policy when pod resize feature is enabled
@@ -4824,9 +4822,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.inplacePodLevelResizeEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
 			tCtx := ktesting.Init(t)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
