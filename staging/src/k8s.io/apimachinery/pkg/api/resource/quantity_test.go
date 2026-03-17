@@ -1169,7 +1169,10 @@ func TestQuoRound(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		test.a.QuoRound(test.b, test.roundVal)
+		_, err := test.a.QuoRound(test.b, test.roundVal)
+		if err != nil {
+			t.Errorf("QuoRound error: %s", err.Error())
+		}
 		if test.a.Cmp(test.expected) != 0 {
 			fmt.Println(test.a.d.Dec)
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
@@ -1196,7 +1199,10 @@ func TestQuoIntegerDivision(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		test.a.QuoIntegerDivision(test.b)
+		_, err := test.a.QuoIntegerDivision(test.b)
+		if err != nil {
+			t.Errorf("QuoIntegerDivision error: %s", err.Error())
+		}
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
 		}

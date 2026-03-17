@@ -387,12 +387,12 @@ func quantityDivideIntDefaultRounding(arg ref.Val, div ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(div)
 	}
 
-	if denominator == 0 {
-		return types.NewErr("division by zero")
-	}
-
 	copy := *q
-	copy.QuoRound(denominator, 4)
+
+	_, err := copy.QuoRound(denominator, 4)
+	if err != nil {
+		return types.NewErr("%s", err.Error())
+	}
 	return &apiservercel.Quantity{
 		Quantity: &copy,
 	}
@@ -409,12 +409,12 @@ func quantityIntegerDivision(arg ref.Val, div ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(div)
 	}
 
-	if denominator == 0 {
-		return types.NewErr("division by zero")
-	}
-
 	copy := *q
-	copy.QuoIntegerDivision(denominator)
+
+	_, err := copy.QuoIntegerDivision(denominator)
+	if err != nil {
+		return types.NewErr("%s", err.Error())
+	}
 	return &apiservercel.Quantity{
 		Quantity: &copy,
 	}
@@ -445,7 +445,10 @@ func quantityDivideIntRound(args ...ref.Val) ref.Val {
 	}
 
 	copy := *q
-	copy.QuoRound(denominator, roundVal)
+	_, err := copy.QuoRound(denominator, roundVal)
+	if err != nil {
+		return types.NewErr("%s", err.Error())
+	}
 	return &apiservercel.Quantity{
 		Quantity: &copy,
 	}
