@@ -29,16 +29,18 @@ import (
 )
 
 const (
-	requiredTagName  = "k8s:required"
-	optionalTagName  = "k8s:optional"
-	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
+	requiredTagName         = "k8s:required"
+	optionalTagName         = "k8s:optional"
+	forbiddenTagName        = "k8s:forbidden"
+	defaultTagName          = "default" // TODO: this should eventually be +k8s:default
+	zeroValueAllowedTagName = "k8s:zeroValueAllowed"
 )
 
 func init() {
 	RegisterTagValidator(requirednessTagValidator{requirednessRequired})
 	RegisterTagValidator(requirednessTagValidator{requirednessOptional})
 	RegisterTagValidator(requirednessTagValidator{requirednessForbidden})
+	RegisterTagValidator(zeroValueAllowedTagValidator{})
 }
 
 // requirednessTagValidator implements multiple modes of requiredness.
@@ -85,6 +87,18 @@ var (
 	requiredMapValidator     = types.Name{Package: libValidationPkg, Name: "RequiredMap"}
 )
 
+// hasZeroValueAllowed returns true if the field is tagged with
+// +k8s:zeroValueAllowed, indicating that the zero value should be accepted
+// even though the field is required.
+func (requirednessTagValidator) hasZeroValueAllowed(context Context) bool {
+	if context.Member == nil {
+		return false
+	}
+	extracted := codetags.Extract("+", context.Member.CommentLines)
+	_, hasTag := extracted[zeroValueAllowedTagName]
+	return hasTag
+}
+
 // TODO: It might be valuable to have a string payload for when requiredness is
 // conditional (e.g. required when <otherfield> is specified).
 func (rtv requirednessTagValidator) doRequired(context Context) (Validations, error) {
@@ -106,6 +120,12 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 		// to understand your scenario to determine if we need to adjust
 		// this behavior or provide alternative validation mechanisms.
 		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", requiredTagName)
+	}
+	// For value types (scalars), check whether +k8s:zeroValueAllowed is present.
+	// If so, omit the zero-value check: the field is documented as required by
+	// clients, but the server accepts the zero value as valid.
+	if rtv.hasZeroValueAllowed(context) {
+		return Validations{Comments: []string{"required with zero-value allowed: zero-value check omitted"}}, nil
 	}
 	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator)}}, nil
 }
@@ -322,4 +342,38 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 	}
 
 	return doc
+}
+
+// zeroValueAllowedTagValidator validates that +k8s:zeroValueAllowed is only
+// used on fields of integer or string types. It generates no validation code
+// by itself; it modifies the behavior of +k8s:required on value-type fields,
+// causing the zero-value check to be omitted.
+type zeroValueAllowedTagValidator struct{}
+
+func (zeroValueAllowedTagValidator) Init(_ Config) {}
+
+func (zeroValueAllowedTagValidator) TagName() string {
+	return zeroValueAllowedTagName
+}
+
+var zeroValueAllowedTagValidScopes = sets.New(ScopeField)
+
+func (zeroValueAllowedTagValidator) ValidScopes() sets.Set[Scope] {
+	return zeroValueAllowedTagValidScopes
+}
+
+func (zeroValueAllowedTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+	t := util.NonPointer(util.NativeType(context.Type))
+	if !types.IsInteger(t) && t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on integer or string types (%s)", rootTypeString(context.Type, t))
+	}
+	return Validations{}, nil
+}
+
+func (zeroValueAllowedTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:         zeroValueAllowedTagName,
+		Scopes:      zeroValueAllowedTagValidScopes.UnsortedList(),
+		Description: "Modifies +k8s:required to accept the zero value (0 or \"\") for integer and string fields.",
+	}
 }
