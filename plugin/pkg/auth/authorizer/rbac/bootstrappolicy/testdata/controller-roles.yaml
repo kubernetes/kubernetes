@@ -1131,6 +1131,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - persistentvolumeclaims/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - pods
     verbs:
     - get

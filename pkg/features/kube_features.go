@@ -681,6 +681,12 @@ const (
 	// Enables relisting individual pods on-demand.
 	PLEGOnDemandRelist featuregate.Feature = "PLEGOnDemandRelist"
 
+	// owner: @ArvindParekh
+	// kep: https://kep.k8s.io/5541
+	//
+	// Adds an Unused condition to PersistentVolumeClaim status that indicates when the PVC was last used by a pod.
+	PersistentVolumeClaimUnusedSinceTime featuregate.Feature = "PersistentVolumeClaimUnusedSinceTime"
+
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
 	//
@@ -1650,6 +1656,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PersistentVolumeClaimUnusedSinceTime: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodAndContainerStatsFromCRI: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2451,6 +2461,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	OrderedNamespaceDeletion: {},
 
 	PLEGOnDemandRelist: {},
+
+	PersistentVolumeClaimUnusedSinceTime: {},
 
 	PodAndContainerStatsFromCRI: {},
 

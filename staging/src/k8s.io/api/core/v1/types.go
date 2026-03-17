@@ -669,6 +669,11 @@ const (
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
 	// Volume is being modified
 	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
+
+	// PersistentVolumeClaimUnused indicates whether the PVC is currently not in use by any Pod.
+	// When status is True, the PVC is not referenced by any non-terminal Pod.
+	// The lastTransitionTime indicates when the PVC last transitioned to being unused.
+	PersistentVolumeClaimUnused PersistentVolumeClaimConditionType = "Unused"
 )
 
 // +enum
