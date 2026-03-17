@@ -2130,14 +2130,6 @@ func (m *kubeGenericRuntimeManager) CheckpointContainer(ctx context.Context, opt
 	return m.runtimeService.CheckpointContainer(ctx, options)
 }
 
-func (m *kubeGenericRuntimeManager) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
-	return m.runtimeService.ListMetricDescriptors(ctx)
-}
-
-func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
-	return m.runtimeService.ListPodSandboxMetrics(ctx)
-}
-
 func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return nil

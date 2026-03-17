@@ -923,38 +923,6 @@ func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, container
 	}
 }
 
-// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
-func (r *remoteRuntimeService) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.ListMetricDescriptors(ctx, &runtimeapi.ListMetricDescriptorsRequest{})
-	logger := klog.FromContext(ctx)
-	if err != nil {
-		logger.Error(err, "ListMetricDescriptors from runtime service failed")
-		return nil, err
-	}
-	logger.V(10).Info("[RemoteRuntimeService] ListMetricDescriptors Response", "stats", resp.GetDescriptors())
-
-	return resp.GetDescriptors(), nil
-}
-
-// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
-func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.ListPodSandboxMetrics(ctx, &runtimeapi.ListPodSandboxMetricsRequest{})
-	logger := klog.FromContext(ctx)
-	if err != nil {
-		logger.Error(err, "ListPodSandboxMetrics from runtime service failed")
-		return nil, err
-	}
-	logger.V(10).Info("[RemoteRuntimeService] ListPodSandboxMetrics Response", "stats", resp.GetPodMetrics())
-
-	return resp.GetPodMetrics(), nil
-}
-
 // RuntimeConfig returns the configuration information of the runtime.
 func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)

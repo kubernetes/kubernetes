@@ -78,8 +78,6 @@ const (
 	RuntimeService_Status_FullMethodName                    = "/runtime.v1.RuntimeService/Status"
 	RuntimeService_CheckpointContainer_FullMethodName       = "/runtime.v1.RuntimeService/CheckpointContainer"
 	RuntimeService_GetContainerEvents_FullMethodName        = "/runtime.v1.RuntimeService/GetContainerEvents"
-	RuntimeService_ListMetricDescriptors_FullMethodName     = "/runtime.v1.RuntimeService/ListMetricDescriptors"
-	RuntimeService_ListPodSandboxMetrics_FullMethodName     = "/runtime.v1.RuntimeService/ListPodSandboxMetrics"
 	RuntimeService_RuntimeConfig_FullMethodName             = "/runtime.v1.RuntimeService/RuntimeConfig"
 	RuntimeService_UpdatePodSandboxResources_FullMethodName = "/runtime.v1.RuntimeService/UpdatePodSandboxResources"
 )
@@ -170,14 +168,6 @@ type RuntimeServiceClient interface {
 	CheckpointContainer(ctx context.Context, in *CheckpointContainerRequest, opts ...grpc.CallOption) (*CheckpointContainerResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
-	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
-	// This list should be static at startup: either the client and server restart together when
-	// adding or removing metrics descriptors, or they should not change.
-	// Put differently, if ListPodSandboxMetrics references a name that is not described in the initial
-	// ListMetricDescriptors call, then the metric will not be broadcasted.
-	ListMetricDescriptors(ctx context.Context, in *ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*ListMetricDescriptorsResponse, error)
-	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
-	ListPodSandboxMetrics(ctx context.Context, in *ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*ListPodSandboxMetricsResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
@@ -471,26 +461,6 @@ func (c *runtimeServiceClient) GetContainerEvents(ctx context.Context, in *GetEv
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type RuntimeService_GetContainerEventsClient = grpc.ServerStreamingClient[ContainerEventResponse]
 
-func (c *runtimeServiceClient) ListMetricDescriptors(ctx context.Context, in *ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*ListMetricDescriptorsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListMetricDescriptorsResponse)
-	err := c.cc.Invoke(ctx, RuntimeService_ListMetricDescriptors_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *runtimeServiceClient) ListPodSandboxMetrics(ctx context.Context, in *ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*ListPodSandboxMetricsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListPodSandboxMetricsResponse)
-	err := c.cc.Invoke(ctx, RuntimeService_ListPodSandboxMetrics_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *runtimeServiceClient) RuntimeConfig(ctx context.Context, in *RuntimeConfigRequest, opts ...grpc.CallOption) (*RuntimeConfigResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RuntimeConfigResponse)
@@ -597,14 +567,6 @@ type RuntimeServiceServer interface {
 	CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
-	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
-	// This list should be static at startup: either the client and server restart together when
-	// adding or removing metrics descriptors, or they should not change.
-	// Put differently, if ListPodSandboxMetrics references a name that is not described in the initial
-	// ListMetricDescriptors call, then the metric will not be broadcasted.
-	ListMetricDescriptors(context.Context, *ListMetricDescriptorsRequest) (*ListMetricDescriptorsResponse, error)
-	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
-	ListPodSandboxMetrics(context.Context, *ListPodSandboxMetricsRequest) (*ListPodSandboxMetricsResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
@@ -706,12 +668,6 @@ func (UnimplementedRuntimeServiceServer) CheckpointContainer(context.Context, *C
 }
 func (UnimplementedRuntimeServiceServer) GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
-}
-func (UnimplementedRuntimeServiceServer) ListMetricDescriptors(context.Context, *ListMetricDescriptorsRequest) (*ListMetricDescriptorsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMetricDescriptors not implemented")
-}
-func (UnimplementedRuntimeServiceServer) ListPodSandboxMetrics(context.Context, *ListPodSandboxMetricsRequest) (*ListPodSandboxMetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxMetrics not implemented")
 }
 func (UnimplementedRuntimeServiceServer) RuntimeConfig(context.Context, *RuntimeConfigRequest) (*RuntimeConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RuntimeConfig not implemented")
@@ -1201,42 +1157,6 @@ func _RuntimeService_GetContainerEvents_Handler(srv interface{}, stream grpc.Ser
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type RuntimeService_GetContainerEventsServer = grpc.ServerStreamingServer[ContainerEventResponse]
 
-func _RuntimeService_ListMetricDescriptors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListMetricDescriptorsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RuntimeServiceServer).ListMetricDescriptors(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RuntimeService_ListMetricDescriptors_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RuntimeServiceServer).ListMetricDescriptors(ctx, req.(*ListMetricDescriptorsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RuntimeService_ListPodSandboxMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListPodSandboxMetricsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RuntimeServiceServer).ListPodSandboxMetrics(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RuntimeService_ListPodSandboxMetrics_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RuntimeServiceServer).ListPodSandboxMetrics(ctx, req.(*ListPodSandboxMetricsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _RuntimeService_RuntimeConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RuntimeConfigRequest)
 	if err := dec(in); err != nil {
@@ -1379,14 +1299,6 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckpointContainer",
 			Handler:    _RuntimeService_CheckpointContainer_Handler,
-		},
-		{
-			MethodName: "ListMetricDescriptors",
-			Handler:    _RuntimeService_ListMetricDescriptors_Handler,
-		},
-		{
-			MethodName: "ListPodSandboxMetrics",
-			Handler:    _RuntimeService_ListPodSandboxMetrics_Handler,
 		},
 		{
 			MethodName: "RuntimeConfig",

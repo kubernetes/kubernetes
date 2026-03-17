@@ -158,14 +158,6 @@ func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, 
 	return nil
 }
 
-func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
-	return nil, nil
-}
-
-func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
-	return nil, nil
-}
-
 func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 	duration := fk.resyncInterval * 2
 	minDuration := time.Minute * 5

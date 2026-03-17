@@ -70,9 +70,6 @@ type FakeRuntimeService struct {
 	Sandboxes              map[string]*FakePodSandbox
 	FakeContainerStats     map[string]*runtimeapi.ContainerStats
 	FakePodSandboxStats    map[string]*runtimeapi.PodSandboxStats
-	FakePodSandboxMetrics  map[string]*runtimeapi.PodSandboxMetrics
-	FakeMetricDescriptors  map[string]*runtimeapi.MetricDescriptor
-	FakeContainerMetrics   map[string]*runtimeapi.ContainerMetrics
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
 
 	ErrorOnSandboxCreate bool
@@ -158,14 +155,12 @@ func (r *FakeRuntimeService) popError(f string) error {
 // NewFakeRuntimeService creates a new FakeRuntimeService.
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
-		Called:                make([]string, 0),
-		Errors:                make(map[string][]error),
-		Containers:            make(map[string]*FakeContainer),
-		Sandboxes:             make(map[string]*FakePodSandbox),
-		FakeContainerStats:    make(map[string]*runtimeapi.ContainerStats),
-		FakePodSandboxStats:   make(map[string]*runtimeapi.PodSandboxStats),
-		FakePodSandboxMetrics: make(map[string]*runtimeapi.PodSandboxMetrics),
-		FakeContainerMetrics:  make(map[string]*runtimeapi.ContainerMetrics),
+		Called:              make([]string, 0),
+		Errors:              make(map[string][]error),
+		Containers:          make(map[string]*FakeContainer),
+		Sandboxes:           make(map[string]*FakePodSandbox),
+		FakeContainerStats:  make(map[string]*runtimeapi.ContainerStats),
+		FakePodSandboxStats: make(map[string]*runtimeapi.PodSandboxStats),
 	}
 }
 
@@ -719,68 +714,6 @@ func (r *FakeRuntimeService) CheckpointContainer(_ context.Context, options *run
 
 func (f *FakeRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	return nil
-}
-
-// SetFakeMetricDescriptors sets the fake metrics descriptors in the FakeRuntimeService.
-func (r *FakeRuntimeService) SetFakeMetricDescriptors(descs []*runtimeapi.MetricDescriptor) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.FakeMetricDescriptors = make(map[string]*runtimeapi.MetricDescriptor)
-	for _, d := range descs {
-		r.FakeMetricDescriptors[d.Name] = d
-	}
-}
-
-// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
-func (r *FakeRuntimeService) ListMetricDescriptors(_ context.Context) ([]*runtimeapi.MetricDescriptor, error) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.Called = append(r.Called, "ListMetricDescriptors")
-	if err := r.popError("ListMetricDescriptors"); err != nil {
-		return nil, err
-	}
-
-	descs := make([]*runtimeapi.MetricDescriptor, 0, len(r.FakeMetricDescriptors))
-	for _, d := range r.FakeMetricDescriptors {
-		descs = append(descs, d)
-	}
-
-	return descs, nil
-}
-
-// SetFakePodSandboxMetrics sets the fake pod sandbox metrics in the FakeRuntimeService.
-func (r *FakeRuntimeService) SetFakePodSandboxMetrics(podStats []*runtimeapi.PodSandboxMetrics) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.FakePodSandboxMetrics = make(map[string]*runtimeapi.PodSandboxMetrics)
-	for _, s := range podStats {
-		r.FakePodSandboxMetrics[s.PodSandboxId] = s
-	}
-}
-
-// ListPodSandboxMetrics returns the list of all pod sandbox metrics in the FakeRuntimeService.
-func (r *FakeRuntimeService) ListPodSandboxMetrics(_ context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.Called = append(r.Called, "ListPodSandboxMetrics")
-	if err := r.popError("ListPodSandboxMetrics"); err != nil {
-		return nil, err
-	}
-
-	var result []*runtimeapi.PodSandboxMetrics
-	for _, sb := range r.Sandboxes {
-		s, found := r.FakePodSandboxMetrics[sb.Id]
-		if !found {
-			continue
-		}
-		result = append(result, s)
-	}
-
-	return result, nil
 }
 
 // RuntimeConfig returns runtime configuration of the FakeRuntimeService.

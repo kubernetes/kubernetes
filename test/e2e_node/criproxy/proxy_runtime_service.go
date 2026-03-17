@@ -60,8 +60,6 @@ const (
 	Status                    = "Status"
 	CheckpointContainer       = "CheckpointContainer"
 	GetContainerEvents        = "GetContainerEvents"
-	ListMetricDescriptors     = "ListMetricDescriptors"
-	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
 	RuntimeConfig             = "RuntimeConfig"
 	UpdatePodSandboxResources = "UpdatePodSandboxResources"
 )
@@ -493,32 +491,6 @@ func (p *RemoteRuntime) GetContainerEvents(req *runtimeapi.GetEventsRequest, ces
 	}
 
 	return nil
-}
-
-// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
-func (p *RemoteRuntime) ListMetricDescriptors(ctx context.Context, req *runtimeapi.ListMetricDescriptorsRequest) (*runtimeapi.ListMetricDescriptorsResponse, error) {
-	if err := p.runInjectors(ListMetricDescriptors); err != nil {
-		return nil, err
-	}
-
-	descs, err := p.runtimeService.ListMetricDescriptors(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &runtimeapi.ListMetricDescriptorsResponse{Descriptors: descs}, nil
-}
-
-// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
-func (p *RemoteRuntime) ListPodSandboxMetrics(ctx context.Context, req *runtimeapi.ListPodSandboxMetricsRequest) (*runtimeapi.ListPodSandboxMetricsResponse, error) {
-	if err := p.runInjectors(ListPodSandboxMetrics); err != nil {
-		return nil, err
-	}
-
-	podMetrics, err := p.runtimeService.ListPodSandboxMetrics(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &runtimeapi.ListPodSandboxMetricsResponse{PodMetrics: podMetrics}, nil
 }
 
 // RuntimeConfig returns the configuration information of the runtime.
