@@ -2014,6 +2014,11 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected CPUSet %v but got %v",
 						testCase.description, testCase.expCSet, cset)
 				}
+				// Verify SMT alignment
+				if err := verifySMTAlignment(cset, testCase.topo); err != nil {
+					t.Errorf("StaticPolicy Allocate() error (%v). SMT misalignment: %v",
+						testCase.description, err)
+				}
 				return
 			}
 
@@ -2157,6 +2162,43 @@ func TestSMTAlignmentErrorText(t *testing.T) {
 func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
 	ret := cpuset.New(cpus...)
 	return &ret
+}
+
+// verifySMTAlignment checks that a cpuset has no SMT/hyperthreading misalignment.
+// When SMT is enabled (CPUsPerCore > 1), the allocation should prefer whole cores.
+// Returns an error if there is more than one partially-allocated core,
+// or if the partial allocation is unnecessary given the request size.
+func verifySMTAlignment(cset cpuset.CPUSet, topo *topology.CPUTopology) error {
+	cpusPerCore := topo.CPUsPerCore()
+	if cpusPerCore == 1 {
+		// SMT disabled, no alignment concerns
+		return nil
+	}
+
+	coreIDs := topo.CPUDetails.KeepOnly(cset).Cores()
+	partialCores := 0
+	for _, coreID := range coreIDs.List() {
+		// Get all CPUs that belong to this core and check how many are allocated
+		cpusInCore := topo.CPUDetails.CPUsInCores(coreID)
+		allocatedFromCore := cpusInCore.Intersection(cset)
+		if allocatedFromCore.Size() != cpusPerCore {
+			partialCores++
+		}
+	}
+
+	// We should have at most one partial core (when request is not divisible by CPUsPerCore)
+	if partialCores > 1 {
+		return fmt.Errorf("SMT misalignment detected: %d partial cores (expected at most 1)",
+			partialCores)
+	}
+
+	// If we have a partial core, verify it's necessary
+	if partialCores == 1 && cset.Size()%cpusPerCore == 0 {
+		return fmt.Errorf("SMT misalignment: partial core present but request size %d is divisible by CPUsPerCore %d",
+			cset.Size(), cpusPerCore)
+	}
+
+	return nil
 }
 
 func getPodUncoreCacheIDs(s state.Reader, topo *topology.CPUTopology, pod *v1.Pod) ([]int, error) {
