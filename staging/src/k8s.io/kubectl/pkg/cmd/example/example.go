@@ -326,12 +326,29 @@ func (o *Options) Run() error {
 	return err
 }
 
+// toSingular maps resource keys whose singular form cannot be derived by
+// stripping a trailing "s".  This includes irregular plurals (e.g.
+// "ingresses" → "ingress") and singular words that already end in "s"
+// (e.g. "ingress" → "ingress") to prevent incorrect trimming.
+var toSingular = map[string]string{
+	"ingress":         "ingress", // already singular, ends in "s"
+	"ingresses":       "ingress",
+	"networkpolicies": "networkpolicy",
+	"cronjobs":        "cronjob",
+	"httproutes":      "httproute",
+}
+
 func defaultNameFor(kindLower, override string) string {
 	if override != "" {
 		return override
 	}
+	if singular, ok := toSingular[kindLower]; ok {
+		return "example-" + singular
+	}
 	base := kindLower
-	if strings.HasSuffix(base, "s") {
+	if strings.HasSuffix(base, "es") {
+		base = strings.TrimSuffix(base, "es")
+	} else if strings.HasSuffix(base, "s") {
 		base = strings.TrimSuffix(base, "s")
 	}
 	return "example-" + base
