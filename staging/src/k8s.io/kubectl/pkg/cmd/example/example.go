@@ -17,6 +17,7 @@ limitations under the License.
 package example
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -53,48 +54,88 @@ var (
         kubectl example deployment --replicas=3 --name=web`))
 )
 
+// marshalExample serialises a typed Kubernetes object to clean YAML suitable
+// for kubectl apply.  It round-trips through JSON (which respects `omitempty`
+// tags on the API structs) and then strips server-managed noise fields that
+// Go's zero-value semantics still emit (status, empty strategy, empty resources,
+// empty template metadata).
+func marshalExample(obj interface{}) ([]byte, error) {
+	raw, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	stripZeroFields(m)
+	return yaml.Marshal(m)
+}
+
+// stripZeroFields recursively removes empty maps, empty slices, and known
+// server-managed fields so that example output looks hand-written.
+func stripZeroFields(m map[string]interface{}) {
+	delete(m, "status")
+
+	for key, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			stripZeroFields(v)
+			if len(v) == 0 {
+				delete(m, key)
+			}
+		case []interface{}:
+			for _, elem := range v {
+				if em, ok := elem.(map[string]interface{}); ok {
+					stripZeroFields(em)
+				}
+			}
+		}
+	}
+}
+
 var buildersByKind = map[string]func(string, string, int) ([]byte, error){
 	"pod": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPod(name, image))
+		return marshalExample(buildPod(name, image))
 	},
 	"pods": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPod(name, image))
+		return marshalExample(buildPod(name, image))
 	},
 	"po": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPod(name, image))
+		return marshalExample(buildPod(name, image))
 	},
 	"deployment": func(name, image string, replicas int) ([]byte, error) {
-		return yaml.Marshal(buildDeployment(name, image, replicas))
+		return marshalExample(buildDeployment(name, image, replicas))
 	},
 	"deployments": func(name, image string, replicas int) ([]byte, error) {
-		return yaml.Marshal(buildDeployment(name, image, replicas))
+		return marshalExample(buildDeployment(name, image, replicas))
 	},
 	"deploy": func(name, image string, replicas int) ([]byte, error) {
-		return yaml.Marshal(buildDeployment(name, image, replicas))
+		return marshalExample(buildDeployment(name, image, replicas))
 	},
 	"service": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildService(name))
+		return marshalExample(buildService(name))
 	},
 	"services": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildService(name))
+		return marshalExample(buildService(name))
 	},
 	"svc": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildService(name))
+		return marshalExample(buildService(name))
 	},
 	"persistentvolumeclaim": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPVC(name))
+		return marshalExample(buildPVC(name))
 	},
 	"persistentvolumeclaims": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPVC(name))
+		return marshalExample(buildPVC(name))
 	},
 	"pvc": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildPVC(name))
+		return marshalExample(buildPVC(name))
 	},
 	"secret": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildSecret(name))
+		return marshalExample(buildSecret(name))
 	},
 	"secrets": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildSecret(name))
+		return marshalExample(buildSecret(name))
 	},
 	"customresourcedefinition": func(name, _ string, _ int) ([]byte, error) {
 		return yaml.Marshal(buildCRD(name))
@@ -106,43 +147,43 @@ var buildersByKind = map[string]func(string, string, int) ([]byte, error){
 		return yaml.Marshal(buildCRD(name))
 	},
 	"configmap": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildConfigMap(name))
+		return marshalExample(buildConfigMap(name))
 	},
 	"configmaps": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildConfigMap(name))
+		return marshalExample(buildConfigMap(name))
 	},
 	"cm": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildConfigMap(name))
+		return marshalExample(buildConfigMap(name))
 	},
 	"job": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildJob(name, image))
+		return marshalExample(buildJob(name, image))
 	},
 	"jobs": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildJob(name, image))
+		return marshalExample(buildJob(name, image))
 	},
 	"cronjob": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildCronJob(name, image))
+		return marshalExample(buildCronJob(name, image))
 	},
 	"cronjobs": func(name, image string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildCronJob(name, image))
+		return marshalExample(buildCronJob(name, image))
 	},
 	"ingress": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildIngress(name))
+		return marshalExample(buildIngress(name))
 	},
 	"ingresses": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildIngress(name))
+		return marshalExample(buildIngress(name))
 	},
 	"ing": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildIngress(name))
+		return marshalExample(buildIngress(name))
 	},
 	"networkpolicy": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildNetworkPolicy(name))
+		return marshalExample(buildNetworkPolicy(name))
 	},
 	"networkpolicies": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildNetworkPolicy(name))
+		return marshalExample(buildNetworkPolicy(name))
 	},
 	"netpol": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildNetworkPolicy(name))
+		return marshalExample(buildNetworkPolicy(name))
 	},
 	"gateway": func(name, _ string, _ int) ([]byte, error) {
 		return yaml.Marshal(buildGateway(name))

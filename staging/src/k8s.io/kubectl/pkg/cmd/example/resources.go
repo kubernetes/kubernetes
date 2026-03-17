@@ -120,7 +120,7 @@ func buildService(name string) *corev1.Service {
 			Ports: []corev1.ServicePort{
 				{
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 				},
 			},
 		},
@@ -357,7 +357,7 @@ func buildNetworkPolicy(name string) *networkingv1.NetworkPolicy {
 					},
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
-							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							Port: intstrPtr(intstr.FromInt32(80)),
 						},
 					},
 				},
@@ -375,7 +375,7 @@ func buildNetworkPolicy(name string) *networkingv1.NetworkPolicy {
 					},
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
-							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 5432},
+							Port: intstrPtr(intstr.FromInt32(5432)),
 						},
 					},
 				},
@@ -497,4 +497,8 @@ func buildHTTPRoute(name string) map[string]interface{} {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func intstrPtr(v intstr.IntOrString) *intstr.IntOrString {
+	return &v
 }
