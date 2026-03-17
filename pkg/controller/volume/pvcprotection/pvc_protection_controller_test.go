@@ -153,10 +153,18 @@ func withProtectionFinalizer(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolume
 }
 
 func withInUseCondition(status v1.ConditionStatus, ts metav1.Time, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+	reason := "PVCNotUsed"
+	message := "PVC is not used by any pod"
+	if status == v1.ConditionTrue {
+		reason = "PVCUsed"
+		message = "PVC is used by a pod"
+	}
 	pvc.Status.Conditions = append(pvc.Status.Conditions, v1.PersistentVolumeClaimCondition{
 		Type:               v1.PersistentVolumeClaimInUse,
 		Status:             status,
 		LastTransitionTime: ts,
+		Reason:             reason,
+		Message:            message,
 	})
 	return pvc
 }

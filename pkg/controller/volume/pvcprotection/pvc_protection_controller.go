@@ -321,8 +321,12 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 
 func (c *Controller) updateInUseConditionStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, isUsed bool) error {
 	targetStatus := v1.ConditionFalse
+	defaultReason := "PVCNotUsed"
+	defaultMessage := "PVC is not used by any pod"
 	if isUsed {
 		targetStatus = v1.ConditionTrue
+		defaultReason = "PVCUsed"
+		defaultMessage = "PVC is used by a pod"
 	}
 
 	claimClone := pvc.DeepCopy()
@@ -333,12 +337,16 @@ func (c *Controller) updateInUseConditionStatus(ctx context.Context, pvc *v1.Per
 			Type:               v1.PersistentVolumeClaimInUse,
 			Status:             targetStatus,
 			LastTransitionTime: now,
+			Reason:             defaultReason,
+			Message:            defaultMessage,
 		})
 	} else if claimClone.Status.Conditions[conditionIndex].Status == targetStatus {
 		return nil
 	} else {
 		claimClone.Status.Conditions[conditionIndex].Status = targetStatus
 		claimClone.Status.Conditions[conditionIndex].LastTransitionTime = now
+		claimClone.Status.Conditions[conditionIndex].Reason = defaultReason
+		claimClone.Status.Conditions[conditionIndex].Message = defaultMessage
 	}
 
 	return c.updateInUseCondition(ctx, pvc, claimClone)

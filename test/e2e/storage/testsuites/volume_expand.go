@@ -53,6 +53,17 @@ const (
 	pvcConditionSyncPeriod = 2 * time.Minute
 )
 
+// ExpectNoResizeConditions verifies that only non-resize PVC conditions remain.
+func ExpectNoResizeConditions(pvcConditions []v1.PersistentVolumeClaimCondition) {
+	for _, condition := range pvcConditions {
+		isResizeCondition := condition.Type == v1.PersistentVolumeClaimFileSystemResizePending ||
+			condition.Type == v1.PersistentVolumeClaimResizing ||
+			condition.Type == v1.PersistentVolumeClaimControllerResizeError ||
+			condition.Type == v1.PersistentVolumeClaimNodeResizeError
+		gomega.ExpectWithOffset(1, isResizeCondition).To(gomega.BeFalse(), "pvc should not have resize-related condition %q", condition.Type)
+	}
+}
+
 type volumeExpandTestSuite struct {
 	tsInfo storageframework.TestSuiteInfo
 }
@@ -281,7 +292,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
 		})
@@ -339,7 +350,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
@@ -419,7 +430,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
