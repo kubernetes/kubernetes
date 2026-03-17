@@ -43,6 +43,7 @@ type CertificateSigningRequest struct {
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
 	// +required
+	// +k8s:required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
