@@ -18,7 +18,9 @@ package example
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -196,4 +198,192 @@ func buildCRD(_ string) map[string]interface{} {
 			},
 		},
 	}
+}
+
+func buildConfigMap(name string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		Data: map[string]string{
+			"config.yaml": "key: value\n",
+			"LOG_LEVEL":   "info",
+		},
+	}
+}
+
+func buildJob(name, image string) *batchv1.Job {
+	jobImage := image
+	if jobImage == "" {
+		jobImage = "perl:5.40"
+	}
+
+	return &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    name,
+							Image:   jobImage,
+							Command: []string{"perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+			BackoffLimit: int32Ptr(4),
+		},
+	}
+}
+
+func buildCronJob(name, image string) *batchv1.CronJob {
+	cronImage := image
+	if cronImage == "" {
+		cronImage = "busybox:1.36"
+	}
+
+	return &batchv1.CronJob{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "CronJob"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule: "*/5 * * * *",
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    name,
+									Image:   cronImage,
+									Command: []string{"/bin/sh", "-c", "date; echo Hello from the Kubernetes cluster"},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyOnFailure,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func buildIngress(name string) *networkingv1.Ingress {
+	pathType := networkingv1.PathTypePrefix
+	return &networkingv1.Ingress{
+		TypeMeta: metav1.TypeMeta{APIVersion: networkingv1.SchemeGroupVersion.String(), Kind: "Ingress"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": name,
+			},
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/rewrite-target": "/",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "example.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: name,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 80,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func buildNetworkPolicy(name string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		TypeMeta: metav1.TypeMeta{APIVersion: networkingv1.SchemeGroupVersion.String(), Kind: "NetworkPolicy"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": name,
+			},
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/name": name,
+				},
+			},
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app.kubernetes.io/name": "frontend",
+								},
+							},
+						},
+					},
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+						},
+					},
+				},
+			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				{
+					To: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app.kubernetes.io/name": "database",
+								},
+							},
+						},
+					},
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 5432},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }

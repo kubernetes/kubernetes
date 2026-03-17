@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	yaml "sigs.k8s.io/yaml"
@@ -82,7 +84,7 @@ func TestExampleList(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, expected := range []string{"pod", "deployment", "service", "persistentvolumeclaim", "secret", "customresourcedefinition"} {
+	for _, expected := range []string{"pod", "deployment", "service", "persistentvolumeclaim", "secret", "customresourcedefinition", "configmap", "job", "cronjob", "ingress", "networkpolicy"} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected %q in --list output, got:\n%s", expected, output)
 		}
@@ -218,6 +220,48 @@ func TestExampleFallbackAliases(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:  "cm alias",
+			alias: "cm",
+			assertKind: func(t *testing.T, output string) {
+				t.Helper()
+				var cm corev1.ConfigMap
+				if err := yaml.Unmarshal([]byte(output), &cm); err != nil {
+					t.Fatalf("failed to unmarshal configmap: %v", err)
+				}
+				if cm.Kind != "ConfigMap" {
+					t.Fatalf("expected ConfigMap kind, got %q", cm.Kind)
+				}
+			},
+		},
+		{
+			name:  "ing alias",
+			alias: "ing",
+			assertKind: func(t *testing.T, output string) {
+				t.Helper()
+				var ing networkingv1.Ingress
+				if err := yaml.Unmarshal([]byte(output), &ing); err != nil {
+					t.Fatalf("failed to unmarshal ingress: %v", err)
+				}
+				if ing.Kind != "Ingress" {
+					t.Fatalf("expected Ingress kind, got %q", ing.Kind)
+				}
+			},
+		},
+		{
+			name:  "netpol alias",
+			alias: "netpol",
+			assertKind: func(t *testing.T, output string) {
+				t.Helper()
+				var np networkingv1.NetworkPolicy
+				if err := yaml.Unmarshal([]byte(output), &np); err != nil {
+					t.Fatalf("failed to unmarshal networkpolicy: %v", err)
+				}
+				if np.Kind != "NetworkPolicy" {
+					t.Fatalf("expected NetworkPolicy kind, got %q", np.Kind)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -229,5 +273,155 @@ func TestExampleFallbackAliases(t *testing.T) {
 			}
 			tt.assertKind(t, output)
 		})
+	}
+}
+
+func TestExampleConfigMap(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "app-config"
+
+	output, err := runExample(t, []string{"configmap"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cm corev1.ConfigMap
+	if err := yaml.Unmarshal([]byte(output), &cm); err != nil {
+		t.Fatalf("failed to unmarshal configmap yaml: %v", err)
+	}
+
+	if cm.Kind != "ConfigMap" {
+		t.Fatalf("expected kind ConfigMap, got %q", cm.Kind)
+	}
+	if cm.Name != "app-config" {
+		t.Fatalf("expected metadata.name app-config, got %q", cm.Name)
+	}
+	if _, ok := cm.Data["config.yaml"]; !ok {
+		t.Fatalf("expected config.yaml key in data")
+	}
+	if _, ok := cm.Data["LOG_LEVEL"]; !ok {
+		t.Fatalf("expected LOG_LEVEL key in data")
+	}
+}
+
+func TestExampleJob(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "pi-calc"
+	flags.Image = "perl:5.40"
+
+	output, err := runExample(t, []string{"job"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var job batchv1.Job
+	if err := yaml.Unmarshal([]byte(output), &job); err != nil {
+		t.Fatalf("failed to unmarshal job yaml: %v", err)
+	}
+
+	if job.Kind != "Job" {
+		t.Fatalf("expected kind Job, got %q", job.Kind)
+	}
+	if job.Name != "pi-calc" {
+		t.Fatalf("expected metadata.name pi-calc, got %q", job.Name)
+	}
+	if got := job.Spec.Template.Spec.Containers[0].Image; got != "perl:5.40" {
+		t.Fatalf("expected image perl:5.40, got %q", got)
+	}
+	if job.Spec.BackoffLimit == nil || *job.Spec.BackoffLimit != 4 {
+		t.Fatalf("expected backoffLimit 4, got %v", job.Spec.BackoffLimit)
+	}
+	if job.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
+		t.Fatalf("expected restartPolicy Never, got %q", job.Spec.Template.Spec.RestartPolicy)
+	}
+}
+
+func TestExampleCronJob(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "hello-cron"
+
+	output, err := runExample(t, []string{"cronjob"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cj batchv1.CronJob
+	if err := yaml.Unmarshal([]byte(output), &cj); err != nil {
+		t.Fatalf("failed to unmarshal cronjob yaml: %v", err)
+	}
+
+	if cj.Kind != "CronJob" {
+		t.Fatalf("expected kind CronJob, got %q", cj.Kind)
+	}
+	if cj.Name != "hello-cron" {
+		t.Fatalf("expected metadata.name hello-cron, got %q", cj.Name)
+	}
+	if cj.Spec.Schedule != "*/5 * * * *" {
+		t.Fatalf("expected schedule */5 * * * *, got %q", cj.Spec.Schedule)
+	}
+	if got := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image; got != "busybox:1.36" {
+		t.Fatalf("expected default image busybox:1.36, got %q", got)
+	}
+}
+
+func TestExampleIngress(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "web-ingress"
+
+	output, err := runExample(t, []string{"ingress"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var ing networkingv1.Ingress
+	if err := yaml.Unmarshal([]byte(output), &ing); err != nil {
+		t.Fatalf("failed to unmarshal ingress yaml: %v", err)
+	}
+
+	if ing.Kind != "Ingress" {
+		t.Fatalf("expected kind Ingress, got %q", ing.Kind)
+	}
+	if ing.Name != "web-ingress" {
+		t.Fatalf("expected metadata.name web-ingress, got %q", ing.Name)
+	}
+	if len(ing.Spec.Rules) == 0 {
+		t.Fatalf("expected at least one ingress rule")
+	}
+	if ing.Spec.Rules[0].Host != "example.com" {
+		t.Fatalf("expected host example.com, got %q", ing.Spec.Rules[0].Host)
+	}
+	if _, ok := ing.Annotations["nginx.ingress.kubernetes.io/rewrite-target"]; !ok {
+		t.Fatalf("expected nginx rewrite-target annotation")
+	}
+}
+
+func TestExampleNetworkPolicy(t *testing.T) {
+	flags := newTestFlags()
+	flags.Name = "app-netpol"
+
+	output, err := runExample(t, []string{"networkpolicy"}, flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var np networkingv1.NetworkPolicy
+	if err := yaml.Unmarshal([]byte(output), &np); err != nil {
+		t.Fatalf("failed to unmarshal networkpolicy yaml: %v", err)
+	}
+
+	if np.Kind != "NetworkPolicy" {
+		t.Fatalf("expected kind NetworkPolicy, got %q", np.Kind)
+	}
+	if np.Name != "app-netpol" {
+		t.Fatalf("expected metadata.name app-netpol, got %q", np.Name)
+	}
+	if len(np.Spec.PolicyTypes) != 2 {
+		t.Fatalf("expected 2 policy types, got %d", len(np.Spec.PolicyTypes))
+	}
+	if len(np.Spec.Ingress) == 0 {
+		t.Fatalf("expected at least one ingress rule")
+	}
+	if len(np.Spec.Egress) == 0 {
+		t.Fatalf("expected at least one egress rule")
 	}
 }

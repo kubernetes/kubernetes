@@ -105,6 +105,45 @@ var buildersByKind = map[string]func(string, string, int) ([]byte, error){
 	"crd": func(name, _ string, _ int) ([]byte, error) {
 		return yaml.Marshal(buildCRD(name))
 	},
+	"configmap": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildConfigMap(name))
+	},
+	"configmaps": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildConfigMap(name))
+	},
+	"cm": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildConfigMap(name))
+	},
+	"job": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildJob(name, image))
+	},
+	"jobs": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildJob(name, image))
+	},
+	"cronjob": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildCronJob(name, image))
+	},
+	"cronjobs": func(name, image string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildCronJob(name, image))
+	},
+	"ingress": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildIngress(name))
+	},
+	"ingresses": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildIngress(name))
+	},
+	"ing": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildIngress(name))
+	},
+	"networkpolicy": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildNetworkPolicy(name))
+	},
+	"networkpolicies": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildNetworkPolicy(name))
+	},
+	"netpol": func(name, _ string, _ int) ([]byte, error) {
+		return yaml.Marshal(buildNetworkPolicy(name))
+	},
 }
 
 // Flags represent CLI flags for the command.
@@ -248,7 +287,8 @@ func printSupported(out io.Writer) error {
 	for k := range buildersByKind {
 		// Only print singular canonical kinds once
 		switch k {
-		case "pods", "deployments", "services", "persistentvolumeclaims", "secrets", "customresourcedefinitions":
+		case "pods", "deployments", "services", "persistentvolumeclaims", "secrets", "customresourcedefinitions",
+			"configmaps", "jobs", "cronjobs", "ingresses", "networkpolicies":
 			// skip plurals in listing to avoid duplicates
 			continue
 		}
@@ -327,6 +367,16 @@ func fallbackResolve(token string) (schema.GroupVersionKind, string, bool) {
 		return schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secret", true
 	case "crd", "customresourcedefinition", "customresourcedefinitions":
 		return schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}, "customresourcedefinition", true
+	case "cm", "configmap", "configmaps":
+		return schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmap", true
+	case "job", "jobs":
+		return schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}, "job", true
+	case "cronjob", "cronjobs":
+		return schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "CronJob"}, "cronjob", true
+	case "ing", "ingress", "ingresses":
+		return schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}, "ingress", true
+	case "netpol", "networkpolicy", "networkpolicies":
+		return schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicy", true
 	default:
 		return schema.GroupVersionKind{}, "", false
 	}
