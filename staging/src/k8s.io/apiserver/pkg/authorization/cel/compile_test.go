@@ -180,6 +180,8 @@ func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name 
 	switch nativeType {
 	case reflect.TypeOf(""), reflect.TypeOf(metav1.LabelSelectorOperator("")), reflect.TypeOf(metav1.FieldSelectorOperator("")):
 		return apiservercel.StringType
+	case reflect.TypeFor[bool]():
+		return apiservercel.BoolType
 	case reflect.TypeOf([]string{}):
 		return apiservercel.NewListType(apiservercel.StringType, -1)
 	case reflect.TypeOf(map[string]v1.ExtraValue{}):
@@ -226,6 +228,13 @@ func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name 
 			return nil
 		}
 		return apiservercel.NewListType(requirementType, -1)
+	case reflect.TypeFor[*v1.ConditionalAuthorizationOptions]():
+		conditionalAuthorizationDeclType := buildConditionalAuthorizationType(field, fields)
+		if err := compareFieldsForType(t, reflect.TypeFor[v1.ConditionalAuthorizationOptions](), conditionalAuthorizationDeclType, field, fields); err != nil {
+			t.Error(err)
+			return nil
+		}
+		return conditionalAuthorizationDeclType
 	default:
 		t.Fatalf("unsupported type %v", nativeType)
 	}
