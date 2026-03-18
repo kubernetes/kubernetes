@@ -151,10 +151,20 @@ func (f *ExemplaryPodFuzzer) FuzzPod(template *ExemplaryPodTemplate, id int) *v1
 func (f *ExemplaryPodFuzzer) precomputeManagedFields(template *ExemplaryPodTemplate) [][]byte {
 	res := make([][]byte, len(template.ManagedFields))
 	for i, mfTemplate := range template.ManagedFields {
-		raw := []byte(mfTemplate.FieldsSchema)
+		schema := mfTemplate.FieldsSchema
+		if schema == "" || schema == "{}" {
+			schema = "{}"
+		}
+		
+		raw := []byte(schema)
 		if mfTemplate.Length > len(raw) {
-			bloat := f.randomString(mfTemplate.Length - len(raw) - 13)
-			raw = []byte(fmt.Sprintf(`{"fuzzBloat":"%s",%s`, bloat, mfTemplate.FieldsSchema[1:]))
+			bloat := f.randomString(mfTemplate.Length - len(raw) - 15) // Overhead for field name and quotes
+			if schema == "{}" {
+				raw = []byte(fmt.Sprintf(`{"fuzzBloat":"%s"}`, bloat))
+			} else {
+				// Inject bloat as the first field
+				raw = []byte(fmt.Sprintf(`{"fuzzBloat":"%s",%s`, bloat, schema[1:]))
+			}
 		}
 		res[i] = raw
 	}

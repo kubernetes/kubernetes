@@ -1,0 +1,107 @@
+name: "complex-daemonset-pod"
+baseSpec:
+  priorityClassName: "system-node-critical"
+  serviceAccountName: "network-agent"
+  hostNetwork: true
+  dnsPolicy: "ClusterFirst"
+  restartPolicy: "Always"
+  schedulerName: "non-existent-fuzz-scheduler" # Safety
+  nodeSelector:
+    disktype: "non-existent-ssd" # Safety
+    kubernetes.io/os: "linux"
+  initContainers:
+  - name: "init-config-writer"
+    image: "registry.k8s.io/pause:3.10"
+    command: ["/bin/setup"]
+    env:
+    - name: "NODE_NAME"
+      valueFrom: { fieldRef: { fieldPath: "spec.nodeName" } }
+    resources: { requests: { cpu: "5m", memory: "30Mi" } }
+    volumeMounts:
+    - mountPath: "/etc/agent/config"
+      name: "config-vol"
+  - name: "init-binary-setup"
+    image: "registry.k8s.io/pause:3.10"
+    command: ["/bin/install"]
+    resources: { requests: { cpu: "100m", memory: "10Mi" } }
+    volumeMounts:
+    - mountPath: "/host/opt/bin"
+      name: "bin-path"
+  - name: "init-state-cleanup"
+    image: "registry.k8s.io/pause:3.10"
+    command: ["/bin/cleanup"]
+    privileged: true
+    resources: { requests: { cpu: "100m", memory: "100Mi" } }
+    volumeMounts:
+    - mountPath: "/var/run/agent"
+      name: "run-path"
+  containers:
+  - name: "core-agent"
+    image: "registry.k8s.io/pause:3.10"
+    args: ["--config=/etc/agent/config", "--log-level=info"]
+    env:
+    - name: "AGENT_NAMESPACE"
+      valueFrom: { fieldRef: { fieldPath: "metadata.namespace" } }
+    - name: "AGENT_CONFIG_MAP"
+      value: "/tmp/agent/config"
+    - name: "STORAGE_ENDPOINT"
+      value: "http://internal-storage.svc.cluster.local"
+    resources:
+      requests: { cpu: "200m", memory: "200Mi" }
+    securityContext:
+      privileged: true
+      capabilities: { add: ["NET_ADMIN", "SYS_MODULE"] }
+    livenessProbe:
+      httpGet: { path: "/healthz", port: 9879 }
+      initialDelaySeconds: 30
+    volumeMounts:
+    - mountPath: "/etc/agent/certs"
+      name: "certs-vol"
+      readOnly: true
+    - mountPath: "/var/run/agent"
+      name: "run-path"
+    - mountPath: "/host/etc/net.d"
+      name: "net-conf-vol"
+  - name: "metrics-sidecar"
+    image: "registry.k8s.io/pause:3.10"
+    env:
+    - name: "CLUSTER_ID"
+      value: "cluster-123-abc"
+    - name: "REGION"
+      value: "zone-alpha-1"
+    resources:
+      limits: { cpu: "500m", memory: "128Mi" }
+      requests: { cpu: "10m", memory: "64Mi" }
+    volumeMounts:
+    - mountPath: "/conf"
+      name: "metrics-conf-vol"
+  volumes:
+  - name: "config-vol"
+    hostPath: { path: "/var/lib/agent/config", type: "DirectoryOrCreate" }
+  - name: "bin-path"
+    hostPath: { path: "/usr/local/bin", type: "Directory" }
+  - name: "run-path"
+    hostPath: { path: "/var/run/agent", type: "DirectoryOrCreate" }
+  - name: "certs-vol"
+    hostPath: { path: "/etc/ssl/certs", type: "Directory" }
+  - name: "net-conf-vol"
+    hostPath: { path: "/etc/cni/net.d", type: "DirectoryOrCreate" }
+  - name: "metrics-conf-vol"
+    configMap: { name: "agent-metrics-config" }
+
+managedFields:
+- manager: "kube-scheduler"
+  operation: "Update"
+  length: 2000
+- manager: "agent-controller-manager"
+  operation: "Update"
+  length: 8000
+- manager: "node-lifecycle-controller"
+  operation: "Apply"
+  length: 4000
+
+annotations:
+- key: "fuzzer.io/arch-complexity-blob"
+  length: 15000
+- key: "fuzzer.io/sidecar-config-history"
+  length: 10000

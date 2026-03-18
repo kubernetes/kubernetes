@@ -59,24 +59,24 @@ err := creator.CreateExemplaryPods(ctx, template, 50000, 100)
 ```
 
 ## Template Definition
-Templates allow you to define the "shape" of the synthetic data. A representative template (`representative-pod.yaml`) is included in the `templates/` directory.
+Templates allow you to define the "shape" of the synthetic data. Multiple profiles are included in the `templates/` directory:
+- `representative-pod.yaml`: A basic pod with typical metadata bloat.
+- `complex-daemonset.yaml`: A high-fidelity profile mimicking a complex infrastructure agent with multiple init/sidecar containers, 20+ volume mounts, and multi-manager `ManagedFields` history.
 
 ### Example Template Structure
 ```yaml
-name: "representative-pod"
+name: "complex-daemonset-pod"
 baseSpec:
-  containers:
-  - name: "fuzz-target"
-    image: "gcr.io/google-containers/pause:3.9"
-  nodeSelector:
-    disktype: "non-existent-ssd" # Safety
+  initContainers: [...]
+  containers: [...]
+  volumes: [...]
 managedFields:
-- manager: "kube-scheduler"
+- manager: "agent-controller-manager"
   operation: "Update"
-  length: 5000 # Bloats the JSON to 5KB for interning tests
+  length: 8000 # Bloats the JSON to 8KB
 annotations:
-- key: "fuzz.metadata/large-blob"
-  length: 24000 # Adds a 24KB annotation
+- key: "fuzzer.io/arch-complexity-blob"
+  length: 15000 # Adds a 15KB annotation
 ```
 
 ## Project Structure
