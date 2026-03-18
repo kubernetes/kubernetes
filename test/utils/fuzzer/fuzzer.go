@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -43,6 +44,10 @@ type ExemplaryManagedFieldTemplate struct {
 	FieldsSchema string `json:"fieldsSchema"`
 	// Length specifies a target length for the FieldsV1.Raw data to simulate bloat.
 	Length int `json:"length"`
+	// FieldPathCount specifies the total number of "f:" fields to generate.
+	FieldPathCount int `json:"fieldPathCount"`
+	// FieldPathDepth specifies the maximum nesting depth for the "f:" fields.
+	FieldPathDepth int `json:"fieldPathDepth"`
 }
 
 // ExemplaryAnnotationTemplate defines how to generate an annotation.
@@ -58,24 +63,30 @@ type ExemplaryPodTemplate struct {
 	ManagedFields []ExemplaryManagedFieldTemplate `json:"managedFields"`
 	Annotations   []ExemplaryAnnotationTemplate   `json:"annotations"`
 	Namespace     string                          `json:"namespace"`
+
+	// Generative complexity settings
+	EnvVarCount       int `json:"envVarCount"`       // Number of unique environment variables to generate
+	ManagedFieldCount int `json:"managedFieldCount"` // Total number of ManagedFields entries to generate
 }
 
 // ExemplaryPodFuzzer generates fuzzed Pod objects based on a template.
 type ExemplaryPodFuzzer struct {
 	rng *rand.Rand
-	
-	// Cache for identical strings to test interning
-	mu             sync.Mutex
-	cachedMF       map[string][][]byte
-	cachedAnnos    map[string]map[string]string
+
+	// Cache for identical data to test interning across multiple pods
+	mu          sync.Mutex
+	cachedMF    map[string][]metav1.ManagedFieldsEntry
+	cachedAnnos map[string]map[string]string
+	cachedEnv   map[string][]v1.EnvVar
 }
 
 // NewExemplaryPodFuzzer creates a new fuzzer with a seeded RNG.
 func NewExemplaryPodFuzzer(seed int64) *ExemplaryPodFuzzer {
 	return &ExemplaryPodFuzzer{
 		rng:         rand.New(rand.NewSource(seed)),
-		cachedMF:    make(map[string][][]byte),
+		cachedMF:    make(map[string][]metav1.ManagedFieldsEntry),
 		cachedAnnos: make(map[string]map[string]string),
+		cachedEnv:   make(map[string][]v1.EnvVar),
 	}
 }
 
@@ -98,39 +109,34 @@ func (f *ExemplaryPodFuzzer) FuzzPod(template *ExemplaryPodTemplate, id int) *v1
 		},
 	}
 
-	// 1. Shared PodSpec (Deduplication Test)
+	// 1. Base Spec with Generative Environment Variables
 	if template.BaseSpec != nil {
-		pod.Spec = *template.BaseSpec
+		pod.Spec = *template.BaseSpec.DeepCopy()
 	}
 
-	// 2. Metadata Bloat: ManagedFields (Deduplicated for Interning Test)
+	if template.EnvVarCount > 0 && len(pod.Spec.Containers) > 0 {
+		f.mu.Lock()
+		env, ok := f.cachedEnv[template.Name]
+		if !ok {
+			env = f.precomputeEnvVars(template.EnvVarCount)
+			f.cachedEnv[template.Name] = env
+		}
+		f.mu.Unlock()
+		// Inject into the primary container
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, env...)
+	}
+
+	// 2. Metadata Bloat: ManagedFields (Identical across pods for interning)
 	f.mu.Lock()
-	rawFields, ok := f.cachedMF[template.Name]
+	mfEntries, ok := f.cachedMF[template.Name]
 	if !ok {
-		rawFields = f.precomputeManagedFields(template)
-		f.cachedMF[template.Name] = rawFields
+		mfEntries = f.precomputeManagedFields(template)
+		f.cachedMF[template.Name] = mfEntries
 	}
 	f.mu.Unlock()
+	pod.ManagedFields = mfEntries
 
-	if len(rawFields) > 0 {
-		pod.ManagedFields = make([]metav1.ManagedFieldsEntry, len(template.ManagedFields))
-		now := metav1.NewTime(time.Now())
-		for i, mfTemplate := range template.ManagedFields {
-			apiVersion := mfTemplate.APIVersion
-			if apiVersion == "" {
-				apiVersion = "v1"
-			}
-			pod.ManagedFields[i] = metav1.ManagedFieldsEntry{
-				Manager:    mfTemplate.Manager,
-				Operation:  metav1.ManagedFieldsOperationType(mfTemplate.Operation),
-				APIVersion: apiVersion,
-				Time:       &now,
-				FieldsV1:   &metav1.FieldsV1{Raw: rawFields[i]},
-			}
-		}
-	}
-
-	// 3. Metadata Bloat: Annotations (Deduplicated for Interning Test)
+	// 3. Metadata Bloat: Annotations (Identical across pods for interning)
 	f.mu.Lock()
 	annos, ok := f.cachedAnnos[template.Name]
 	if !ok {
@@ -149,33 +155,131 @@ func (f *ExemplaryPodFuzzer) FuzzPod(template *ExemplaryPodTemplate, id int) *v1
 	return pod
 }
 
-func (f *ExemplaryPodFuzzer) precomputeManagedFields(template *ExemplaryPodTemplate) [][]byte {
-	res := make([][]byte, len(template.ManagedFields))
-	for i, mfTemplate := range template.ManagedFields {
-		schema := mfTemplate.FieldsSchema
-		if schema == "" || schema == "{}" {
-			schema = "{}"
-		}
+func (f *ExemplaryPodFuzzer) precomputeManagedFields(template *ExemplaryPodTemplate) []metav1.ManagedFieldsEntry {
+	if len(template.ManagedFields) == 0 {
+		return nil
+	}
+
+	totalEntries := template.ManagedFieldCount
+	if totalEntries < len(template.ManagedFields) {
+		totalEntries = len(template.ManagedFields)
+	}
+
+	res := make([]metav1.ManagedFieldsEntry, totalEntries)
+	now := metav1.NewTime(time.Now())
+
+	for i := 0; i < totalEntries; i++ {
+		mfTemplate := template.ManagedFields[i%len(template.ManagedFields)]
 		
-		raw := []byte(schema)
-		if mfTemplate.Length > len(raw) {
-			bloat := f.randomString(mfTemplate.Length - len(raw) - 15) // Overhead for field name and quotes
-			if schema == "{}" {
-				raw = []byte(fmt.Sprintf(`{"fuzzBloat":"%s"}`, bloat))
-			} else {
-				// Inject bloat as the first field
-				raw = []byte(fmt.Sprintf(`{"fuzzBloat":"%s",%s`, bloat, schema[1:]))
-			}
+		// Build structurally complex FieldsV1
+		raw := f.buildComplexFieldsV1(mfTemplate)
+
+		apiVersion := mfTemplate.APIVersion
+		if apiVersion == "" {
+			apiVersion = "v1"
 		}
-		res[i] = raw
+
+		// Replicate "few managers, many entries" pattern by cycling suffixes
+		res[i] = metav1.ManagedFieldsEntry{
+			Manager:    fmt.Sprintf("%s-%d", mfTemplate.Manager, i/len(template.ManagedFields)),
+			Operation:  metav1.ManagedFieldsOperationType(mfTemplate.Operation),
+			APIVersion: apiVersion,
+			Time:       &now,
+			FieldsV1:   &metav1.FieldsV1{Raw: raw},
+		}
 	}
 	return res
+}
+
+func (f *ExemplaryPodFuzzer) buildComplexFieldsV1(tm ExemplaryManagedFieldTemplate) []byte {
+	// Start with the provided schema if any
+	schema := tm.FieldsSchema
+	if schema == "" || schema == "{}" {
+		schema = "{}"
+	}
+
+	// If no generative fields requested, return as is (with optional bloat)
+	if tm.FieldPathCount <= 0 {
+		raw := []byte(schema)
+		if tm.Length > len(raw) {
+			bloat := f.randomString(tm.Length - len(raw) - 15)
+			if schema == "{}" {
+				return []byte(fmt.Sprintf(`{"fuzzBloat":"%s"}`, bloat))
+			}
+			return []byte(fmt.Sprintf(`{"fuzzBloat":"%s",%s`, bloat, schema[1:]))
+		}
+		return raw
+	}
+
+	// Build a complex NESTED structure
+	depth := tm.FieldPathDepth
+	if depth <= 0 {
+		depth = 1
+	}
+	
+	// Create a map-based tree structure
+	tree := f.generateNestedMap(tm.FieldPathCount, depth)
+	
+	genJson, err := json.Marshal(tree)
+	if err != nil {
+		// Fallback to simple flat JSON if nesting fails
+		return []byte(`{"f:error":"generation_failed"}`)
+	}
+	
+	// If a target length is also specified, add a large bloat field
+	if tm.Length > len(genJson) {
+		bloat := f.randomString(tm.Length - len(genJson) - 17)
+		// Inject bloat at the start
+		res := fmt.Sprintf(`{"f:fuzzBloat":"%s",%s`, bloat, string(genJson)[1:])
+		return []byte(res)
+	}
+	
+	return genJson
+}
+
+func (f *ExemplaryPodFuzzer) generateNestedMap(totalFields, maxDepth int) map[string]interface{} {
+	root := make(map[string]interface{})
+	fieldsCreated := 0
+	
+	for fieldsCreated < totalFields {
+		curr := root
+		// Pick a random depth for this specific field branch
+		branchDepth := f.rng.Intn(maxDepth) + 1
+		
+		for d := 0; d < branchDepth; d++ {
+			key := fmt.Sprintf("f:node_%d_%d", d, f.rng.Intn(10)) // Use few branch nodes to force overlap
+			if d == branchDepth-1 {
+				// Leaf node
+				key = fmt.Sprintf("f:field_%04d", fieldsCreated)
+				curr[key] = map[string]interface{}{}
+				fieldsCreated++
+			} else {
+				// Intermediate node
+				if _, ok := curr[key]; !ok {
+					curr[key] = make(map[string]interface{})
+				}
+				curr = curr[key].(map[string]interface{})
+			}
+		}
+	}
+	return root
 }
 
 func (f *ExemplaryPodFuzzer) precomputeAnnotations(template *ExemplaryPodTemplate) map[string]string {
 	res := make(map[string]string)
 	for _, annTemplate := range template.Annotations {
 		res[annTemplate.Key] = f.randomString(annTemplate.Length)
+	}
+	return res
+}
+
+func (f *ExemplaryPodFuzzer) precomputeEnvVars(count int) []v1.EnvVar {
+	res := make([]v1.EnvVar, count)
+	for i := 0; i < count; i++ {
+		res[i] = v1.EnvVar{
+			Name:  fmt.Sprintf("FUZZ_GEN_VARIABLE_%03d", i),
+			Value: f.randomString(64),
+		}
 	}
 	return res
 }

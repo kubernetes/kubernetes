@@ -1,4 +1,6 @@
 name: "complex-daemonset-pod"
+envVarCount: 120
+managedFieldCount: 20
 baseSpec:
   priorityClassName: "system-node-critical"
   serviceAccountName: "network-agent"
@@ -44,8 +46,6 @@ baseSpec:
       valueFrom: { fieldRef: { fieldPath: "metadata.namespace" } }
     - name: "AGENT_CONFIG_MAP"
       value: "/tmp/agent/config"
-    - name: "STORAGE_ENDPOINT"
-      value: "http://internal-storage.svc.cluster.local"
     resources:
       requests: { cpu: "200m", memory: "200Mi" }
     securityContext:
@@ -64,11 +64,6 @@ baseSpec:
       name: "net-conf-vol"
   - name: "metrics-sidecar"
     image: "registry.k8s.io/pause:3.10"
-    env:
-    - name: "CLUSTER_ID"
-      value: "cluster-123-abc"
-    - name: "REGION"
-      value: "zone-alpha-1"
     resources:
       limits: { cpu: "500m", memory: "128Mi" }
       requests: { cpu: "10m", memory: "64Mi" }
@@ -88,17 +83,30 @@ baseSpec:
     hostPath: { path: "/etc/cni/net.d", type: "DirectoryOrCreate" }
   - name: "metrics-conf-vol"
     configMap: { name: "agent-metrics-config" }
+  - name: "v-01"
+    hostPath: { path: "/var/lib/agent/v1", type: "DirectoryOrCreate" }
+  - name: "v-02"
+    hostPath: { path: "/var/lib/agent/v2", type: "DirectoryOrCreate" }
+  - name: "v-03"
+    hostPath: { path: "/var/lib/agent/v3", type: "DirectoryOrCreate" }
+  - name: "v-04"
+    hostPath: { path: "/var/lib/agent/v4", type: "DirectoryOrCreate" }
+  - name: "v-05"
+    hostPath: { path: "/var/lib/agent/v5", type: "DirectoryOrCreate" }
 
 managedFields:
-- manager: "kube-scheduler"
+- manager: "system-scheduler"
   operation: "Update"
-  length: 2000
+  fieldPathCount: 400
+  fieldPathDepth: 5
 - manager: "agent-controller-manager"
   operation: "Update"
-  length: 8000
+  fieldPathCount: 800
+  fieldPathDepth: 7
 - manager: "node-lifecycle-controller"
   operation: "Apply"
-  length: 4000
+  fieldPathCount: 300
+  fieldPathDepth: 4
 
 annotations:
 - key: "fuzzer.io/arch-complexity-blob"

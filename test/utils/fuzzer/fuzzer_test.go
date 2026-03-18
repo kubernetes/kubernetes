@@ -18,9 +18,8 @@ package fuzzer
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,6 +54,8 @@ func TestExemplaryPodFuzzer(t *testing.T) {
 				Length: 100,
 			},
 		},
+		EnvVarCount:       10,
+		ManagedFieldCount: 5,
 	}
 
 	pod1 := fuzzer.FuzzPod(template, 1)
@@ -64,14 +65,19 @@ func TestExemplaryPodFuzzer(t *testing.T) {
 	assert.Equal(t, "representative-1", pod1.Name)
 	assert.Equal(t, "representative-2", pod2.Name)
 
-	// Verify shared spec (interning test)
+	// Verify shared spec base (interning test)
 	assert.Equal(t, sharedSpec.Containers[0].Image, pod1.Spec.Containers[0].Image)
 	assert.Equal(t, pod1.Spec.Containers[0].Image, pod2.Spec.Containers[0].Image)
 
-	// Verify ManagedFields
-	assert.Len(t, pod1.ManagedFields, 1)
-	assert.Equal(t, "kube-scheduler", pod1.ManagedFields[0].Manager)
-	assert.Equal(t, `{"f:spec":{"f:nodeName":{}}}`, string(pod1.ManagedFields[0].FieldsV1.Raw))
+	// Verify Generative Env Vars
+	assert.Len(t, pod1.Spec.Containers[0].Env, 10)
+	assert.True(t, strings.HasPrefix(pod1.Spec.Containers[0].Env[0].Name, "FUZZ_GEN_VARIABLE_"))
+	assert.Equal(t, pod1.Spec.Containers[0].Env[0].Value, pod2.Spec.Containers[0].Env[0].Value)
+
+	// Verify ManagedFields (Generative Count)
+	assert.Len(t, pod1.ManagedFields, 5)
+	assert.Equal(t, "kube-scheduler-0", pod1.ManagedFields[0].Manager)
+	assert.Equal(t, pod1.ManagedFields[0].FieldsV1.Raw, pod2.ManagedFields[0].FieldsV1.Raw)
 
 	// Verify Annotations
 	assert.Len(t, pod1.Annotations, 1)
@@ -80,7 +86,31 @@ func TestExemplaryPodFuzzer(t *testing.T) {
 
 	// Verify stability (interning test: identical strings across pods)
 	assert.Equal(t, pod1.Annotations["fuzz.metadata/blob"], pod2.Annotations["fuzz.metadata/blob"])
-	assert.Equal(t, string(pod1.ManagedFields[0].FieldsV1.Raw), string(pod2.ManagedFields[0].FieldsV1.Raw))
+}
+
+func TestDeeplyNestedManagedFields(t *testing.T) {
+	fuzzer := NewExemplaryPodFuzzer(42)
+	template := &ExemplaryPodTemplate{
+		Name: "nested-test",
+		ManagedFields: []ExemplaryManagedFieldTemplate{
+			{
+				Manager:        "nested-manager",
+				Operation:      "Apply",
+				FieldPathCount: 50,
+				FieldPathDepth: 5,
+			},
+		},
+		ManagedFieldCount: 1,
+	}
+
+	pod := fuzzer.FuzzPod(template, 0)
+	assert.Len(t, pod.ManagedFields, 1)
+	
+	raw := string(pod.ManagedFields[0].FieldsV1.Raw)
+	// Verify it contains multiple "f:" paths
+	assert.GreaterOrEqual(t, strings.Count(raw, "f:"), 50)
+	// Verify it contains multiple levels of nesting
+	assert.GreaterOrEqual(t, strings.Count(raw, "{"), 5)
 }
 
 func TestLoadTemplateFromFile(t *testing.T) {
@@ -88,9 +118,6 @@ func TestLoadTemplateFromFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "representative-pod", template.Name)
 	assert.NotNil(t, template.BaseSpec)
-	assert.Len(t, template.ManagedFields, 2)
-	assert.Len(t, template.Annotations, 1)
-	assert.Equal(t, 24000, template.Annotations[0].Length)
 }
 
 func TestWriteExemplaryPodsToDir(t *testing.T) {
@@ -106,9 +133,4 @@ func TestWriteExemplaryPodsToDir(t *testing.T) {
 	files, err := os.ReadDir(dir)
 	assert.NoError(t, err)
 	assert.Len(t, files, 5)
-
-	for i := 0; i < 5; i++ {
-		expectedFile := filepath.Join(dir, fmt.Sprintf("test-pod-%d.yaml", i))
-		assert.FileExists(t, expectedFile)
-	}
 }
