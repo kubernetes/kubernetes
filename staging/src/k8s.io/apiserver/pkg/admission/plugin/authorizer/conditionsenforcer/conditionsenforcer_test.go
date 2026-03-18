@@ -251,7 +251,7 @@ func makeUpdateRequest(t *testing.T) *http.Request {
 func setupConditionsEnforcer(t *testing.T) admission.Interface {
 	t.Helper()
 
-	plugin := NewConditionalAuthorizationEnforcer() // Enablement determined by the feature gate
+	plugin := NewConditionalAuthorizationEnforcer(false) // Enablement determined by the feature gate, CEL off
 	plugin.InspectFeatureGates(utilfeature.DefaultFeatureGate)
 	if err := plugin.ValidateInitialization(); err != nil {
 		t.Fatalf("ValidateInitialization failed: %v", err)
@@ -294,7 +294,7 @@ func TestConditionsEnforcerInitialization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, tt.gateEnabled)
 
-			plugin := NewConditionalAuthorizationEnforcer()
+			plugin := NewConditionalAuthorizationEnforcer(false)
 			if tt.inspectGates {
 				plugin.InspectFeatureGates(utilfeature.DefaultFeatureGate)
 			}
