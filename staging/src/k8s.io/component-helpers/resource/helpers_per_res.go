@@ -246,16 +246,13 @@ func findContainerStatus(statuses []v1.ContainerStatus, name string) *v1.Contain
 	return nil
 }
 
-func joinIter[T any](a, b []T) iter.Seq[*T] {
+func joinIter[T any](ss ...[]T) iter.Seq[*T] {
 	return func(yield func(*T) bool) {
-		for i := range a {
-			if !yield(&a[i]) {
-				return
-			}
-		}
-		for i := range b {
-			if !yield(&b[i]) {
-				return
+		for _, s := range ss {
+			for i := range s {
+				if !yield(&s[i]) {
+					return
+				}
 			}
 		}
 	}

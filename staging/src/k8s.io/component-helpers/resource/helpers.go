@@ -48,6 +48,8 @@ type PodResourcesOptions struct {
 	SkipPodLevelResources bool
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
+	// Resources is a list of resources to include in .... FIXME !!!!
+	Resources []v1.ResourceName
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
