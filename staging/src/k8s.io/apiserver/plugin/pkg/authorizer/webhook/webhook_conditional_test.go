@@ -35,6 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	apiscel "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
@@ -745,47 +747,41 @@ func TestEvaluateConditions(t *testing.T) {
 		{
 			name: "full builtin evaluation of one ConditionsMap => Deny",
 			decision: authorizer.ConditionsAwareDecisionConditionsMap(
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "very bad"}},
 				nil,
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "all ok"}},
 			),
-			noACRReviewer:   true,
-			decisionOnError: authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
-			}),
-			wantDecision: authorizer.DecisionDeny,
-			wantReason:   `condition "example.com/d" denied the request with description "very bad"`,
+			noACRReviewer:              true,
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
+			wantDecision:               authorizer.DecisionDeny,
+			wantReason:                 `condition "example.com/d" denied the request with description "very bad"`,
 		},
 		{
 			name: "full builtin evaluation of one ConditionsMap => NoOpinion",
 			decision: authorizer.ConditionsAwareDecisionConditionsMap(
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "very bad"}},
 				nil,
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "all ok"}},
 			),
-			noACRReviewer:   true,
-			decisionOnError: authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				return authorizer.ConditionEvaluationResultBoolean(false)
-			}),
-			wantDecision: authorizer.DecisionNoOpinion,
-			wantReason:   `no conditions matched`,
+			noACRReviewer:              true,
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
+			wantDecision:               authorizer.DecisionNoOpinion,
+			wantReason:                 `no conditions matched`,
 		},
 		{
 			name: "full builtin evaluation of one ConditionsMap => Allow",
 			decision: authorizer.ConditionsAwareDecisionConditionsMap(
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "very bad"}},
 				nil,
-				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL, Description: "all ok"}},
 			),
-			noACRReviewer:   true,
-			decisionOnError: authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
-			}),
-			wantDecision: authorizer.DecisionAllow,
-			wantReason:   `condition "example.com/c" allowed the request with description "all ok"`,
+			noACRReviewer:              true,
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
+			wantDecision:               authorizer.DecisionAllow,
+			wantReason:                 `condition "example.com/c" allowed the request with description "all ok"`,
 		},
 		{
 			name: "partial builtin evaluation of one ConditionsMap => webhook Allow",
@@ -850,19 +846,19 @@ func TestEvaluateConditions(t *testing.T) {
 			name: "builtin evaluation of union succeeds => Allow",
 			decision: testUnion(
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 			),
 			noACRReviewer:              true,
 			decisionOnError:            authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
 			wantDecision:               authorizer.DecisionAllow,
 			wantReason:                 `authorizer-1: {condition "example.com/c" allowed the request}`,
 		},
@@ -870,19 +866,19 @@ func TestEvaluateConditions(t *testing.T) {
 			name: "builtin evaluation of union succeeds => Deny",
 			decision: testUnion(
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 			),
 			noACRReviewer:              true,
 			decisionOnError:            authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: transparentConditionsEvaluator("d"),
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
 			wantDecision:               authorizer.DecisionDeny,
 			wantReason:                 `authorizer-1: {condition "example.com/d" denied the request}`,
 		},
@@ -890,14 +886,14 @@ func TestEvaluateConditions(t *testing.T) {
 			name: "first conditionsmap cannot be simplified fully",
 			decision: testUnion(
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
 					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/opaque"}},
 				),
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 			),
 			acrResponse: &authorizationv1alpha1.AuthorizationConditionsReview{
@@ -909,7 +905,7 @@ func TestEvaluateConditions(t *testing.T) {
 				},
 			},
 			decisionOnError:            authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
 			wantDecision:               authorizer.DecisionNoOpinion,
 			wantReason:                 `webhook's noopinion reason`,
 			// The first ConditionsMap is refined, but stays conditional, so the second one is sent as-is.
@@ -930,8 +926,8 @@ func TestEvaluateConditions(t *testing.T) {
 						Decision: authorizationv1.ConditionsAwareDecision{
 							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
 							ConditionsMap: &authorizationv1.ConditionsMap{
-								DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
-								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+								DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
+								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 							},
 						},
 					},
@@ -942,14 +938,14 @@ func TestEvaluateConditions(t *testing.T) {
 			name: "first conditionsmap can be simplified fully, but not second",
 			decision: testUnion(
 				authorizer.ConditionsAwareDecisionConditionsMap(
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "false", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 				authorizer.ConditionsAwareDecisionConditionsMap(
 					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
 					nil,
-					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
@@ -962,7 +958,7 @@ func TestEvaluateConditions(t *testing.T) {
 				},
 			},
 			decisionOnError:            authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			builtinConditionsEvaluator: plugincel.NewAuthorizationConditionsEvaluator(nil, nil, nil, apiscel.RuntimeCELCostBudget),
 			wantDecision:               authorizer.DecisionAllow,
 			wantReason:                 `webhook's second authorizer allows`,
 			verifyACR: verifyACRDecision(authorizationv1.ConditionsAwareDecision{
@@ -981,7 +977,7 @@ func TestEvaluateConditions(t *testing.T) {
 							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
 							ConditionsMap: &authorizationv1.ConditionsMap{
 								DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
-								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "true", Type: plugincel.ConditionTypeAuthorizationCEL}},
 							},
 						},
 					},
