@@ -62,6 +62,24 @@ func compareInts(val1 testHeapObject, val2 testHeapObject) bool {
 	return first < second
 }
 
+func TestDataLessBounds(t *testing.T) {
+	h := New(testHeapObjectKeyFunc, compareInts)
+	h.AddOrUpdate(mkHeapObj("foo", 1))
+
+	if h.data.Less(-1, 0) {
+		t.Fatalf("expected Less to return false for negative index")
+	}
+	if h.data.Less(0, -1) {
+		t.Fatalf("expected Less to return false for negative index")
+	}
+	if h.data.Less(h.data.Len(), 0) {
+		t.Fatalf("expected Less to return false for out-of-bounds left index")
+	}
+	if h.data.Less(0, h.data.Len()) {
+		t.Fatalf("expected Less to return false for out-of-bounds right index")
+	}
+}
+
 // TestHeapBasic tests Heap invariant
 func TestHeapBasic(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
