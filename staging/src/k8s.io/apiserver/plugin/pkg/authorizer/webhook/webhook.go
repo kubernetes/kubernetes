@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -90,7 +91,7 @@ type WebhookAuthorizer struct {
 	metrics                         metrics.AuthorizerMetrics
 	celMatcher                      *authorizationcel.CELMatcher
 	name                            string
-	builtinConditionsEvaluator      builtinConditionsEvaluator
+	makeBuiltinConditionsEvaluator  func() conditionsenforcer.BuiltinConditionsEvaluator
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client.
@@ -101,7 +102,7 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 	if authorizationV1Alpha1Interface != nil {
 		conditionsReviewer = &authorizationConditionsReviewV1Alpha1Client{authorizationV1Alpha1Interface.RESTClient()}
 	}
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, compiler, "", conditionsReviewer, nil) // TODO(luxas)
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, compiler, "", conditionsReviewer, getBuiltinConditionsEvaluator)
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -137,11 +138,15 @@ func New(sarConfig *rest.Config, sarVersion string, authorizedTTL, unauthorizedT
 		}
 	}
 
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matchConditions, metrics, compiler, name, conditionsReviewer, nil) // TODO(luxas)
+	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matchConditions, metrics, compiler, name, conditionsReviewer, getBuiltinConditionsEvaluator)
+}
+
+func getBuiltinConditionsEvaluator() conditionsenforcer.BuiltinConditionsEvaluator {
+	return conditionsenforcer.RegisteredBuiltinConditionsEvaluators()
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, am metrics.AuthorizerMetrics, compiler authorizationcel.Compiler, name string, authorizationConditionsReviewer authorizationConditionsReviewer, builtinConditionsEvaluator builtinConditionsEvaluator) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, am metrics.AuthorizerMetrics, compiler authorizationcel.Compiler, name string, authorizationConditionsReviewer authorizationConditionsReviewer, makeBuiltinConditionsEvaluator func() conditionsenforcer.BuiltinConditionsEvaluator) (*WebhookAuthorizer, error) {
 	// compile all expressions once in validation and save the results to be used for eval later
 	cm, fieldErr := apiservervalidation.ValidateAndCompileMatchConditions(compiler, matchConditions)
 	if err := fieldErr.ToAggregate(); err != nil {
@@ -163,7 +168,7 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 		metrics:                         am,
 		celMatcher:                      cm,
 		name:                            name,
-		builtinConditionsEvaluator:      builtinConditionsEvaluator,
+		makeBuiltinConditionsEvaluator:  makeBuiltinConditionsEvaluator,
 	}, nil
 }
 
@@ -439,7 +444,12 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, unevaluatedD
 		return unevaluatedDecision.UnconditionalParts()
 	}
 
-	possiblyEvaluatedDecision := tryEvaluateUsingBuiltins(ctx, unevaluatedDecision, data, w.builtinConditionsEvaluator)
+	// makeBuiltinConditionsEvaluator returns a fresh conditions evaluator during every call, as they can be lazily initialized
+	var builtinConditionsEvaluator conditionsenforcer.BuiltinConditionsEvaluator
+	if w.makeBuiltinConditionsEvaluator != nil {
+		builtinConditionsEvaluator = w.makeBuiltinConditionsEvaluator()
+	}
+	possiblyEvaluatedDecision := tryEvaluateUsingBuiltins(ctx, unevaluatedDecision, data, builtinConditionsEvaluator)
 	// If we were successful in evaluating the conditions in-process to Allow/Deny/NoOpinion, return that
 	if possiblyEvaluatedDecision.IsUnconditional() {
 		return possiblyEvaluatedDecision.UnconditionalParts()
@@ -1022,11 +1032,7 @@ func v1ExtraToV1beta1Extra(in map[string]authorizationv1.ExtraValue) map[string]
 	return ret
 }
 
-type builtinConditionsEvaluator interface {
-	EvaluateCondition(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult
-}
-
-func tryEvaluateUsingBuiltins(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData, builtinConditionsEvaluator builtinConditionsEvaluator) authorizer.ConditionsAwareDecision {
+func tryEvaluateUsingBuiltins(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData, builtinConditionsEvaluator conditionsenforcer.BuiltinConditionsEvaluator) authorizer.ConditionsAwareDecision {
 	if unevaluatedDecision.IsUnconditional() {
 		return unevaluatedDecision
 	}

@@ -18,6 +18,7 @@ package conditionsenforcer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -26,12 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	apiscel "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
@@ -44,7 +49,7 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewConditionalAuthorizationEnforcer(false), nil // Default off, can be overridden by InspectFeatureGates
+		return NewConditionalAuthorizationEnforcer(false, true), nil // Feature default off, can be overridden by InspectFeatureGates, but CEL on by default
 	})
 }
 
@@ -55,17 +60,24 @@ var _ admission.Interface = &conditionsEnforcer{}
 var _ admission.ValidationInterface = &conditionsEnforcer{}
 var _ genericadmissioninit.WantsFeatures = &conditionsEnforcer{}
 var _ genericadmissioninit.WantsAuthorizer = &conditionsEnforcer{}
+var _ genericadmissioninit.WantsExternalKubeInformerFactory = &conditionsEnforcer{}
+var _ genericadmissioninit.WantsExternalKubeClientSet = &conditionsEnforcer{}
 
 // NewConditionalAuthorizationEnforcer instantiates a new authorization conditions enforcer admission plugin
-func NewConditionalAuthorizationEnforcer(featureEnabled bool) *conditionsEnforcer {
+func NewConditionalAuthorizationEnforcer(featureEnabled, enableBuiltinCEL bool) *conditionsEnforcer {
 	return &conditionsEnforcer{
-		featureEnabled: featureEnabled,
+		featureEnabled:   featureEnabled,
+		enableBuiltinCEL: enableBuiltinCEL,
 	}
 }
 
 type conditionsEnforcer struct {
 	featureEnabled bool
 	authorizer     authorizer.Authorizer
+
+	enableBuiltinCEL bool
+	informerFactory  informers.SharedInformerFactory
+	client           kubernetes.Interface
 }
 
 func (c *conditionsEnforcer) InspectFeatureGates(features featuregate.FeatureGate) {
@@ -76,7 +88,28 @@ func (c *conditionsEnforcer) SetAuthorizer(authorizer authorizer.Authorizer) {
 	c.authorizer = authorizer
 }
 
+func (c *conditionsEnforcer) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	c.informerFactory = f
+}
+
+func (c *conditionsEnforcer) SetExternalKubeClientSet(client kubernetes.Interface) {
+	c.client = client
+}
+
 func (c *conditionsEnforcer) ValidateInitialization() error {
+	if c.enableBuiltinCEL {
+		if c.authorizer == nil {
+			return errors.New("ConditionalAuthorizationEnforcer: authorizer must be given when enableBuiltinCEL == true")
+		}
+		if c.informerFactory == nil {
+			return errors.New("ConditionalAuthorizationEnforcer: informerFactory must be given when enableBuiltinCEL == true")
+		}
+		if c.client == nil {
+			return errors.New("ConditionalAuthorizationEnforcer: client must be given when enableBuiltinCEL == true")
+		}
+		// Register the CEL evaluator into the global registry.
+		RegisterBuiltinConditionsEvaluator("cel", plugincel.NewAuthorizationConditionsEvaluator(c.authorizer, c.informerFactory, c.client, apiscel.RuntimeCELCostBudget), true)
+	}
 	return nil
 }
 

@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -902,137 +903,136 @@ authorizers:
 				expectAllowed: false,
 			},
 		*/
-		// TODO(luxas): Reactivate this when we support in-tree evaluation.
-		/*
-			// Tests for the builtin authorizer function in k8s authorization CEL.
-			// The "compound authorization" pattern: creating an object with the "protected-label"
-			// label requires the additional permission "verb=use apigroup=example.com
-			// resource=protectedlabels name=protected-label", which is checked via the
-			// authorizer CEL function.
-			{
-				name: "cel authorizer compound authorization - allow",
-				user: "compound-authz-allow-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = compoundAuthzSARHandler("configmaps")
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   "protected-cm-allow" + suffix,
-							Labels: map[string]string{"protected-label": "yes"},
-						},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed:             true,
-				expectAllowedWhenDisabled: boolPtr(false),
-			},
-			{
-				name: "cel authorizer compound authorization - deny",
-				user: "compound-authz-deny-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = compoundAuthzSARHandler("configmaps")
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
-				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   "protected-cm-deny" + suffix,
-							Labels: map[string]string{"protected-label": "yes"},
-						},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed: false,
-			},
 
-			// Tests for the namespaceObject variable in k8s authorization CEL.
-			// The "test-ns" namespace is created with labels {env: production, team: platform}.
-			{
-				name: "cel namespaceObject - positive match",
-				user: "ns-label-match-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-							if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
-								return
-							}
-							sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
-								Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-								ConditionsMap: &authorizationv1.ConditionsMap{
-									Conditions: []authorizationv1.Condition{
-										{
-											ID:     "require-production-namespace",
-											Effect: authorizationv1.ConditionEffectAllow,
-											Condition: `namespaceObject != null && ` +
-												`has(namespaceObject.metadata) && ` +
-												`has(namespaceObject.metadata.labels) && ` +
-												`'env' in namespaceObject.metadata.labels && ` +
-												`namespaceObject.metadata.labels['env'] == 'production'`,
-											Type:        "k8s.io/authorization-cel",
-											Description: "only allow in production namespaces",
-										},
-									},
-								},
-							}
-						}
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
+		// Tests for the builtin authorizer function in k8s authorization CEL.
+		// The "compound authorization" pattern: creating an object with the "protected-label"
+		// label requires the additional permission "verb=use apigroup=example.com
+		// resource=protectedlabels name=protected-label", which is checked via the
+		// authorizer CEL function.
+		{
+			name: "cel authorizer compound authorization - allow",
+			user: "compound-authz-allow-user",
+			webhookBehaviors: map[string]func(ws *webhookServerHandler){
+				"in-process-eval-only": func(ws *webhookServerHandler) {
+					ws.sarHandler = compoundAuthzSARHandler("configmaps")
+					ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
 				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "ns-match-cm" + suffix},
-					}, metav1.CreateOptions{})
-					return err
-				},
-				expectAllowed:             true,
-				expectAllowedWhenDisabled: boolPtr(false),
 			},
-			{
-				name: "cel namespaceObject - negative match",
-				user: "ns-label-nomatch-user",
-				webhookBehaviors: map[string]func(ws *webhookServerHandler){
-					"in-process-eval-only": func(ws *webhookServerHandler) {
-						ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
-							if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
-								return
-							}
-							sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
-								Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
-								ConditionsMap: &authorizationv1.ConditionsMap{
-									Conditions: []authorizationv1.Condition{
-										{
-											ID:     "require-staging-namespace",
-											Effect: authorizationv1.ConditionEffectAllow,
-											Condition: `namespaceObject != null && ` +
-												`has(namespaceObject.metadata) && ` +
-												`has(namespaceObject.metadata.labels) && ` +
-												`'env' in namespaceObject.metadata.labels && ` +
-												`namespaceObject.metadata.labels['env'] == 'staging'`,
-											Type:        "k8s.io/authorization-cel",
-											Description: "only allow in staging namespaces",
-										},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "protected-cm-allow" + suffix,
+						Labels: map[string]string{"protected-label": "yes"},
+					},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed:             true,
+			expectAllowedWhenDisabled: boolPtr(false),
+		},
+		{
+			name: "cel authorizer compound authorization - deny",
+			user: "compound-authz-deny-user",
+			webhookBehaviors: map[string]func(ws *webhookServerHandler){
+				"in-process-eval-only": func(ws *webhookServerHandler) {
+					ws.sarHandler = compoundAuthzSARHandler("configmaps")
+					ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
+				},
+			},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "protected-cm-deny" + suffix,
+						Labels: map[string]string{"protected-label": "yes"},
+					},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed: false,
+		},
+
+		// Tests for the namespaceObject variable in k8s authorization CEL.
+		// The "test-ns" namespace is created with labels {env: production, team: platform}.
+		{
+			name: "cel namespaceObject - positive match",
+			user: "ns-label-match-user",
+			webhookBehaviors: map[string]func(ws *webhookServerHandler){
+				"in-process-eval-only": func(ws *webhookServerHandler) {
+					ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
+						if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
+							return
+						}
+						sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+							ConditionsMap: &authorizationv1.ConditionsMap{
+								Conditions: []authorizationv1.Condition{
+									{
+										ID:     "require-production-namespace",
+										Effect: authorizationv1.ConditionEffectAllow,
+										Condition: `namespaceObject != null && ` +
+											`has(namespaceObject.metadata) && ` +
+											`has(namespaceObject.metadata.labels) && ` +
+											`'env' in namespaceObject.metadata.labels && ` +
+											`namespaceObject.metadata.labels['env'] == 'production'`,
+										Type:        "k8s.io/authorization-cel",
+										Description: "only allow in production namespaces",
 									},
 								},
-							}
+							},
 						}
-						ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
-					},
+					}
+					ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
 				},
-				makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
-					// test-ns has env=production, not staging, so this should be denied
-					_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "ns-nomatch-cm" + suffix},
-					}, metav1.CreateOptions{})
-					return err
+			},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "ns-match-cm" + suffix},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed:             true,
+			expectAllowedWhenDisabled: boolPtr(false),
+		},
+		{
+			name: "cel namespaceObject - negative match",
+			user: "ns-label-nomatch-user",
+			webhookBehaviors: map[string]func(ws *webhookServerHandler){
+				"in-process-eval-only": func(ws *webhookServerHandler) {
+					ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
+						if sar.Spec.ResourceAttributes == nil || sar.Spec.ResourceAttributes.Resource != "configmaps" {
+							return
+						}
+						sar.Status.ConditionalDecision = &authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+							ConditionsMap: &authorizationv1.ConditionsMap{
+								Conditions: []authorizationv1.Condition{
+									{
+										ID:     "require-staging-namespace",
+										Effect: authorizationv1.ConditionEffectAllow,
+										Condition: `namespaceObject != null && ` +
+											`has(namespaceObject.metadata) && ` +
+											`has(namespaceObject.metadata.labels) && ` +
+											`'env' in namespaceObject.metadata.labels && ` +
+											`namespaceObject.metadata.labels['env'] == 'staging'`,
+										Type:        "k8s.io/authorization-cel",
+										Description: "only allow in staging namespaces",
+									},
+								},
+							},
+						}
+					}
+					ws.acrHandler = acrEvaluateCEL(ws.t, "nonexistent-panic-on-ACR-webhook")
 				},
-				expectAllowed: false,
-			},*/
+			},
+			makeRequest: func(t *testing.T, client *clientset.Clientset, suffix string) error {
+				// test-ns has env=production, not staging, so this should be denied
+				_, err := client.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "ns-nomatch-cm" + suffix},
+				}, metav1.CreateOptions{})
+				return err
+			},
+			expectAllowed: false,
+		},
 
 		// Tests for HPA v1 and v2 with CPU utilization conditions.
 		// The authorizer returns version-specific CEL conditions that require
@@ -2230,8 +2230,6 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 
-// TODO(luxas): Reactivate this when we add support for in-tree evaluation.
-/*
 // compoundAuthzSARHandler returns a SAR handler that implements compound
 // authorization: creating a resource with the "protected-label" label
 // requires the additional "use protectedlabels" permission, checked via the
@@ -2259,7 +2257,6 @@ func compoundAuthzSARHandler(matchResource string) func(sar *authorizationv1.Sub
 		}
 	}
 }
-*/
 
 // hpaCPUUtilizationSARHandler returns a processSAR function for use with
 // celConditionalTestCases. It sets CEL conditions on HPA SARs that require
@@ -2422,7 +2419,7 @@ func celConditionalTestCases(processSAR func(sar *authorizationv1.SubjectAccessR
 		},
 		// TODO(luxas): Reactivate this when we support in-tree evaluation.
 		// When the condition type is k8s.io/authorization-cel, in-tree evaluation handles it.
-		/*"in-process-eval-only": func(ws *webhookServerHandler) {
+		"in-process-eval-only": func(ws *webhookServerHandler) {
 			ws.sarHandler = func(sar *authorizationv1.SubjectAccessReview) {
 				processSAR(sar, "k8s.io/authorization-cel")
 			}
@@ -2456,7 +2453,7 @@ func celConditionalTestCases(processSAR func(sar *authorizationv1.SubjectAccessR
 				}
 				acrEvaluateCEL(ws.t, "k8s.io/authorization-cel")(acr)
 			}
-		},*/
+		},
 	}
 }
 

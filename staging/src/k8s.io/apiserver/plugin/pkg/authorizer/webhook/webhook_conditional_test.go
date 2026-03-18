@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	apiscel "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -82,7 +83,7 @@ func newTestWebhookAuthorizer(
 	sarReviewer subjectAccessReviewer,
 	acrReviewer authorizationConditionsReviewer,
 	decisionOnError authorizer.Decision,
-	builtinConditionsEvaluator builtinConditionsEvaluator,
+	builtinConditionsEvaluator conditionsenforcer.BuiltinConditionsEvaluator,
 ) *WebhookAuthorizer {
 	wh, err := newWithBackoff(
 		sarReviewer,
@@ -95,7 +96,7 @@ func newTestWebhookAuthorizer(
 		authorizationcel.NewDefaultCompiler(),
 		"test",
 		acrReviewer,
-		builtinConditionsEvaluator,
+		func() conditionsenforcer.BuiltinConditionsEvaluator { return builtinConditionsEvaluator },
 	)
 	if err != nil {
 		panic(fmt.Sprintf("newWithBackoff failed: %v", err))
@@ -375,7 +376,7 @@ func TestEvaluateConditions(t *testing.T) {
 		// verifyACR is called after EvaluateConditions with the ACR request that
 		// was received by the fake reviewer. Useful for inspecting serialized fields.
 		verifyACR                  func(*testing.T, *authorizationv1alpha1.AuthorizationConditionsReview)
-		builtinConditionsEvaluator builtinConditionsEvaluator
+		builtinConditionsEvaluator conditionsenforcer.BuiltinConditionsEvaluator
 	}{
 		// Unconditional decisions short-circuit without calling the ACR reviewer.
 		{
@@ -635,7 +636,7 @@ func TestEvaluateConditions(t *testing.T) {
 				},
 			},
 			decisionOnError: authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+			builtinConditionsEvaluator: conditionsenforcer.BuiltinConditionsEvaluatorFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				if condition.GetType() == "transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
@@ -681,7 +682,7 @@ func TestEvaluateConditions(t *testing.T) {
 				},
 			},
 			decisionOnError: authorizer.DecisionNoOpinion,
-			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+			builtinConditionsEvaluator: conditionsenforcer.BuiltinConditionsEvaluatorFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultError(fmt.Errorf("unexpected error"))
 			}),
 			wantDecision: authorizer.DecisionAllow,
@@ -997,12 +998,6 @@ func TestEvaluateConditions(t *testing.T) {
 			}
 		})
 	}
-}
-
-type conditionsEvaluationFunc func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult
-
-func (f conditionsEvaluationFunc) EvaluateCondition(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-	return f(ctx, condition, data)
 }
 
 // TestConditionsAwareAuthorize_EndToEnd tests a full round-trip using an HTTP
