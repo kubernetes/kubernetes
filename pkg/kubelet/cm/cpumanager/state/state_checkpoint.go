@@ -211,6 +211,9 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV3() (*CPUManagerCheckpointV3
 		return nil, err
 	}
 
+	// Reset V3 (as it might contain some remaining data from previous load attempt)
+	checkpointV3 = newCPUManagerCheckpointV3()
+
 	// Loaded V2, now migrate to V3.
 	sc.logger.Info("migrating cpu manager checkpoint from v2 to v3")
 	sc.migrateV2CheckpointToV3Checkpoint(checkpointV2, checkpointV3)
