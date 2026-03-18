@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -122,6 +124,7 @@ func newTestWebhookAuthorizer(
 	sarReviewer subjectAccessReviewer,
 	acrReviewer authorizationConditionsReviewer,
 	decisionOnError authorizer.Decision,
+	builtinConditionsEvaluator builtinConditionsEvaluator,
 ) *WebhookAuthorizer {
 	wh, err := newWithBackoff(
 		sarReviewer,
@@ -134,6 +137,7 @@ func newTestWebhookAuthorizer(
 		authorizationcel.NewDefaultCompiler(),
 		"test",
 		acrReviewer,
+		builtinConditionsEvaluator,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("newWithBackoff failed: %v", err))
@@ -347,7 +351,7 @@ func TestConditionsAwareAuthorize(t *testing.T) {
 				acrReviewer = &fakeAuthorizationConditionsReviewer{}
 			}
 
-			wh := newTestWebhookAuthorizer(sarReviewer, acrReviewer, tc.decisionOnError)
+			wh := newTestWebhookAuthorizer(sarReviewer, acrReviewer, tc.decisionOnError, nil)
 			decision := wh.ConditionsAwareAuthorize(testCtx, testAttr)
 
 			if got := decision.String(); got != tc.wantDecision {
@@ -465,7 +469,7 @@ func TestAuthorize_FoldDown(t *testing.T) {
 				},
 			}
 
-			wh := newTestWebhookAuthorizer(sarReviewer, nil, authorizer.DecisionNoOpinion)
+			wh := newTestWebhookAuthorizer(sarReviewer, nil, authorizer.DecisionNoOpinion, nil)
 			d, _, _ := wh.Authorize(testCtx, testAttr)
 			if d != tc.wantDecision {
 				t.Errorf("expected %v, got %v", tc.wantDecision, d)
@@ -495,7 +499,8 @@ func TestEvaluateConditions(t *testing.T) {
 		wantErr string
 		// verifyACR is called after EvaluateConditions with the ACR request that
 		// was received by the fake reviewer. Useful for inspecting serialized fields.
-		verifyACR func(*testing.T, *authorizationv1alpha1.AuthorizationConditionsReview)
+		verifyACR                  func(*testing.T, *authorizationv1alpha1.AuthorizationConditionsReview)
+		builtinConditionsEvaluator builtinConditionsEvaluator
 	}{
 		// Unconditional decisions are a programmer error at this API layer:
 		// EvaluateConditions is only ever supposed to be called on a conditional
@@ -734,6 +739,261 @@ func TestEvaluateConditions(t *testing.T) {
 			wantDecision:    authorizer.DecisionAllow,
 			wantReason:      "partial allow",
 			wantErr:         "condition 'c' evaluation had a warning",
+		},
+		// In-tree (builtin) evaluation resolves as much as possible of the decision before
+		// falling back to the webhook.
+		{
+			name: "full builtin evaluation of one ConditionsMap => Deny",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				nil,
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+			),
+			noACRReviewer:   true,
+			decisionOnError: authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
+			}),
+			wantDecision: authorizer.DecisionDeny,
+			wantReason:   `condition "example.com/d" denied the request with description "very bad"`,
+		},
+		{
+			name: "full builtin evaluation of one ConditionsMap => NoOpinion",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				nil,
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+			),
+			noACRReviewer:   true,
+			decisionOnError: authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				return authorizer.ConditionEvaluationResultBoolean(false)
+			}),
+			wantDecision: authorizer.DecisionNoOpinion,
+			wantReason:   `no conditions matched`,
+		},
+		{
+			name: "full builtin evaluation of one ConditionsMap => Allow",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				nil,
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+			),
+			noACRReviewer:   true,
+			decisionOnError: authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
+			}),
+			wantDecision: authorizer.DecisionAllow,
+			wantReason:   `condition "example.com/c" allowed the request with description "all ok"`,
+		},
+		{
+			name: "partial builtin evaluation of one ConditionsMap => webhook Allow",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				// simplified in-process
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				nil,
+				// needs a webhook due to opaque type
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/opaque", Description: "all ok"}},
+			),
+			acrResponse: &authorizationv1alpha1.AuthorizationConditionsReview{
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					Decision: authorizationv1.ConditionsAwareDecision{
+						Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+						Allow: &authorizationv1.UnconditionalDecision{Reason: "webhook's allow reason"},
+					},
+				},
+			},
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			wantDecision:               authorizer.DecisionAllow,
+			wantReason:                 `webhook's allow reason`,
+			// The false deny condition is dropped, only the opaque allow condition is sent to the webhook.
+			verifyACR: verifyACRDecision(authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+				ConditionsMap: &authorizationv1.ConditionsMap{
+					AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/opaque", Description: "all ok"}},
+				},
+			}),
+		},
+		{
+			name: "builtin error does not affect the outcome",
+			decision: authorizer.ConditionsAwareDecisionConditionsMap(
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+				nil,
+				[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+			),
+			acrResponse: &authorizationv1alpha1.AuthorizationConditionsReview{
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					Decision: authorizationv1.ConditionsAwareDecision{
+						Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+						Allow: &authorizationv1.UnconditionalDecision{Reason: "webhook's allow reason"},
+					},
+				},
+			},
+			decisionOnError: authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: conditionsEvaluationFunc(func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				return authorizer.ConditionEvaluationResultError(fmt.Errorf("unexpected error"))
+			}),
+			wantDecision: authorizer.DecisionAllow,
+			wantReason:   `webhook's allow reason`,
+			// Builtin errors make the conditions unevaluatable, so the whole ConditionsMap is sent to the webhook.
+			verifyACR: verifyACRDecision(authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+				ConditionsMap: &authorizationv1.ConditionsMap{
+					DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "d", Type: "example.com/transparent", Description: "very bad"}},
+					AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent", Description: "all ok"}},
+				},
+			}),
+		},
+		{
+			name: "builtin evaluation of union succeeds => Allow",
+			decision: testUnion(
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+				),
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+				),
+			),
+			noACRReviewer:              true,
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			wantDecision:               authorizer.DecisionAllow,
+			wantReason:                 `authorizer-1: {condition "example.com/c" allowed the request}`,
+		},
+		{
+			name: "builtin evaluation of union succeeds => Deny",
+			decision: testUnion(
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+				),
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+				),
+			),
+			noACRReviewer:              true,
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: transparentConditionsEvaluator("d"),
+			wantDecision:               authorizer.DecisionDeny,
+			wantReason:                 `authorizer-1: {condition "example.com/d" denied the request}`,
+		},
+		{
+			name: "first conditionsmap cannot be simplified fully",
+			decision: testUnion(
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/opaque"}},
+				),
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+				),
+			),
+			acrResponse: &authorizationv1alpha1.AuthorizationConditionsReview{
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					Decision: authorizationv1.ConditionsAwareDecision{
+						Type:      authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+						NoOpinion: &authorizationv1.UnconditionalDecision{Reason: "webhook's noopinion reason"},
+					},
+				},
+			},
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			wantDecision:               authorizer.DecisionNoOpinion,
+			wantReason:                 `webhook's noopinion reason`,
+			// The first ConditionsMap is refined, but stays conditional, so the second one is sent as-is.
+			verifyACR: verifyACRDecision(authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+				Union: []authorizationv1.NamedConditionsAwareDecision{
+					{
+						AuthorizerName: "authorizer-0",
+						Decision: authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+							ConditionsMap: &authorizationv1.ConditionsMap{
+								AllowConditions: []authorizationv1.Condition{{ID: "example.com/a", Condition: "a", Type: "example.com/opaque"}},
+							},
+						},
+					},
+					{
+						AuthorizerName: "authorizer-1",
+						Decision: authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+							ConditionsMap: &authorizationv1.ConditionsMap{
+								DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "first conditionsmap can be simplified fully, but not second",
+			decision: testUnion(
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/b", Condition: "b", Type: "example.com/transparent"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/a", Condition: "a", Type: "example.com/transparent"}},
+				),
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+				),
+				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
+			),
+			acrResponse: &authorizationv1alpha1.AuthorizationConditionsReview{
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					Decision: authorizationv1.ConditionsAwareDecision{
+						Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+						Allow: &authorizationv1.UnconditionalDecision{Reason: "webhook's second authorizer allows"},
+					},
+				},
+			},
+			decisionOnError:            authorizer.DecisionNoOpinion,
+			builtinConditionsEvaluator: transparentConditionsEvaluator("c"),
+			wantDecision:               authorizer.DecisionAllow,
+			wantReason:                 `webhook's second authorizer allows`,
+			verifyACR: verifyACRDecision(authorizationv1.ConditionsAwareDecision{
+				Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+				Union: []authorizationv1.NamedConditionsAwareDecision{
+					{
+						AuthorizerName: "authorizer-0",
+						Decision: authorizationv1.ConditionsAwareDecision{
+							Type:      authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+							NoOpinion: &authorizationv1.UnconditionalDecision{Reason: "no conditions matched"},
+						},
+					},
+					{
+						AuthorizerName: "authorizer-1",
+						Decision: authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+							ConditionsMap: &authorizationv1.ConditionsMap{
+								DenyConditions:  []authorizationv1.Condition{{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
+								AllowConditions: []authorizationv1.Condition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
+							},
+						},
+					},
+					{
+						AuthorizerName: "authorizer-2",
+						Decision: authorizationv1.ConditionsAwareDecision{
+							Type: authorizationv1.ConditionsAwareDecisionTypeDeny,
+							Deny: &authorizationv1.UnconditionalDecision{Reason: "something later denies"},
+						},
+					},
+				},
+			}),
 		},
 		// Unknown response type must fail closed.
 		{
@@ -1004,7 +1264,7 @@ func TestEvaluateConditions(t *testing.T) {
 				data = fakeConditionsData{}
 			}
 
-			wh := newTestWebhookAuthorizer(&fakeSubjectAccessReviewer{}, acrReviewer, tc.decisionOnError)
+			wh := newTestWebhookAuthorizer(&fakeSubjectAccessReviewer{}, acrReviewer, tc.decisionOnError, tc.builtinConditionsEvaluator)
 			d, reason, err := wh.EvaluateConditions(testCtx, tc.decision, data)
 
 			var gotErr string
@@ -1029,6 +1289,45 @@ func TestEvaluateConditions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// transparentConditionsEvaluator evaluates conditions of type example.com/transparent in-tree, where only the
+// trueCondition evaluates to true, and leaves all other conditions to the webhook.
+func transparentConditionsEvaluator(trueCondition string) builtinConditionsEvaluator {
+	return conditionsEvaluationFunc(func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+		if condition.GetType() != "example.com/transparent" {
+			return authorizer.ConditionsEvaluationResultUnevaluatable()
+		}
+		return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == trueCondition)
+	})
+}
+
+// testUnion builds a Union decision, naming the sub-decisions authorizer-0, authorizer-1, and so on.
+func testUnion(decisions ...authorizer.ConditionsAwareDecision) authorizer.ConditionsAwareDecision {
+	var union authorizer.ConditionsAwareDecisionUnion
+	for i, d := range decisions {
+		union.Add(fmt.Sprintf("authorizer-%d", i), d)
+	}
+	return union.ToDecision()
+}
+
+// verifyACRDecision returns a verifyACR function that checks the decision sent to the webhook.
+func verifyACRDecision(want authorizationv1.ConditionsAwareDecision) func(*testing.T, *authorizationv1alpha1.AuthorizationConditionsReview) {
+	return func(t *testing.T, acr *authorizationv1alpha1.AuthorizationConditionsReview) {
+		t.Helper()
+		if acr == nil || acr.Request == nil {
+			t.Fatal("expected an ACR request to be sent")
+		}
+		if diff := cmp.Diff(want, acr.Request.Decision, cmpopts.EquateEmpty()); diff != "" {
+			t.Errorf("unexpected decision sent to the webhook (-want +got):\n%s", diff)
+		}
+	}
+}
+
+type conditionsEvaluationFunc func(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult
+
+func (f conditionsEvaluationFunc) EvaluateCondition(ctx context.Context, condition authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+	return f(ctx, condition, data)
 }
 
 // TestConditionsAwareAuthorize_EndToEnd tests a full round-trip using an HTTP
@@ -1148,7 +1447,7 @@ func TestEvaluateConditions_EndToEnd(t *testing.T) {
 		t.Fatalf("failed to build ACR reviewer: %v", err)
 	}
 
-	wh := newTestWebhookAuthorizer(&fakeSubjectAccessReviewer{}, acrReviewer, authorizer.DecisionNoOpinion)
+	wh := newTestWebhookAuthorizer(&fakeSubjectAccessReviewer{}, acrReviewer, authorizer.DecisionNoOpinion, nil)
 	d, reason, err := wh.EvaluateConditions(testCtx, condDecision, fakeConditionsData{})
 
 	if err != nil {
@@ -1336,7 +1635,7 @@ func TestConditionalResponseCaching(t *testing.T) {
 		t.Helper()
 		wh, err := newWithBackoff(sarReviewer, time.Hour, 0, testRetryBackoff,
 			authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(),
-			authorizationcel.NewDefaultCompiler(), "test", &fakeAuthorizationConditionsReviewer{})
+			authorizationcel.NewDefaultCompiler(), "test", &fakeAuthorizationConditionsReviewer{}, nil)
 		if err != nil {
 			t.Fatalf("newWithBackoff failed: %v", err)
 		}
