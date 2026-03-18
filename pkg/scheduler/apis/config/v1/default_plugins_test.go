@@ -227,7 +227,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.DefaultBinder},
 						{Name: names.NodeDeclaredFeatures},
 						{Name: names.TopologyPlacementGenerator},
-						{Name: names.PodGroupCount, Weight: ptr.To[int32](1)},
+						{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)},
 					},
 				},
 			},

@@ -96,7 +96,7 @@ func applyGangScheduling(config *v1.Plugins) {
 
 func applyTopologyAwareWorkloadScheduling(config *v1.Plugins) {
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
-	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupCount, Weight: ptr.To[int32](1)})
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)})
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

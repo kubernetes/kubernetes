@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podgroupcount
+package podgrouppodscount
 
 import (
 	"context"
@@ -26,22 +26,22 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
-// PodGroupCount is a placement score plugin that favors placements that can accommodate more pods from the considered PodGroup.
-type PodGroupCount struct {
+// PodGroupPodsCount is a placement score plugin that favors placements that can accommodate more pods from the considered PodGroup.
+type PodGroupPodsCount struct {
 	handle fwk.Handle
 }
 
-var _ fwk.PlacementScorePlugin = &PodGroupCount{}
+var _ fwk.PlacementScorePlugin = &PodGroupPodsCount{}
 
-const Name = names.PodGroupCount
+const Name = names.PodGroupPodsCount
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, h fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
-	return &PodGroupCount{handle: h}, nil
+	return &PodGroupPodsCount{handle: h}, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (pl *PodGroupCount) Name() string {
+func (pl *PodGroupPodsCount) Name() string {
 	return Name
 }
 
@@ -49,7 +49,7 @@ func (pl *PodGroupCount) Name() string {
 // Both scheduled (assumed/assigned) pods and the proposed assignments are taken into consideration
 // when computing the score. This ensures that the relative difference between choices is reduced,
 // and small changes to the total count result in small changes to the score.
-func (pl *PodGroupCount) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *PodGroupPodsCount) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
 	if err != nil {
 		return 0, fwk.AsStatus(err)
@@ -59,8 +59,8 @@ func (pl *PodGroupCount) ScorePlacement(ctx context.Context, state fwk.PodGroupC
 }
 
 // PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
-// PodGroupCount implements this interface.
-func (pl *PodGroupCount) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+// PodGroupPodsCount implements this interface.
+func (pl *PodGroupPodsCount) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 	return pl
 }
 
@@ -68,7 +68,7 @@ func (pl *PodGroupCount) PlacementScoreExtensions() fwk.PlacementScoreExtensions
 // The normalization is based on the maximum count among all candidate placements.
 // We purposely do not consider MinCount (the minimum pods required for the group) during normalization
 // to avoid large gaps in scores when there are minimal differences in pod counts.
-func (pl *PodGroupCount) NormalizePlacementScore(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, scores []fwk.PlacementScore) *fwk.Status {
+func (pl *PodGroupPodsCount) NormalizePlacementScore(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, scores []fwk.PlacementScore) *fwk.Status {
 	maxCount := int64(0)
 
 	for _, score := range scores {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podgroupcount
+package podgrouppodscount
 
 import (
 	"context"
@@ -188,7 +188,7 @@ func TestScorePlacement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
-			pl := plugin.(*PodGroupCount)
+			pl := plugin.(*PodGroupPodsCount)
 
 			// Construct PodGroupInfo for the test pod
 			pgInfo := &framework.PodGroupInfo{
@@ -277,7 +277,7 @@ func TestNormalizePlacementScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pl := &PodGroupCount{}
+			pl := &PodGroupPodsCount{}
 			pgInfo := &framework.PodGroupInfo{Name: "pg1"}
 			status := pl.NormalizePlacementScore(context.Background(), nil, pgInfo, tt.scores)
 			if tt.expectedError != "" {

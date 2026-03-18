@@ -39,5 +39,5 @@ const (
 	VolumeRestrictions              = "VolumeRestrictions"
 	VolumeZone                      = "VolumeZone"
 	TopologyPlacementGenerator      = "TopologyPlacementGenerator"
-	PodGroupCount                   = "PodGroupCount"
+	PodGroupPodsCount               = "PodGroupPodsCount"
 )
