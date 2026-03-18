@@ -71559,6 +71559,40 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"systemMemoryContentionThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "systemMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System memory contention pressure. Default: 0.9",
+							Type:        []string{"number"},
+							Format:      "double",
+						},
+					},
+					"systemDiskContentionThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "systemDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for System disk contention pressure. Default: 0.9",
+							Type:        []string{"number"},
+							Format:      "double",
+						},
+					},
+					"kubepodsMemoryContentionThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "kubepodsMemoryContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods memory contention pressure. Default: 0.9",
+							Type:        []string{"number"},
+							Format:      "double",
+						},
+					},
+					"kubepodsDiskContentionThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "kubepodsDiskContentionThreshold is the threshold (in float strictly greater than 0.0 and less than or equal to 1.0) for Kubepods disk contention pressure. Default: 0.9",
+							Type:        []string{"number"},
+							Format:      "double",
+						},
+					},
+					"psiPressureTransitionPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "psiPressureTransitionPeriod is the duration for which the kubelet has to wait before transitioning out of a PSI-related contention pressure condition. A duration of 0s will be converted to the default value of 5m. Default: \"5m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"maxOpenFiles": {
 						SchemaProps: spec.SchemaProps{
 							Description: "maxOpenFiles is Number of files that can be opened by Kubelet process. The value must be a non-negative number. Default: 1000000",

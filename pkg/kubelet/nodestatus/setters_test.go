@@ -41,6 +41,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1726,6 +1727,165 @@ func TestDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestPSICondition(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-time.Second)
+	nowFunc := func() time.Time { return now }
+
+	condType := v1.NodeSystemMemoryContentionPressure
+
+	cases := []struct {
+		desc             string
+		node             *v1.Node
+		psiData          *statsapi.PSIData
+		psiError         error
+		transitionPeriod time.Duration
+		expectConditions []v1.NodeCondition
+		expectEvents     []testEvent
+	}{
+		{
+			desc:             "new, no pressure",
+			node:             &v1.Node{},
+			psiData:          &statsapi.PSIData{Avg10: 0, Avg60: 0},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     fmt.Sprintf("NodeHasNo%s", condType),
+				},
+			},
+		},
+		{
+			desc:             "new, pressure",
+			node:             &v1.Node{},
+			psiData:          &statsapi.PSIData{Avg10: 100, Avg60: 100},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     fmt.Sprintf("NodeHas%s", condType),
+				},
+			},
+		},
+		{
+			desc: "transition to pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, false, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 100, Avg60: 100},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     fmt.Sprintf("NodeHas%s", condType),
+				},
+			},
+		},
+		{
+			desc: "transition to no pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, true, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 0, Avg60: 0},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     fmt.Sprintf("NodeHasNo%s", condType),
+				},
+			},
+		},
+		{
+			desc: "pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, true, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 100, Avg60: 100},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "trending lower",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, true, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 50, Avg60: 100},
+			transitionPeriod: 5 * time.Minute,
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "transition to no pressure delayed by transitionPeriod",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, true, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 0, Avg60: 0},
+			transitionPeriod: 5 * time.Minute,
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc:             "transition to ConditionUnknown on nil PSI",
+			node:             &v1.Node{},
+			psiData:          nil,
+			psiError:         fmt.Errorf("failed to get psi"),
+			expectConditions: []v1.NodeCondition{*makePSIConditionUnknown(condType, now, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "no pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makePSICondition(condType, false, before, before)},
+				},
+			},
+			psiData:          &statsapi.PSIData{Avg10: 0, Avg60: 0},
+			expectConditions: []v1.NodeCondition{*makePSICondition(condType, false, before, now)},
+			expectEvents:     []testEvent{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			events := []testEvent{}
+			recordEventFunc := func(logger klog.Logger, eventType, event string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+				})
+			}
+			getPSIFunc := func(ctx context.Context) (*statsapi.PSIData, error) {
+				return tc.psiData, tc.psiError
+			}
+			threshold := 0.9
+			// construct setter
+			setter := PSICondition(nowFunc, condType, getPSIFunc, threshold, tc.transitionPeriod, recordEventFunc)
+			// call setter on node
+			if err := setter(ctx, tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected condition
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
+			// check expected events
+			require.Len(t, events, len(tc.expectEvents))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
+		})
+	}
+}
+
 func TestVolumesInUse(t *testing.T) {
 	withVolumesInUse := &v1.Node{
 		Status: v1.NodeStatus{
@@ -1951,6 +2111,38 @@ func makeDiskPressureCondition(pressure bool, transition, heartbeat time.Time) *
 		Status:             v1.ConditionFalse,
 		Reason:             "KubeletHasNoDiskPressure",
 		Message:            "kubelet has no disk pressure",
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func makePSICondition(condType v1.NodeConditionType, pressure bool, transition, heartbeat time.Time) *v1.NodeCondition {
+	if pressure {
+		return &v1.NodeCondition{
+			Type:               condType,
+			Status:             v1.ConditionTrue,
+			Reason:             fmt.Sprintf("NodeHas%s", condType),
+			Message:            fmt.Sprintf("Node has %s", condType),
+			LastTransitionTime: metav1.NewTime(transition),
+			LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		}
+	}
+	return &v1.NodeCondition{
+		Type:               condType,
+		Status:             v1.ConditionFalse,
+		Reason:             fmt.Sprintf("NodeHasNo%s", condType),
+		Message:            fmt.Sprintf("Node has no %s", condType),
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func makePSIConditionUnknown(condType v1.NodeConditionType, transition, heartbeat time.Time) *v1.NodeCondition {
+	return &v1.NodeCondition{
+		Type:               condType,
+		Status:             v1.ConditionUnknown,
+		Reason:             "KubeletUnableToGetPSI",
+		Message:            "kubelet is unable to get PSI",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
 	}

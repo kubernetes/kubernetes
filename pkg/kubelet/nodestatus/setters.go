@@ -45,6 +45,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 const (
@@ -745,6 +746,99 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 		// Make sure to only update node status after reconciler starts syncing up states
 		if syncedFunc() {
 			node.Status.VolumesInUse = volumesInUseFunc()
+		}
+		return nil
+	}
+}
+
+// PSICondition returns a Setter that updates a PSI-based condition on the node.
+func PSICondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
+	conditionType v1.NodeConditionType,
+	getPSIFunc func(context.Context) (*statsapi.PSIData, error),
+	threshold float64,
+	transitionPeriod time.Duration,
+	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+) Setter {
+	var timeBelowThreshold *time.Time
+	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
+		currentTime := metav1.NewTime(nowFunc())
+		var condition *v1.NodeCondition
+
+		// Check if condition already exists and if it does, just pick it up for update.
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == conditionType {
+				condition = &node.Status.Conditions[i]
+			}
+		}
+
+		newCondition := false
+		// If the condition doesn't exist, create one
+		if condition == nil {
+			condition = &v1.NodeCondition{
+				Type:   conditionType,
+				Status: v1.ConditionUnknown,
+			}
+			newCondition = true
+		}
+
+		// Update the heartbeat time
+		condition.LastHeartbeatTime = currentTime
+
+		psi, err := getPSIFunc(ctx)
+		if err != nil || psi == nil {
+			if newCondition || condition.Status != v1.ConditionUnknown {
+				condition.Status = v1.ConditionUnknown
+				condition.Reason = "KubeletUnableToGetPSI"
+				condition.Message = "kubelet is unable to get PSI"
+				condition.LastTransitionTime = currentTime
+			}
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, *condition)
+			}
+			return nil
+		}
+
+		thresholdPercentage := threshold * 100
+		isPressured := psi.Avg10 >= thresholdPercentage && psi.Avg60 >= thresholdPercentage
+
+		if isPressured {
+			timeBelowThreshold = nil
+			if condition.Status != v1.ConditionTrue {
+				condition.Status = v1.ConditionTrue
+				condition.Reason = fmt.Sprintf("NodeHas%s", conditionType)
+				condition.Message = fmt.Sprintf("Node has %s", conditionType)
+				condition.LastTransitionTime = currentTime
+				// Record an event indicating high resource pressure (ongoing or new)
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHas%s", conditionType))
+			}
+		} else {
+			if newCondition || condition.Status == v1.ConditionUnknown {
+				condition.Status = v1.ConditionFalse
+				condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
+				condition.Message = fmt.Sprintf("Node has no %s", conditionType)
+				condition.LastTransitionTime = currentTime
+				recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
+			} else if condition.Status == v1.ConditionTrue {
+				if timeBelowThreshold == nil {
+					t := currentTime.Time
+					timeBelowThreshold = &t
+				}
+				if currentTime.Time.Sub(*timeBelowThreshold) >= transitionPeriod {
+					condition.Status = v1.ConditionFalse
+					condition.Reason = fmt.Sprintf("NodeHasNo%s", conditionType)
+					condition.Message = fmt.Sprintf("Node has no %s", conditionType)
+					condition.LastTransitionTime = currentTime
+					timeBelowThreshold = nil
+					recordEventFunc(logger, v1.EventTypeNormal, fmt.Sprintf("NodeHasNo%s", conditionType))
+				}
+			} else if condition.Status == v1.ConditionFalse {
+				timeBelowThreshold = nil
+			}
+		}
+
+		if newCondition {
+			node.Status.Conditions = append(node.Status.Conditions, *condition)
 		}
 		return nil
 	}

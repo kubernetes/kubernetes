@@ -309,5 +309,10 @@ var (
 		"FailCgroupV1",
 		"CrashLoopBackOff.MaxContainerRestartPeriod",
 		"UserNamespaces.IDsPerPod",
+		"KubepodsDiskContentionThreshold",
+		"KubepodsMemoryContentionThreshold",
+		"SystemDiskContentionThreshold",
+		"SystemMemoryContentionThreshold",
+		"PSIPressureTransitionPeriod.Duration",
 	)
 )
