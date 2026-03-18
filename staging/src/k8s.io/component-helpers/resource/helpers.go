@@ -23,16 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// ContainerType signifies container type
-type ContainerType int
-
-const (
-	// Containers is for normal containers
-	Containers ContainerType = 1 << iota
-	// InitContainers is for init containers
-	InitContainers
-)
-
 // PodResourcesOptions controls the behavior of PodRequests and PodLimits.
 type PodResourcesOptions struct {
 	// Reuse, if provided will be reused to accumulate resources and returned by the PodRequests or PodLimits
@@ -76,27 +66,7 @@ func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
 // It returns true if either the Requests or Limits maps are non-empty.
 func IsPodLevelResourcesSet(pod *v1.Pod) bool {
-	if pod.Spec.Resources == nil {
-		return false
-	}
-
-	if (len(pod.Spec.Resources.Requests) + len(pod.Spec.Resources.Limits)) == 0 {
-		return false
-	}
-
-	for resourceName := range pod.Spec.Resources.Requests {
-		if IsSupportedPodLevelResource(resourceName) {
-			return true
-		}
-	}
-
-	for resourceName := range pod.Spec.Resources.Limits {
-		if IsSupportedPodLevelResource(resourceName) {
-			return true
-		}
-	}
-
-	return false
+	return IsPodLevelRequestsSet(pod) || IsPodLevelLimitsSet(pod)
 }
 
 // IsPodLevelRequestsSet checks if pod-level requests are set. It returns true if
@@ -146,168 +116,16 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return Requests.PodTotal(pod, opts)
-	/*
-		reqs := v1.ResourceList{}
-		if !opts.SkipContainerLevelResources {
-			reqs = AggregateContainerRequests(pod, opts)
-		}
-
-		if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-
-			var effectiveReqs v1.ResourceList
-			if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-				if pod.Status.Resources != nil {
-					effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
-						Spec:      pod.Spec.Resources.Requests,
-						Actuated:  pod.Status.Resources.Requests,
-						Allocated: pod.Status.AllocatedResources,
-					})
-				}
-			}
-
-			for resourceName, quantity := range pod.Spec.Resources.Requests {
-				if IsSupportedPodLevelResource(resourceName) {
-					reqs[resourceName] = quantity
-					if effectiveReqs != nil {
-						reqs[resourceName] = effectiveReqs[resourceName]
-					}
-
-				}
-			}
-		}
-
-		// Add overhead for running a pod to the sum of requests if requested:
-		if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-			addResourceList(reqs, pod.Spec.Overhead)
-		}
-
-		return reqs
-	*/
 }
 
 // AggregateContainerRequests computes the total resource requests of all the containers
-// in a pod. This computation folows the formula defined in the KEP for sidecar
+// in a pod. This computation follows the formula defined in the KEP for sidecar
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	reqs := reuseOrClearResourceList(opts.Reuse)
-
-	for res := range Requests.PodResourceIter(pod, opts) {
-		reqs[res] = Requests.AggregateContainerResource(pod, res, opts)
-	}
-	return reqs
-
-	/*
-	   // attempt to reuse the maps if passed, or allocate otherwise
-
-	   	reqs := reuseOrClearResourceList(opts.Reuse)
-	   	var containerStatuses map[string]*v1.ContainerStatus
-	   	if opts.UseStatusResources {
-	   		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
-	   		for i := range pod.Status.ContainerStatuses {
-	   			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-	   		}
-	   		for i := range pod.Status.InitContainerStatuses {
-	   			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
-	   		}
-	   	}
-
-	   	for _, container := range pod.Spec.Containers {
-	   		containerReqs := container.Resources.Requests
-	   		if opts.UseStatusResources {
-	   			cs, found := containerStatuses[container.Name]
-	   			if found && cs.Resources != nil {
-	   				containerReqs = determineEffectiveRequests(pod, &ResourceState{
-	   					Spec:      container.Resources.Requests,
-	   					Actuated:  cs.Resources.Requests,
-	   					Allocated: cs.AllocatedResources,
-	   				})
-	   			}
-	   		}
-
-	   		if len(opts.NonMissingContainerRequests) > 0 {
-	   			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
-	   		}
-
-	   		if opts.ContainerFn != nil {
-	   			opts.ContainerFn(containerReqs, Containers)
-	   		}
-
-	   		addResourceList(reqs, containerReqs)
-	   	}
-
-	   	restartableInitContainerReqs := v1.ResourceList{}
-	   	initContainerReqs := v1.ResourceList{}
-	   	// init containers define the minimum of any resource
-	   	//
-	   	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
-	   	// init container is initializing, then
-	   	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
-	   	//
-	   	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
-	   	for _, container := range pod.Spec.InitContainers {
-	   		containerReqs := container.Resources.Requests
-	   		if opts.UseStatusResources {
-	   			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-	   				cs, found := containerStatuses[container.Name]
-	   				if found && cs.Resources != nil {
-	   					containerReqs = determineEffectiveRequests(pod, &ResourceState{
-	   						Spec:      container.Resources.Requests,
-	   						Actuated:  cs.Resources.Requests,
-	   						Allocated: cs.AllocatedResources,
-	   					})
-	   				}
-	   			}
-	   		}
-
-	   		if len(opts.NonMissingContainerRequests) > 0 {
-	   			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
-	   		}
-
-	   		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-	   			// and add them to the resulting cumulative container requests
-	   			addResourceList(reqs, containerReqs)
-
-	   			// track our cumulative restartable init container resources
-	   			addResourceList(restartableInitContainerReqs, containerReqs)
-	   			containerReqs = restartableInitContainerReqs
-	   		} else {
-	   			tmp := v1.ResourceList{}
-	   			addResourceList(tmp, containerReqs)
-	   			addResourceList(tmp, restartableInitContainerReqs)
-	   			containerReqs = tmp
-	   		}
-
-	   		if opts.ContainerFn != nil {
-	   			opts.ContainerFn(containerReqs, InitContainers)
-	   		}
-	   		maxResourceList(initContainerReqs, containerReqs)
-	   	}
-
-	   	maxResourceList(reqs, initContainerReqs)
-	   	return reqs
-	*/
-}
-
-type ResourceState struct {
-	Spec      v1.ResourceList
-	Actuated  v1.ResourceList
-	Allocated v1.ResourceList
-}
-
-func determineEffectiveRequests(pod *v1.Pod, rs *ResourceState) v1.ResourceList {
-	if IsPodResizeInfeasible(pod) {
-		return max(rs.Actuated, rs.Allocated)
-	}
-	return max(rs.Spec, rs.Actuated, rs.Allocated)
-}
-
-func determineEffectiveLimits(pod *v1.Pod, rs *ResourceState) v1.ResourceList {
-	if IsPodResizeInfeasible(pod) {
-		return rs.Actuated.DeepCopy()
-	}
-	return max(rs.Spec, rs.Actuated)
+	opts.SkipPodLevelResources = true
+	opts.ExcludeOverhead = true
+	return Requests.PodTotal(pod, opts)
 }
 
 // IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
@@ -330,61 +148,11 @@ func IsPodResizeDeferred(pod *v1.Pod) bool {
 	return false
 }
 
-// applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values
-func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.ResourceList {
-	cp := v1.ResourceList{}
-	for k, v := range reqs {
-		cp[k] = v.DeepCopy()
-	}
-
-	for k, v := range nonMissing {
-		if _, found := reqs[k]; !found {
-			rk := cp[k]
-			rk.Add(v)
-			cp[k] = rk
-		}
-	}
-	return cp
-}
-
 // PodLimits computes the pod limits per the PodResourcesOptions supplied. If PodResourcesOptions is nil, then
 // the limits are returned including pod overhead for any non-zero limits. The computation is part of the API and must be reviewed
 // as an API change.
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	limits := AggregateContainerLimits(pod, opts)
-	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
-
-		var effectiveLims v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveLims = determineEffectiveLimits(pod, &ResourceState{
-					Spec:     pod.Spec.Resources.Limits,
-					Actuated: pod.Status.Resources.Limits,
-				})
-			}
-		}
-		for resourceName, quantity := range pod.Spec.Resources.Limits {
-			if IsSupportedPodLevelResource(resourceName) {
-				limits[resourceName] = quantity
-				if effectiveLims != nil {
-					limits[resourceName] = effectiveLims[resourceName]
-				}
-			}
-		}
-	}
-
-	// Add overhead to non-zero limits if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		for name, quantity := range pod.Spec.Overhead {
-			if value, ok := limits[name]; ok && !value.IsZero() {
-				value.Add(quantity)
-				limits[name] = value
-			}
-		}
-	}
-
-	return limits
+	return Limits.PodTotal(pod, opts)
 }
 
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
@@ -392,112 +160,9 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	limits := reuseOrClearResourceList(opts.Reuse)
-	var containerStatuses map[string]*v1.ContainerStatus
-	if opts.UseStatusResources {
-		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-		for i := range pod.Status.InitContainerStatuses {
-			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
-		}
-	}
-
-	for _, container := range pod.Spec.Containers {
-		containerLimits := container.Resources.Limits
-		if opts.UseStatusResources {
-			cs, found := containerStatuses[container.Name]
-			if found && cs.Resources != nil {
-				containerLimits = determineEffectiveLimits(pod, &ResourceState{
-					Spec:     containerLimits,
-					Actuated: cs.Resources.Limits,
-				})
-			}
-		}
-
-		addResourceList(limits, containerLimits)
-	}
-
-	restartableInitContainerLimits := v1.ResourceList{}
-	initContainerLimits := v1.ResourceList{}
-	// init containers define the minimum of any resource
-	//
-	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
-	// init container is initializing, then
-	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
-	//
-	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
-	for _, container := range pod.Spec.InitContainers {
-		containerLimits := container.Resources.Limits
-		if opts.UseStatusResources {
-			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				cs, found := containerStatuses[container.Name]
-				if found && cs.Resources != nil {
-					containerLimits = determineEffectiveLimits(pod, &ResourceState{
-						Spec:     containerLimits,
-						Actuated: cs.Resources.Limits,
-					})
-				}
-			}
-		}
-
-		// Is the init container marked as a restartable init container?
-		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			addResourceList(limits, containerLimits)
-
-			// track our cumulative restartable init container resources
-			addResourceList(restartableInitContainerLimits, containerLimits)
-			containerLimits = restartableInitContainerLimits
-		} else {
-			tmp := v1.ResourceList{}
-			addResourceList(tmp, containerLimits)
-			addResourceList(tmp, restartableInitContainerLimits)
-			containerLimits = tmp
-		}
-
-		maxResourceList(initContainerLimits, containerLimits)
-	}
-
-	maxResourceList(limits, initContainerLimits)
-	return limits
-}
-
-// addResourceList adds the resources in newList to list.
-func addResourceList(list, newList v1.ResourceList) {
-	for name, quantity := range newList {
-		if value, ok := list[name]; !ok {
-			list[name] = quantity.DeepCopy()
-		} else {
-			value.Add(quantity)
-			list[name] = value
-		}
-	}
-}
-
-// maxResourceList sets list to the greater of list/newList for every resource in newList
-func maxResourceList(list, newList v1.ResourceList) {
-	for name, quantity := range newList {
-		if value, ok := list[name]; !ok || quantity.Cmp(value) > 0 {
-			list[name] = quantity.DeepCopy()
-		}
-	}
-}
-
-// max returns the result of max(a, b...) for each named resource and is only used if we can't
-// accumulate into an existing resource list
-func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
-	var result v1.ResourceList
-	if a != nil {
-		result = a.DeepCopy()
-	} else {
-		result = v1.ResourceList{}
-	}
-	for _, other := range b {
-		maxResourceList(result, other)
-	}
-	return result
+	opts.SkipPodLevelResources = true
+	opts.ExcludeOverhead = true
+	return Limits.PodTotal(pod, opts)
 }
 
 // reuseOrClearResourceList is a helper for avoiding excessive allocations of

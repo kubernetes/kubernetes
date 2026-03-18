@@ -141,7 +141,7 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	// Determine whether pod-level limits should be applied.
 	var podCPULimited, podMemoryLimited bool
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
+	if podLevelResourcesEnabled && resourcehelper.IsPodLevelLimitsSet(allocatedPod) {
 		podCPULimited = !allocatedPod.Spec.Resources.Limits.Cpu().IsZero()
 		podMemoryLimited = !allocatedPod.Spec.Resources.Limits.Memory().IsZero()
 	}
