@@ -449,7 +449,7 @@ type ConditionsMap struct {
 	// +listType=map
 	// +listMapKey=id
 	// +required
-	Conditions []Condition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"`
+	Conditions []Condition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"` //nolint:kubeapilinter // These are authorization conditions.
 }
 
 // ConditionsAwareDecisionType is an enum representing what kind of authorization decision

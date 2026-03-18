@@ -18,6 +18,9 @@ package authorization
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/admission"
+	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -447,4 +450,124 @@ type ConditionsAwareDecision struct {
 	// +optional
 	// +listType=atomic
 	Union []ConditionsAwareDecision
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AuthorizationConditionsReview describes a request to evaluate authorization conditions.
+type AuthorizationConditionsReview struct {
+	metav1.TypeMeta
+	// metadata is the standard list metadata.
+	// In AuthorizationConditionsReview, it must be an empty struct.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Request describes the attributes for the authorization conditions request.
+	// +optional
+	Request *AuthorizationConditionsRequest
+	// Response describes the attributes for the authorization conditions response.
+	// +optional
+	Response *AuthorizationConditionsResponse
+}
+
+// AuthorizationConditionsRequest describes the authorization conditions request.
+type AuthorizationConditionsRequest struct {
+	// Decision contains the conditional decision the authorizer authored at authorization time.
+	// +required
+	Decision ConditionsAwareDecision
+
+	// AdmissionControlData may contain additional information for evaluating the conditions.
+	// +optional
+	AdmissionControlData *AuthorizationConditionsTargetAdmissionControl
+}
+
+// AuthorizationConditionsTargetAdmissionControl contains the data available during admission control,
+// against which authorization decisions can be written. It follows the same structure as AdmissionReview.
+type AuthorizationConditionsTargetAdmissionControl struct {
+	// UID is an identifier for the individual request/response. It allows us to distinguish instances of requests which are
+	// otherwise identical (parallel requests, requests when earlier requests did not modify etc)
+	// The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request.
+	// It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.
+	// TODO(luxas): This is kept here in case we want it in the future, and the same proto binding for it is
+	// reserved as for AdmissionReview.
+	// UID types.UID `json:"uid" protobuf:"bytes,1,opt,name=uid"`
+
+	// These fields are reserved here for future use, in case conditional authorization would need to support something
+	// similar to AdmissionReview's matchPolicy: Equivalent. That is not supported to begin with, though.
+	// Kind is the fully-qualified type of object being submitted (for example, v1.Pod or autoscaling.v1.Scale)
+	// Kind metav1.GroupVersionKind `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Resource is the fully-qualified resource being requested (for example, v1.pods)
+	// Resource metav1.GroupVersionResource `json:"resource" protobuf:"bytes,3,opt,name=resource"`
+	// SubResource is the subresource being requested, if any (for example, "status" or "scale")
+	// +optional
+	// SubResource string `json:"subResource,omitempty" protobuf:"bytes,4,opt,name=subResource"`
+
+	// RequestKind is the fully-qualified type of the original API request (for example, v1.Pod or autoscaling.v1.Scale).
+	// If this is specified and differs from the value in "kind", an equivalent match and conversion was performed.
+	//
+	// For example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of
+	// `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]` and `matchPolicy: Equivalent`,
+	// an API request to apps/v1beta1 deployments would be converted and sent to the webhook
+	// with `kind: {group:"apps", version:"v1", kind:"Deployment"}` (matching the rule the webhook registered for),
+	// and `requestKind: {group:"apps", version:"v1beta1", kind:"Deployment"}` (indicating the kind of the original API request).
+	//
+	// See documentation for the "matchPolicy" field in the webhook configuration type for more details.
+	// +optional
+	RequestKind *metav1.GroupVersionKind
+	// RequestResource is the fully-qualified resource of the original API request (for example, v1.pods).
+	// If this is specified and differs from the value in "resource", an equivalent match and conversion was performed.
+	//
+	// For example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of
+	// `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]` and `matchPolicy: Equivalent`,
+	// an API request to apps/v1beta1 deployments would be converted and sent to the webhook
+	// with `resource: {group:"apps", version:"v1", resource:"deployments"}` (matching the resource the webhook registered for),
+	// and `requestResource: {group:"apps", version:"v1beta1", resource:"deployments"}` (indicating the resource of the original API request).
+	//
+	// See documentation for the "matchPolicy" field in the webhook configuration type.
+	// +optional
+	RequestResource *metav1.GroupVersionResource
+	// RequestSubResource is the name of the subresource of the original API request, if any (for example, "status" or "scale")
+	// If this is specified and differs from the value in "subResource", an equivalent match and conversion was performed.
+	// See documentation for the "matchPolicy" field in the webhook configuration type.
+	// +optional
+	RequestSubResource string
+
+	// Name is the name of the object as presented in the request. On a CREATE operation, the client may omit name and
+	// rely on the server to generate the name. If that is the case, this field will contain an empty string.
+	// +optional
+	Name string
+	// Namespace is the namespace associated with the request (if any).
+	// +optional
+	Namespace string
+	// Operation is the operation being performed. This may be different than the operation
+	// requested. e.g. a patch can result in either a CREATE or UPDATE Operation.
+	Operation admission.Operation
+
+	// UserInfo is information about the requesting user
+	UserInfo authentication.UserInfo
+	// Object is the object from the incoming request.
+	// +optional
+	Object runtime.RawExtension
+	// OldObject is the existing object. Only populated for DELETE and UPDATE requests.
+	// +optional
+	OldObject runtime.RawExtension
+	// DryRun indicates that modifications will definitely not be persisted for this request.
+	// Defaults to false.
+	// +optional
+	DryRun *bool
+	// Options is the operation option structure of the operation being performed.
+	// e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be
+	// different than the options the caller provided. e.g. for a patch request the performed
+	// Operation might be a CREATE, in which case the Options will a
+	// `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.
+	// +optional
+	Options runtime.RawExtension
+}
+
+// AuthorizationConditionsResponse describes an authorization conditions response.
+type AuthorizationConditionsResponse struct {
+	// Decision contains the authorizer's decision after seeing the data.
+	// +required
+	Decision ConditionsAwareDecision
 }

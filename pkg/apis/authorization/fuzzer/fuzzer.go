@@ -17,10 +17,34 @@ limitations under the License.
 package fuzzer
 
 import (
+	"sigs.k8s.io/randfill"
+
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
 // Funcs returns the fuzzer functions for the authorization api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{}
+	return []interface{}{
+		// Sort field names consistently in the RawExtension JSON encoding
+		func(obj *authorizationapi.AuthorizationConditionsReview, c randfill.Continue) {
+			c.FillNoCustom(obj)
+			if obj.Request != nil && obj.Request.AdmissionControlData != nil {
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.Object)
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.OldObject)
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.Options)
+			}
+		},
+		// Sort field names consistently in the RawExtension JSON encoding
+		func(obj *authorizationv1alpha1.AuthorizationConditionsReview, c randfill.Continue) {
+			c.FillNoCustom(obj)
+			if obj.Request != nil && obj.Request.AdmissionControlData != nil {
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.Object)
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.OldObject)
+				fuzzer.NormalizeJSONRawExtension(&obj.Request.AdmissionControlData.Options)
+			}
+		},
+	}
 }
