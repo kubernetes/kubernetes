@@ -31,33 +31,29 @@ import (
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	requestQuantity := resource.Quantity{}
+	result := resourcehelper.Requests.PodResourceTotal(pod, resourceName, resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		ExcludeOverhead:       true, // We only want to include overhead if the rest of the pod total is non-zero.
+	})
 
 	switch resourceName {
 	case v1.ResourceCPU:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
+		result.Format = resource.DecimalSI
 	case v1.ResourceMemory, v1.ResourceStorage, v1.ResourceEphemeralStorage:
-		requestQuantity = resource.Quantity{Format: resource.BinarySI}
+		result.Format = resource.BinarySI
 	default:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
-	}
-
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{SkipContainerLevelResources: hasPodLevelResources, ExcludeOverhead: true})[resourceName]; ok {
-		requestQuantity.Add(rQuantity)
+		result.Format = resource.DecimalSI
 	}
 
 	// Add overhead for running a pod
 	// to the total requests if the resource total is non-zero
-	if pod.Spec.Overhead != nil {
-		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
-			requestQuantity.Add(podOverhead)
+	if pod.Spec.Overhead != nil && !result.IsZero() {
+		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok {
+			result.Add(podOverhead)
 		}
 	}
 
-	return requestQuantity
+	return result
 }
 
 // GetResourceRequest finds and returns the request value for a specific resource.

@@ -502,9 +502,9 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
-	podRequest, ok := podLevelRequests[resource]
-	if !ok {
+	// FIXME: Should this include status resources?
+	podRequest := resourcehelpers.Requests.PodResourceTotal(pod, resource, resourcehelpers.PodResourcesOptions{})
+	if podRequest.IsZero() {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
 	}
 	return podRequest.MilliValue(), nil
@@ -514,6 +514,9 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
 func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
+	// FIXME: Why does this work so differently from resourcehelpers.AggregateContainerRequests?
+	//        Why exclude non-sidecar init containers?
+	//        Why are all containers required to set a request?
 	containers := append([]v1.Container{}, pod.Spec.Containers...)
 	for _, c := range pod.Spec.InitContainers {
 		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {

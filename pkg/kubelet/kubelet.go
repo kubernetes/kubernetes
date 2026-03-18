@@ -3115,12 +3115,14 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 				allocatedOldPod, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
 				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
 
-				oldRequest := resourcehelper.PodRequests(allocatedOldPod, opts)
-				newRequest := resourcehelper.PodRequests(allocatedPod, opts)
+				oldCPURequest := resourcehelper.Requests.PodResourceTotal(allocatedOldPod, v1.ResourceCPU, opts)
+				oldMemRequest := resourcehelper.Requests.PodResourceTotal(allocatedOldPod, v1.ResourceMemory, opts)
+				newCPURequest := resourcehelper.Requests.PodResourceTotal(allocatedPod, v1.ResourceCPU, opts)
+				newMemRequest := resourcehelper.Requests.PodResourceTotal(allocatedPod, v1.ResourceMemory, opts)
 
 				// If cpu or memory requests shrank, then retry the pending resizes.
-				if newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
-					newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0 {
+				if newMemRequest.Cmp(oldMemRequest) < 0 ||
+					newCPURequest.Cmp(oldCPURequest) < 0 {
 					retryPendingResizes = true
 					triggerReason = allocation.TriggerReasonPodResized
 				}

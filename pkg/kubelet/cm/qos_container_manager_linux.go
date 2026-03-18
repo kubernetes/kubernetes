@@ -182,14 +182,12 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{
+		req := resource.Requests.PodResourceTotal(pod, v1.ResourceCPU, resource.PodResourcesOptions{
 			Reuse: reuseReqs,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
 		})
-		if request, found := req[v1.ResourceCPU]; found {
-			burstablePodCPURequest += request.MilliValue()
-		}
+		burstablePodCPURequest += req.MilliValue()
 	}
 
 	// make sure best effort is always 2 shares
@@ -220,10 +218,8 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
-		if request, found := req[v1.ResourceMemory]; found {
-			podMemoryRequest += request.Value()
-		}
+		req := resource.Requests.PodResourceTotal(pod, v1.ResourceMemory, resource.PodResourcesOptions{Reuse: reuseReqs})
+		podMemoryRequest += req.Value()
 		qosMemoryRequests[qosClass] += podMemoryRequest
 	}
 

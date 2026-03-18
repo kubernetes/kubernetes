@@ -239,9 +239,7 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 		}
 	}
 
-	requests := resourcehelper.PodRequests(pod, opts)
-
-	quantity := requests[resourceName]
+	quantity := resourcehelper.Requests.PodResourceTotal(pod, resourceName, opts)
 	if resourceName == v1.ResourceCPU {
 		return quantity.MilliValue()
 	}

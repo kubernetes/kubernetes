@@ -271,7 +271,7 @@ func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(san
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, disableCPUQuota bool) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit resource.Quantity, disableCPUQuota bool) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
 	var cpuShares int64
 
@@ -280,7 +280,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
-	if cpuRequest == nil && cpuLimit != nil {
+	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
 		cpuShares = int64(cm.MilliCPUToShares(cpuLimit.MilliValue()))
 	} else {
 		// if cpuRequest.Amount is nil, then MilliCPUToShares will return the minimal number

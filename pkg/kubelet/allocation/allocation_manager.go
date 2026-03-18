@@ -397,11 +397,13 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 	opts := resourcehelper.PodResourcesOptions{
 		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
-	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
-	newRequest := resourcehelper.PodRequests(pod, opts)
+	oldCPURequest := resourcehelper.Requests.PodResourceTotal(allocatedPod, v1.ResourceCPU, opts)
+	oldMemRequest := resourcehelper.Requests.PodResourceTotal(allocatedPod, v1.ResourceMemory, opts)
+	newCPURequest := resourcehelper.Requests.PodResourceTotal(pod, v1.ResourceCPU, opts)
+	newMemRequest := resourcehelper.Requests.PodResourceTotal(pod, v1.ResourceMemory, opts)
 
-	return newRequest.Memory().Cmp(*oldRequest.Memory()) > 0 ||
-		newRequest.Cpu().Cmp(*oldRequest.Cpu()) > 0
+	return newMemRequest.Cmp(oldMemRequest) > 0 ||
+		newCPURequest.Cmp(oldCPURequest) > 0
 }
 
 func (m *manager) HasPendingResizes() bool {

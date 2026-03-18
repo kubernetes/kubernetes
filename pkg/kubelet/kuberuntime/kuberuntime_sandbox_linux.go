@@ -22,7 +22,6 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -34,8 +33,8 @@ import (
 func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
 	resources := &runtimeapi.LinuxContainerResources{}
 	if pod.Spec.Overhead != nil {
-		cpu := pod.Spec.Overhead.Cpu()
-		memory := pod.Spec.Overhead.Memory()
+		cpu := pod.Spec.Overhead[v1.ResourceCPU]
+		memory := pod.Spec.Overhead[v1.ResourceMemory]
 
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
@@ -52,18 +51,15 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Contex
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
-	req := resourcehelper.PodRequests(pod, opts)
-	lim := resourcehelper.PodLimits(pod, opts)
-	var cpuRequest *resource.Quantity
-	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
-		cpuRequest = req.Cpu()
-	}
+	cpuReq := resourcehelper.Requests.PodResourceTotal(pod, v1.ResourceCPU, opts)
+	cpuLim := resourcehelper.Limits.PodResourceTotal(pod, v1.ResourceCPU, opts)
+	memLim := resourcehelper.Limits.PodResourceTotal(pod, v1.ResourceMemory, opts)
 
 	// If pod has exclusive cpu the sandbox will not have cfs quote enforced
 	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(pod)
 
 	logger.V(5).Info("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), disableCPUQuota)
+	return m.calculateLinuxResources(cpuReq, cpuLim, memLim, disableCPUQuota)
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(ctx context.Context, pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
