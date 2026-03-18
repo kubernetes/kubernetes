@@ -340,6 +340,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authenticationv1beta1.TokenReviewSpec{}.OpenAPIModelName():                                                      schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref),
 		authenticationv1beta1.TokenReviewStatus{}.OpenAPIModelName():                                                    schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref),
 		authenticationv1beta1.UserInfo{}.OpenAPIModelName():                                                             schema_k8sio_api_authentication_v1beta1_UserInfo(ref),
+		authorizationv1.Condition{}.OpenAPIModelName():                                                                  schema_k8sio_api_authorization_v1_Condition(ref),
+		authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName():                                            schema_k8sio_api_authorization_v1_ConditionalAuthorizationOptions(ref),
+		authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_ConditionsAwareDecision(ref),
+		authorizationv1.ConditionsMap{}.OpenAPIModelName():                                                              schema_k8sio_api_authorization_v1_ConditionsMap(ref),
 		authorizationv1.FieldSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref),
 		authorizationv1.LabelSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_LabelSelectorAttributes(ref),
 		authorizationv1.LocalSubjectAccessReview{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref),
@@ -13075,6 +13079,181 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_authorization_v1_Condition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Condition represents a single authorization condition to be evaluated against data available later in the request chain, e.g. objects available in admission.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "id uniquely identifies this condition within the scope of the authorizer that authored it. Validated as a Kubernetes label key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "effect specifies how the condition evaluating to \"true\" should be treated.\n\nPossible enum values:\n - `\"Allow\"` means that if this condition evaluates to true, the ConditionsMap evaluates to Allow, unless any Deny/NoOpinion condition also evaluates to true.\n - `\"Deny\"` means that if this condition evaluates to true, the ConditionsMap necessarily evaluates to Deny. No further authorizers are consulted.\n - `\"NoOpinion\"` means that if this condition evaluates to true, the given authorizer's ConditionsMap cannot evaluate to Allow anymore, but necessarily Deny or NoOpinion.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Allow", "Deny", "NoOpinion"},
+						},
+					},
+					"condition": {
+						SchemaProps: spec.SchemaProps{
+							Description: "condition is a string encoding of the condition to be evaluated. It is a pure, deterministic function from condition data to a boolean (or error). Might or might not be human-readable. Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type describes the type (format/encoding/language) of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain suffix of *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "description is an optional human-friendly description that can be shown as an error message or for debugging.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"id", "effect"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_ConditionalAuthorizationOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionalAuthorizationOptions contains options for requesting conditional authorization.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enabled specifies whether the client supports conditions or not.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_ConditionsAwareDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionsAwareDecision represents one authorizer's decision. It is an enum type, with variants described in ConditionsAwareDecisionType, plus a reason and error.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type describes the type of the decision, and acts as an enum discriminator.\n\nPossible enum values:\n - `\"Allow\"` represents an unconditional Allow authorizer decision.\n - `\"ConditionsMap\"` represents an authorizer decision that is dependent on request data available later in the request chain, and thus at this stage conditional.\n - `\"Deny\"` represents an unconditional Deny authorizer decision.\n - `\"NoOpinion\"` represents an unconditional NoOpinion authorizer decision, which means that the authorizer does not have a specific opinion on whether the request should be allowed or denied, and thus can other authorizers later in the union have their say.\n - `\"Union\"` is a decision type whose final decision is computed by an ordered list of sub-authorizers, with their individual decisions. A decision can thus be represented as a tree, with Union decisions being internal nodes, and Deny/Allow/NoOpinion/ConditionsMap decisions being leaf nodes, which are visited in depth-first order.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is optional. It indicates why a request was allowed or denied. Only applicable when type is one of ConditionsAwareDecisionTypeDeny, ConditionsAwareDecisionTypeAllow or ConditionsAwareDecisionTypeNoOpinion.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"evaluationError": {
+						SchemaProps: spec.SchemaProps{
+							Description: "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request. Only applicable when type is one of ConditionsAwareDecisionTypeDeny, ConditionsAwareDecisionTypeAllow or ConditionsAwareDecisionTypeNoOpinion.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditionsMap": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsMap represents a conditional decision, modelled as a map of conditions. Must be non-null when type == \"ConditionsMap\", otherwise this field must be unset.",
+							Ref:         ref(authorizationv1.ConditionsMap{}.OpenAPIModelName()),
+						},
+					},
+					"union": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions must match exactly the order of the authorizers in the union authorizer. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName(), authorizationv1.ConditionsMap{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_ConditionsMap(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionsMap represents a map of conditions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is an unordered map of conditions, keyed by ID, that shall be evaluated data available later, to determine whether the authorizer that authored the conditions allows or denies the request. If any ConditionsEffect=Deny condition evaluates to true or errors, the evaluated decision must be Deny. Else if any ConditionsEffect=NoOpinion condition evaluates to true or errors, the evaluated decision must be NoOpinion. Else if any ConditionsEffect=Allow condition evaluates to true, the evaluated decision must be Allow. Else, the evaluated decision must be NoOpinion.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(authorizationv1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"conditions"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.Condition{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -13529,11 +13708,17 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 							Ref:         ref(authorizationv1.NonResourceAttributes{}.OpenAPIModelName()),
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization. If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned. If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13735,11 +13920,17 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 							Format:      "",
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization. If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned. If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13752,7 +13943,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"allowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "allowed is required. True if the action would be allowed, false otherwise.",
+							Description: "allowed is required. True if the action would be allowed, false otherwise. Mutually exclusive with denied and conditionalDecision.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -13760,7 +13951,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 					},
 					"denied": {
 						SchemaProps: spec.SchemaProps{
-							Description: "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+							Description: "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. Mutually exclusive with allowed and conditionalDecision.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -13779,10 +13970,18 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 							Format:      "",
 						},
 					},
+					"conditionalDecision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed and denied. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"allowed"},
 			},
 		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
 	}
 }
 
@@ -14227,11 +14426,17 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref comm
 							Ref:         ref(authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName()),
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization. If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned. If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -14433,11 +14638,17 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.R
 							Format:      "",
 						},
 					},
+					"conditionalAuthorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalAuthorization contains options for requesting conditional authorization. If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned. If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.ConditionalAuthorizationOptions{}.OpenAPIModelName(), authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1beta1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -14450,7 +14661,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 				Properties: map[string]spec.Schema{
 					"allowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "allowed is required. True if the action would be allowed, false otherwise.",
+							Description: "allowed is required. True if the action would be allowed, false otherwise. Mutually exclusive with denied and conditionalDecision.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -14458,7 +14669,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 					},
 					"denied": {
 						SchemaProps: spec.SchemaProps{
-							Description: "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+							Description: "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. Mutually exclusive with allowed and conditionalDecision.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -14477,10 +14688,18 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 							Format:      "",
 						},
 					},
+					"conditionalDecision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed and denied. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"allowed"},
 			},
 		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
 	}
 }
 
