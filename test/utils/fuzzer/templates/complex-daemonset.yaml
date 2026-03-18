@@ -1,5 +1,5 @@
 name: "complex-daemonset-pod"
-envVarCount: 30
+envVarCount: 60
 managedFieldCount: 2
 baseSpec:
   priorityClassName: "system-node-critical"
@@ -97,13 +97,13 @@ baseSpec:
 managedFields:
 - manager: "system-controller-manager"
   operation: "Update"
-  fieldPathCount: 1100
-  fieldPathDepth: 6
+  fieldPathCount: 2000 # Increased from 1100
+  fieldPathDepth: 7
 - manager: "node-agent"
   operation: "Update"
-  fieldPathCount: 50
-  fieldPathDepth: 3
+  fieldPathCount: 500  # Increased from 50
+  fieldPathDepth: 4
 
 annotations:
 - key: "fuzzer.io/metadata-bloat"
-  length: 24000
+  length: 40000 # Increased from 24000
