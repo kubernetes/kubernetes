@@ -24,20 +24,27 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func PodRequestsV2(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+type Requirement int
+
+const (
+	Requests Requirement = iota
+	Limits
+)
+
+func (t Requirement) PodTotal(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
 
-	for res := range allRequestResources(pod, opts) {
-		reqs[res] = PodResourceRequest(pod, res, opts)
+	for res := range t.PodResourceIter(pod, opts) {
+		reqs[res] = t.PodResourceTotal(pod, res, opts)
 	}
 
 	return reqs
 }
 
-// allRequestResources iterates over all resources requested across pod-level requests, container
+// PodResourceIter iterates over all resources requested across pod-level requests, container
 // requests, and pod overhead.
-func allRequestResources(pod *v1.Pod, opts PodResourcesOptions) iter.Seq[v1.ResourceName] {
+func (t Requirement) PodResourceIter(pod *v1.Pod, opts PodResourcesOptions) iter.Seq[v1.ResourceName] {
 	return func(yield func(v1.ResourceName) bool) {
 		var seenBuf [8]v1.ResourceName // Pre-allocate for 8 resources on the stack.
 		seen := seenBuf[:0]
@@ -52,8 +59,9 @@ func allRequestResources(pod *v1.Pod, opts PodResourcesOptions) iter.Seq[v1.Reso
 			}
 			return true
 		}
+
 		if !opts.SkipPodLevelResources && pod.Spec.Resources != nil {
-			for res := range pod.Spec.Resources.Requests {
+			for res := range t.get(pod.Spec.Resources) {
 				if IsSupportedPodLevelResource(res) {
 					if !slices.Contains(seen, res) {
 						if !yield(res) {
@@ -63,85 +71,31 @@ func allRequestResources(pod *v1.Pod, opts PodResourcesOptions) iter.Seq[v1.Reso
 					}
 				}
 			}
-			if opts.UseStatusResources && opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil {
-				for res := range pod.Status.Resources.Requests {
-					if !slices.Contains(seen, res) {
-						if !yield(res) {
-							return
-						}
-						seen = append(seen, res)
-					}
+			if opts.UseStatusResources && opts.InPlacePodLevelResourcesVerticalScalingEnabled {
+				if pod.Status.Resources != nil && !scanResources(t.get(pod.Status.Resources)) {
+					return
 				}
-				for res := range pod.Status.AllocatedResources {
-					if !slices.Contains(seen, res) {
-						if !yield(res) {
-							return
-						}
-						seen = append(seen, res)
-					}
+				if t == Requests && !scanResources(pod.Status.AllocatedResources) {
+					return
 				}
 			}
 		}
-		if !opts.ExcludeOverhead {
-			for res := range pod.Spec.Overhead {
-				if !slices.Contains(seen, res) {
-					if !yield(res) {
-						return
-					}
-					seen = append(seen, res)
-				}
-			}
+		if !opts.ExcludeOverhead && !scanResources(pod.Spec.Overhead) {
+			return
 		}
 		if !opts.SkipContainerLevelResources {
-			for c := range containerIter(pod) {
-				for res := range c.Resources.Requests {
-					if !slices.Contains(seen, res) {
-						if !yield(res) {
-							return
-						}
-						seen = append(seen, res)
-					}
+			for c := range joinIter(pod.Spec.InitContainers, pod.Spec.Containers) {
+				if !scanResources(t.get(&c.Resources)) {
+					return
 				}
 			}
 			if opts.UseStatusResources {
-				for _, cs := range pod.Status.ContainerStatuses {
-					if cs.Resources != nil {
-						for res := range cs.Resources.Requests {
-							if !slices.Contains(seen, res) {
-								if !yield(res) {
-									return
-								}
-								seen = append(seen, res)
-							}
-						}
+				for cs := range joinIter(pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses) {
+					if cs.Resources != nil && !scanResources(t.get(cs.Resources)) {
+						return
 					}
-					for res := range cs.AllocatedResources {
-						if !slices.Contains(seen, res) {
-							if !yield(res) {
-								return
-							}
-							seen = append(seen, res)
-						}
-					}
-				}
-				for _, cs := range pod.Status.InitContainerStatuses {
-					if cs.Resources != nil {
-						for res := range cs.Resources.Requests {
-							if !slices.Contains(seen, res) {
-								if !yield(res) {
-									return
-								}
-								seen = append(seen, res)
-							}
-						}
-					}
-					for res := range cs.AllocatedResources {
-						if !slices.Contains(seen, res) {
-							if !yield(res) {
-								return
-							}
-							seen = append(seen, res)
-						}
+					if t == Requests && !scanResources(cs.AllocatedResources) {
+						return
 					}
 				}
 			}
@@ -149,20 +103,21 @@ func allRequestResources(pod *v1.Pod, opts PodResourcesOptions) iter.Seq[v1.Reso
 	}
 }
 
-func PodResourceRequest(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptions) resource.Quantity {
+func (t Requirement) PodResourceTotal(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptions) resource.Quantity {
 	var request resource.Quantity
 	if !opts.SkipPodLevelResources && IsSupportedPodLevelResource(res) && pod.Spec.Resources != nil {
-		request = pod.Spec.Resources.Requests[res]
+		request = t.get(pod.Spec.Resources)[res]
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			request = determineEffectiveRequest(pod,
+			request = t.determineEffectiveResource(pod,
 				request,
 				pod.Status.Resources.Requests[res],
 				pod.Status.AllocatedResources[res])
 		}
+		request = request.DeepCopy()
 	}
 
 	if !opts.SkipContainerLevelResources && request.IsZero() {
-		request = AggregateContainerResourceRequest(pod, res, opts)
+		request = t.AggregateContainerResource(pod, res, opts)
 	}
 
 	// Add overhead for running a pod to the sum of requests if requested:
@@ -170,7 +125,7 @@ func PodResourceRequest(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptio
 		overhead := pod.Spec.Overhead[res]
 		if !overhead.IsZero() {
 			if request.IsZero() {
-				request = overhead
+				request = overhead.DeepCopy()
 			} else {
 				request.Add(overhead)
 			}
@@ -180,8 +135,7 @@ func PodResourceRequest(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptio
 	return request
 }
 
-func AggregateContainerResourceRequest(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptions) resource.Quantity {
-
+func (t Requirement) AggregateContainerResource(pod *v1.Pod, res v1.ResourceName, opts PodResourcesOptions) resource.Quantity {
 	var longRunningReq, maxInitReq resource.Quantity
 
 	// init containers define the minimum of any resource
@@ -192,20 +146,20 @@ func AggregateContainerResourceRequest(pod *v1.Pod, res v1.ResourceName, opts Po
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
 	for _, container := range pod.Spec.InitContainers {
-		containerReq := container.Resources.Requests[res]
+		containerReq := t.get(&container.Resources)[res]
 		if opts.UseStatusResources {
 			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
 				cs := findContainerStatus(pod.Status.InitContainerStatuses, container.Name)
 				if cs != nil && cs.Resources != nil {
-					containerReq = determineEffectiveRequest(pod,
+					containerReq = t.determineEffectiveResource(pod,
 						containerReq,
-						cs.Resources.Requests[res],
+						t.get(cs.Resources)[res],
 						cs.AllocatedResources[res])
 				}
 			}
 		}
 
-		if containerReq.IsZero() {
+		if t == Requests && containerReq.IsZero() {
 			if nonMissing, ok := opts.NonMissingContainerRequests[res]; ok {
 				containerReq = nonMissing
 			}
@@ -216,16 +170,8 @@ func AggregateContainerResourceRequest(pod *v1.Pod, res v1.ResourceName, opts Po
 			longRunningReq.Add(containerReq)
 			containerReq = longRunningReq
 		} else {
-			// We need a sum of longRunningReq + containerReq.
-			// To avoid allocation if they are both int64-based:
-			if longRunningReq.IsZero() {
-				// use containerReq as is
-			} else if containerReq.IsZero() {
-				containerReq = longRunningReq
-			} else {
-				// This might still allocate if it's not int64.
-				containerReq.Add(longRunningReq)
-			}
+			containerReq = containerReq.DeepCopy()
+			containerReq.Add(longRunningReq)
 		}
 
 		// TODO: this doesn't support opts.ContainerFn
@@ -234,18 +180,18 @@ func AggregateContainerResourceRequest(pod *v1.Pod, res v1.ResourceName, opts Po
 	}
 
 	for _, container := range pod.Spec.Containers {
-		containerReq := container.Resources.Requests[res]
+		containerReq := t.get(&container.Resources)[res]
 		if opts.UseStatusResources {
 			cs := findContainerStatus(pod.Status.ContainerStatuses, container.Name)
 			if cs != nil && cs.Resources != nil {
-				containerReq = determineEffectiveRequest(pod,
+				containerReq = t.determineEffectiveResource(pod,
 					containerReq,
-					cs.Resources.Requests[res],
+					t.get(cs.Resources)[res],
 					cs.AllocatedResources[res])
 			}
 		}
 
-		if containerReq.IsZero() {
+		if t == Requests && containerReq.IsZero() {
 			if nonMissing, ok := opts.NonMissingContainerRequests[res]; ok {
 				containerReq = nonMissing
 			}
@@ -259,7 +205,21 @@ func AggregateContainerResourceRequest(pod *v1.Pod, res v1.ResourceName, opts Po
 	return maxQuantity(longRunningReq, maxInitReq)
 }
 
-func determineEffectiveRequest(pod *v1.Pod, desired, actuated, allocated resource.Quantity) resource.Quantity {
+func (t Requirement) get(reqs *v1.ResourceRequirements) v1.ResourceList {
+	switch t {
+	case Requests:
+		return reqs.Requests
+	case Limits:
+		return reqs.Limits
+	default:
+		panic("invalid requirement type")
+	}
+}
+
+func (t Requirement) determineEffectiveResource(pod *v1.Pod, desired, actuated, allocated resource.Quantity) resource.Quantity {
+	if t == Limits {
+		allocated = resource.Quantity{}
+	}
 	if IsPodResizeInfeasible(pod) {
 		return maxQuantity(actuated, allocated)
 	}
@@ -267,7 +227,14 @@ func determineEffectiveRequest(pod *v1.Pod, desired, actuated, allocated resourc
 }
 
 // maxQuantity returns the largest quantity from two provided values.
+// This assumes that q1 and q2 cannot be negative.
 func maxQuantity(q1, q2 resource.Quantity) resource.Quantity {
+	if q1.IsZero() {
+		return q2
+	}
+	if q2.IsZero() {
+		return q1
+	}
 	if q1.Cmp(q2) > 0 {
 		return q1
 	}
@@ -283,15 +250,15 @@ func findContainerStatus(statuses []v1.ContainerStatus, name string) *v1.Contain
 	return nil
 }
 
-func containerIter(pod *v1.Pod) iter.Seq2[*v1.Container, ContainerType] {
-	return func(yield func(*v1.Container, ContainerType) bool) {
-		for i := range pod.Spec.InitContainers {
-			if !yield(&pod.Spec.InitContainers[i], InitContainers) {
+func joinIter[T any](a, b []T) iter.Seq[*T] {
+	return func(yield func(*T) bool) {
+		for i := range a {
+			if !yield(&a[i]) {
 				return
 			}
 		}
-		for i := range pod.Spec.Containers {
-			if !yield(&pod.Spec.Containers[i], Containers) {
+		for i := range b {
+			if !yield(&b[i]) {
 				return
 			}
 		}

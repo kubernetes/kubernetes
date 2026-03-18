@@ -1454,6 +1454,36 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
+			description: "pod scaled down with AllocatedResources (should be ignored for limits)",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "pod scaled down with restartable init containers, don't use status",
 			expectedLimits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("1Gi"),

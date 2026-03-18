@@ -274,6 +274,58 @@ func BenchmarkPodRequests(b *testing.B) {
 				return pod
 			}(),
 		},
+		{
+			name: "FractionalPod",
+			pod: func() *v1.Pod {
+				pod := &v1.Pod{
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("2"),
+								v1.ResourceMemory: resource.MustParse("2Gi"),
+							},
+						},
+						Overhead: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonInfeasible,
+							},
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1.5"),
+								v1.ResourceMemory: resource.MustParse("1.5Gi"),
+							},
+						},
+					},
+				}
+				pod.Spec.Containers = []v1.Container{{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				}}
+				pod.Status.ContainerStatuses = []v1.ContainerStatus{{
+					Name: "container",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("120m"),
+							v1.ResourceMemory: resource.MustParse("120Mi"),
+						},
+					},
+				}}
+				return pod
+			}(),
+		},
 	}
 
 	options := []struct {
@@ -309,7 +361,7 @@ func BenchmarkPodRequests(b *testing.B) {
 		{
 			name: "WithAll",
 			opts: PodResourcesOptions{
-				UseStatusResources:                              true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 				NonMissingContainerRequests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("100m"),
@@ -318,7 +370,6 @@ func BenchmarkPodRequests(b *testing.B) {
 				Reuse: v1.ResourceList{},
 			},
 		},
-
 	}
 
 	for _, tc := range cases {

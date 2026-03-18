@@ -147,7 +147,7 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 // those pod-level values are used in calculating Pod Requests.
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	return PodRequestsV2(pod, opts)
+	return Requests.PodTotal(pod, opts)
 	/*
 		reqs := v1.ResourceList{}
 		if !opts.SkipContainerLevelResources {
@@ -195,8 +195,8 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
 
-	for res := range allRequestResources(pod, opts) {
-		reqs[res] = AggregateContainerResourceRequest(pod, res, opts)
+	for res := range Requests.PodResourceIter(pod, opts) {
+		reqs[res] = Requests.AggregateContainerResource(pod, res, opts)
 	}
 	return reqs
 
