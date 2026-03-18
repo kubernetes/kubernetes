@@ -72,6 +72,9 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 			subjectAccessReview.Spec.ResourceAttributes.LabelSelector = nil
 		}
 	}
+	// spec.conditionalAuthorization is not set to nil here when the feature gate is off, instead it is
+	// used to build an error in SARStatusFromAuthorize if it is set when the feature gate is off.
+
 	if errs := authorizationvalidation.ValidateSubjectAccessReview(subjectAccessReview); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(subjectAccessReview.Kind), "", errs)
 	}
@@ -83,14 +86,8 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	}
 
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(subjectAccessReview.Spec)
-	decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
-	subjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: (decision == authorizer.DecisionAllow),
-		Denied:  (decision == authorizer.DecisionDeny),
-		Reason:  reason,
-	}
-	subjectAccessReview.Status.EvaluationError = authorizationutil.BuildEvaluationError(evaluationErr, authorizationAttributes)
+	subjectAccessReview.Status = authorizationutil.SARStatusFromAuthorize(ctx, r.authorizer, authorizationAttributes, subjectAccessReview.Spec.ConditionalAuthorization)
 
 	return subjectAccessReview, nil
 }
