@@ -67,19 +67,26 @@ The fuzzer is used to measure the RSS impact of high-density metadata on the Kub
       --kubeconfig=$HOME/.kube/config
     ```
 
-3.  **Measure Memory**:
+4.  **Verify Pod Count**:
+    The most efficient way to verify the injection at scale is to query the API server's internal storage metrics:
+    ```bash
+    kubectl get --raw /metrics | grep 'apiserver_storage_objects{resource="pods"}'
+    ```
+
+5.  **Measure Memory**:
     ```bash
     docker exec fuzzer-benchmark-control-plane ps aux | grep -E "kube-apiserver|etcd"
     ```
 
-### **Analysis: Latest Results (50,000 Pods)**
+### **Analysis: Latest Results (50,000 Pods on Kubernetes v1.35.0)**
 
-In recent benchmarks using the tuned `complex-daemonset` template:
+The latest benchmark utilized the "heavy" configuration of the `complex-daemonset` template (~182 KB per manifest, ~5,200 nested field paths) running on **Kubernetes v1.35.0**.
 
 | Process | Stable RSS | Peak RSS | Time to Inject |
 | :--- | :--- | :--- | :--- |
-| **kube-apiserver** | **9.28 GB** | 9.73 GB | **~98s** |
-| **etcd** | **0.64 GB** | 0.67 GB | -- |
+| **kube-apiserver** | **13.64 GB** | 14.86 GB | **~98s** |
+| **etcd** | **0.90 GB** | 11.29 GB | -- |
+
 
 ## Configuration Guide
 
