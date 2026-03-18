@@ -55,6 +55,12 @@ const (
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
 
+	// owner: @chenk008
+	// alpha: 1.36
+	//
+	// If enabled, the client will decode watch stream events concurrently.
+	ClientsConcurrentWatchObjectDecode = "ClientsConcurrentWatchObjectDecode"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -110,6 +116,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsConcurrentWatchObjectDecode: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Alpha},
 	},
 	ClientsPreferCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
