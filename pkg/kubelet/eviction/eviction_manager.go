@@ -432,10 +432,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 				// so it should never be nil for pods admitted through the API.
 				gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
 			} else {
-				gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-				if pod.Spec.TerminationGracePeriodSeconds != nil {
-					gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
-				}
+				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
 			}
 		}
 

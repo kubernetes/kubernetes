@@ -935,22 +935,11 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			podMaker := makePodWithMemoryStats
-			summaryStatsMaker := makeMemoryStats
 
-			podsToMake := []podToMake{
-				{name: "evict-me", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
-			}
-			pods := []*v1.Pod{}
-			podStats := map[*v1.Pod]statsapi.PodStats{}
-			for _, ptm := range podsToMake {
-				pod, podStat := podMaker(ptm.name, ptm.priority, ptm.requests, ptm.limits, ptm.memoryWorkingSet)
-				pod.Spec.TerminationGracePeriodSeconds = &podTermGracePeriod
-				pods = append(pods, pod)
-				podStats[pod] = podStat
-			}
-			podToEvict := pods[0]
-			activePodsFunc := func() []*v1.Pod { return pods }
+			podToEvict, podStat := makePodWithMemoryStats("evict-me", lowPriority, newResourceList("100m", "1Gi", ""), newResourceList("100m", "1Gi", ""), "900Mi")
+			podToEvict.Spec.TerminationGracePeriodSeconds = &podTermGracePeriod
+			podStats := map[*v1.Pod]statsapi.PodStats{podToEvict: podStat}
+			activePodsFunc := func() []*v1.Pod { return []*v1.Pod{podToEvict} }
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
@@ -972,7 +961,7 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 					},
 				},
 			}
-			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+			summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", podStats)}
 			manager := &managerImpl{
 				clock:                        fakeClock,
 				killPodFunc:                  podKiller.killPodNow,
@@ -988,7 +977,7 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 
 			// Induce memory pressure below threshold
 			fakeClock.Step(1 * time.Minute)
-			summaryProvider.result = summaryStatsMaker("500Mi", podStats)
+			summaryProvider.result = makeMemoryStats("500Mi", podStats)
 			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1003,7 +992,7 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 
 			// Advance past the soft eviction grace period
 			fakeClock.Step(3 * time.Minute)
-			summaryProvider.result = summaryStatsMaker("500Mi", podStats)
+			summaryProvider.result = makeMemoryStats("500Mi", podStats)
 			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
