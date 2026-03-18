@@ -81,8 +81,6 @@ In recent benchmarks using the tuned `complex-daemonset` template:
 | **kube-apiserver** | **9.28 GB** | 9.73 GB | **~98s** |
 | **etcd** | **0.64 GB** | 0.67 GB | -- |
 
-These results confirm that **String Interning** is highly effective. Without interning, 50,000 pods of this density (~87KB raw) would likely consume **>40 GB** of RSS. The stabilization at **9.28 GB** proves that the API server is successfully deduplicating the redundant field paths and spec fields shared across the fuzzed batch.
-
 ## Configuration Guide
 
 Templates allow you to define the generative complexity of the synthetic data.
