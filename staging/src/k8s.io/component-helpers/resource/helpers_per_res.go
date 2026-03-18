@@ -174,8 +174,6 @@ func (t Requirement) AggregateContainerResource(pod *v1.Pod, res v1.ResourceName
 			containerReq.Add(longRunningReq)
 		}
 
-		// TODO: this doesn't support opts.ContainerFn
-
 		maxInitReq = maxQuantity(maxInitReq, containerReq)
 	}
 
@@ -196,8 +194,6 @@ func (t Requirement) AggregateContainerResource(pod *v1.Pod, res v1.ResourceName
 				containerReq = nonMissing
 			}
 		}
-
-		// TODO: this doesn't support opts.ContainerFn
 
 		longRunningReq.Add(containerReq)
 	}

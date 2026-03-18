@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -131,32 +132,34 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		SkipPodLevelResources: !podLevelResourcesEnabled,
 		UseStatusResources:    false,
 	})
-	// track if limits were applied for each resource.
-	memoryLimitsDeclared := true
-	cpuLimitsDeclared := true
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !podLevelResourcesEnabled,
-		ContainerFn: func(res v1.ResourceList, containerType resourcehelper.ContainerType) {
-			if res.Cpu().IsZero() {
-				cpuLimitsDeclared = false
-			}
-			if res.Memory().IsZero() {
-				memoryLimitsDeclared = false
-			}
-		},
+		UseStatusResources:    false,
 	})
 
+	// Determine whether pod-level limits should be applied.
+	var podCPULimited, podMemoryLimited bool
 	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
-		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = true
-		}
-
-		if !allocatedPod.Spec.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = true
-		}
+		podCPULimited = !allocatedPod.Spec.Resources.Limits.Cpu().IsZero()
+		podMemoryLimited = !allocatedPod.Spec.Resources.Limits.Memory().IsZero()
 	}
+	if !podCPULimited || !podMemoryLimited {
+		allCPULimited := true
+		allMemLimited := true
+		for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.Containers|podutil.InitContainers) {
+			allCPULimited = allCPULimited && !c.Resources.Limits.Cpu().IsZero()
+			allMemLimited = allMemLimited && !c.Resources.Limits.Memory().IsZero()
+
+			if !allCPULimited && !allMemLimited {
+				break
+			}
+		}
+		podCPULimited = podCPULimited || allCPULimited
+		podMemoryLimited = podMemoryLimited || allMemLimited
+	}
+
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
 
@@ -194,11 +197,11 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		result.Memory = &memoryLimits
 	} else if qosClass == v1.PodQOSBurstable {
 		result.CPUShares = &cpuShares
-		if cpuLimitsDeclared {
+		if podCPULimited {
 			result.CPUQuota = &cpuQuota
 			result.CPUPeriod = &cpuPeriod
 		}
-		if memoryLimitsDeclared {
+		if podMemoryLimited {
 			result.Memory = &memoryLimits
 		}
 	} else {

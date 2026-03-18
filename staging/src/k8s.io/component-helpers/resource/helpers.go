@@ -49,8 +49,6 @@ type PodResourcesOptions struct {
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
-	// ContainerFn is called with the effective resources required for each container within the pod.
-	ContainerFn func(res v1.ResourceList, containerType ContainerType)
 	// NonMissingContainerRequests if provided will replace any missing container level requests for the specified resources
 	// with the given values.  If the requests for those resources are explicitly set, even if zero, they will not be modified.
 	NonMissingContainerRequests v1.ResourceList
@@ -419,9 +417,6 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 			}
 		}
 
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerLimits, Containers)
-		}
 		addResourceList(limits, containerLimits)
 	}
 
@@ -462,9 +457,6 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 			containerLimits = tmp
 		}
 
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerLimits, InitContainers)
-		}
 		maxResourceList(initContainerLimits, containerLimits)
 	}
 
