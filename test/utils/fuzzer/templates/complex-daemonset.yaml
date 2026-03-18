@@ -1,15 +1,15 @@
 name: "complex-daemonset-pod"
-envVarCount: 120
-managedFieldCount: 20
+envVarCount: 30
+managedFieldCount: 2
 baseSpec:
   priorityClassName: "system-node-critical"
   serviceAccountName: "network-agent"
   hostNetwork: true
   dnsPolicy: "ClusterFirst"
   restartPolicy: "Always"
-  schedulerName: "non-existent-fuzz-scheduler" # Safety
+  schedulerName: "non-existent-fuzz-scheduler"
   nodeSelector:
-    disktype: "non-existent-ssd" # Safety
+    disktype: "non-existent-ssd"
     kubernetes.io/os: "linux"
   initContainers:
   - name: "init-config-writer"
@@ -95,21 +95,15 @@ baseSpec:
     hostPath: { path: "/var/lib/agent/v5", type: "DirectoryOrCreate" }
 
 managedFields:
-- manager: "system-scheduler"
+- manager: "system-controller-manager"
   operation: "Update"
-  fieldPathCount: 400
-  fieldPathDepth: 5
-- manager: "agent-controller-manager"
+  fieldPathCount: 1100
+  fieldPathDepth: 6
+- manager: "node-agent"
   operation: "Update"
-  fieldPathCount: 800
-  fieldPathDepth: 7
-- manager: "node-lifecycle-controller"
-  operation: "Apply"
-  fieldPathCount: 300
-  fieldPathDepth: 4
+  fieldPathCount: 50
+  fieldPathDepth: 3
 
 annotations:
-- key: "fuzzer.io/arch-complexity-blob"
-  length: 15000
-- key: "fuzzer.io/sidecar-config-history"
-  length: 10000
+- key: "fuzzer.io/metadata-bloat"
+  length: 24000
