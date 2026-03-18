@@ -697,7 +697,7 @@ func (c GenericCondition) DeepCopy() Condition {
 // conditions evaluators that support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
 // for conditions that the evaluator does not recognize. In the latter case, a partially evaluated, deep copied
 // ConditionsMap might be returned.
-func (c *ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateFunc func(context.Context, ConditionsData, Condition) ConditionEvaluationResult) ConditionsAwareDecision {
+func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateFunc func(context.Context, ConditionsData, Condition) ConditionEvaluationResult) ConditionsAwareDecision {
 	evalCond := func(cond Condition) ConditionEvaluationResult {
 		return cond.Evaluate(ctx, data)
 	}
