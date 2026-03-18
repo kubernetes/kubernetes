@@ -544,6 +544,118 @@ var _ = SIGDescribe("Probing container", func() {
 	})
 
 	/*
+		Testname: Pod liveness probe, using grpc call with TLS mode, success
+		Description: A Pod is created with liveness probe on a TLS-enabled gRPC service
+		using Mode=TLS. The probe should succeed because TLS is used to connect to the
+		TLS server. When liveness probe does not fail then the restart count MUST remain zero.
+	*/
+	f.It("should *not* be restarted with a GRPC liveness probe with TLS mode",
+		framework.WithFeatureGate(features.GRPCContainerProbeTLS),
+		func(ctx context.Context) {
+			livenessProbe := &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					GRPC: &v1.GRPCAction{
+						Port: 5000,
+						Mode: ptr.To(v1.GRPCProbeModeTLS),
+					},
+				},
+				InitialDelaySeconds: probeTestInitialDelaySeconds,
+				TimeoutSeconds:      5,
+				FailureThreshold:    1,
+			}
+
+			pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost",
+				"--tls-cert-file", "/localhost.crt",
+				"--tls-private-key-file", "/localhost.key")
+
+			RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		})
+
+	/*
+		Testname: Pod liveness probe using plaintext grpc call against tls server, failure due to no tls mode.
+		Description: A Pod is created with a plaintext gRPC liveness probe (no Mode set)
+		against a TLS-enabled gRPC server. The probe should fail because the server
+		requires TLS but the probe connects with plaintext.
+	*/
+	f.It("should be restarted with a GRPC liveness probe when not using TLS against a TLS server",
+		framework.WithFeatureGate(features.GRPCContainerProbeTLS),
+		func(ctx context.Context) {
+			livenessProbe := &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					GRPC: &v1.GRPCAction{
+						Port: 5000,
+					},
+				},
+				InitialDelaySeconds: probeTestInitialDelaySeconds,
+				TimeoutSeconds:      5,
+				FailureThreshold:    1,
+			}
+
+			pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost",
+				"--tls-cert-file", "/localhost.crt",
+				"--tls-private-key-file", "/localhost.key")
+
+			RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		})
+
+	/*
+		Testname: Pod liveness probe, using grpc call with TLS mode, unhealthy response
+		Description: A Pod is created with a TLS-enabled gRPC service that starts
+		returning NOT_SERVING after a delay. The liveness probe uses Mode=TLS.
+		The probe should detect the unhealthy response and restart the container.
+	*/
+	f.It("should be restarted with a GRPC liveness probe with TLS mode when endpoint returns not healthy",
+		framework.WithFeatureGate(features.GRPCContainerProbeTLS),
+		func(ctx context.Context) {
+			livenessProbe := &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					GRPC: &v1.GRPCAction{
+						Port: 5000,
+						Mode: ptr.To(v1.GRPCProbeModeTLS),
+					},
+				},
+				InitialDelaySeconds: probeTestInitialDelaySeconds,
+				TimeoutSeconds:      5,
+				FailureThreshold:    1,
+			}
+
+			pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost",
+				"--tls-cert-file", "/localhost.crt",
+				"--tls-private-key-file", "/localhost.key",
+				"--delay-unhealthy-sec", "20")
+
+			RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		})
+
+	/*
+		Testname: Pod liveness probe, using grpc call with TLS mode, wrong port
+		Description: A Pod is created with a TLS-enabled gRPC service on port 5000.
+		The liveness probe uses Mode=TLS but targets a wrong port (2333) where nothing
+		is listening. The probe should fail due to connection error and restart the container.
+	*/
+	f.It("should be restarted with a GRPC liveness probe with TLS mode on wrong port",
+		framework.WithFeatureGate(features.GRPCContainerProbeTLS),
+		func(ctx context.Context) {
+			livenessProbe := &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					GRPC: &v1.GRPCAction{
+						Port: 2333,
+						Mode: ptr.To(v1.GRPCProbeModeTLS),
+					},
+				},
+				InitialDelaySeconds: probeTestInitialDelaySeconds * 4,
+				TimeoutSeconds:      5,
+				FailureThreshold:    1,
+			}
+
+			pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost",
+				"--tls-cert-file", "/localhost.crt",
+				"--tls-private-key-file", "/localhost.key")
+
+			RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		})
+
+	/*
 			Release: v1.23
 			Testname: Pod liveness probe, using grpc call, failure
 			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
@@ -1917,18 +2029,21 @@ func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.P
 	}
 }
 
-func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
+func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string, extraArgs ...string) *v1.Pod {
+	command := []string{
+		"/agnhost",
+		"grpc-health-checking",
+	}
+	command = append(command, extraArgs...)
+
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{
-						"/agnhost",
-						"grpc-health-checking",
-					},
+					Name:           containerName,
+					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
+					Command:        command,
 					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
