@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -414,7 +415,7 @@ func NewEventBroadcasterAdapter(client clientset.Interface) EventBroadcasterAdap
 // migration of individual components to the new Event API.
 func NewEventBroadcasterAdapterWithContext(ctx context.Context, client clientset.Interface) EventBroadcasterAdapter {
 	eventClient := &eventBroadcasterAdapterImpl{}
-	if _, err := client.Discovery().ServerResourcesForGroupVersion(eventsv1.SchemeGroupVersion.String()); err == nil {
+	if _, err := discovery.ToDiscoveryInterfaceWithContext(client.Discovery()).ServerResourcesForGroupVersionWithContext(ctx, eventsv1.SchemeGroupVersion.String()); err == nil {
 		eventClient.eventsv1Client = client.EventsV1()
 		eventClient.eventsv1Broadcaster = NewBroadcaster(&EventSinkImpl{Interface: eventClient.eventsv1Client})
 	}

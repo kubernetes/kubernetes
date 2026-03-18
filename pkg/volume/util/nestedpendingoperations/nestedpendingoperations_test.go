@@ -17,6 +17,7 @@ limitations under the License.
 package nestedpendingoperations
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -824,36 +825,36 @@ func testConcurrentOperationsNegative(
 
 /* END concurrent operations tests */
 
-func generateCallbackFunc(done chan<- interface{}) func() volumetypes.OperationContext {
-	return func() volumetypes.OperationContext {
+func generateCallbackFunc(done chan<- interface{}) func(ctx context.Context) volumetypes.OperationContext {
+	return func(ctx context.Context) volumetypes.OperationContext {
 		done <- true
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 }
 
-func generateWaitFunc(done <-chan interface{}) func() volumetypes.OperationContext {
-	return func() volumetypes.OperationContext {
+func generateWaitFunc(done <-chan interface{}) func(ctx context.Context) volumetypes.OperationContext {
+	return func(ctx context.Context) volumetypes.OperationContext {
 		<-done
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 }
 
-func panicFunc() volumetypes.OperationContext {
+func panicFunc(ctx context.Context) volumetypes.OperationContext {
 	panic("testing panic")
 }
 
-func errorFunc() volumetypes.OperationContext {
+func errorFunc(ctx context.Context) volumetypes.OperationContext {
 	return volumetypes.NewOperationContext(fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2"), false)
 }
 
-func generateWaitWithErrorFunc(done <-chan interface{}) func() volumetypes.OperationContext {
-	return func() volumetypes.OperationContext {
+func generateWaitWithErrorFunc(done <-chan interface{}) func(ctx context.Context) volumetypes.OperationContext {
+	return func(ctx context.Context) volumetypes.OperationContext {
 		<-done
 		return volumetypes.NewOperationContext(fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2"), false)
 	}
 }
 
-func noopFunc() volumetypes.OperationContext {
+func noopFunc(ctx context.Context) volumetypes.OperationContext {
 	return volumetypes.NewOperationContext(nil, nil, false)
 }
 

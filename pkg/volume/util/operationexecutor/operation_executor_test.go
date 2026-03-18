@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -596,7 +597,7 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 }
 
 func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -605,7 +606,7 @@ func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout
 	}
 }
 func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -614,7 +615,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount Mo
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(logger klog.Logger, volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -623,7 +624,7 @@ func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(logger klog.Logger,
 	}
 }
 func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(logger klog.Logger, volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -632,7 +633,7 @@ func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(logger klog.Logger,
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -641,7 +642,7 @@ func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolum
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -650,7 +651,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach Att
 	}, nil
 }
 func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -660,7 +661,7 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(l
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -670,7 +671,7 @@ func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentV
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -680,7 +681,7 @@ func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.P
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -690,7 +691,7 @@ func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount 
 }
 
 func (fopg *fakeOperationGenerator) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -700,7 +701,7 @@ func (fopg *fakeOperationGenerator) GenerateMapVolumeFunc(waitForAttachTimeout t
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}
@@ -710,7 +711,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount Moun
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
+	opFunc := func(ctx context.Context) volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
 	}

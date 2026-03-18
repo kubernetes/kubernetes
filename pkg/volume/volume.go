@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -173,7 +174,7 @@ type Mounter interface {
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
 	//   - Error of any other type should be considered a final error
-	SetUp(mounterArgs MounterArgs) error
+	SetUp(ctx context.Context, mounterArgs MounterArgs) error
 
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
@@ -181,7 +182,7 @@ type Mounter interface {
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, mounterArgs MounterArgs) error
+	SetUpAt(ctx context.Context, dir string, mounterArgs MounterArgs) error
 	// GetAttributes returns the attributes of the mounter.
 	// This function is called after SetUp()/SetUpAt().
 	GetAttributes() Attributes

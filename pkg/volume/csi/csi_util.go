@@ -195,12 +195,12 @@ func GetCSIDriverName(spec *volume.Spec) (string, error) {
 	}
 }
 
-func createCSIOperationContext(volumeSpec *volume.Spec, timeout time.Duration) (context.Context, context.CancelFunc) {
+func createCSIOperationContext(ctx context.Context, volumeSpec *volume.Spec, timeout time.Duration) (context.Context, context.CancelFunc) {
 	migrated := false
 	if volumeSpec != nil {
 		migrated = volumeSpec.Migrated
 	}
-	ctx := context.WithValue(context.Background(), additionalInfoKey, additionalInfo{Migrated: strconv.FormatBool(migrated)})
+	ctx := context.WithValue(ctx, additionalInfoKey, additionalInfo{Migrated: strconv.FormatBool(migrated)})
 	return context.WithTimeout(ctx, timeout)
 }
 

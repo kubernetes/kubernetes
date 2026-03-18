@@ -19,6 +19,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -144,6 +146,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
+	tCtx := ktesting.Init(t)
 	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -212,7 +215,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 
 	// Stat the directory and check the permission bits
-	testSetUp(mounter, metadataDir, volPath)
+	testSetUp(tCtx, mounter, metadataDir, volPath)
 
 	log := physicalMounter.GetLog()
 	// Check the number of mounts performed during setup
@@ -263,8 +266,8 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	physicalMounter.ResetLog()
 }
 
-func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+func testSetUp(ctx context.Context, mounter volume.Mounter, metadataDir, volPath string) error {
+	if err := mounter.SetUp(ctx, volume.MounterArgs{}); err != nil {
 		return fmt.Errorf("expected success, got: %w", err)
 	}
 	// Stat the directory and check the permission bits

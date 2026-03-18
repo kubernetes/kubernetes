@@ -17,6 +17,7 @@ limitations under the License.
 package downwardapi
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -163,11 +164,11 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *downwardAPIVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *downwardAPIVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
 	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod)
@@ -183,7 +184,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		klog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}

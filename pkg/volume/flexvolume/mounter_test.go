@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/test/utils/harness"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSetUpAt(tt *testing.T) {
+	tCtx := ktesting.Init(tt)
 	t := harness.For(tt)
 	defer t.Close()
 
@@ -72,9 +74,9 @@ func TestSetUpAt(tt *testing.T) {
 
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
 	var mounterArgs volume.MounterArgs
-	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
+	m.SetUpAt(tCtx, rootDir+"/mount-dir", mounterArgs)
 
 	group := int64(42)
 	mounterArgs.FsGroup = &group
-	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
+	m.SetUpAt(tCtx, rootDir+"/mount-dir", mounterArgs)
 }

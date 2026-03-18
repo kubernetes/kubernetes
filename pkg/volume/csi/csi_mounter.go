@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -96,11 +97,11 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
-	return c.SetUpAt(c.GetPath(), mounterArgs)
+func (c *csiMountMgr) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return c.SetUpAt(ctx, c.GetPath(), mounterArgs)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (c *csiMountMgr) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Info(log("Mounter.SetUpAt(%s)", dir))
 
 	csi, err := c.csiClientGetter.Get()
@@ -110,7 +111,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 
-	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
+	ctx, cancel := createCSIOperationContext(ctx, c.spec, csiTimeout)
 	defer cancel()
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)

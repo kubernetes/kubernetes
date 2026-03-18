@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMakePayload(t *testing.T) {
@@ -323,6 +324,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -368,7 +370,7 @@ func TestPlugin(t *testing.T) {
 	var mounterArgs volume.MounterArgs
 	group := int64(1001)
 	mounterArgs.FsGroup = &group
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -389,6 +391,7 @@ func TestPlugin(t *testing.T) {
 // should be mounter and the configMap data written to it.
 func TestPluginReboot(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid3")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -428,7 +431,7 @@ func TestPluginReboot(t *testing.T) {
 	var mounterArgs volume.MounterArgs
 	group := int64(1001)
 	mounterArgs.FsGroup = &group
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -446,6 +449,7 @@ func TestPluginReboot(t *testing.T) {
 
 func TestPluginOptional(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -492,7 +496,7 @@ func TestPluginOptional(t *testing.T) {
 	var mounterArgs volume.MounterArgs
 	group := int64(1001)
 	mounterArgs.FsGroup = &group
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -538,6 +542,7 @@ func TestPluginOptional(t *testing.T) {
 
 func TestPluginKeysOptional(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -591,7 +596,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	var mounterArgs volume.MounterArgs
 	group := int64(1001)
 	mounterArgs.FsGroup = &group
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -623,6 +628,7 @@ func volumeSpec(volumeName, configMapName string, defaultMode int32) *v1.Volume 
 
 func TestInvalidConfigMapSetup(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -671,7 +677,7 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 	var mounterArgs volume.MounterArgs
 	group := int64(1001)
 	mounterArgs.FsGroup = &group
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err == nil {
 		t.Errorf("Expected setup to fail")
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package git_repo
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -449,6 +451,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func doTestPlugin(t *testing.T, sc scenario) []error {
+	tCtx := ktesting.Init(t)
 	allErrs := []error{}
 
 	plugMgr := volume.VolumePluginMgr{}
@@ -485,7 +488,7 @@ func doTestPlugin(t *testing.T, sc scenario) []error {
 	}
 
 	// Test setUp()
-	setUpErrs := doTestSetUp(sc, mounter)
+	setUpErrs := doTestSetUp(tCtx, sc, mounter)
 	allErrs = append(allErrs, setUpErrs...)
 
 	if _, err := os.Stat(path); err != nil {
@@ -540,7 +543,7 @@ func doTestPlugin(t *testing.T, sc scenario) []error {
 	return allErrs
 }
 
-func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
+func doTestSetUp(ctx context.Context, sc scenario, mounter volume.Mounter) []error {
 	expecteds := sc.expecteds
 	allErrs := []error{}
 
@@ -589,7 +592,7 @@ func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
 	g := mounter.(*gitRepoVolumeMounter)
 	g.exec = fake
 
-	err := g.SetUp(volume.MounterArgs{})
+	err := g.SetUp(ctx, volume.MounterArgs{})
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}

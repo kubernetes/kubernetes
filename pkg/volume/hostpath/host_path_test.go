@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -203,6 +203,7 @@ func TestProvisioner(t *testing.T) {
 }
 
 func TestInvalidHostPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, "fake", nil, nil))
 
@@ -220,7 +221,7 @@ func TestInvalidHostPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -228,6 +229,7 @@ func TestInvalidHostPath(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, "fake", nil, nil))
 
@@ -256,7 +258,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

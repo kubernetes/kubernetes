@@ -23,12 +23,14 @@ import (
 	"syscall"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestFSGroupMount(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 	info, err := os.Stat(tmpDir)
@@ -49,11 +51,11 @@ func TestFSGroupMount(t *testing.T) {
 	pod2.Spec.SecurityContext = &v1.PodSecurityContext{
 		FSGroup: &fsGroup2,
 	}
-	err = testFSGroupMount(plug, pod1, tmpDir, fsGroup1)
+	err = testFSGroupMount(tCtx, plug, pod1, tmpDir, fsGroup1)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	err = testFSGroupMount(plug, pod2, tmpDir, fsGroup2)
+	err = testFSGroupMount(tCtx, plug, pod2, tmpDir, fsGroup2)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

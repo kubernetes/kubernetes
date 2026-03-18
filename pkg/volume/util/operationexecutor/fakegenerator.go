@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -34,13 +35,13 @@ import (
 type fakeOGCounter struct {
 	// calledFuncs stores name and count of functions
 	calledFuncs map[string]int
-	opFunc      func() volumetypes.OperationContext
+	opFunc      func(ctx context.Context) volumetypes.OperationContext
 }
 
 var _ OperationGenerator = &fakeOGCounter{}
 
 // NewFakeOGCounter returns a OperationGenerator
-func NewFakeOGCounter(opFunc func() volumetypes.OperationContext) OperationGenerator {
+func NewFakeOGCounter(opFunc func(ctx context.Context) volumetypes.OperationContext) OperationGenerator {
 	return &fakeOGCounter{
 		calledFuncs: map[string]int{},
 		opFunc:      opFunc,

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -49,7 +50,7 @@ func NewManager(c clientset.Interface) *Manager {
 	once := &sync.Once{}
 	tokenRequestsSupported := func() bool {
 		once.Do(func() {
-			resources, err := c.Discovery().ServerResourcesForGroupVersion("v1")
+			resources, err := discovery.ToDiscoveryInterfaceWithContext(c.Discovery()).ServerResourcesForGroupVersionWithContext(context.TODO(), ("v1"))
 			if err != nil {
 				return
 			}

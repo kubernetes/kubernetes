@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/ptr"
@@ -219,6 +220,7 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			if !test.enableSELinuxFeatureGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
@@ -302,7 +304,7 @@ func TestMounterSetUp(t *testing.T) {
 				expectedMountOptions = append(expectedMountOptions, test.expectedSELinuxContext)
 			}
 
-			if err := csiMounter.SetUp(mounterArgs); err != nil {
+			if err := csiMounter.SetUp(tCtx, mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 			//Test the default value of file system type is not overridden
@@ -416,6 +418,7 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			modes := []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
 			}
@@ -468,7 +471,7 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 			dataDir := filepath.Dir(mounter.GetPath())
 
 			// Mounter.SetUp()
-			err = csiMounter.SetUp(mounterArgs)
+			err = csiMounter.SetUp(tCtx, mounterArgs)
 			if tc.setupShouldFail {
 				if err == nil {
 					t.Error("test should fail, but no error occurred")
@@ -570,6 +573,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 	for _, tc := range testCases {
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -607,7 +611,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			err = csiMounter.SetUp(volume.MounterArgs{})
+			err = csiMounter.SetUp(tCtx, volume.MounterArgs{})
 			if tc.setupShouldFail {
 				if err != nil {
 					if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
@@ -751,6 +755,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 	for _, tc := range testCases {
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			mounter, err := plug.NewMounter(
 				tc.spec("ext4", []string{}),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -774,7 +779,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
 			}
-			err = csiMounter.SetUp(volume.MounterArgs{})
+			err = csiMounter.SetUp(tCtx, volume.MounterArgs{})
 
 			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
 				t.Fatalf("expected exitError: %+v got: %+v", tc.exitError, err)
@@ -851,6 +856,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -887,7 +893,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := csiMounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -931,6 +937,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 }
 
 func TestMounterSetUpWithFSGroup(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := fakeclient.NewSimpleClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
@@ -1155,7 +1162,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			fsGroupPtr = &fsGroup
 		}
 		mounterArgs.FsGroup = fsGroupPtr
-		if err := csiMounter.SetUp(mounterArgs); err != nil {
+		if err := csiMounter.SetUp(tCtx, mounterArgs); err != nil {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 
@@ -1176,6 +1183,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 }
 
 func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		name                string
 		podUID              types.UID
@@ -1240,7 +1248,7 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 			csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.SetNextError(status.Errorf(codes.InvalidArgument, "mount failed"))
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{ReconstructedVolume: tc.reconstructedVolume}); err == nil {
+			if err := csiMounter.SetUp(tCtx, volume.MounterArgs{ReconstructedVolume: tc.reconstructedVolume}); err == nil {
 				t.Fatalf("mounter.Setup expected err but succeed")
 			}
 
@@ -1452,6 +1460,7 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 			client := fakeclient.NewSimpleClientset()
 			if test.driver != nil {
@@ -1489,7 +1498,7 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, false)
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := csiMounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
