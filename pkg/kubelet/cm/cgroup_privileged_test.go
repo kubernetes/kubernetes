@@ -22,6 +22,7 @@ import (
 	"os"
 	"testing"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -34,7 +35,7 @@ func TestCgroupV1Validate(t *testing.T) {
 	}
 
 	// Check if running cgroup v1
-	if isCgroup2() {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		t.Skip("Test requires cgroup v1")
 	}
 
@@ -58,7 +59,7 @@ func TestCgroupV2Validate(t *testing.T) {
 		t.Skip("Requires root privileges")
 	}
 
-	if !isCgroup2() {
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
 		t.Skip("Test requires cgroup v2")
 	}
 
@@ -81,7 +82,7 @@ func TestCgroupV1CreateAndDestroy(t *testing.T) {
 		t.Skip("Requires root privileges")
 	}
 
-	if isCgroup2() {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		t.Skip("Test requires cgroup v1")
 	}
 
@@ -121,7 +122,7 @@ func TestCgroupV2CreateAndDestroy(t *testing.T) {
 		t.Skip("Requires root privileges")
 	}
 
-	if !isCgroup2() {
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
 		t.Skip("Test requires cgroup v2")
 	}
 
@@ -161,7 +162,7 @@ func TestCgroupMemoryUsage(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
 	var manager CgroupManager
-	if isCgroup2() {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		manager = NewCgroupV2Manager(logger, &CgroupSubsystems{}, "cgroupfs")
 	} else {
 		manager = NewCgroupV1Manager(logger, &CgroupSubsystems{}, "cgroupfs")
@@ -174,9 +175,4 @@ func TestCgroupMemoryUsage(t *testing.T) {
 	} else {
 		t.Logf("Root cgroup memory usage: %d bytes", usage)
 	}
-}
-
-func isCgroup2() bool {
-	_, err := os.Stat("/sys/fs/cgroup/cgroup.controllers")
-	return err == nil
 }

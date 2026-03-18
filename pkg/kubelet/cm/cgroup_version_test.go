@@ -26,11 +26,7 @@ import (
 
 func TestCgroupV1ManagerVersion(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-
-	// Create a cgroup v1 manager
-	manager := NewCgroupV1Manager(logger, &CgroupSubsystems{}, "systemd")
-
-	// Verify version returns 1
+	manager := NewCgroupV1Manager(logger, &CgroupSubsystems{}, "cgroupfs")
 	if manager.Version() != 1 {
 		t.Errorf("Expected version 1, got %d", manager.Version())
 	}
@@ -38,11 +34,7 @@ func TestCgroupV1ManagerVersion(t *testing.T) {
 
 func TestCgroupV2ManagerVersion(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-
-	// Create a cgroup v2 manager
-	manager := NewCgroupV2Manager(logger, &CgroupSubsystems{}, "systemd")
-
-	// Verify version returns 2
+	manager := NewCgroupV2Manager(logger, &CgroupSubsystems{}, "cgroupfs")
 	if manager.Version() != 2 {
 		t.Errorf("Expected version 2, got %d", manager.Version())
 	}
