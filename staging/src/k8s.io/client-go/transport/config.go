@@ -77,6 +77,10 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// DialerStopCh is an optional stop channel for the cert-reloading dialer goroutine.
+	// If nil, the dialer goroutine will run for the lifetime of the process.
+	DialerStopCh <-chan struct{}
 }
 
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.

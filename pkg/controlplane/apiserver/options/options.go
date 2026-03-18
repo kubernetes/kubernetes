@@ -96,6 +96,12 @@ type Options struct {
 	CoordinatedLeadershipLeaseDuration time.Duration
 	CoordinatedLeadershipRenewDeadline time.Duration
 	CoordinatedLeadershipRetryPeriod   time.Duration
+
+	// DialerStopCh is an optional stop channel for cert-reloading dialer goroutines.
+	// If set, it controls the lifecycle of background goroutines that handle
+	// certificate rotation for transport configs using file-based TLS.
+	// This is primarily useful in tests to prevent goroutine leaks.
+	DialerStopCh <-chan struct{}
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.

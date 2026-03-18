@@ -55,6 +55,7 @@ func BuildPeerProxy(
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
 	serializer runtime.NegotiatedSerializer,
 	es *egressselector.EgressSelector,
+	dialerStopCh <-chan struct{},
 ) (utilpeerproxy.Interface, error) {
 	if proxyClientCertFile == "" {
 		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
@@ -70,7 +71,9 @@ func BuildPeerProxy(
 			KeyFile:    proxyClientKeyFile,
 			CAFile:     peerCAFile,
 			ServerName: "kubernetes.default.svc",
-		}}
+		},
+		DialerStopCh: dialerStopCh,
+	}
 
 	if es != nil {
 		egressDialer, err := es.Lookup(egressselector.ControlPlane.AsNetworkContext())

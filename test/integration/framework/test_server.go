@@ -235,6 +235,9 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
+	// Set DialerStopCh to stop cert-reloading dialer goroutines when the test ends.
+	// This prevents goroutine leaks since CAFile triggers file-based TLS reloading.
+	kubeAPIServerClientConfig.DialerStopCh = ctx.Done()
 
 	// wait for health
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
