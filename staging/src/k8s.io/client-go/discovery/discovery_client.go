@@ -112,6 +112,12 @@ type DiscoveryInterfaceWithContext interface {
 	WithLegacyWithContext(ctx context.Context) DiscoveryInterfaceWithContext
 }
 
+// DiscoveryInterfaces combines both interface variants.
+type DiscoveryInterfaces interface {
+	DiscoveryInterface
+	DiscoveryInterfaceWithContext
+}
+
 func ToDiscoveryInterfaceWithContext(i DiscoveryInterface) DiscoveryInterfaceWithContext {
 	if i == nil {
 		return nil
