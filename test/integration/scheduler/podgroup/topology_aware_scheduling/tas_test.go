@@ -224,7 +224,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			name: "gang schedules on a single rack, choosing placement with highest allocation percentage (default placement scoring algorithm)",
+			name: "gang schedules on a single rack, choosing placement with the highest score in default placement scoring algorithm",
 			steps: []step{
 				{
 					name: "Create nodes in multiple zones and racks",
@@ -254,6 +254,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					waitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				{
+					// Scoring results: PodGroupPodsCount will score the same for rack1 and rack2,
+					// and NodeResourcesFit with default strategy MostAllocated will score higher on rack1.
 					name: "Verify all pods scheduled on rack1",
 					verifyAssignments: &verifyAssignments{
 						pods:  []string{"p1", "p2", "p3"},
@@ -303,6 +305,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					waitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				// Each node has 2 CPUs, each of gang pods requests 1 CPU.
+				// The PodGroupPods count scoring plugin will score racks 1-3 the same, as they will all fit the entire podgroup.
 				// Allocation fractions in racks (for the default "most allocated" strategy the max allocation is picked):
 				// - rack1: (0 + 3)/4 = 0.75
 				// - rack2: (2 + 3)/6 = 0.83
@@ -586,6 +589,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
+			// TODO: Add a test scenario where minCount < pod count and when entering the scheduling cycle, scheduler sees more than minCount pods in queue.
 			name: "gang with minCount < pod count schedules on a single rack, choosing smaller rack",
 			steps: []step{
 				{
@@ -626,7 +630,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					waitForPodsScheduled: []string{"p4"},
 				},
 				{
-					name: "Verify all pods in pg1 scheduled on rack2, which scored higher with the mostAllocated strategy",
+					name: "Verify all pods in pg1 scheduled on rack2, which scored higher in the default placement scoring algorithm",
+					// Scoring details:
+					// At the time of scoring pg1 contained 3 pods. Racks 1 and 2 both fit all 3 pods, and were scored equally by PodGroupPodsCount.
+					// NodeResourcesFit with the default mostAllocated strategy scored rack2 higher than rack1.
 					verifyAssignments: &verifyAssignments{
 						pods:  []string{"p1", "p2", "p3", "p4"},
 						nodes: sets.New("node4-rack2", "node5-rack2"),
@@ -857,7 +864,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				// Each node has 2 CPUs, each of gang pods requests 1 CPU.
 				// Scores are first calculated when scheduling the first pod, without the knowledge how many pods would be in the podgroup.
-				// Allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
+				// PodGroupPodsCount will score the same for each rack (because both racks can fit the first pod).
+				// NodeResourcesFit will compute allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
 				// - rack1: 1/4 = 0.25
 				// - rack2: 1/6 = 0.17
 				{
@@ -913,7 +921,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				// Each node has 2 CPUs, each of podgroup pods requests 1 CPU.
 				// Scores are first calculated when scheduling the first pod, without the knowledge how many pods would be in the podgroup.
-				// Allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
+				// PodGroupPodsCount will score the same for each rack (because both racks can fit the first pod).
+				// NodeResourcesFit will compute allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
 				// - rack1: 2/6 = 0.33
 				// - rack2: 3/6 = 0.5
 				// - rack3: 1/8 = 0.125
@@ -959,7 +968,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				// Each node has 2 CPUs, podgroup pods request 1 or 2 CPUs.
 				// Scores are first calculated when scheduling the first pod, without the knowledge how many pods would be in the podgroup.
-				// Allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
+				// PodGroupPodsCount will score the same for each rack (because both racks can fit the first pod).
+				// NodeResourcesFit will compute allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
 				// - rack1: 3/8 = 0.375
 				// - rack2: 1/2 = 0.5
 				{
@@ -1019,6 +1029,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				// Each node has 2 CPUs, podgroup pods request 1 or 2 CPUs.
 				// Scores are first calculated when scheduling the first pod, without the knowledge how many pods would be in the podgroup.
+				// PodGroupPodsCount will score the same for each rack (because both racks can fit the first pod).
 				// Allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
 				// - rack1: 1/6 = 0.17
 				// - rack2: 1/2 = 0.5
@@ -1175,6 +1186,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				// Each node has 2 CPUs, each of gang pods requests 1 CPU.
 				// Scores are first calculated when scheduling the first pod, without the knowledge how many pods would be in the podgroup.
+				// PodGroupPodsCount will score the same for each rack (because both racks can fit the first pod).
 				// Allocation fractions in racks (for the default "most allocated" strategy the highest allocation is picked):
 				// - rack1: 1/4 = 0.25
 				// - rack2: 1/2 = 0.5
