@@ -19,10 +19,12 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +38,10 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestGetAuthorizerAttributes(t *testing.T) {
@@ -276,7 +282,7 @@ func TestAuditAnnotation(t *testing.T) {
 				errors.New("can't parse user info"),
 			},
 			"",
-			reasonError,
+			ReasonError,
 		},
 	}
 
@@ -296,14 +302,214 @@ func TestAuditAnnotation(t *testing.T) {
 		var annotation string
 		var ok bool
 		if len(tc.decisionAnnotation) > 0 {
-			annotation, ok = ae.GetEventAnnotation(decisionAnnotationKey)
+			annotation, ok = ae.GetEventAnnotation(DecisionAnnotationKey)
 			assert.True(t, ok, k+": decision annotation not found")
 			assert.Equal(t, tc.decisionAnnotation, annotation, k+": unexpected decision annotation")
 		}
 
-		annotation, ok = ae.GetEventAnnotation(reasonAnnotationKey)
+		annotation, ok = ae.GetEventAnnotation(ReasonAnnotationKey)
 		assert.True(t, ok, k+": reason annotation not found")
 		assert.Equal(t, tc.reasonAnnotation, annotation, k+": unexpected reason annotation")
 	}
 
+}
+
+// conditionsAwareFakeAuthorizer allows returning arbitrary ConditionsAwareDecision values.
+type conditionsAwareFakeAuthorizer struct {
+	makeDecision func() authorizer.ConditionsAwareDecision
+}
+
+func (f *conditionsAwareFakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return f.ConditionsAwareAuthorize(ctx, a).UnconditionalParts()
+}
+
+func (f *conditionsAwareFakeAuthorizer) ConditionsAwareAuthorize(_ context.Context, _ authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return f.makeDecision()
+}
+
+func (f *conditionsAwareFakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func TestWithAuthorization(t *testing.T) {
+	scheme := runtime.NewScheme()
+	negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
+
+	makeCondMapAllowDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			authorizer.GenericCondition{ID: "c1", Condition: "object.metadata.name == 'foo'", Effect: authorizer.ConditionEffectAllow, Type: "cel"},
+		)
+	}
+
+	makeCondMapDenyOnlyDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			authorizer.GenericCondition{ID: "c1", Condition: "object.metadata.name == 'bar'", Effect: authorizer.ConditionEffectDeny, Type: "cel"},
+		)
+	}
+
+	classifierAlwaysTrue := ConditionalAuthorizationRequestClassifier(func(_ authorizer.Attributes) bool { return true })
+	classifierAlwaysFalse := ConditionalAuthorizationRequestClassifier(func(_ authorizer.Attributes) bool { return false })
+
+	type expectedOutcome struct {
+		statusCode           int
+		handlerCalled        bool
+		decisionAnnotation   string
+		reasonAnnotation     string
+		conditionalInContext bool
+	}
+
+	tests := []struct {
+		name                       string
+		authorizer                 authorizer.Authorizer
+		conditionalAuthzClassifier ConditionalAuthorizationRequestClassifier
+		disabled                   expectedOutcome
+		enabled                    expectedOutcome
+	}{
+		{
+			name:       "nil authorizer passes through",
+			authorizer: nil,
+			disabled:   expectedOutcome{statusCode: http.StatusOK, handlerCalled: true},
+			enabled:    expectedOutcome{statusCode: http.StatusOK, handlerCalled: true},
+		},
+		{
+			name:       "allow",
+			authorizer: fakeAuthorizer{authorizer.DecisionAllow, "RBAC: allowed", nil},
+			disabled:   expectedOutcome{statusCode: http.StatusOK, handlerCalled: true, decisionAnnotation: DecisionAllow, reasonAnnotation: "RBAC: allowed"},
+			enabled:    expectedOutcome{statusCode: http.StatusOK, handlerCalled: true, decisionAnnotation: DecisionAllow, reasonAnnotation: "RBAC: allowed"},
+		},
+		{
+			name:       "deny",
+			authorizer: fakeAuthorizer{authorizer.DecisionDeny, "RBAC: denied", nil},
+			disabled:   expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "RBAC: denied"},
+			enabled:    expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "RBAC: denied"},
+		},
+		{
+			name:       "no opinion with error",
+			authorizer: fakeAuthorizer{authorizer.DecisionNoOpinion, "", errors.New("webhook error")},
+			disabled:   expectedOutcome{statusCode: http.StatusInternalServerError, reasonAnnotation: ReasonError},
+			enabled:    expectedOutcome{statusCode: http.StatusInternalServerError, reasonAnnotation: ReasonError},
+		},
+		{
+			name:       "no opinion without error",
+			authorizer: fakeAuthorizer{authorizer.DecisionNoOpinion, "no match", nil},
+			disabled:   expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "no match"},
+			enabled:    expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "no match"},
+		},
+		{
+			name: "conditional allow + classifier true",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: makeCondMapAllowDecision,
+			},
+			conditionalAuthzClassifier: classifierAlwaysTrue,
+			// gate off: condMap constructor fail-closes to NoOpinion (no deny effect) => forbidden
+			disabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled"},
+			// gate on: CanBecomeAllowed=true, classifier=true => conditional path
+			enabled: expectedOutcome{statusCode: http.StatusOK, handlerCalled: true, conditionalInContext: true},
+		},
+		{
+			name: "conditional allow + classifier false",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: makeCondMapAllowDecision,
+			},
+			conditionalAuthzClassifier: classifierAlwaysFalse,
+			// gate off: condMap constructor fail-closes to NoOpinion => forbidden
+			disabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled"},
+			// gate on: classifier rejects, err=nil => forbidden
+			enabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "failed closed: tried to return conditional decision to conditions-unaware authorizer"},
+		},
+		{
+			name: "conditional allow + classifier nil",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: makeCondMapAllowDecision,
+			},
+			conditionalAuthzClassifier: nil,
+			// gate off: condMap constructor fail-closes to NoOpinion => forbidden
+			disabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled"},
+			// gate on: no classifier, err=nil => forbidden
+			enabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "failed closed: tried to return conditional decision to conditions-unaware authorizer"},
+		},
+		{
+			name: "conditional deny-only + classifier true",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: makeCondMapDenyOnlyDecision,
+			},
+			conditionalAuthzClassifier: classifierAlwaysTrue,
+			// gate off: condMap constructor fail-closes to Deny (has deny effect) => forbidden
+			disabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid, reasonAnnotation: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled"},
+			// gate on: CanBecomeAllowed=false, err=nil => forbidden
+			enabled: expectedOutcome{statusCode: http.StatusForbidden, decisionAnnotation: DecisionForbid},
+		},
+		{
+			name: "no opinion with error (conditions-aware)",
+			authorizer: &conditionsAwareFakeAuthorizer{
+				makeDecision: func() authorizer.ConditionsAwareDecision {
+					return authorizer.ConditionsAwareDecisionNoOpinion("", fmt.Errorf("internal issue"))
+				},
+			},
+			disabled: expectedOutcome{statusCode: http.StatusInternalServerError, reasonAnnotation: ReasonError},
+			enabled:  expectedOutcome{statusCode: http.StatusInternalServerError, reasonAnnotation: ReasonError},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, mode := range []struct {
+				name string
+				gate bool
+				want expectedOutcome
+			}{
+				{"disabled", false, tt.disabled},
+				{"enabled", true, tt.enabled},
+			} {
+				t.Run(mode.name, func(t *testing.T) {
+					if mode.gate {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+					}
+
+					handlerCalled := false
+					var gotConditionalDecision bool
+
+					innerHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						handlerCalled = true
+						_, _, gotConditionalDecision = request.ConditionallyAuthorizedDecisionFrom(req.Context())
+						w.WriteHeader(http.StatusOK)
+					})
+
+					noopMetrics := func(_ context.Context, _ string, _, _ time.Time) {}
+					handler := withAuthorization(innerHandler, tt.authorizer, negotiatedSerializer, noopMetrics, tt.conditionalAuthzClassifier)
+
+					req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/namespaces/default/pods", nil)
+					req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
+					req.RemoteAddr = "127.0.0.1"
+
+					recorder := httptest.NewRecorder()
+					handler.ServeHTTP(recorder, req)
+
+					if recorder.Code != mode.want.statusCode {
+						t.Errorf("status code = %d, want %d", recorder.Code, mode.want.statusCode)
+					}
+					if handlerCalled != mode.want.handlerCalled {
+						t.Errorf("handler called = %v, want %v", handlerCalled, mode.want.handlerCalled)
+					}
+
+					ae := audit.AuditContextFrom(req.Context())
+					annotation, ok := ae.GetEventAnnotation(DecisionAnnotationKey)
+					if mode.want.decisionAnnotation != "" && !ok {
+						t.Errorf("decision annotation not found, expected %q", mode.want.decisionAnnotation)
+					} else if annotation != mode.want.decisionAnnotation {
+						t.Errorf("decision annotation = %q, want %q", annotation, mode.want.decisionAnnotation)
+					}
+					annotation, ok = ae.GetEventAnnotation(ReasonAnnotationKey)
+					if mode.want.reasonAnnotation != "" && !ok {
+						t.Errorf("reason annotation not found, expected %q", mode.want.reasonAnnotation)
+					} else if annotation != mode.want.reasonAnnotation {
+						t.Errorf("reason annotation = %q, want %q", annotation, mode.want.reasonAnnotation)
+					}
+					if mode.want.conditionalInContext != gotConditionalDecision {
+						t.Errorf("conditional decision in context = %v, want %v", gotConditionalDecision, mode.want.conditionalInContext)
+					}
+				})
+			}
+		})
+	}
 }
