@@ -898,7 +898,6 @@ func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 	}
 }
 
-
 // TestSoftEvictionGracePeriod is a table-driven test covering various
 // MaxPodGracePeriodSeconds behaviors during soft eviction.
 // The negative-value case is a regression test for
@@ -907,9 +906,9 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 	podTermGracePeriod := int64(60) // pod requests a 60s graceful shutdown
 
 	testCases := []struct {
-		name                    string
-		maxPodGracePeriod       int64
-		expectedGracePeriod     int64
+		name                string
+		maxPodGracePeriod   int64
+		expectedGracePeriod int64
 	}{
 		{
 			name:                "negative value defers to pod grace period",
@@ -1028,7 +1027,6 @@ func TestSoftEvictionGracePeriod(t *testing.T) {
 		})
 	}
 }
-
 
 func TestPIDPressure(t *testing.T) {
 	testCases := []struct {
