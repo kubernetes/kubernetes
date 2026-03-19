@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // serviceCIDRStrategy implements verification logic for ServiceCIDR allocators.
@@ -55,24 +57,22 @@ func (serviceCIDRStrategy) NamespaceScoped() bool {
 // and should not be modified by the user.
 func (serviceCIDRStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"networking.k8s.io/v1": fieldpath.NewSet(
-		// Disabled to match PrepareForCreate/PrepareForUpdate, which do not wipe fields
-		// https://github.com/kubernetes/kubernetes/issues/137680
-		// fieldpath.MakePathOrDie("status"),
-		),
-		"networking.k8s.io/v1beta1": fieldpath.NewSet(
-		// Disabled to match PrepareForCreate/PrepareForUpdate, which do not wipe fields
-		// https://github.com/kubernetes/kubernetes/issues/137680
-		// fieldpath.MakePathOrDie("status"),
-		),
+		"networking.k8s.io/v1":      fieldpath.NewSet(),
+		"networking.k8s.io/v1beta1": fieldpath.NewSet(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDRStatusFieldWiping) {
+		fields["networking.k8s.io/v1"].Insert(fieldpath.MakePathOrDie("status"))
+		fields["networking.k8s.io/v1beta1"].Insert(fieldpath.MakePathOrDie("status"))
 	}
 	return fields
 }
 
 // PrepareForCreate clears the status of an ServiceCIDR before creation.
 func (serviceCIDRStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	_ = obj.(*networking.ServiceCIDR)
-
+	cidr := obj.(*networking.ServiceCIDR)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDRStatusFieldWiping) {
+		cidr.Status = networking.ServiceCIDRStatus{}
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -80,7 +80,9 @@ func (serviceCIDRStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	newServiceCIDR := obj.(*networking.ServiceCIDR)
 	oldServiceCIDR := old.(*networking.ServiceCIDR)
 
-	_, _ = newServiceCIDR, oldServiceCIDR
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDRStatusFieldWiping) {
+		newServiceCIDR.Status = oldServiceCIDR.Status
+	}
 }
 
 // Validate validates a new ServiceCIDR.

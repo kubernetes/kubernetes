@@ -2154,6 +2154,17 @@
           "request": "requestValue"
         }
       ]
-    }
+    },
+    "nodeAllocatableResourceClaimStatuses": [
+      {
+        "resourceClaimName": "resourceClaimNameValue",
+        "containers": [
+          "containersValue"
+        ],
+        "resources": {
+          "resourcesKey": "0"
+        }
+      }
+    ]
   }
 }

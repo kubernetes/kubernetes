@@ -45,6 +45,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
@@ -186,6 +187,8 @@ func NewCommand() *cobra.Command {
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
 	numDevices := fs.Int("num-devices", 4, "number of devices to simulate per node")
+	enableDeviceMetadata := fs.Bool("enable-device-metadata", false,
+		"Enable the device metadata feature.")
 	fs = kubeletPlugin.Flags()
 	for _, f := range kubeletPluginFlagSets.FlagSets {
 		fs.AddFlagSet(f)
@@ -222,10 +225,17 @@ func NewCommand() *cobra.Command {
 			},
 		}
 
-		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
+		pluginOpts := []any{
 			Options{EnableHealthService: true},
 			kubeletplugin.PluginDataDirectoryPath(datadir),
 			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
+			kubeletplugin.EnableDeviceMetadata(*enableDeviceMetadata),
+		}
+		if *enableDeviceMetadata {
+			pluginOpts = append(pluginOpts, kubeletplugin.MetadataVersions(metadatav1alpha1.SchemeGroupVersion))
+		}
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
+			pluginOpts...,
 		)
 		if err != nil {
 			return fmt.Errorf("start example plugin: %w", err)

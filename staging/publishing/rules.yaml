@@ -1231,8 +1231,6 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
-    - repository: streaming
-      branch: master
     - repository: client-go
       branch: master
     - repository: component-base

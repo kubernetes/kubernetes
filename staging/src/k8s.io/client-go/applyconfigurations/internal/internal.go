@@ -6040,6 +6040,24 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: requiredDuringSchedulingIgnoredDuringExecution
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus
+  map:
+    fields:
+    - name: containers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: resourceClaimName
+      type:
+        scalar: string
+      default: ""
+    - name: resources
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.core.v1.NodeCondition
   map:
     fields:
@@ -7166,6 +7184,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: nodeAllocatableResourceClaimStatuses
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus
+          elementRelationship: atomic
     - name: nominatedNodeName
       type:
         scalar: string
@@ -12452,6 +12476,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: nodeAllocatableResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.NodeAllocatableResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -12804,6 +12833,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1.NodeAllocatableResourceMapping
+  map:
+    fields:
+    - name: allocationMultiplier
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: capacityKey
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1.OpaqueDeviceConfiguration
   map:
     fields:
@@ -13136,6 +13174,11 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
           elementRelationship: atomic
+    - name: nodeAllocatableResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.NodeAllocatableResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -13552,6 +13595,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.NodeAllocatableResourceMapping
+  map:
+    fields:
+    - name: allocationMultiplier
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: capacityKey
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1beta1.OpaqueDeviceConfiguration
   map:
     fields:
@@ -13877,6 +13929,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: nodeAllocatableResourceMappings
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.NodeAllocatableResourceMapping
     - name: nodeName
       type:
         scalar: string
@@ -14283,6 +14340,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.NodeAllocatableResourceMapping
+  map:
+    fields:
+    - name: allocationMultiplier
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: capacityKey
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration
   map:
     fields:

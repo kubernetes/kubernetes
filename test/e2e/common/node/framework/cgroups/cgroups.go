@@ -344,7 +344,7 @@ func verifyPodMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.P
 func VerifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, info *ContainerResources) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupV2 := IsPodOnCgroupv2Node(f, pod)
+	onCgroupV2 := IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 
 	// Verify cgroup values
 	expectedResources := info.ResourceRequirements()
@@ -413,7 +413,7 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 // IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) (result bool) {
+func IsPodOnCgroupv2Node(f *framework.Framework, podName, containerName string) (result bool) {
 	podOnCgroupv2NodeMutex.Lock()
 	defer podOnCgroupv2NodeMutex.Unlock()
 	if podOnCgroupv2Node != nil {
@@ -424,7 +424,7 @@ func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) (result bool) {
 	}()
 
 	cmd := "mount -t cgroup2"
-	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, "/bin/sh", "-c", cmd)
 	if err != nil {
 		return false
 	}

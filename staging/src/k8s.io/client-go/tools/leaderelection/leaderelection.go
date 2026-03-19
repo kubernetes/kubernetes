@@ -451,7 +451,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 			le.setObservedRecord(&leaderElectionRecord)
 			return true
 		}
-		logger.Error(err, "Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe())
+		logger.V(2).Info("Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe(), "err", err)
 	}
 
 	// 2. obtain or create the ElectionRecord

@@ -1788,6 +1788,11 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
+	cpu400m := resource.MustParse("400m")
+	memory400Mi := resource.MustParse("400Mi")
+	cpu800m := resource.MustParse("800m")
+	memory800Mi := resource.MustParse("800Mi")
+
 	// Creating a pair reference pod and status for the test cases to refer
 	// the specific fields.
 	basePod, baseStatus := makeBasePodAndStatusWithInitContainers()
@@ -1798,9 +1803,11 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 	}
 
 	for desc, test := range map[string]struct {
-		mutatePodFn    func(*v1.Pod)
-		mutateStatusFn func(*kubecontainer.PodStatus)
-		actions        podActions
+		mutatePodFn          func(*v1.Pod)
+		mutateStatusFn       func(*kubecontainer.PodStatus)
+		actions              podActions
+		disableIPPRInitCtrFG bool
+		skipWindows          bool
 	}{
 		"initialization completed; start all containers": {
 			actions: podActions{
@@ -1986,9 +1993,115 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
+		"resize request exists on a not yet running non-sidecar init container; start it": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Resources.Requests = v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = nil
+			},
+			actions: podActions{
+				KillPod:               false,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"resize of a running non-sidecar init container": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Resources.Requests = v1.ResourceList{
+					v1.ResourceCPU:    cpu800m,
+					v1.ResourceMemory: memory800Mi,
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:1]
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateRunning
+			},
+			actions: podActions{
+				KillPod:               false,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: nil,
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					v1.ResourceMemory: {
+						{
+							kubeContainerID: baseStatus.ContainerStatuses[0].ID,
+							desiredContainerResources: resourceRequirements{
+								memoryRequest: memory800Mi.Value(),
+								cpuRequest:    cpu800m.MilliValue(),
+							},
+							currentContainerResources: &resourceRequirements{
+								memoryRequest: memory400Mi.Value(),
+								cpuRequest:    cpu400m.MilliValue(),
+							},
+						},
+					},
+					v1.ResourceCPU: {
+						{
+							kubeContainerID: baseStatus.ContainerStatuses[0].ID,
+							desiredContainerResources: resourceRequirements{
+								memoryRequest: memory800Mi.Value(),
+								cpuRequest:    cpu800m.MilliValue(),
+							},
+							currentContainerResources: &resourceRequirements{
+								memoryRequest: memory400Mi.Value(),
+								cpuRequest:    cpu400m.MilliValue(),
+							},
+						},
+					},
+				},
+			},
+			skipWindows: true, // Windows does not support resize.
+		},
+		"resize of a running non-sidecar init container with FG disabled": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Resources.Requests = v1.ResourceList{
+					v1.ResourceCPU:    cpu800m,
+					v1.ResourceMemory: memory800Mi,
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:1]
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateRunning
+			},
+			actions: podActions{
+				KillPod:               false,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: nil,
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				ContainersToUpdate:    map[v1.ResourceName][]containerToUpdateInfo{},
+			},
+			skipWindows:          true, // Windows does not support resize.
+			disableIPPRInitCtrFG: true,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if test.skipWindows && goruntime.GOOS == "windows" {
+				t.Skip("Skipping test since Windows does not support resize")
+			}
+			if test.disableIPPRInitCtrFG {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, false)
+			}
 			pod, status := makeBasePodAndStatusWithInitContainers()
+			if test.actions.ContainersToUpdate != nil {
+				for res := range test.actions.ContainersToUpdate {
+					for i := range test.actions.ContainersToUpdate[res] {
+						// Link the expected action to the mutated pod container
+						test.actions.ContainersToUpdate[res][i].container = &pod.Spec.InitContainers[0]
+					}
+				}
+				// Sync the state manager with the base (old) values before the resize
+				resources := pod.Spec.InitContainers[0].Resources
+				require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.InitContainers[0].Name, resources))
+			}
+
 			if test.mutatePodFn != nil {
 				test.mutatePodFn(pod)
 			}
@@ -2008,6 +2121,12 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 		{
 			Name:  "init1",
 			Image: "bar-image",
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("400m"),
+					v1.ResourceMemory: resource.MustParse("400Mi"),
+				},
+			},
 		},
 		{
 			Name:  "init2",
@@ -2391,23 +2510,25 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 			},
 		},
 	} {
-		pod, status := makeBasePodAndStatusWithRestartableInitContainers()
-		m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
-		m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
-		m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
-		m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
-		if test.mutatePodFn != nil {
-			test.mutatePodFn(pod)
-		}
-		if test.mutateStatusFn != nil {
-			test.mutateStatusFn(pod, status)
-		}
-		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status, false)
-		verifyActions(t, &test.actions, &actions, desc)
-		if test.resetStatusFn != nil {
-			test.resetStatusFn(status)
-		}
+		t.Run(desc, func(t *testing.T) {
+			pod, status := makeBasePodAndStatusWithRestartableInitContainers()
+			m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+			m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+			m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
+			m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
+			if test.mutatePodFn != nil {
+				test.mutatePodFn(pod)
+			}
+			if test.mutateStatusFn != nil {
+				test.mutateStatusFn(pod, status)
+			}
+			tCtx := ktesting.Init(t)
+			actions := m.computePodActions(tCtx, pod, status, false)
+			verifyActions(t, &test.actions, &actions, desc)
+			if test.resetStatusFn != nil {
+				test.resetStatusFn(status)
+			}
+		})
 	}
 }
 

@@ -42,7 +42,8 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	domain := strings.Repeat("x", resourceapi.DeviceMaxDomainLength-len(domainSuffix)) + domainSuffix
 	stringValue := strings.Repeat("v", resourceapi.DeviceAttributeMaxValueLength)
 	pool := resourceslice.Pool{
-		Slices: make([]resourceslice.Slice, numSlices),
+		Slices:   make([]resourceslice.Slice, numSlices),
+		AllNodes: true,
 	}
 	numDevices := 0
 	for i := range numSlices {
@@ -115,7 +116,7 @@ func TestCreateResourceSlices(tCtx ktesting.TContext, numSlices int) {
 	// Ask the controller to delete all slices except for one empty slice.
 	tCtx.Log("Deleting slices")
 	resources = resources.DeepCopy()
-	resources.Pools[poolName] = resourceslice.Pool{Slices: []resourceslice.Slice{{}}}
+	resources.Pools[poolName] = resourceslice.Pool{Slices: []resourceslice.Slice{{}}, AllNodes: true}
 	controller.Update(resources)
 
 	// A slice should be updated to be empty, and the rest should be deleted.

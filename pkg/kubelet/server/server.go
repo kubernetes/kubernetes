@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -82,6 +83,7 @@ import (
 	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -90,6 +92,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	kubeletcadvisor "k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
@@ -263,6 +266,32 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 		logger.Error(err, "Failed to serve")
 		os.Exit(1)
 	}
+}
+
+// ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
+func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
+	logger := klog.FromContext(ctx)
+	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "pods", pods.DefaultQPS, pods.DefaultBurstTokens))
+
+	podsv1alpha1.RegisterPodsServer(server, srv)
+
+	l, err := util.CreateListener(endpoint)
+	if err != nil {
+		logger.Error(err, "Failed to create listener for pods API endpoint")
+		os.Exit(1)
+	}
+
+	logger.Info("Starting to serve the pods API", "endpoint", endpoint)
+	go func() {
+		if err := server.Serve(l); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			logger.Error(err, "Failed to serve")
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("Shutting down pods API server")
+	server.GracefulStop()
 }
 
 type NodeRequestAttributesGetter interface {

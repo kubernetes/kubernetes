@@ -65,6 +65,10 @@ spec:
         counters:
           countersKey:
             value: "0"
+      nodeAllocatableResourceMappings:
+        nodeAllocatableResourceMappingsKey:
+          allocationMultiplier: "0"
+          capacityKey: capacityKeyValue
       nodeName: nodeNameValue
       nodeSelector:
         nodeSelectorTerms:

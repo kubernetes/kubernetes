@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -187,6 +188,17 @@ var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithNodeAllocatableResources = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	instanceQuantity := k8sresource.MustParse("1")
+	obj.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+		v1.ResourceCPU: {
+			AllocationMultiplier: &instanceQuantity,
+		},
+	}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -199,14 +211,15 @@ func TestResourceSliceStrategy(t *testing.T) {
 func TestResourceSliceStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	testCases := map[string]struct {
-		obj                     *resource.ResourceSlice
-		deviceTaints            bool
-		partitionableDevices    bool
-		bindingConditions       bool
-		deviceStatus            bool
-		consumableCapacity      bool
-		expectedValidationError bool
-		expectObj               *resource.ResourceSlice
+		obj                         *resource.ResourceSlice
+		deviceTaints                bool
+		partitionableDevices        bool
+		bindingConditions           bool
+		deviceStatus                bool
+		consumableCapacity          bool
+		draNodeAllocatableResources bool
+		expectedValidationError     bool
+		expectObj                   *resource.ResourceSlice
 	}{
 		"simple": {
 			obj: slice,
@@ -351,6 +364,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-node-allocatable-dra-claims": {
+			obj:                         sliceWithNodeAllocatableResources,
+			draNodeAllocatableResources: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-node-allocatable-dra-claims-disabled-feature": {
+			obj:                         sliceWithNodeAllocatableResources,
+			draNodeAllocatableResources: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -361,6 +392,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
 			})
 
 			obj := tc.obj.DeepCopy()

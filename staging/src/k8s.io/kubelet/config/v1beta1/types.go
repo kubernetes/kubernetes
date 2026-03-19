@@ -109,8 +109,9 @@ const (
 	// NoneMemoryReservationPolicy disables memory.min protection for containers and pods.
 	// This is the default to maintain node stability by preventing "locked" memory.
 	NoneMemoryReservationPolicy MemoryReservationPolicy = "None"
-	// HardReservationMemoryReservationPolicy enables memory.min for containers and pods.
-	HardReservationMemoryReservationPolicy MemoryReservationPolicy = "HardReservation"
+	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
+	// memory.min for Guaranteed pods, memory.low for Burstable pods.
+	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -902,8 +903,8 @@ type KubeletConfiguration struct {
 	// MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection.
 	// "None" (default): The kubelet does not set memory.min for containers and pods,
 	// ensuring no hard memory is locked by the kernel.
-	// "HardReservation": The kubelet sets the cgroup v2 memory.min value based on pod and container memory requests.
-	// This ensures the requested memory is never reclaimed by the kernel, but may trigger an OOM if the reservation cannot be satisfied.
+	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
+	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
 	// See https://kep.k8s.io/2570 for more details.
 	// Default: None
 	// +featureGate=MemoryQoS

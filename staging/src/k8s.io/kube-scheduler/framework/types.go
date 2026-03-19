@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
@@ -287,6 +288,8 @@ type NodeInfo interface {
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
 	String() string
+	// GetNodeAllocatableDRAClaimState returns the node allocatable DRA claim allocation states on this node.
+	GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*NodeAllocatableDRAClaimState
 
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
@@ -680,4 +683,20 @@ type PodGroupAssignments struct {
 	// during the pod group scheduling cycle.
 	// The pods are guaranteed to also be present in the PodGroupInfo.
 	ProposedAssignments []ProposedAssignment
+}
+
+// NodeAllocatableDRAClaimState holds information about a node allocatable resource DRA claim's allocation on a node.
+type NodeAllocatableDRAClaimState struct {
+	// ConsumerPods is a set of UIDs of pods that are consuming the DRA claim on this node.
+	ConsumerPods sets.Set[types.UID]
+}
+
+// Snapshot returns a copy of NodeAllocatableDRAClaimAllocationState with ConsumerPods cloned.
+func (s *NodeAllocatableDRAClaimState) Snapshot() *NodeAllocatableDRAClaimState {
+	if s == nil {
+		return nil
+	}
+	return &NodeAllocatableDRAClaimState{
+		ConsumerPods: s.ConsumerPods.Clone(),
+	}
 }

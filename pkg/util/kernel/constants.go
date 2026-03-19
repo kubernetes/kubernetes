@@ -58,3 +58,9 @@ const TCPReceiveMemoryNamespacedKernelVersion = "4.15"
 // TCPTransmitMemoryNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_wmem was namespaced(netns).
 // (ref: https://github.com/torvalds/linux/commit/356d1833b638bd465672aefeb71def3ab93fc17d)
 const TCPTransmitMemoryNamespacedKernelVersion = "4.15"
+
+// MemoryQoSMinKernelVersion is the minimum kernel version for safe memory.high throttling.
+// Kernels older than 5.9 have a livelock bug where processes can get stuck in an infinite
+// reclaim loop at the memory.high boundary.
+// (ref: https://github.com/torvalds/linux/commit/b3ff92916af3156df27716bb080a407e4caf9085)
+const MemoryQoSMinKernelVersion = "5.9"

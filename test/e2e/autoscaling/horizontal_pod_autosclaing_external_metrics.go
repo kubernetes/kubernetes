@@ -22,7 +22,11 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v2 "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
@@ -84,3 +88,80 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 	})
 })
+
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZero),
+	"Horizontal pod autoscaling (scale to zero)", func() {
+		var (
+			rc                *e2eautoscaling.ResourceConsumer
+			metricsController *e2eautoscaling.ExternalMetricsController
+		)
+
+		waitBuffer := 1 * time.Minute
+
+		f := framework.NewDefaultFramework("horizontal-pod-autoscaling-scale-to-zero")
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ginkgo.By("Setting up the external metrics server")
+			metricsController = e2eautoscaling.RunExternalMetricsServer(ctx, f.ClientSet, f.Namespace.Name, "external-metrics-server", nil)
+		})
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if metricsController != nil {
+				e2eautoscaling.CleanupExternalMetricsServer(ctx, f.ClientSet, f.Namespace.Name, "external-metrics-server")
+			}
+		})
+
+		ginkgo.It("should scale down to zero and back up based on external metric value", func(ctx context.Context) {
+			ginkgo.By("Creating the resource consumer deployment")
+			initPods := 1
+			rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+				0, 0, 0,
+				int64(podCPURequest), 200,
+				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+				nil)
+			ginkgo.DeferCleanup(rc.CleanUp)
+			rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+			metricName := "queue_messages_ready"
+
+			ginkgo.By(fmt.Sprintf("Creating an HPA with minReplicas=0 based on external metric %s", metricName))
+			stabilizationWindowZero := int32(0)
+			behavior := &v2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &v2.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationWindowZero,
+				},
+			}
+			hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscalerWithBehavior(ctx,
+				rc, metricName, nil, v2.ValueMetricType, 50,
+				0, 3, behavior)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+			ginkgo.By(fmt.Sprintf("Setting %s metric value to 0 to trigger scale to zero", metricName))
+			err := metricsController.SetMetricValue(ctx, metricName, 0, nil)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for HPA to scale down to zero replicas")
+			rc.WaitForReplicas(ctx, 0, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+
+			ginkgo.By("Verifying the ScaledToZero condition is True")
+			updatedHPA, err := f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Get(ctx, hpa.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			var scaledToZeroCondition *v2.HorizontalPodAutoscalerCondition
+			for i := range updatedHPA.Status.Conditions {
+				if updatedHPA.Status.Conditions[i].Type == v2.ScaledToZero {
+					scaledToZeroCondition = &updatedHPA.Status.Conditions[i]
+					break
+				}
+			}
+			gomega.Expect(scaledToZeroCondition).NotTo(gomega.BeNil(), "expected ScaledToZero condition to be present")
+			gomega.Expect(scaledToZeroCondition.Status).To(gomega.Equal(v1.ConditionTrue), "expected ScaledToZero condition to be True")
+
+			ginkgo.By(fmt.Sprintf("Setting %s metric value to 200 to trigger scale from zero", metricName))
+			err = metricsController.SetMetricValue(ctx, metricName, 200, nil)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for HPA to scale back up from zero")
+			rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+		})
+	})

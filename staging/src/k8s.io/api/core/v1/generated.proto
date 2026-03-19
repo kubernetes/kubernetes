@@ -2686,6 +2686,22 @@ message NodeAffinity {
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
+// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
+message NodeAllocatableResourceClaimStatus {
+  // ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+  // +required
+  optional string resourceClaimName = 1;
+
+  // Containers lists the names of all containers in this pod that reference the claim.
+  // +optional
+  // +listType=set
+  repeated string containers = 2;
+
+  // Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 3;
+}
+
 // NodeCondition contains condition information for a node.
 message NodeCondition {
   // Type of node condition.
@@ -4944,6 +4960,16 @@ message PodStatus {
   // +featureGate=InPlacePodLevelResourcesVerticalScaling
   // +optional
   optional ResourceRequirements resources = 20;
+
+  // NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
+  // that were allocated for this pod through DRA claims. This includes resources currently
+  // reported in v1.Node `status.allocatable` that are not extended resources
+  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+  // +featureGate=DRANodeAllocatableResources
+  // +optional
+  // +listType=atomic
+  repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

@@ -232,12 +232,56 @@ func (pgs *podGroupState) snapshot() *podGroupStateSnapshot {
 // empty returns true when the group contains no pods.
 // It must be called under the cache lock.
 func (pgs *podGroupState) empty() bool {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
 	return pgs.podGroupStateData.empty()
 }
 
-// forgetPod moves a pod back from the assumed state to unscheduled.
+// addPod adds the pod to this group.
+// Depending on the NodeName, it can insert the pod into either assignedPods or unscheduledPods.
+// It must be called under the cache lock.
+func (pgs *podGroupState) addPod(pod *v1.Pod) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.addPod(pod)
+}
+
+// updatePod updates the pod in this group.
+// In case of binding, it moves the pod to assignedPods.
+// It must be called under the cache lock.
+func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.updatePod(oldPod, newPod)
+}
+
+// deletePod removes the pod from this pod group state.
+// It must be called under the cache lock.
+func (pgs *podGroupState) deletePod(podUID types.UID) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.deletePod(podUID)
+}
+
+// assumePod marks a pod as assumed within the pod group state.
+// It must be called under the cache lock.
+func (pgs *podGroupState) assumePod(pod *v1.Pod) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.assumePod(pod)
+}
+
+// forgetPod moves a pod back from the assumed state to unscheduled within the pod group state.
 // It must be called under the cache lock.
 func (pgs *podGroupState) forgetPod(podUID types.UID) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
 	pgs.podGroupStateData.forgetPod(podUID)
 }
 

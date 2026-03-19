@@ -559,7 +559,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	m.memoryReservationPolicy = kubeletconfiginternal.HardReservationMemoryReservationPolicy
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
 
 	podRequestMemory := resource.MustParse("128Mi")
 	pod1LimitMemory := resource.MustParse("256Mi")
@@ -658,7 +658,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
+		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.low"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
 	}
 }

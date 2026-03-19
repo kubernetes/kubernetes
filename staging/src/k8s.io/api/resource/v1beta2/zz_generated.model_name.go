@@ -197,6 +197,11 @@ func (in NetworkDeviceData) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableResourceMapping) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.NodeAllocatableResourceMapping"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in OpaqueDeviceConfiguration) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration"
 }

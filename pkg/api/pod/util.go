@@ -1106,6 +1106,8 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropImageVolumeWithDigest(podStatus)
 	}
 
+	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
+
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1125,6 +1127,20 @@ func draExendedResourceInUse(podStatus *api.PodStatus) bool {
 		return true
 	}
 	return false
+}
+
+func dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus *api.PodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourceStatusInUse(oldPodStatus) {
+		return
+	}
+	podStatus.NodeAllocatableResourceClaimStatuses = nil
+}
+
+func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {

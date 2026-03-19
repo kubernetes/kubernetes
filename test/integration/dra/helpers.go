@@ -191,7 +191,10 @@ var createPodInternal = func(tCtx ktesting.TContext, namespace string, suffix st
 			container.Resources.Limits[res] = resource.MustParse(qty)
 		}
 	}
-	pod.Spec.ResourceClaims = resourceClaims
+	if len(claims) > 0 {
+		// Update the field only if claims are passed.
+		pod.Spec.ResourceClaims = resourceClaims
+	}
 	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create pod "+podName)
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
@@ -272,17 +275,18 @@ func waitForClaimAllocatedToDevice(tCtx ktesting.TContext, namespace, claimName 
 	)
 }
 
-func expectPodUnschedulable(tCtx ktesting.TContext, pod *v1.Pod, reason string) {
+func expectPodSchedulerError(tCtx ktesting.TContext, pod *v1.Pod, reason string) {
 	tCtx.Helper()
-	tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, pod.Namespace), fmt.Sprintf("expected pod to be unschedulable because %q", reason))
-	pod, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-	tCtx.ExpectNoError(err)
-	gomega.NewWithT(tCtx).Expect(pod).To(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-		"Type":    gomega.Equal(v1.PodScheduled),
-		"Status":  gomega.Equal(v1.ConditionFalse),
-		"Reason":  gomega.Equal(v1.PodReasonUnschedulable),
-		"Message": gomega.ContainSubstring(reason),
-	}))))
+	tCtx.ExpectNoError(e2epod.WaitForPodCondition(tCtx, tCtx.Client(), pod.Namespace, pod.Name, v1.PodReasonSchedulerError, time.Minute, func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase == v1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonSchedulerError && strings.Contains(cond.Message, reason) {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	}), fmt.Sprintf("expected pod to have scheduler error because %q", reason))
 }
 
 type nodeInfo struct {

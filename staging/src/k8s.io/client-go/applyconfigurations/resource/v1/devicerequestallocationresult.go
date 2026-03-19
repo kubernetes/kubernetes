@@ -71,13 +71,13 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// ShareID uniquely identifies an individual allocation share of the device,

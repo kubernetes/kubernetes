@@ -790,6 +790,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAffinity"):
 		return &applyconfigurationscorev1.NodeAffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
+		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
 		return &applyconfigurationscorev1.NodeConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeConfigSource"):
@@ -1620,6 +1622,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1712,6 +1716,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1800,6 +1806,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta2.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaim"):

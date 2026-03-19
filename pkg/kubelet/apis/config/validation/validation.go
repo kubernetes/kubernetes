@@ -352,14 +352,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	if !localFeatureGate.Enabled(features.MemoryQoS) &&
-		kc.MemoryReservationPolicy == kubeletconfig.HardReservationMemoryReservationPolicy {
+		kc.MemoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryReservationPolicy %q requires MemoryQoS feature gate to be enabled",
 			kc.MemoryReservationPolicy))
 	}
 	switch kc.MemoryReservationPolicy {
-	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.HardReservationMemoryReservationPolicy:
+	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy:
 	default:
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.HardReservationMemoryReservationPolicy))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
 	}
 
 	if kc.ContainerRuntimeEndpoint == "" {

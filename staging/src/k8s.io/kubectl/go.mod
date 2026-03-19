@@ -23,7 +23,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/russross/blackfriday/v2 v2.1.0
-	github.com/spf13/cobra v1.10.0
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v2 v2.4.3
@@ -37,7 +37,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260304202019-5b3e3fdb0acf
+	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	k8s.io/metrics v0.0.0
 	k8s.io/streaming v0.0.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2

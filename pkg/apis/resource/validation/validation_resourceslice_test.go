@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -77,9 +78,9 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 			},
 		},
 	}
-	for i := 0; i < numDevices; i++ {
+	for d := range numDevices {
 		device := resourceapi.Device{
-			Name:       fmt.Sprintf("device-%d", i),
+			Name:       fmt.Sprintf("device-%d", d),
 			Attributes: testAttributes(),
 			Capacity:   testCapacity(),
 		}
@@ -110,6 +111,47 @@ func testResourceSliceWithBindingConditions(name, nodeName, driverName string, n
 	return slice
 }
 
+func testNodeAllocatableResourceCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	return map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		"dra.example.com/cpu":    {Value: resource.MustParse("100")},
+		"dra.example.com/memory": {Value: resource.MustParse("100Gi")},
+	}
+}
+
+func testResourceSliceWithNodeAllocatableResources(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
+		},
+	}
+	for d := range numDevices {
+		device := resourceapi.Device{
+			Name:       fmt.Sprintf("device-%d", d),
+			Attributes: testAttributes(),
+			Capacity:   testNodeAllocatableResourceCapacity(),
+			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				v1.ResourceCPU: {
+					AllocationMultiplier: ptr.To(resource.MustParse("1")),
+					CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+				},
+				"memory": {
+					CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+				},
+			},
+		}
+		slice.Spec.Devices = append(slice.Spec.Devices, device)
+	}
+	return slice
+}
+
 func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
@@ -118,9 +160,10 @@ func TestValidateResourceSlice(t *testing.T) {
 	badValue := "spaces not allowed"
 
 	scenarios := map[string]struct {
-		slice                         *resourceapi.ResourceSlice
-		wantFailures                  field.ErrorList
-		consumableCapacityFeatureGate bool
+		slice                                        *resourceapi.ResourceSlice
+		wantFailures                                 field.ErrorList
+		consumableCapacityFeatureGate                bool
+		enableDRANodeAllocatableResourcesFeatureGate bool
 	}{
 		"good": {
 			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices),
@@ -993,11 +1036,136 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(0), "condition1", "bindingFailureConditions must not overlap with bindingConditions")},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition1", "condition3"}),
 		},
+		"correct-node-allocatable-resource-mappings": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"node-allocatable-resource-mappings-both-quantityfrom": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {
+						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-no-quantityfrom": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)), "", "at least one of allocationMultiplier or capacityKey must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-capacityKey-empty": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), "", "capacityKey must not be an empty string"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {
+						CapacityKey: ptr.To[resourceapi.QualifiedName](""),
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-capacity-key-not-found": {
+			wantFailures: field.ErrorList{
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {
+						CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-negative": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "-1", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("-1"))},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-zero": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "0", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("0"))},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"capacity key not in spec.devices[].capacity": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/hugepages"),
+						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("capacityKey"), resourceapi.QualifiedName("dra.example.com/hugepages")),
+			},
+		},
+		"mapped resource is not a node allocatable resource": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceName("dra.example.com/gpu"): {
+						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
+				features.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
+			})
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

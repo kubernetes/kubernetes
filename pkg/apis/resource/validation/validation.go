@@ -865,6 +865,38 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
+	allErrs = append(allErrs, validateNodeAllocatableResourceMappings(device.NodeAllocatableResourceMappings, device.Capacity, fldPath.Child("nodeAllocatableResourceMappings"))...)
+
+	return allErrs
+}
+
+func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]resource.NodeAllocatableResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for resourceName, mapping := range mappings {
+		keyPath := fldPath.Key(string(resourceName))
+		if !v1helper.IsNativeResource(resourceName) {
+			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
+		}
+
+		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+		} else {
+			if mapping.AllocationMultiplier != nil {
+				if mapping.AllocationMultiplier.Sign() <= 0 {
+					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
+				}
+			}
+			if mapping.CapacityKey != nil {
+				if *mapping.CapacityKey == "" {
+					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+				} else if capacities == nil {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				}
+			}
+		}
+	}
 	return allErrs
 }
 

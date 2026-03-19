@@ -2093,6 +2093,99 @@ func TestMergePodStatus(t *testing.T) {
 	}
 }
 
+func TestContainerTerminationMetric(t *testing.T) {
+	metrics.Register()
+	manager := newTestManager(&fake.Clientset{})
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metric-pod",
+			Namespace: "test",
+			UID:       "12345",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "test-container"},
+			},
+		},
+	}
+	manager.podManager.(mutablePodManager).AddPod(pod)
+
+	metrics.TerminatedContainersTotal.Reset()
+
+	initialStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "test-container",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), pod, initialStatus)
+
+	manager.testSyncBatch(context.Background())
+
+	// Test successful termination (exit code 0)
+	successStatus := v1.PodStatus{
+		Phase: v1.PodSucceeded,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "test-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 0,
+						Reason:   "Completed",
+					},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), pod, successStatus)
+	manager.testSyncBatch(context.Background())
+
+	count, err := testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "0", "Completed"))
+	require.NoError(t, err)
+	assert.InDelta(t, 1.0, count, 0)
+
+	// Test error termination (exit code 1) for a second container to verify cumulative behavior
+	errorPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "error-pod",
+			Namespace: "test",
+			UID:       "67890",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "error-container"},
+			},
+		},
+	}
+	manager.podManager.(mutablePodManager).AddPod(errorPod)
+
+	errorStatus := v1.PodStatus{
+		Phase: v1.PodFailed,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "error-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "Error",
+					},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), errorPod, errorStatus)
+	manager.testSyncBatch(context.Background())
+
+	count, err = testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "1", "Error"))
+	require.NoError(t, err)
+	assert.InDelta(t, 1.0, count, 0)
+}
+
 func TestPodResizeConditions(t *testing.T) {
 	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")

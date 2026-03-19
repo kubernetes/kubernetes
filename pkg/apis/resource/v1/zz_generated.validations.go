@@ -337,6 +337,7 @@ func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field
 		}(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, safe.Field(oldObj, func(oldObj *resourcev1.Device) []string { return oldObj.BindingFailureConditions }), oldObj != nil)...)
 
 	// field resourcev1.Device.AllowMultipleAllocations has no validation
+	// field resourcev1.Device.NodeAllocatableResourceMappings has no validation
 	return errs
 }
 

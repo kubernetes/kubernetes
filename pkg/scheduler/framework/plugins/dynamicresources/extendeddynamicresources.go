@@ -597,7 +597,7 @@ func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, 
 
 	// If the claim was marked as pending allocation (in-flight), remove that marker and restore
 	// the assumed claim state to what it was before this scheduling attempt.
-	if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID()); deleted {
+	if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID(), false); deleted {
 		pl.draManager.ResourceClaims().AssumedClaimRestore(extendedResourceClaim.Namespace, extendedResourceClaim.Name)
 	}
 	if isSpecialClaimName(extendedResourceClaim.Name) {

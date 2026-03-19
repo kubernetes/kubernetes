@@ -553,6 +553,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DRADeviceTaintRules
   versionedSpecs:
   - default: false
@@ -582,6 +586,12 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
+    version: "1.36"
+- name: DRANodeAllocatableResources
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
     version: "1.36"
 - name: DRAPartitionableDevices
   versionedSpecs:
@@ -829,6 +839,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
+- name: InPlacePodVerticalScalingInitContainers
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: JobBackoffLimitPerIndex
   versionedSpecs:
   - default: false
@@ -1001,6 +1017,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: KubeletRegistrationGetOnExistsOnly
   versionedSpecs:
   - default: true
@@ -1331,6 +1351,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: PersistentVolumeClaimUnusedSinceTime
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: PLEGOnDemandRelist
   versionedSpecs:
   - default: true
@@ -1437,6 +1463,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.29"
+- name: PodsAPI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: PodSchedulingReadiness
   versionedSpecs:
   - default: false
@@ -1843,6 +1875,16 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: ServiceCIDRStatusFieldWiping
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.36"
 - name: ShardedListAndWatch
   versionedSpecs:
   - default: false

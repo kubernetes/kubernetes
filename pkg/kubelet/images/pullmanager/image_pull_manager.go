@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 var _ ImagePullManager = &PullManager{}
@@ -574,12 +573,6 @@ func imagePullSecretLess(a, b kubeletconfiginternal.ImagePullSecret) int {
 	}
 
 	return strings.Compare(a.UID, b.UID)
-}
-
-// trimImageTagDigest removes the tag and digest from an image name
-func trimImageTagDigest(containerImage string) (string, error) {
-	imageName, _, _, err := parsers.ParseImageName(containerImage)
-	return imageName, err
 }
 
 // mergePullServiceAccounts merges two slices of ImagePullServiceAccount object into one while

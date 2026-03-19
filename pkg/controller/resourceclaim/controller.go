@@ -60,12 +60,6 @@ const (
 	// podResourceClaimTemplateIndexKey is the lookup name for the index function which indexes only by pod ResourceClaim templates.
 	podResourceClaimTemplateIndexKey = "pod-resource-claim-template-index"
 
-	// podResourceClaimAnnotation is the special annotation that generated
-	// ResourceClaims get. Its value is the pod.spec.resourceClaims[].name
-	// for which it was generated. This is used only inside the controller
-	// and not documented as part of the Kubernetes API.
-	podResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
-
 	// claimPodOwnerIndex is used to find ResourceClaims which have
 	// a specific pod as owner. Values for this index are the pod UID.
 	claimPodOwnerIndex = "claim-pod-owner-index"
@@ -712,7 +706,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		annotations[podResourceClaimAnnotation] = podClaim.Name
+		annotations[resourceapi.PodResourceClaimAnnotation] = podClaim.Name
 		generateName := pod.Name + "-" + podClaim.Name + "-"
 		maxBaseLen := 57 // Leave space for hyphen and 5 random characters in a name with 63 characters.
 		if len(generateName) > maxBaseLen {
@@ -795,7 +789,7 @@ func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceC
 		if !ok {
 			return nil, fmt.Errorf("unexpected object of type %T returned by claim cache", claimObj)
 		}
-		podClaimName, ok := claim.Annotations[podResourceClaimAnnotation]
+		podClaimName, ok := claim.Annotations[resourceapi.PodResourceClaimAnnotation]
 		// No annotation? Then it cannot be an automatically generated claim
 		// and we need to ignore it.
 		if !ok {
@@ -1142,7 +1136,7 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 		source := ""
 		if val, ok := rc.Annotations[resourceapi.ExtendedResourceClaimAnnotation]; ok && val == "true" {
 			source = "extended_resource"
-		} else if val, ok := rc.Annotations[podResourceClaimAnnotation]; ok && val != "" {
+		} else if val, ok := rc.Annotations[resourceapi.PodResourceClaimAnnotation]; ok && val != "" {
 			source = "resource_claim_template"
 		}
 		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++

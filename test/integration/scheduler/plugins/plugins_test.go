@@ -2655,7 +2655,7 @@ var _ fwk.PostBindPlugin = &PostBindPlugin{}
 
 type JobPlugin struct {
 	podLister     listersv1.PodLister
-	podsActivated bool
+	podsActivated chan struct{}
 }
 
 func (j *JobPlugin) Name() string {
@@ -2696,7 +2696,7 @@ func (j *JobPlugin) PostBind(_ context.Context, state fwk.CycleState, p *v1.Pod,
 					s.Map[namespacedName] = pod
 				}
 				s.Unlock()
-				j.podsActivated = true
+				j.podsActivated <- struct{}{}
 			}
 		}
 	}
@@ -2710,7 +2710,10 @@ func TestActivatePods(t *testing.T) {
 	var jobPlugin *JobPlugin
 	// Create a plugin registry for testing. Register a Job plugin.
 	registry := frameworkruntime.Registry{jobPluginName: func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		jobPlugin = &JobPlugin{podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister()}
+		jobPlugin = &JobPlugin{
+			podLister:     fh.SharedInformerFactory().Core().V1().Pods().Lister(),
+			podsActivated: make(chan struct{}, 10),
+		}
 		return jobPlugin, nil
 	}}
 
@@ -2775,8 +2778,10 @@ func TestActivatePods(t *testing.T) {
 	}
 
 	// Lastly verify the pods activation logic is really called.
-	if jobPlugin.podsActivated == false {
-		t.Errorf("JobPlugin's pods activation logic is not called")
+	select {
+	case <-jobPlugin.podsActivated:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("JobPlugin's pods activation logic wasn't called")
 	}
 }
 

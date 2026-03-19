@@ -3822,6 +3822,37 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
+        "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
+        "properties": {
+          "containers": {
+            "description": "Containers lists the names of all containers in this pod that reference the claim.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          },
+          "resourceClaimName": {
+            "default": "",
+            "description": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
+            "type": "string"
+          },
+          "resources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "resourceClaimName",
+          "resources"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.NodeCondition": {
         "description": "NodeCondition contains condition information for a node.",
         "properties": {
@@ -6186,6 +6217,19 @@
           "message": {
             "description": "A human readable message indicating details about why the pod is in this condition.",
             "type": "string"
+          },
+          "nodeAllocatableResourceClaimStatuses": {
+            "description": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "nominatedNodeName": {
             "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",

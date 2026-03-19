@@ -21,8 +21,12 @@ import (
 	"slices"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // rolesWithAllowStar are the controller roles which are allowed to contain a *.  These are
@@ -38,7 +42,7 @@ var rolesWithAllowStar = sets.NewString(
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
-// or resources.  There are three known exceptions: namespace lifecycle and GC which have to
+// or resources. There are three known exceptions: namespace lifecycle and GC which have to
 // delete anything, and HPA, which has the power to read metrics associated
 // with any object.
 func TestNoStarsForControllers(t *testing.T) {
@@ -90,6 +94,80 @@ func TestControllerRoleLabel(t *testing.T) {
 		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
 		}
+	}
+}
+
+func TestPodGroupProtectionControllerRBAC(t *testing.T) {
+	roleName := saRolePrefix + "podgroup-protection-controller"
+
+	tests := []struct {
+		name              string
+		enableFeatureGate bool
+		expectRole        bool
+	}{
+		{
+			name:              "role and binding absent when GenericWorkload is disabled",
+			enableFeatureGate: false,
+			expectRole:        false,
+		},
+		{
+			name:              "role and binding present when GenericWorkload is enabled",
+			enableFeatureGate: true,
+			expectRole:        true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enableFeatureGate)
+
+			var foundRole *rbacv1.ClusterRole
+			for i, role := range ControllerRoles() {
+				if role.Name == roleName {
+					foundRole = &ControllerRoles()[i]
+					break
+				}
+			}
+
+			if !test.expectRole {
+				if foundRole != nil {
+					t.Fatalf("role %q should not exist when GenericWorkload is disabled", roleName)
+				}
+				return
+			}
+
+			if foundRole == nil {
+				t.Fatalf("role %q not found when GenericWorkload is enabled", roleName)
+			}
+
+			wantRules := []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "update", "watch"}, APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"podgroups"}},
+				{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+			}
+			if !reflect.DeepEqual(foundRole.Rules, wantRules) {
+				t.Errorf("unexpected rules:\ngot:  %+v\nwant: %+v", foundRole.Rules, wantRules)
+			}
+
+			var foundBinding *rbacv1.ClusterRoleBinding
+			for i, binding := range ControllerRoleBindings() {
+				if binding.RoleRef.Name == roleName {
+					foundBinding = &ControllerRoleBindings()[i]
+					break
+				}
+			}
+			if foundBinding == nil {
+				t.Fatalf("binding for %q not found", roleName)
+			}
+			if len(foundBinding.Subjects) != 1 {
+				t.Fatalf("expected 1 subject, got %d", len(foundBinding.Subjects))
+			}
+			if got, want := foundBinding.Subjects[0].Name, "podgroup-protection-controller"; got != want {
+				t.Errorf("subject name = %q, want %q", got, want)
+			}
+			if got, want := foundBinding.Subjects[0].Namespace, "kube-system"; got != want {
+				t.Errorf("subject namespace = %q, want %q", got, want)
+			}
+		})
 	}
 }
 

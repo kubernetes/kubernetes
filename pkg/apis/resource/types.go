@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,10 @@ const (
 	// special ResourceClaim. Its single valid value is "true".
 	// This is used only inside the scheduler.
 	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// PodResourceClaimAnnotation is the annotation set on template-generated
+	// ResourceClaims by the ResourceClaim controller. Its value is the
+	// pod.spec.resourceClaims[].name for which the claim was generated.
+	PodResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 	// Resource device class prefix is for generating implicit extended resource
 	// name for a device class when its ExtendedResourceName field is not
 	// specified. The generated name is this prefix + the device class name.
@@ -361,7 +366,7 @@ type Device struct {
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -377,7 +382,7 @@ type Device struct {
 	// All entries are condition types, which means
 	// they must be labels.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -393,7 +398,7 @@ type Device struct {
 	// All entries are condition types, which means
 	// they must be labels.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -409,6 +414,59 @@ type Device struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool
+
+	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// that are managed by the DRA driver exposing this device. This includes resources currently
+	// reported in v1.Node `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// In addition to standard requests made through the Pod `spec`, these resources
+	// can also be requested through claims and allocated by the DRA driver.
+	// For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
+	// dependencies of an accelerator device.
+	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
+	// Extended resource names are not permitted as keys.
+	// +optional
+	// +featureGate=DRANodeAllocatableResources
+	NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping
+}
+
+// NodeAllocatableResourceMapping defines the translation of the requested DRA device/capacity
+// units to the corresponding quantity of the node-allocatable resource.
+type NodeAllocatableResourceMapping struct {
+	// CapacityKey references a capacity name defined as a key in the
+	// `spec.devices[*].capacity` map. When this field is set, the value associated with
+	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
+	// (for a specific claim allocation) determines the base quantity for
+	// the node allocatable resource. If `allocationMultiplier` is also set, it is
+	// multiplied with the base quantity.
+	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
+	// and this field is set to "dra.example.com/memory", then for a claim allocation
+	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
+	// node allocatable resource mapping will be "4Gi", and `allocationMultiplier` should
+	// be omitted or set to "1".
+	// +optional
+	CapacityKey *QualifiedName
+
+	// AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim.
+	// It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set.
+	// 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.
+	// 	   a. A DRA driver representing each CPU core as a device would have
+	//        {ResourceName: "cpu", allocationMultiplier: "2"} in its
+	//        `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,
+	// 		  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.
+	//     b. A GPU device that needs additional node memory per GPU allocation would
+	//        have {ResourceName: "memory", allocationMultiplier: "2Gi"}.  Each allocated
+	// 		  GPU device instance of this type will account for 2Gi of memory.
+	//
+	// 2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.
+	// 	   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.
+	//     For example, if a Device's capacity "dra.example.com/cores" is consumed,
+	//     and each "core" provides 2 "cpu"s, the mapping would be:
+	//     {ResourceName: "cpu", capacityKey: "dra.example.com/cores", allocationMultiplier: "2"}.
+	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+	// +optional
+	AllocationMultiplier *resource.Quantity
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1459,7 +1517,7 @@ type AllocationResult struct {
 	// AllocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gate.
 	//
 	// +optional
@@ -1557,7 +1615,7 @@ type DeviceRequestAllocationResult struct {
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -1568,7 +1626,7 @@ type DeviceRequestAllocationResult struct {
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional

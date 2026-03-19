@@ -72,6 +72,7 @@ func TestSchedulerPerf(t *testing.T) {
 					// off (pre-alpha = feature doesn't event exist).
 					if gate.EmulationVersion().AtLeast(version.MustParse("1.34")) {
 						overrides[features.DRAConsumableCapacity] = false
+						overrides[features.DRADeviceBindingConditions] = false
 					}
 					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
 					return nil, nil

@@ -37,6 +37,7 @@ import (
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
+	const maxLimit = 1048576
 	testCases := []struct {
 		min        int32
 		maxPerCore int32
@@ -49,7 +50,7 @@ func TestGetConntrackMax(t *testing.T) {
 		{
 			maxPerCore: 67890, // use this if Max is 0
 			min:        1,     // avoid 0 default
-			expected:   67890 * ncores,
+			expected:   min(67890*ncores, maxLimit),
 		},
 		{
 			maxPerCore: 1, // ensure that Min is considered

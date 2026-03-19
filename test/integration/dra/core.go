@@ -95,23 +95,30 @@ func testConvert(tCtx ktesting.TContext) {
 // testFilterTimeout covers the scheduler plugin's filter timeout configuration and behavior.
 //
 // It runs the scheduler with non-standard settings and thus cannot run in parallel.
-func testFilterTimeout(tCtx ktesting.TContext, devicesPerSlice int) {
+func testFilterTimeout(tCtx ktesting.TContext, requestDeviceCount int) {
 	namespace := createTestNamespace(tCtx, nil)
 	class, driverName := createTestClass(tCtx, namespace)
-	deviceNames := make([]string, devicesPerSlice)
-	for i := range devicesPerSlice {
+	deviceNames := make([]string, requestDeviceCount)
+	for i := range requestDeviceCount {
 		deviceNames[i] = fmt.Sprintf("dev-%d", i)
 	}
 	slice := st.MakeResourceSlice("worker-0", driverName).Devices(deviceNames...)
 	createSlice(tCtx, slice.Obj())
-	otherSlice := st.MakeResourceSlice("worker-1", driverName).Devices(deviceNames...)
+	otherSlice := st.MakeResourceSlice("worker-1", driverName).Devices(deviceNames[:requestDeviceCount-1]...)
 	createdOtherSlice := createSlice(tCtx, otherSlice.Obj())
-	claim := claim.DeepCopy()
-	claim.Spec.Devices.Requests[0].Exactly.Count = int64(devicesPerSlice + 1) // Impossible to allocate.
-	claim = createClaim(tCtx, namespace, "", class, claim)
+
+	// Impossible to allocate on worker-1: not enough devices, but allocation is too
+	// dumb to notice that upfront and keeps trying until it times out.
+	// On worker-0 we can allocate, but don't schedule because of the timeout on worker-1.
+	newClaim := func(suffix string) *resourceapi.ResourceClaim {
+		c := claim.DeepCopy()
+		c.Spec.Devices.Requests[0].Exactly.Count = int64(requestDeviceCount)
+		return createClaim(tCtx, namespace, suffix, class, c)
+	}
 
 	runSubTest(tCtx, "disabled", func(tCtx ktesting.TContext) {
-		pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
+		cl := newClaim("-disabled")
+		pod := createPod(tCtx, namespace, "-disabled", podWithClaimName, cl)
 		startSchedulerWithConfig(tCtx, `
 profiles:
 - schedulerName: default-scheduler
@@ -120,11 +127,14 @@ profiles:
     args:
       filterTimeout: 0s
 `)
-		expectPodUnschedulable(tCtx, pod, "cannot allocate all claims")
+		// Without a timeout, the allocator runs to completion on both nodes.
+		// worker-0 has enough devices and succeeds, so the pod gets scheduled.
+		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name))
 	})
 
 	runSubTest(tCtx, "enabled", func(tCtx ktesting.TContext) {
-		pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
+		cl := newClaim("-enabled")
+		pod := createPod(tCtx, namespace, "-enabled", podWithClaimName, cl)
 		startSchedulerWithConfig(tCtx, `
 profiles:
 - schedulerName: default-scheduler
@@ -133,12 +143,13 @@ profiles:
     args:
       filterTimeout: 10ms
 `)
-		expectPodUnschedulable(tCtx, pod, "timed out trying to allocate devices")
+		expectPodSchedulerError(tCtx, pod, "timed out trying to allocate devices")
 
-		// Update one slice such that allocation succeeds.
-		// The scheduler must retry and should succeed now.
+		// Update the smaller slice such that allocation also succeeds.
+		// The scheduler retries automatically (timeouts go through
+		// backoff queue, not unschedulable pool) and should succeed now.
 		createdOtherSlice.Spec.Devices = append(createdOtherSlice.Spec.Devices, resourceapi.Device{
-			Name: fmt.Sprintf("dev-%d", devicesPerSlice),
+			Name: deviceNames[requestDeviceCount-1],
 		})
 		_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, createdOtherSlice, metav1.UpdateOptions{})
 		tCtx.ExpectNoError(err, "update worker-1's ResourceSlice")
@@ -220,6 +231,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						},
 					},
 				},
+				AllNodes: true,
 			},
 		},
 	}
@@ -324,9 +336,10 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 							}
 							return expected
 						}()...),
-						"BindingConditions":        gomega.Equal(device.BindingConditions),
-						"BindingFailureConditions": gomega.Equal(device.BindingFailureConditions),
-						"BindsToNode":              gomega.Equal(device.BindsToNode),
+						"BindingConditions":               gomega.Equal(device.BindingConditions),
+						"BindingFailureConditions":        gomega.Equal(device.BindingFailureConditions),
+						"BindsToNode":                     gomega.Equal(device.BindsToNode),
+						"NodeAllocatableResourceMappings": gomega.Equal(device.NodeAllocatableResourceMappings),
 					}))
 				}
 				return expected

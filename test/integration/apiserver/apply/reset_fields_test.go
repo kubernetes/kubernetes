@@ -329,18 +329,6 @@ func TestApplyResetFields(t *testing.T) {
 // TestFieldsWipingConsistency verifies that field wiping is applied consistently across the API
 // and that field wiping is consistent GetResetFields.
 func TestFieldsWipingConsistency(t *testing.T) {
-	type resetFieldBug struct {
-		resource, endpoint, field string
-	}
-
-	// DO NOT ADD NEW ENTRIES HERE.
-	// This tracks known pre-existing bugs in field wiping or GetResetFields.
-	// We should fix these and eventually remove this list.
-	knownBugs := sets.New[resetFieldBug](
-		// https://github.com/kubernetes/kubernetes/issues/137680
-		resetFieldBug{resource: "networking.k8s.io/servicecidrs", endpoint: "/", field: "status"},
-	)
-
 	// DO NOT ADD NEW ENTRIES HERE.
 	// This tracks pre-existing APIs where status is allowed to update metadata.
 	// All new APIs should use ResetObjectMetaForStatus.
@@ -523,16 +511,6 @@ func TestFieldsWipingConsistency(t *testing.T) {
 					if wipes == resets {
 						return
 					}
-					key := resetFieldBug{
-						resource: groupResource(mapping.Resource),
-						endpoint: endpoint,
-						field:    field,
-					}
-					if reason, allowed := knownBugs[key]; allowed {
-						t.Logf("Known mismatch (%s endpoint, %s field): PrepareForUpdate wipes=%v, GetResetFields resets=%v (%s)",
-							endpoint, field, wipes, resets, reason)
-						return
-					}
 					direction := "PrepareForUpdate wipes the field but GetResetFields does not declare it"
 					if resets && !wipes {
 						direction = "GetResetFields declares the field but PrepareForUpdate does not wipe it"
@@ -548,12 +526,7 @@ func TestFieldsWipingConsistency(t *testing.T) {
 					if wipes {
 						return
 					}
-					key := resetFieldBug{resource: groupResource(mapping.Resource), endpoint: endpoint, field: field}
-					if knownBugs.Has(key) {
-						t.Logf("%s does not wipe %s (known bug)", endpoint, field)
-					} else {
-						t.Errorf("%s did NOT wipe %s via PrepareForUpdate", endpoint, field)
-					}
+					t.Errorf("%s did NOT wipe %s via PrepareForUpdate", endpoint, field)
 				}
 				requireWiped(mainWipesStatus, "/", "status")
 				requireWiped(statusWipesSpec, "/status", "spec")

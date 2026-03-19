@@ -209,11 +209,14 @@ linters:
         path: "staging/src/k8s.io/api/core/v1/types.go"
       - text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "field NodeAllocatableResourceClaimStatus.Resources should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
       
       ## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
       - text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
       
+        
       ## For map fields in the resource API (across all versions).
       - text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
@@ -223,6 +226,10 @@ linters:
         path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      - text: "nomaps: field Device.NodeAllocatableResourceMappings should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
+      - text: "nomaps: field BasicDevice.NodeAllocatableResourceMappings should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.

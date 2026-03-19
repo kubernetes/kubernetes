@@ -698,7 +698,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstableShares, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &burstableShares, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -712,7 +712,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement": {
 			pod: &v1.Pod{
@@ -726,7 +726,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: false,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -743,7 +743,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      defaultQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.low": "209715200"}},
 		},
 		"burstable-with-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -757,7 +757,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -771,7 +771,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: false,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.min": "104857600"}},
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-partial-limits-with-tuned-quota": {
 			pod: &v1.Pod{
@@ -788,7 +788,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			},
 			enforceCPULimits: true,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.min": "209715200"}},
+			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.low": "209715200"}},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -850,7 +850,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 
 	for testName, testCase := range testCases {
 
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, kubeletconfig.HardReservationMemoryReservationPolicy)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
 		if !reflect.DeepEqual(actual.Unified, testCase.expected.Unified) {
 			t.Errorf("unexpected result, test: %v, unified not as expected", testName)

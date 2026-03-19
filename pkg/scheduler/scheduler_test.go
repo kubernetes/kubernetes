@@ -1093,6 +1093,15 @@ func Test_UnionedGVKs(t *testing.T) {
 			} else if !tt.enableInPlacePodVerticalScaling {
 				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
+				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
+				pluginConfig = slices.Clone(pluginConfig)
+				for i := range pluginConfig {
+					if pluginConfig[i].Name == "DynamicResources" {
+						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
+						break
+					}
+				}
 			} else {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
 				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{

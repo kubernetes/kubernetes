@@ -2556,3 +2556,123 @@ func TestScorePlacement_Resources(t *testing.T) {
 		})
 	}
 }
+
+func TestComputePodResourceRequestWithNodeAllocatableDRA(t *testing.T) {
+	testComputePodResourceRequestWithNodeAllocatableDRA(ktesting.Init(t))
+}
+func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext) {
+	tests := []struct {
+		name                              string
+		pod                               *v1.Pod
+		expected                          *preFilterState
+		enableDRANodeAllocatableResources bool
+	}{
+		{
+			name:                              "Pod with DRA claim and EnableDRANodeAllocatableResources enabled",
+			enableDRANodeAllocatableResources: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "node-allocatable-claim",
+									},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "node-allocatable-claim",
+							ResourceClaimName: ptr.To("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Resources: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU: resource.MustParse("50m"),
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 150, // NodeAllocatableResourceClaimStatus + standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+		{
+			name:                              "Pod with DRA claim and EnableDRANodeAllocatableResources disabled",
+			enableDRANodeAllocatableResources: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "node-allocatable-claim",
+									},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "node-allocatable-claim",
+							ResourceClaimName: ptr.To("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Resources: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU: resource.MustParse("50m"),
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 100, // only standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
+			opts := ResourceRequestsOptions{
+				EnableDRANodeAllocatableResources: tc.enableDRANodeAllocatableResources,
+			}
+			result := computePodResourceRequest(tc.pod, opts)
+
+			if diff := cmp.Diff(tc.expected.Resource, result.Resource); diff != "" {
+				tCtx.Errorf("computePodResourceRequest() returned diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

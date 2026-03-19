@@ -194,6 +194,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newGarbageCollectorControllerDescriptor())
 	register(newDaemonSetControllerDescriptor())
 	register(newJobControllerDescriptor())
+	register(newPodGroupProtectionControllerDescriptor())
 	register(newDeploymentControllerDescriptor())
 	register(newReplicaSetControllerDescriptor())
 	register(newHorizontalPodAutoscalerControllerDescriptor())

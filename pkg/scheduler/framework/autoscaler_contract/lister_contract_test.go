@@ -152,12 +152,20 @@ func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID,
 	return nil
 }
 
-func (r *resourceClaimTrackerContract) ClaimHasPendingAllocation(_ types.UID) bool {
+func (r *resourceClaimTrackerContract) GetPendingAllocation(_ types.UID) (*resourceapi.AllocationResult, bool) {
+	return nil, false
+}
+
+func (r *resourceClaimTrackerContract) MaybeRemoveClaimPendingAllocation(_ types.UID, _ bool) (deleted bool) {
 	return false
 }
 
-func (r *resourceClaimTrackerContract) RemoveClaimPendingAllocation(_ types.UID) (deleted bool) {
-	return false
+func (r *resourceClaimTrackerContract) AddSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
+	return nil
+}
+
+func (r *resourceClaimTrackerContract) RemoveSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
+	return nil
 }
 
 func (r *resourceClaimTrackerContract) AssumeClaimAfterAPICall(_ *resourceapi.ResourceClaim) error {

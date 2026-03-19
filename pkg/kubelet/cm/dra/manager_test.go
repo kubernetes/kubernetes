@@ -2534,3 +2534,239 @@ func TestTruncateHealthMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildResourceHealth(t *testing.T) {
+	testCases := map[string]struct {
+		device        state.Device
+		healthInfo    state.DeviceHealth
+		enableMessage bool
+		wantHealth    v1.ResourceHealthStatus
+		wantResource  v1.ResourceID
+		wantMessage   *string
+	}{
+		"message enabled and CDI id": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"message disabled": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "device ok",
+			},
+			enableMessage: false,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   nil,
+		},
+		"empty message": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   nil,
+		},
+		"unhealthy status": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnhealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnhealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"unknown status": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnknown,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnknown,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"fallback resource id": {
+			device: state.Device{
+				PoolName:   "pool",
+				DeviceName: "device",
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnhealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnhealthy,
+			wantResource:  v1.ResourceID("driver/pool/device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := buildResourceHealth("driver", tc.device, tc.healthInfo, tc.enableMessage)
+			assert.Equal(t, tc.wantHealth, got.Health)
+			assert.Equal(t, tc.wantResource, got.ResourceID)
+			assert.Equal(t, tc.wantMessage, got.Message)
+		})
+	}
+}
+
+func TestToResourceHealthStatus(t *testing.T) {
+	testCases := map[string]struct {
+		input    state.DeviceHealthStatus
+		expected v1.ResourceHealthStatus
+	}{
+		"healthy": {
+			input:    state.DeviceHealthStatusHealthy,
+			expected: v1.ResourceHealthStatusHealthy,
+		},
+		"unhealthy": {
+			input:    state.DeviceHealthStatusUnhealthy,
+			expected: v1.ResourceHealthStatusUnhealthy,
+		},
+		"unknown": {
+			input:    state.DeviceHealthStatusUnknown,
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+		"empty": {
+			input:    state.DeviceHealthStatus(""),
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+		"unexpected": {
+			input:    state.DeviceHealthStatus("Other"),
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, toResourceHealthStatus(tc.input))
+		})
+	}
+}
+
+func TestToDeviceHealthStatus(t *testing.T) {
+	testCases := map[string]struct {
+		input    drahealthv1alpha1.HealthStatus
+		expected state.DeviceHealthStatus
+	}{
+		"healthy": {
+			input:    drahealthv1alpha1.HealthStatus_HEALTHY,
+			expected: state.DeviceHealthStatusHealthy,
+		},
+		"unhealthy": {
+			input:    drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			expected: state.DeviceHealthStatusUnhealthy,
+		},
+		"unknown": {
+			input:    drahealthv1alpha1.HealthStatus_UNKNOWN,
+			expected: state.DeviceHealthStatusUnknown,
+		},
+		"unexpected": {
+			input:    drahealthv1alpha1.HealthStatus(99),
+			expected: state.DeviceHealthStatusUnknown,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, toDeviceHealthStatus(tc.input))
+		})
+	}
+}
+
+func TestBuildDeviceHealth(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	longMessage := strings.Repeat("a", v1.ResourceHealthMessageMaxLength+5)
+
+	testCases := map[string]struct {
+		health         drahealthv1alpha1.HealthStatus
+		timeoutSeconds int64
+		message        string
+		wantHealth     state.DeviceHealthStatus
+		wantTimeout    time.Duration
+		wantMessage    string
+	}{
+		"healthy with positive timeout": {
+			health:         drahealthv1alpha1.HealthStatus_HEALTHY,
+			timeoutSeconds: 12,
+			message:        "ok",
+			wantHealth:     state.DeviceHealthStatusHealthy,
+			wantTimeout:    12 * time.Second,
+			wantMessage:    "ok",
+		},
+		"unhealthy with zero timeout": {
+			health:         drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			timeoutSeconds: 0,
+			message:        "fail",
+			wantHealth:     state.DeviceHealthStatusUnhealthy,
+			wantTimeout:    DefaultHealthTimeout,
+			wantMessage:    "fail",
+		},
+		"unknown with negative timeout": {
+			health:         drahealthv1alpha1.HealthStatus_UNKNOWN,
+			timeoutSeconds: -1,
+			message:        longMessage,
+			wantHealth:     state.DeviceHealthStatusUnknown,
+			wantTimeout:    DefaultHealthTimeout,
+			wantMessage:    truncateHealthMessage(longMessage),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			grpcDevice := &drahealthv1alpha1.DeviceHealth{
+				Device: &drahealthv1alpha1.DeviceIdentifier{
+					PoolName:   "pool",
+					DeviceName: "device",
+				},
+				Health:                    tc.health,
+				LastUpdatedTime:           123,
+				HealthCheckTimeoutSeconds: tc.timeoutSeconds,
+				Message:                   tc.message,
+			}
+
+			got := buildDeviceHealth(logger, grpcDevice)
+			assert.Equal(t, "pool", got.PoolName)
+			assert.Equal(t, "device", got.DeviceName)
+			assert.Equal(t, tc.wantHealth, got.Health)
+			assert.Equal(t, time.Unix(123, 0), got.LastUpdated)
+			assert.Equal(t, tc.wantTimeout, got.HealthCheckTimeout)
+			assert.Equal(t, tc.wantMessage, got.Message)
+		})
+	}
+}

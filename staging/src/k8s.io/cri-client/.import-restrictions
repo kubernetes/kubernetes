@@ -1,0 +1,17 @@
+rules:
+  # prevent import of k8s.io/kubernetes
+  - selectorRegexp: k8s[.]io/kubernetes
+    forbiddenPrefixes:
+      - ''
+  # prevent import of k8s.io/apimachinery
+  - selectorRegexp: k8s[.]io/apimachinery
+    forbiddenPrefixes:
+      - ''
+  # prevent import of k8s.io/api
+  - selectorRegexp: k8s[.]io/api
+    forbiddenPrefixes:
+      - ''
+  # prevent import of k8s.io/client-go
+  - selectorRegexp: k8s[.]io/client-go
+    forbiddenPrefixes:
+      - ''

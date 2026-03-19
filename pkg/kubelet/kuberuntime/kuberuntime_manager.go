@@ -708,14 +708,14 @@ func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourc
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
-func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
+func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, pod *v1.Pod, containerIdx int, initContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
 	logger := klog.FromContext(ctx)
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		return true
 	}
 
 	var container v1.Container
-	if isRestartableInitContainer {
+	if initContainer {
 		container = pod.Spec.InitContainers[containerIdx]
 	} else {
 		container = pod.Spec.Containers[containerIdx]
@@ -790,7 +790,9 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			container: &container,
 			message:   fmt.Sprintf("Container %s resize requires restart", container.Name),
 		}
-		if isRestartableInitContainer {
+		if initContainer {
+			// Validation prevents non-restartable init containers from being marked for restart,
+			// so we know this init container is restartable.
 			changes.InitContainersToStart = append(changes.InitContainersToStart, containerIdx)
 		} else {
 			changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)

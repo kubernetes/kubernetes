@@ -806,6 +806,7 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
 	logger := klog.FromContext(context.Background()).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	enableHealthMessage := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage)
 	for i := range status.ContainerStatuses {
 		containerStatus := &status.ContainerStatuses[i]
 
@@ -913,31 +914,12 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 						}
 
 						healthInfo := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
-
-						var health v1.ResourceHealthStatus
-						switch healthInfo.Health {
-						case state.DeviceHealthStatusHealthy:
-							health = v1.ResourceHealthStatusHealthy
-						case state.DeviceHealthStatusUnhealthy:
-							health = v1.ResourceHealthStatusUnhealthy
-						default:
-							health = v1.ResourceHealthStatusUnknown
-						}
-
-						// Create the ResourceHealth entry
-						resourceHealth := v1.ResourceHealth{
-							Health: health,
-						}
-						if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage) && len(healthInfo.Message) > 0 {
-							resourceHealth.Message = &healthInfo.Message
-						}
-
-						// Use first CDI device ID as ResourceID, with fallback
-						if len(device.CDIDeviceIDs) > 0 {
-							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
-						} else {
-							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
-						}
+						resourceHealth := buildResourceHealth(
+							driverName,
+							device,
+							healthInfo,
+							enableHealthMessage,
+						)
 
 						// Skip if we've already added this resourceID
 						if seenResourceIDs[resourceHealth.ResourceID] {
@@ -959,6 +941,70 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 			}
 		}
 		containerStatus.AllocatedResourcesStatus = finalStatuses
+	}
+}
+
+func toResourceHealthStatus(health state.DeviceHealthStatus) v1.ResourceHealthStatus {
+	switch health {
+	case state.DeviceHealthStatusHealthy:
+		return v1.ResourceHealthStatusHealthy
+	case state.DeviceHealthStatusUnhealthy:
+		return v1.ResourceHealthStatusUnhealthy
+	default:
+		return v1.ResourceHealthStatusUnknown
+	}
+}
+
+func buildResourceHealth(driverName string, device state.Device, healthInfo state.DeviceHealth, enableMessage bool) v1.ResourceHealth {
+	// Create the ResourceHealth entry
+	resourceHealth := v1.ResourceHealth{
+		Health: toResourceHealthStatus(healthInfo.Health),
+	}
+	if enableMessage && len(healthInfo.Message) > 0 {
+		resourceHealth.Message = &healthInfo.Message
+	}
+	// Use first CDI device ID as ResourceID, with fallback
+	if len(device.CDIDeviceIDs) > 0 {
+		resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
+	} else {
+		resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
+	}
+	return resourceHealth
+}
+
+func toDeviceHealthStatus(health drahealthv1alpha1.HealthStatus) state.DeviceHealthStatus {
+	switch health {
+	case drahealthv1alpha1.HealthStatus_HEALTHY:
+		return state.DeviceHealthStatusHealthy
+	case drahealthv1alpha1.HealthStatus_UNHEALTHY:
+		return state.DeviceHealthStatusUnhealthy
+	default:
+		return state.DeviceHealthStatusUnknown
+	}
+}
+
+func buildDeviceHealth(logger klog.Logger, device *drahealthv1alpha1.DeviceHealth) state.DeviceHealth {
+	// Extract the health check timeout from the gRPC response
+	// If not specified, zero, or negative, use the default timeout
+	timeout := DefaultHealthTimeout
+	timeoutSeconds := device.GetHealthCheckTimeoutSeconds()
+	if timeoutSeconds > 0 {
+		timeout = time.Duration(timeoutSeconds) * time.Second
+	} else if timeoutSeconds < 0 {
+		// Log warning for negative timeout values and use default
+		logger.V(4).Info("Ignoring negative health check timeout, using default",
+			"poolName", device.GetDevice().GetPoolName(),
+			"deviceName", device.GetDevice().GetDeviceName(),
+			"providedTimeout", timeoutSeconds,
+			"defaultTimeout", DefaultHealthTimeout)
+	}
+	return state.DeviceHealth{
+		PoolName:           device.GetDevice().GetPoolName(),
+		DeviceName:         device.GetDevice().GetDeviceName(),
+		Health:             toDeviceHealthStatus(device.GetHealth()),
+		LastUpdated:        time.Unix(device.GetLastUpdatedTime(), 0),
+		HealthCheckTimeout: timeout,
+		Message:            truncateHealthMessage(device.GetMessage()),
 	}
 }
 
@@ -996,39 +1042,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 		// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
 		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
 		for i, d := range resp.GetDevices() {
-			var health state.DeviceHealthStatus
-			switch d.GetHealth() {
-			case drahealthv1alpha1.HealthStatus_HEALTHY:
-				health = state.DeviceHealthStatusHealthy
-			case drahealthv1alpha1.HealthStatus_UNHEALTHY:
-				health = state.DeviceHealthStatusUnhealthy
-			default:
-				health = state.DeviceHealthStatusUnknown
-			}
-
-			// Extract the health check timeout from the gRPC response
-			// If not specified, zero, or negative, use the default timeout
-			timeout := DefaultHealthTimeout
-			timeoutSeconds := d.GetHealthCheckTimeoutSeconds()
-			if timeoutSeconds > 0 {
-				timeout = time.Duration(timeoutSeconds) * time.Second
-			} else if timeoutSeconds < 0 {
-				// Log warning for negative timeout values and use default
-				logger.V(4).Info("Ignoring negative health check timeout, using default",
-					"poolName", d.GetDevice().GetPoolName(),
-					"deviceName", d.GetDevice().GetDeviceName(),
-					"providedTimeout", timeoutSeconds,
-					"defaultTimeout", DefaultHealthTimeout)
-			}
-
-			devices[i] = state.DeviceHealth{
-				PoolName:           d.GetDevice().GetPoolName(),
-				DeviceName:         d.GetDevice().GetDeviceName(),
-				Health:             health,
-				LastUpdated:        time.Unix(d.GetLastUpdatedTime(), 0),
-				HealthCheckTimeout: timeout,
-				Message:            truncateHealthMessage(d.GetMessage()),
-			}
+			devices[i] = buildDeviceHealth(logger, d)
 		}
 
 		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(logger, pluginName, devices)

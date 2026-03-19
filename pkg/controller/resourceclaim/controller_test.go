@@ -1030,7 +1030,7 @@ func makeTemplatedClaim(podClaimName, generateName, namespace, classname string,
 			Name:         fmt.Sprintf("%s-%d", generateName, createCounter),
 			GenerateName: generateName,
 			Namespace:    namespace,
-			Annotations:  map[string]string{"resource.kubernetes.io/pod-claim-name": podClaimName},
+			Annotations:  map[string]string{resourceapi.PodResourceClaimAnnotation: podClaimName},
 		},
 	}
 	if owner != nil {

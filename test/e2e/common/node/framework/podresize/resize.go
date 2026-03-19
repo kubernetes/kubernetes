@@ -186,10 +186,10 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo)
 
 	wantInitCtrs, wantCtrs := separateContainers(wantInfo)
 	var errs []error
-	if err := verifyPodContainersStatusResources(gotPod.Status.InitContainerStatuses, wantInitCtrs); err != nil {
+	if err := VerifyPodContainersStatusResources(gotPod.Status.InitContainerStatuses, wantInitCtrs); err != nil {
 		errs = append(errs, err)
 	}
-	if err := verifyPodContainersStatusResources(gotPod.Status.ContainerStatuses, wantCtrs); err != nil {
+	if err := VerifyPodContainersStatusResources(gotPod.Status.ContainerStatuses, wantCtrs); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -208,7 +208,7 @@ func VerifyPodLevelStatusResources(gotPod *v1.Pod, wantPodResources *v1.Resource
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wantCtrs []v1.Container) error {
+func VerifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wantCtrs []v1.Container) error {
 	ginkgo.GinkgoHelper()
 
 	var errs []error
@@ -295,7 +295,7 @@ func addResourceList(des, src v1.ResourceList) {
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod)
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 
 	var errs []error
 	for _, ci := range tcInfo {

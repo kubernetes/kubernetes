@@ -735,8 +735,9 @@ func preCheckForNode(logger klog.Logger, nodeInfo *framework.NodeInfo) queue.Pre
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
 	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
-		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	})
 	if len(insufficientResources) != 0 {
 		for i := range insufficientResources {

@@ -252,7 +252,7 @@ func TestCARotationConnectionBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create transport: %v", err)
 	}
-	transport.(*atomicTransportHolder).caRefreshDuration = 500 * time.Millisecond
+	transport.(*trackedTransport).rt.(*atomicTransportHolder).caRefreshDuration = 500 * time.Millisecond
 
 	client := &http.Client{
 		Transport: transport,

@@ -81,7 +81,7 @@ func TestClientGOMetrics(t *testing.T) {
 				metrics.TransportCreateCalls.Increment("hit")
 			},
 			want: `
-			            # HELP rest_client_transport_create_calls_total [ALPHA] Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached
+			            # HELP rest_client_transport_create_calls_total [ALPHA] Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, miss-gc: recreated and added back to the cache after being garbage collected, uncacheable: created and not cached
 			            # TYPE rest_client_transport_create_calls_total counter
 			            rest_client_transport_create_calls_total{result="hit"} 1
 				`,
@@ -208,4 +208,49 @@ func TestTransportCAReloadsMetric(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTransportCleanupMetrics(t *testing.T) {
+	t.Run("cleanup cancel calls", func(t *testing.T) {
+		transportCertRotationGCCalls.Reset()
+		metrics.TransportCertRotationGCCalls.Increment()
+		metrics.TransportCertRotationGCCalls.Increment()
+
+		want := `
+			# HELP rest_client_transport_cert_rotation_gc_calls_total [ALPHA] Number of times a cert rotation goroutine cancel func is called via GC cleanup of the associated transport
+			# TYPE rest_client_transport_cert_rotation_gc_calls_total counter
+			rest_client_transport_cert_rotation_gc_calls_total 2
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "rest_client_transport_cert_rotation_gc_calls_total"); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("cleanup delete calls: deleted", func(t *testing.T) {
+		transportCacheGCCalls.Reset()
+		metrics.TransportCacheGCCalls.Increment("deleted")
+
+		want := `
+			# HELP rest_client_transport_cache_gc_calls_total [ALPHA] Number of times a GC cleanup attempts to delete a transport cache entry, partitioned by the result: deleted, skipped
+			# TYPE rest_client_transport_cache_gc_calls_total counter
+			rest_client_transport_cache_gc_calls_total{result="deleted"} 1
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "rest_client_transport_cache_gc_calls_total"); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("cleanup delete calls: skipped", func(t *testing.T) {
+		transportCacheGCCalls.Reset()
+		metrics.TransportCacheGCCalls.Increment("skipped")
+
+		want := `
+			# HELP rest_client_transport_cache_gc_calls_total [ALPHA] Number of times a GC cleanup attempts to delete a transport cache entry, partitioned by the result: deleted, skipped
+			# TYPE rest_client_transport_cache_gc_calls_total counter
+			rest_client_transport_cache_gc_calls_total{result="skipped"} 1
+		`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "rest_client_transport_cache_gc_calls_total"); err != nil {
+			t.Fatal(err)
+		}
+	})
 }

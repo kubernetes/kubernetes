@@ -497,16 +497,12 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
 	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
-	for _, container := range pod.Spec.Containers {
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !IsResizableContainer(container, containerType) {
+			continue
+		}
 		alloc := *container.Resources.DeepCopy()
 		podAlloc.ContainerResources[container.Name] = alloc
-	}
-
-	for _, container := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&container) {
-			alloc := *container.Resources.DeepCopy()
-			podAlloc.ContainerResources[container.Name] = alloc
-		}
 	}
 
 	return podAlloc
@@ -643,7 +639,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
 	switch containerType {
 	case podutil.InitContainers:
-		return podutil.IsRestartableInitContainer(container)
+		return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) || podutil.IsRestartableInitContainer(container)
 	case podutil.Containers:
 		return true
 	default:

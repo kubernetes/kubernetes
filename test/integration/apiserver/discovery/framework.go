@@ -143,7 +143,7 @@ func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 	name := a.Version + "." + a.Group
 	err := client.ApiregistrationV1().APIServices().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if !errors.IsNotFound(err) {
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -212,7 +212,7 @@ func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 	name := a.Names.Plural + "." + a.Group
 	err := client.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if !errors.IsNotFound(err) {
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 

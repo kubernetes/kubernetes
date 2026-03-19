@@ -38,6 +38,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -288,34 +289,76 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(logger klog.Logger, conf
 	}
 }
 
-// setMemoryQoS sums the memory requests of all pods in the Burstable class,
-// and set the sum memory as the memory.min in the Unified field of CgroupConfig.
+// setMemoryQoS sets cgroup v2 memory protection for QoS-class cgroups.
+// Guaranteed pods get memory.min (hard protection), Burstable pods get memory.low (soft protection).
 func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v1.PodQOSClass]*CgroupConfig) {
-	setMemoryMin := func(qos v1.PodQOSClass, memoryMin int64) {
+	setUnified := func(qos v1.PodQOSClass, key string, value int64) {
 		if configs[qos].ResourceParameters.Unified == nil {
 			configs[qos].ResourceParameters.Unified = make(map[string]string)
 		}
-		configs[qos].ResourceParameters.Unified[Cgroup2MemoryMin] = strconv.FormatInt(memoryMin, 10)
-		logger.V(4).Info("MemoryQoS config for qos", "qos", qos, "memoryMin", memoryMin)
+		configs[qos].ResourceParameters.Unified[key] = strconv.FormatInt(value, 10)
+		logger.V(4).Info("MemoryQoS config for qos", "qos", qos, "key", key, "value", value)
 	}
 
-	if m.memoryReservationPolicy != kubeletconfig.HardReservationMemoryReservationPolicy {
-		setMemoryMin(v1.PodQOSGuaranteed, 0)
-		setMemoryMin(v1.PodQOSBurstable, 0)
+	if m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
+		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
+		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
+		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
+		// Clear per-pod memory protection only when MemoryQoS feature gate is
+		// enabled but policy is None (rollback scenario). When the gate is off,
+		// pods never had protection set, so there's nothing to reconcile.
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+			m.reconcilePodMemoryProtection(logger)
+		}
 		return
 	}
 
 	qosMemoryRequests := m.getQoSMemoryRequests()
 
-	// Calculate the memory.min:
-	// for burstable(/kubepods/burstable): sum of all burstable pods
-	// for guaranteed(/kubepods): sum of all guaranteed and burstable pods
-	burstableMin := qosMemoryRequests[v1.PodQOSBurstable]
-	guaranteedMin := qosMemoryRequests[v1.PodQOSGuaranteed] + burstableMin
+	burstableRequests := qosMemoryRequests[v1.PodQOSBurstable]
+	guaranteedRequests := qosMemoryRequests[v1.PodQOSGuaranteed]
 
-	// Always set memory.min, even when it is 0, because omitted Unified keys are not cleared by the cgroup manager.
-	setMemoryMin(v1.PodQOSBurstable, burstableMin)
-	setMemoryMin(v1.PodQOSGuaranteed, guaranteedMin)
+	kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(guaranteedRequests))
+	kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(burstableRequests))
+
+	// Guaranteed QoS class: memory.min = sum of guaranteed + burstable requests
+	// (parent must cover children's protection for it to be effective)
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests+burstableRequests)
+
+	// Burstable QoS class: memory.low = sum of burstable pod requests
+	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
+}
+
+// reconcilePodMemoryProtection clears stale memory.min and memory.low on pod-level cgroups
+// when MemoryQoS is disabled or memoryReservationPolicy is not TieredReservation.
+func (m *qosContainerManagerImpl) reconcilePodMemoryProtection(logger klog.Logger) {
+	pods := m.activePods()
+	for _, pod := range pods {
+		podQOS := v1qos.GetPodQOS(pod)
+		var parentContainer CgroupName
+		switch podQOS {
+		case v1.PodQOSGuaranteed:
+			parentContainer = m.qosContainersInfo.Guaranteed
+		case v1.PodQOSBurstable:
+			parentContainer = m.qosContainersInfo.Burstable
+		case v1.PodQOSBestEffort:
+			parentContainer = m.qosContainersInfo.BestEffort
+		}
+		podCgroupName := NewCgroupName(parentContainer, GetPodCgroupNameSuffix(pod.UID))
+		podConfig := &CgroupConfig{
+			Name: podCgroupName,
+			ResourceParameters: &ResourceConfig{
+				Unified: map[string]string{
+					Cgroup2MemoryMin: "0",
+					Cgroup2MemoryLow: "0",
+				},
+			},
+		}
+		if err := m.cgroupManager.Update(logger, podConfig); err != nil {
+			logger.V(4).Info("Failed to reconcile pod memory protection", "pod", klog.KObj(pod), "err", err)
+		}
+	}
 }
 
 func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
@@ -347,9 +390,9 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
 		return err
 	}
 
-	// update the qos level cgrougs v2 settings of memory qos if feature enabled
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min settings. Called regardless of the MemoryQoS
+	// feature gate to clear stale values when the feature is disabled.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 

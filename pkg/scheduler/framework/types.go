@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -205,6 +206,11 @@ type NodeInfo struct {
 
 	// DeclaredFeatures is a set of features published by the node
 	DeclaredFeatures ndf.FeatureSet
+
+	// NodeAllocatableDRAClaimStates tracks the state of claims requesting node-allocatable resources
+	// (resources published in Node.Status.Allocatable like cpu, memory. etc.).
+	// This is used to enforce sharing policies for these claims on the node.
+	NodeAllocatableDRAClaimStates map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -252,6 +258,10 @@ func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
 	return n.DeclaredFeatures
 }
 
+func (n *NodeInfo) GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState {
+	return n.NodeAllocatableDRAClaimStates
+}
+
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
 // when nodes is a []*NodeInfo.
 var _ klog.KMetadata = &NodeInfo{}
@@ -290,15 +300,16 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 // SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
-		Generation:       n.Generation,
-		DeclaredFeatures: n.DeclaredFeatures.Clone(),
+		node:                          n.node,
+		Requested:                     n.Requested.Clone(),
+		NonZeroRequested:              n.NonZeroRequested.Clone(),
+		Allocatable:                   n.Allocatable.Clone(),
+		UsedPorts:                     make(fwk.HostPortInfo),
+		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:                  make(map[string]int),
+		Generation:                    n.Generation,
+		DeclaredFeatures:              n.DeclaredFeatures.Clone(),
+		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -328,6 +339,9 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	}
 	for key, value := range n.PVCRefCounts {
 		clone.PVCRefCounts[key] = value
+	}
+	for key, value := range n.NodeAllocatableDRAClaimStates {
+		clone.NodeAllocatableDRAClaimStates[key] = value.Snapshot()
 	}
 	return clone
 }
@@ -441,6 +455,42 @@ func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
 
 	n.Generation = nextGeneration()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		n.updateNodeAllocatableDRAClaimState(podInfo, sign)
+	}
+}
+
+// updateNodeAllocatableDRAClaimState updates the NodeInfo based on DRA node allocatable resource claims in the pod.
+func (n *NodeInfo) updateNodeAllocatableDRAClaimState(podInfo fwk.PodInfo, sign int64) {
+	pod := podInfo.GetPod()
+
+	if n.NodeAllocatableDRAClaimStates == nil && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		n.NodeAllocatableDRAClaimStates = make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState, len(pod.Status.NodeAllocatableResourceClaimStatuses))
+	}
+
+	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+		resourceClaimNamespacedName := types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      claimStatus.ResourceClaimName,
+		}
+
+		if _, exists := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]; !exists {
+			n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName] = &fwk.NodeAllocatableDRAClaimState{
+				ConsumerPods: sets.New[types.UID](),
+			}
+		}
+		state := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]
+
+		if sign > 0 {
+			state.ConsumerPods.Insert(pod.UID)
+		} else {
+			state.ConsumerPods.Delete(pod.UID)
+			if state.ConsumerPods.Len() == 0 {
+				delete(n.NodeAllocatableDRAClaimStates, resourceClaimNamespacedName)
+			}
+		}
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -786,11 +836,14 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
+	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
+
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: inPlacePodVerticalScalingEnabled,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 	})
 	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
@@ -800,8 +853,9 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:       !podLevelResourcesEnabled,
-			NonMissingContainerRequests: nonMissingContainerRequests,
+			SkipPodLevelResources:                    !podLevelResourcesEnabled,
+			NonMissingContainerRequests:              nonMissingContainerRequests,
+			UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 		})
 	}
 	non0CPU := non0Requests[v1.ResourceCPU]
@@ -1052,13 +1106,14 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		Requested:        &Resource{},
-		NonZeroRequested: &Resource{},
-		Allocatable:      &Resource{},
-		Generation:       nextGeneration(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
+		Requested:                     &Resource{},
+		NonZeroRequested:              &Resource{},
+		Allocatable:                   &Resource{},
+		Generation:                    nextGeneration(),
+		UsedPorts:                     make(fwk.HostPortInfo),
+		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:                  make(map[string]int),
+		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)

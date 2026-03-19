@@ -39,6 +39,10 @@ const (
 	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
 	// SystemNodeCritical is the system priority class name that represents node-critical.
 	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
+
+	// PodGroupProtectionFinalizer is the finalizer added to PodGroups to prevent
+	// premature deletion while pods still reference them.
+	PodGroupProtectionFinalizer = GroupName + "/podgroup-protection"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

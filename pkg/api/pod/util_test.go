@@ -917,16 +917,66 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	podWithDRANodeAllocatableResourceStatus := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+					},
+				},
+			},
+			InitContainers:      []api.Container{{}},
+			EphemeralContainers: []api.EphemeralContainer{{}},
+			ResourceClaims: []api.PodResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
+				},
+			},
+		},
+		Status: api.PodStatus{
+			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Resources: map[api.ResourceName]resource.Quantity{
+						api.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+		},
+	}
+
+	podWithoutDRANodeAllocatableResourceStatus := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+					},
+				},
+			},
+			InitContainers:      []api.Container{{}},
+			EphemeralContainers: []api.EphemeralContainer{{}},
+			ResourceClaims: []api.PodResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
+				},
+			},
+		},
+	}
 
 	var noPod *api.Pod
 
 	testcases := []struct {
-		description     string
-		enabled         bool
-		extendedEnabled bool
-		oldPod          *api.Pod
-		newPod          *api.Pod
-		wantPod         *api.Pod
+		description                      string
+		enabled                          bool
+		extendedEnabled                  bool
+		enableDRANodeAllocatableResouces bool
+		oldPod                           *api.Pod
+		newPod                           *api.Pod
+		wantPod                          *api.Pod
 	}{
 		{
 			description: "old with claims / new with claims / disabled",
@@ -1057,6 +1107,38 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			newPod:          podWithExtendedResource,
 			wantPod:         podWithExtendedResource,
 		},
+		{
+			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -1064,10 +1146,14 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			if !tc.enabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
 				features.DRAExtendedResource:       tc.extendedEnabled,
-			})
+			}
+			if tc.enableDRANodeAllocatableResouces {
+				overrides[features.DRANodeAllocatableResources] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()

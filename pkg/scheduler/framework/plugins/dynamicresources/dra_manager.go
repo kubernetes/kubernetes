@@ -70,6 +70,9 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		manager.resourceClaimTracker.inFlightAllocationSharers = &sync.Map{}
+	}
 
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
@@ -150,8 +153,9 @@ type claimTracker struct {
 	// for which allocation was triggered during a scheduling cycle and the
 	// corresponding claim status update call in PreBind has not been done
 	// yet. If another pod needs the claim, the pod is treated as "not
-	// schedulable yet". The cluster event for the claim status update will
-	// make it schedulable.
+	// schedulable yet" unless the pod is a member of a PodGroup. For ungrouped
+	// pods, the cluster event for the claim status update will make it
+	// schedulable.
 	//
 	// This mechanism avoids the following problem:
 	// - Pod A triggers allocation for claim X.
@@ -165,24 +169,38 @@ type claimTracker struct {
 	// problem:
 	// - Pod A and B get scheduled as above.
 	// - PreBind for pod A gets called first, then fails with a temporary API error.
-	//   It removes the updated claim from the assume cache because of that.
+	//   It removes the updated claim from the in-flight claims because of that.
 	// - PreBind for pod B gets called next and succeeds with adding the
 	//   allocation and its own reservedFor entry.
 	// - The assume cache is now not reflecting that the claim is allocated,
 	//   which could lead to reusing the same resource for some other claim.
+	//
+	// For pods in a PodGroup, a pending allocation may be shared among several
+	// pods in the group. In the PreBind phase, the allocation will be written
+	// for the first pod that succeeds. The scenario above is prevented by
+	// keeping the pending allocation in-flight as long as it has not been
+	// unreserved for every pod in the group, as tracked by
+	// inFlightAllocationSharers.
 	//
 	// A sync.Map is used because in practice sharing of a claim between
 	// pods is expected to be rare compared to per-pod claim, so we end up
 	// hitting the "multiple goroutines read, write, and overwrite entries
 	// for disjoint sets of keys" case that sync.Map is optimized for.
 	inFlightAllocations *sync.Map
-	allocatedDevices    *allocatedDevices
-	logger              klog.Logger
+	// inFlightAllocationSharers counts the actively scheduling pods
+	// sharing a given ResourceClaim.
+	inFlightAllocationSharers *sync.Map
+	allocatedDevices          *allocatedDevices
+	logger                    klog.Logger
 }
 
-func (c *claimTracker) ClaimHasPendingAllocation(claimUID types.UID) bool {
-	_, found := c.inFlightAllocations.Load(claimUID)
-	return found
+func (c *claimTracker) GetPendingAllocation(claimUID types.UID) (*resourceapi.AllocationResult, bool) {
+	var allocation *resourceapi.AllocationResult
+	claim, found := c.inFlightAllocations.Load(claimUID)
+	if found && claim != nil {
+		allocation = claim.(*resourceapi.ResourceClaim).Status.Allocation
+	}
+	return allocation, found
 }
 
 func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
@@ -195,7 +213,21 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 	return nil
 }
 
-func (c *claimTracker) RemoveClaimPendingAllocation(claimUID types.UID) (deleted bool) {
+func (c *claimTracker) MaybeRemoveClaimPendingAllocation(claimUID types.UID, shareable bool) (deleted bool) {
+	if c.inFlightAllocationSharers != nil && shareable {
+		value, ok := c.inFlightAllocationSharers.Load(claimUID)
+		if ok && value.(int) > 0 {
+			if loggerV := c.logger.V(5); loggerV.Enabled() {
+				claim, found := c.inFlightAllocations.Load(claimUID)
+				if found {
+					claim := claim.(*resourceapi.ResourceClaim)
+					c.logger.V(5).Info("Claim is still shared by other pods, not removing in-flight claim", "claim", klog.KObj(claim), "uid", claimUID, "version", claim.ResourceVersion)
+				}
+			}
+			return false
+		}
+	}
+
 	claim, found := c.inFlightAllocations.LoadAndDelete(claimUID)
 	// The assume cache doesn't log this, but maybe it should.
 	if found {
@@ -205,6 +237,43 @@ func (c *claimTracker) RemoveClaimPendingAllocation(claimUID types.UID) (deleted
 		c.logger.V(5).Info("Redundant remove of in-flight claim, not found", "uid", claimUID)
 	}
 	return found
+}
+
+func (c *claimTracker) AddSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
+	newSharers := 1
+	value, loaded := c.inFlightAllocationSharers.LoadOrStore(claimUID, newSharers)
+	if loaded {
+		oldSharers := value.(int)
+		newSharers = oldSharers + 1
+		swapped := c.inFlightAllocationSharers.CompareAndSwap(claimUID, oldSharers, newSharers)
+		if !swapped {
+			// The value must have changed since we loaded
+			return fmt.Errorf("conflict adding in-flight allocation sharer for claim %s/%s, UID=%s", allocatedClaim.Namespace, allocatedClaim.Name, claimUID)
+		}
+	}
+	c.logger.V(5).Info("Added share for in-flight claim", "claim", klog.KObj(allocatedClaim), "uid", claimUID, "version", allocatedClaim.ResourceVersion, "sharers", newSharers)
+	return nil
+}
+
+func (c *claimTracker) RemoveSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
+	value, ok := c.inFlightAllocationSharers.Load(claimUID)
+	if !ok {
+		return nil
+	}
+	oldSharers := value.(int)
+	newSharers := oldSharers - 1
+	var written bool
+	if newSharers == 0 {
+		written = c.inFlightAllocationSharers.CompareAndDelete(claimUID, oldSharers)
+	} else {
+		written = c.inFlightAllocationSharers.CompareAndSwap(claimUID, oldSharers, newSharers)
+	}
+	if !written {
+		// The value must have changed since we loaded
+		return fmt.Errorf("conflict removing in-flight allocation sharer for claim %s/%s, UID=%s", allocatedClaim.Namespace, allocatedClaim.Name, claimUID)
+	}
+	c.logger.V(5).Info("Removed share for in-flight claim", "claim", klog.KObj(allocatedClaim), "uid", claimUID, "version", allocatedClaim.ResourceVersion, "sharers", newSharers)
+	return nil
 }
 
 func (c *claimTracker) Get(namespace, claimName string) (*resourceapi.ResourceClaim, error) {

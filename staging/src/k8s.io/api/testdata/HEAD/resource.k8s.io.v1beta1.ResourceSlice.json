@@ -155,7 +155,13 @@
           "bindingFailureConditions": [
             "bindingFailureConditionsValue"
           ],
-          "allowMultipleAllocations": true
+          "allowMultipleAllocations": true,
+          "nodeAllocatableResourceMappings": {
+            "nodeAllocatableResourceMappingsKey": {
+              "capacityKey": "capacityKeyValue",
+              "allocationMultiplier": "0"
+            }
+          }
         }
       }
     ],

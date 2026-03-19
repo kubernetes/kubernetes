@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -33,7 +34,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/logs/logreduction"
-	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -98,7 +98,7 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
-			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithPropagators(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})),
 			otelgrpc.WithTracerProvider(tp),
 		}
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.

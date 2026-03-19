@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -270,8 +271,9 @@ func TestNewNodeInfo(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:  map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts: map[string]int{},
+		ImageStates:                   map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts:                  map[string]int{},
+		NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -381,8 +383,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{},
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{},
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -471,8 +474,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:  map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts: map[string]int{},
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{},
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -553,6 +557,30 @@ func TestNodeInfoClone(t *testing.T) {
 		},
 		{
 			nodeInfo: &NodeInfo{
+				Requested:                     &Resource{},
+				NonZeroRequested:              &Resource{},
+				Allocatable:                   &Resource{},
+				Generation:                    3,
+				UsedPorts:                     fwk.HostPortInfo{},
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{},
+				DeclaredFeatures:              declaredFeatureSet.Clone(),
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			},
+			expected: &NodeInfo{
+				Requested:                     &Resource{},
+				NonZeroRequested:              &Resource{},
+				Allocatable:                   &Resource{},
+				Generation:                    3,
+				UsedPorts:                     fwk.HostPortInfo{},
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{},
+				DeclaredFeatures:              declaredFeatureSet,
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			},
+		},
+		{
+			nodeInfo: &NodeInfo{
 				Requested:        &Resource{},
 				NonZeroRequested: &Resource{},
 				Allocatable:      &Resource{},
@@ -561,6 +589,9 @@ func TestNodeInfoClone(t *testing.T) {
 				ImageStates:      map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts:     map[string]int{},
 				DeclaredFeatures: declaredFeatureSet.Clone(),
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+					{Name: "claim1", Namespace: "default"}: {ConsumerPods: sets.New[types.UID]("pod1uid", "pod2uid")},
+				},
 			},
 			expected: &NodeInfo{
 				Requested:        &Resource{},
@@ -571,6 +602,9 @@ func TestNodeInfoClone(t *testing.T) {
 				ImageStates:      map[string]*fwk.ImageStateSummary{},
 				PVCRefCounts:     map[string]int{},
 				DeclaredFeatures: declaredFeatureSet,
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+					{Name: "claim1", Namespace: "default"}: {ConsumerPods: sets.New[types.UID]("pod1uid", "pod2uid")},
+				},
 			},
 		},
 	}
@@ -747,9 +781,10 @@ func TestNodeInfoAddPod(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:      map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts:     map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
-		DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+		ImageStates:                   map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts:                  map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
+		DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+		NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -998,9 +1033,10 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:      map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:     map[string]int{"node_info_cache_test/pvc-1": 1},
-				DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{"node_info_cache_test/pvc-1": 1},
+				DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -1165,9 +1201,10 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:      map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:     map[string]int{},
-				DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				ImageStates:                   map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:                  map[string]int{},
+				DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -1470,10 +1507,13 @@ func TestFitError_Error(t *testing.T) {
 }
 
 var (
+	cpu100m       = resource.MustParse("100m")
+	mem200M       = resource.MustParse("200Mi")
 	cpu500m       = resource.MustParse("500m")
 	mem500M       = resource.MustParse("500Mi")
 	cpu700m       = resource.MustParse("700m")
 	mem800M       = resource.MustParse("800Mi")
+	cpu1000m      = resource.MustParse("1000m")
 	cpu1200m      = resource.MustParse("1200m")
 	mem1200M      = resource.MustParse("1200Mi")
 	restartAlways = v1.ContainerRestartPolicyAlways
@@ -1481,12 +1521,15 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		containers               []v1.Container
-		podResources             *v1.ResourceRequirements
-		podLevelResourcesEnabled bool
-		expectedResource         fwk.PodResource
-		initContainers           []v1.Container
+		name                                 string
+		containers                           []v1.Container
+		podResources                         *v1.ResourceRequirements
+		podLevelResourcesEnabled             bool
+		nodeAllocatableResourcesDRAEnabled   bool
+		nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
+		expectedResource                     fwk.PodResource
+		initContainers                       []v1.Container
+		overhead                             *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -1711,17 +1754,316 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Non0Mem: schedutil.DefaultMemoryRequest,
 			},
 		},
+		{
+			name:                               "DRA gate disabled, with node allocatable resource claim",
+			nodeAllocatableResourcesDRAEnabled: false,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						// We do not set Pod.Spec.ResourceClaims in this test.
+						// We assume the name maps to Pod.Spec.ResourceClaims[].ResourceClaimName.
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                               "container with DRA node allocatable resource claim",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                               "Multiple DRA node allocatable resource claims",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+							{
+								Name: "node-allocatable-claim-2",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim-1",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+				{
+					ResourceClaimName: "node-allocatable-claim-2",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU: cpu100m,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                               "Single DRA claim with multiple resources",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim-1",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu1000m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu1000m.MilliValue(),
+					Memory:   mem500M.Value() + mem200M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu1000m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                               "DRA node allocatable Resources with Init Container",
+			nodeAllocatableResourcesDRAEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu1200m, // Higher than app container
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem1200M, // Higher than init container
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim-1",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu1200m.MilliValue() + cpu100m.MilliValue(), // max(cpu500m, cpu1200m) + draCpu
+					Memory:   mem1200M.Value() + mem200M.Value(),           // max(mem500M, mem1200M) + draMem
+				},
+				Non0CPU: cpu1200m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem1200M.Value() + mem200M.Value(),
+			},
+		},
+		{
+			name:                               "DRA node allocatable Resources with Pod Level Resources",
+			nodeAllocatableResourcesDRAEnabled: true,
+			podLevelResourcesEnabled:           true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu700m,
+					v1.ResourceMemory: mem800M,
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim-1",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu700m.MilliValue(), // pod level requests determines the overall footprint
+					Memory:   mem800M.Value(),      // pod level requests determines the overall footprint
+				},
+				Non0CPU: cpu700m.MilliValue(),
+				Non0Mem: mem800M.Value(),
+			},
+		},
+		{
+			name:                               "DRA node allocatable Resources with Pod Overhead",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim-1",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim-1",
+					Resources: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceCPU:    cpu100m,
+						v1.ResourceMemory: mem200M,
+					},
+				},
+			},
+			// Pod Overhead
+			overhead: &v1.ResourceList{
+				v1.ResourceCPU:    cpu100m,
+				v1.ResourceMemory: mem200M,
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(), // container + dra + overhead
+					Memory:   mem500M.Value() + mem200M.Value() + mem200M.Value(),                // container + dra + overhead
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value(),
+			},
+		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:           tc.podLevelResourcesEnabled,
+				features.DRANodeAllocatableResources: tc.nodeAllocatableResourcesDRAEnabled,
+			})
+			podSpec := v1.PodSpec{
+				Resources:      tc.podResources,
+				Containers:     tc.containers,
+				InitContainers: tc.initContainers,
+			}
+			if tc.overhead != nil {
+				podSpec.Overhead = *tc.overhead
+			}
 			podInfo := PodInfo{
 				Pod: &v1.Pod{
-					Spec: v1.PodSpec{
-						Resources:      tc.podResources,
-						Containers:     tc.containers,
-						InitContainers: tc.initContainers,
+					Spec: podSpec,
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: tc.nodeAllocatableResourceClaimStatuses,
 					},
 				},
 			}
@@ -2474,5 +2816,180 @@ func TestQueuedPodInfo_UpdateInvalidatesSignature(t *testing.T) {
 
 	if queuedPodInfo.PodSignature != nil {
 		t.Errorf("Expected signature to be nil after Update, got '%s'", string(queuedPodInfo.PodSignature))
+	}
+}
+
+func TestUpdateNodeAllocatableDRAClaimState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	claim1NamespacedName := types.NamespacedName{
+		Name:      "node-allocatable-claim-1",
+		Namespace: "default",
+	}
+	claim2NamespacedName := types.NamespacedName{
+		Name:      "node-allocatable-claim-2",
+		Namespace: "default",
+	}
+	tests := []struct {
+		name          string
+		initialState  map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState
+		pod           *v1.Pod
+		sign          int64
+		expectedState map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState
+	}{
+		{
+			name:         "Add pod with single claim",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{ResourceClaimName: "node-allocatable-claim-1"},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name:         "Add pod with multiple claims",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-1",
+						},
+						{
+							ResourceClaimName: "node-allocatable-claim-2",
+						},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				claim2NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name: "Add multiple pods with the same claim",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{ResourceClaimName: "node-allocatable-claim-1"},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid", "pod2-uid")},
+			},
+		},
+		{
+			name: "Add multiple pods with different claims",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-2",
+						},
+					},
+				},
+			},
+			sign: 1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+				claim2NamespacedName: {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+		},
+		{
+			name: "Remove pod with single claim",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-1",
+						},
+					},
+				},
+			},
+			sign:          -1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+		},
+		{
+			name: "Remove pod with shared claim",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid", "pod2-uid")},
+				claim2NamespacedName: {ConsumerPods: sets.New[types.UID]("pod2-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Namespace: "default"},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{ResourceClaimName: "node-allocatable-claim-1"},
+						{ResourceClaimName: "node-allocatable-claim-2"},
+					},
+				},
+			},
+			sign: -1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name: "Add pod with no claims",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Namespace: "default"},
+			},
+			sign: 1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+		{
+			name: "Remove pod with no claims",
+			initialState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Namespace: "default"},
+			},
+			sign: -1,
+			expectedState: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
+				claim1NamespacedName: {ConsumerPods: sets.New[types.UID]("pod1-uid")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ni := &NodeInfo{
+				NodeAllocatableDRAClaimStates: tt.initialState,
+			}
+			podInfo, _ := NewPodInfo(tt.pod)
+			ni.updateNodeAllocatableDRAClaimState(podInfo, tt.sign)
+
+			if diff := cmp.Diff(tt.expectedState, ni.NodeAllocatableDRAClaimStates, cmp.AllowUnexported(fwk.NodeAllocatableDRAClaimState{})); diff != "" {
+				t.Errorf("updateNodeAllocatableDRAClaimState() returned diff (-want +got):\\n%s", diff)
+			}
+		})
 	}
 }

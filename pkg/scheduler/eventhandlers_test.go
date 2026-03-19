@@ -697,15 +697,17 @@ func TestAdmissionCheck(t *testing.T) {
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
 	extendedResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: "foo.com/bar", Reason: "Insufficient foo.com/bar", Requested: 1, Unresolvable: true}}
-	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	nodeCPUCapacity := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	extendedResource := map[v1.ResourceName]string{"foo.com/bar": "1"}
+	nodeAllocatableResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 9000, Used: 0, Capacity: 8000, Unresolvable: true}}
 	tests := []struct {
-		name                      string
-		node                      *v1.Node
-		existingPods              []*v1.Pod
-		pod                       *v1.Pod
-		wantAdmissionResults      [][]AdmissionResult
-		enableDRAExtendedResource bool
+		name                              string
+		node                              *v1.Node
+		existingPods                      []*v1.Pod
+		pod                               *v1.Pod
+		wantAdmissionResults              [][]AdmissionResult
+		enableDRAExtendedResource         bool
+		enableDRANodeAllocatableResources bool
 	}{
 		{
 			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
@@ -718,7 +720,7 @@ func TestAdmissionCheck(t *testing.T) {
 		},
 		{
 			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
-			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(cpu).Obj(),
+			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(nodeCPUCapacity).Obj(),
 			pod:  st.MakePod().Name("pod2").Container("c").Overhead(v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).NodeSelector(map[string]string{"foo": "bar1"}).Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "7"}).Node("fake-node").Obj(),
@@ -747,10 +749,69 @@ func TestAdmissionCheck(t *testing.T) {
 			wantAdmissionResults:      [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
 			enableDRAExtendedResource: true,
 		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is disabled",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse("8"),
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: false,
+		},
+		{
+			name: "pod rejected when DRANodeAllocatableResources flag is enabled and pod's resource request exceeds node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{{nodeAllocatableResourceError}, {nodeAllocatableResourceError}},
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is enabled and pod's resource request fits within node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
+				cpuQty.Sub(resource.MustParse("1"))
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: cpuQty,
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tt.enableDRAExtendedResource)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:         tt.enableDRAExtendedResource,
+				features.DRANodeAllocatableResources: tt.enableDRANodeAllocatableResources,
+			})
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 

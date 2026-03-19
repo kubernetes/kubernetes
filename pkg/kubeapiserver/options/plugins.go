@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
+	"k8s.io/kubernetes/plugin/pkg/admission/scheduling/podgroupprotection"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
@@ -89,6 +90,7 @@ var AllOrderedPlugins = []string{
 	extendedresourcetoleration.PluginName,   // ExtendedResourceToleration
 	setdefault.PluginName,                   // DefaultStorageClass
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+	podgroupprotection.PluginName,           // PodGroupProtection
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                       // PersistentVolumeClaimResize
 	runtimeclass.PluginName,                 // RuntimeClass
@@ -148,6 +150,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	storageobjectinuseprotection.Register(plugins)
+	podgroupprotection.Register(plugins)
 	certapproval.Register(plugins)
 	certsigning.Register(plugins)
 	ctbattest.Register(plugins)
@@ -170,6 +173,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
 		resourcequota.PluginName,                // ResourceQuota
 		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+		podgroupprotection.PluginName,           // PodGroupProtection
 		podpriority.PluginName,                  // Priority
 		nodetaint.PluginName,                    // TaintNodesByCondition
 		runtimeclass.PluginName,                 // RuntimeClass

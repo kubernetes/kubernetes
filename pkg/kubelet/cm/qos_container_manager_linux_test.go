@@ -208,8 +208,8 @@ func TestQoSContainerCgroup(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			m, err := createTestQOSContainerManager(logger)
 			require.NoError(t, err)
-			// Set memory reservation policy to HardReservation to enable memory.min
-			m.memoryReservationPolicy = kubeletconfig.HardReservationMemoryReservationPolicy
+			// Set memory reservation policy to TieredReservation to enable memory.min
+			m.memoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
 			m.activePods = func() []*v1.Pod { return tc.pods }
 
 			guaranteedUnified := map[string]string{}
@@ -218,7 +218,7 @@ func TestQoSContainerCgroup(t *testing.T) {
 			}
 			burstableUnified := map[string]string{}
 			if tc.initialBurstable != "" {
-				burstableUnified[Cgroup2MemoryMin] = tc.initialBurstable
+				burstableUnified[Cgroup2MemoryLow] = tc.initialBurstable
 			}
 
 			qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
@@ -243,65 +243,48 @@ func TestQoSContainerCgroup(t *testing.T) {
 			m.setMemoryQoS(logger, qosConfigs)
 
 			assert.Equal(t, tc.expectedGuaranteed, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 		})
 	}
 }
 
 func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
-	tests := []struct {
-		name              string
-		initialGuaranteed map[string]string
-		initialBurstable  map[string]string
-	}{
-		{
-			name:              "explicitly resets memory.min to 0 when unset",
-			initialGuaranteed: nil,
-			initialBurstable:  nil,
-		},
-		{
-			name: "sets memory.min to zero when MemoryReservationPolicyNone ",
-			initialGuaranteed: map[string]string{
-				Cgroup2MemoryMin: "1234",
-			},
-			initialBurstable: map[string]string{
-				Cgroup2MemoryMin: "5678",
-			},
+	logger, _ := ktesting.NewTestContext(t)
+	fakeCM := &fakeCgroupManager{}
+	cgroupRoot := ParseCgroupfsToCgroupName("/")
+	cgroupRoot = NewCgroupName(cgroupRoot, defaultNodeAllocatableCgroupName)
+	m := &qosContainerManagerImpl{
+		cgroupManager:           fakeCM,
+		cgroupRoot:              cgroupRoot,
+		activePods:              activeTestPods,
+		memoryReservationPolicy: kubeletconfig.NoneMemoryReservationPolicy,
+		qosContainersInfo: QOSContainersInfo{
+			Guaranteed: cgroupRoot,
+			Burstable:  NewCgroupName(cgroupRoot, "burstable"),
+			BestEffort: NewCgroupName(cgroupRoot, "besteffort"),
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			m, err := createTestQOSContainerManager(logger)
-			require.NoError(t, err)
-
-			qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
-				v1.PodQOSGuaranteed: {
-					Name: m.qosContainersInfo.Guaranteed,
-					ResourceParameters: &ResourceConfig{
-						Unified: tc.initialGuaranteed,
-					},
-				},
-				v1.PodQOSBurstable: {
-					Name: m.qosContainersInfo.Burstable,
-					ResourceParameters: &ResourceConfig{
-						Unified: tc.initialBurstable,
-					},
-				},
-				v1.PodQOSBestEffort: {
-					Name:               m.qosContainersInfo.BestEffort,
-					ResourceParameters: &ResourceConfig{},
-				},
-			}
-
-			m.setMemoryQoS(logger, qosConfigs)
-
-			assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-			assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryMin])
-			assert.NotContains(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified, Cgroup2MemoryMin)
-		})
+	// memoryReservationPolicy defaults to NoneMemoryReservationPolicy, so memory.min should be explicitly reset.
+	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+		v1.PodQOSGuaranteed: {
+			Name:               m.qosContainersInfo.Guaranteed,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBurstable: {
+			Name:               m.qosContainersInfo.Burstable,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBestEffort: {
+			Name:               m.qosContainersInfo.BestEffort,
+			ResourceParameters: &ResourceConfig{},
+		},
 	}
+
+	m.setMemoryQoS(logger, qosConfigs)
+
+	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 }
 
 // fakeCgroupManager is used because Start() requires a functional

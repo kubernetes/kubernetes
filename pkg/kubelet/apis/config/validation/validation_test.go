@@ -568,17 +568,17 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "MemoryReservationPolicy requires MemoryQoS",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.FeatureGates = map[string]bool{"MemoryQoS": false}
-				conf.MemoryReservationPolicy = kubeletconfig.HardReservationMemoryReservationPolicy
+				conf.MemoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
 				return conf
 			},
-			errMsg: "invalid configuration: memoryReservationPolicy \"HardReservation\" requires MemoryQoS feature gate to be enabled",
+			errMsg: "invalid configuration: memoryReservationPolicy \"TieredReservation\" requires MemoryQoS feature gate to be enabled",
 		}, {
 			name: "invalid MemoryReservationPolicy",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.MemoryReservationPolicy = "invalid"
 				return conf
 			},
-			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"HardReservation\"",
+			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"TieredReservation\"",
 		}, {
 			name: "invalid Taint.TimeAdded",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

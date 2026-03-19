@@ -30,6 +30,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,8 +88,10 @@ var (
 )
 
 const (
-	numNodes       = 8
-	maxPodsPerNode = 5000 // This should never be the limiting factor, no matter how many tests run in parallel.
+	numNodes           = 8
+	maxPodsPerNode     = 5000 // This should never be the limiting factor, no matter how many tests run in parallel.
+	nodeCPUCapacity    = "100"
+	nodeMemoryCapacity = "1k"
 
 	// schedulingTimeout is the time we grant the scheduler for one scheduling attempt,
 	// whether it's successful or not.
@@ -133,7 +136,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				// Number of devices per slice is chosen so that Filter takes a few seconds:
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
-				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 21) })
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 			},
 		},
@@ -183,7 +186,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false)
 				})
 			},
 		},
@@ -198,7 +201,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, false)
 				})
 			},
 		},
@@ -207,6 +210,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				resourcev1beta1.SchemeGroupVersion:  true,
 				resourcev1beta2.SchemeGroupVersion:  true,
 				resourcealphaapi.SchemeGroupVersion: true,
+				schedulingapi.SchemeGroupVersion:    true,
 			},
 			features: map[featuregate.Feature]bool{
 				// Additional DRA feature gates go here,
@@ -220,6 +224,9 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
+				features.DRANodeAllocatableResources:  true,
+				features.GangScheduling:               true,
+				features.GenericWorkload:              true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!
@@ -243,9 +250,11 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// Number of devices per slice is chosen so that Filter takes a few seconds: The allocator
 				// in the experimental channel has an improvement that requires a higher number here than
 				// in the incubating and stable channels.
-				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 21) })
 				runSubTest(tCtx, "ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, true) })
+				runSubTest(tCtx, "PodGroup", testPodGroup)
 			},
 		},
 	} {
@@ -368,8 +377,8 @@ func createNodes(tCtx ktesting.TContext) {
 		// Make the node ready.
 		node.Status = v1.NodeStatus{
 			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100"),
-				v1.ResourceMemory: resource.MustParse("1000"),
+				v1.ResourceCPU:    resource.MustParse(nodeCPUCapacity),
+				v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
 				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
 			},
 			Phase: v1.NodeRunning,
