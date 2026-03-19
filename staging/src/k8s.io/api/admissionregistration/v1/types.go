@@ -27,12 +27,14 @@ type Rule struct {
 	// If '*' is present, the length of the slice must be one.
 	// Required.
 	// +listType=atomic
+	// +optional
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,1,rep,name=apiGroups"`
 
 	// apiVersions is the API versions the resources belong to. '*' is all versions.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
 	// +listType=atomic
+	// +optional
 	APIVersions []string `json:"apiVersions,omitempty" protobuf:"bytes,2,rep,name=apiVersions"`
 
 	// resources is a list of resources this rule applies to.
@@ -51,6 +53,7 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	// +listType=atomic
+	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 
 	// scope specifies the scope of this rule.
@@ -187,10 +190,12 @@ type ExpressionWarning struct {
 	// fieldRef is the path to the field that refers to the expression.
 	// For example, the reference to the expression of the first item of
 	// validations is "spec.validations[0].expression"
+	// +required
 	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
 	// warning contains the content of type checking information in a human-readable form.
 	// Each line of the warning contains the type that the expression is checked
 	// against, followed by the type check error from the compiler.
+	// +required
 	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
 }
 
@@ -222,6 +227,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
+	// +optional
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// validations contain CEL expressions which is used to apply the validation.
@@ -298,10 +304,12 @@ type ParamKind struct {
 	// apiVersion is the API group version the resources belong to.
 	// In format of "group/version".
 	// Required.
+	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,rep,name=apiVersion"`
 
 	// kind is the API kind the resources belong to.
 	// Required.
+	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,2,rep,name=kind"`
 }
 
@@ -348,6 +356,7 @@ type Validation struct {
 	//     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
 	//     non-intersecting keys are appended, retaining their partial order.
 	// Required.
+	// +required
 	Expression string `json:"expression" protobuf:"bytes,1,opt,name=Expression"`
 	// message represents the message displayed when validation fails. The message is required if the Expression contains
 	// line breaks. The message must not contain line breaks.
@@ -386,10 +395,12 @@ type Variable struct {
 	// name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
 	// The variable can be accessed in other expressions through `variables`
 	// For example, if name is "foo", the variable will be available as `variables.foo`
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
 
 	// expression is the expression that will be evaluated as the value of the variable.
 	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+	// +required
 	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
 }
 
@@ -410,6 +421,7 @@ type AuditAnnotation struct {
 	// will be discarded.
 	//
 	// Required.
+	// +required
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 
 	// valueExpression represents the expression which is evaluated by CEL to
@@ -427,6 +439,7 @@ type AuditAnnotation struct {
 	// will be joined together in a comma-separated list.
 	//
 	// Required.
+	// +required
 	ValueExpression string `json:"valueExpression" protobuf:"bytes,2,opt,name=valueExpression"`
 }
 
@@ -552,6 +565,7 @@ type ParamRef struct {
 	// by setting the `name` field, leaving `selector` blank, and setting namespace
 	// if `paramKind` is namespace-scoped.
 	//
+	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,rep,name=name"`
 
 	// namespace is the namespace of the referenced resource. Allows limiting
@@ -594,6 +608,7 @@ type ParamRef struct {
 	// Allowed values are `Allow` or `Deny`
 	//
 	// Required
+	// +optional
 	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
 }
 
@@ -792,10 +807,12 @@ type ValidatingWebhook struct {
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// clientConfig defines how to communicate with the hook.
 	// Required
+	// +required
 	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
 
 	// rules describes what operations on what resources/subresources the webhook cares about.
@@ -805,6 +822,7 @@ type ValidatingWebhook struct {
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	// +listType=atomic
+	// +optional
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// failurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -895,6 +913,7 @@ type ValidatingWebhook struct {
 	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
 	// sideEffects == Unknown or Some.
+	// +required
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
 	// timeoutSeconds specifies the timeout for this webhook. After the timeout passes,
@@ -913,6 +932,7 @@ type ValidatingWebhook struct {
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
 	// +listType=atomic
+	// +required
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
 	// matchConditions is a list of conditions that must be met for a request to be sent to this
@@ -942,10 +962,12 @@ type MutatingWebhook struct {
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// clientConfig defines how to communicate with the hook.
 	// Required
+	// +required
 	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
 
 	// rules describes what operations on what resources/subresources the webhook cares about.
@@ -955,6 +977,7 @@ type MutatingWebhook struct {
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	// +listType=atomic
+	// +optional
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// failurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -1045,6 +1068,7 @@ type MutatingWebhook struct {
 	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
 	// sideEffects == Unknown or Some.
+	// +required
 	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
 	// timeoutSeconds specifies the timeout for this webhook. After the timeout passes,
@@ -1063,6 +1087,7 @@ type MutatingWebhook struct {
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
 	// +listType=atomic
+	// +required
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
 	// reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
@@ -1148,6 +1173,7 @@ type MutatingAdmissionPolicySpec struct {
 	// The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
 	// '*' matches CREATE, UPDATE and CONNECT.
 	// Required.
+	// +optional
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// variables contain definitions of variables that can be used in composition of other expressions.
@@ -1217,6 +1243,7 @@ type MutatingAdmissionPolicySpec struct {
 	// order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only
 	// reinvoked when mutations change the object after this mutation is invoked.
 	// Required.
+	// +optional
 	ReinvocationPolicy ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,7,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 }
 
@@ -1227,16 +1254,19 @@ type Mutation struct {
 	// Required.
 	//
 	// +unionDiscriminator
+	// +required
 	PatchType PatchType `json:"patchType" protobuf:"bytes,2,opt,name=patchType,casttype=PatchType"`
 
 	// applyConfiguration defines the desired configuration values of an object.
 	// The configuration is applied to the admission object using
 	// [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
 	// A CEL expression is used to create apply configuration.
+	// +optional
 	ApplyConfiguration *ApplyConfiguration `json:"applyConfiguration,omitempty" protobuf:"bytes,3,opt,name=applyConfiguration"`
 
 	// jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
 	// A CEL expression is used to create the JSON patch.
+	// +optional
 	JSONPatch *JSONPatch `json:"jsonPatch,omitempty" protobuf:"bytes,4,opt,name=jsonPatch"`
 }
 
@@ -1293,6 +1323,7 @@ type ApplyConfiguration struct {
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
+	// +optional
 	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
 }
 
@@ -1363,6 +1394,7 @@ type JSONPatch struct {
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
+	// +optional
 	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
 }
 
@@ -1410,6 +1442,7 @@ type MutatingAdmissionPolicyBindingSpec struct {
 	// policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
+	// +optional
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
 	// paramRef specifies the parameter resource used to configure the admission control policy.
@@ -1455,9 +1488,11 @@ type RuleWithOperations struct {
 	// If '*' is present, the length of the slice must be one.
 	// Required.
 	// +listType=atomic
+	// +optional
 	Operations []OperationType `json:"operations,omitempty" protobuf:"bytes,1,rep,name=operations,casttype=OperationType"`
 	// Rule is embedded, it describes other criteria of the rule, like
 	// APIGroups, APIVersions, Resources, etc.
+	// +required
 	Rule `json:",inline" protobuf:"bytes,2,opt,name=rule"`
 }
 
@@ -1524,9 +1559,11 @@ type WebhookClientConfig struct {
 type ServiceReference struct {
 	// namespace is the namespace of the service.
 	// Required
+	// +required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 	// name is the name of the service.
 	// Required
+	// +required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// path is an optional URL path which will be sent in any request to
@@ -1552,6 +1589,7 @@ type MatchCondition struct {
 	// optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
 	//
 	// Required.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
@@ -1567,5 +1605,6 @@ type MatchCondition struct {
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// Required.
+	// +required
 	Expression string `json:"expression" protobuf:"bytes,2,opt,name=expression"`
 }
