@@ -493,7 +493,7 @@ func TestGetISCSICHAP(t *testing.T) {
 			spec:                  &volume.Spec{},
 			expectedDiscoveryCHAP: false,
 			expectedSessionCHAP:   false,
-			expectedError:         fmt.Errorf("Spec does not reference an ISCSI volume type"),
+			expectedError:         fmt.Errorf("spec does not reference an ISCSI volume type"),
 		},
 	}
 	for _, testcase := range tests {

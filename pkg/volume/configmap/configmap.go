@@ -65,7 +65,7 @@ func (plugin *configMapPlugin) GetPluginName() string {
 func (plugin *configMapPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a ConfigMap volume type")
+		return "", fmt.Errorf("spec does not reference a ConfigMap volume type")
 	}
 
 	return fmt.Sprintf(

@@ -69,7 +69,7 @@ func (plugin *downwardAPIPlugin) GetPluginName() string {
 func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a DownwardAPI volume type")
+		return "", fmt.Errorf("spec does not reference a DownwardAPI volume type")
 	}
 
 	// Return user defined volume name, since this is an ephemeral volume type

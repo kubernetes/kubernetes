@@ -487,7 +487,7 @@ func getISCSIVolumeInfo(spec *volume.Spec) (bool, string, error) {
 		return spec.ReadOnly, spec.PersistentVolume.Spec.ISCSI.FSType, nil
 	}
 
-	return false, "", fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return false, "", fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 // get iSCSI target info: target portal, portals, iqn, and lun
@@ -499,7 +499,7 @@ func getISCSITargetInfo(spec *volume.Spec) (string, []string, string, int32, err
 		return spec.PersistentVolume.Spec.ISCSI.TargetPortal, spec.PersistentVolume.Spec.ISCSI.Portals, spec.PersistentVolume.Spec.ISCSI.IQN, spec.PersistentVolume.Spec.ISCSI.Lun, nil
 	}
 
-	return "", nil, "", 0, fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return "", nil, "", 0, fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 // get iSCSI initiator info: iface and initiator name
@@ -511,7 +511,7 @@ func getISCSIInitiatorInfo(spec *volume.Spec) (string, *string, error) {
 		return spec.PersistentVolume.Spec.ISCSI.ISCSIInterface, spec.PersistentVolume.Spec.ISCSI.InitiatorName, nil
 	}
 
-	return "", nil, fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return "", nil, fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 // get iSCSI Discovery CHAP boolean
@@ -523,7 +523,7 @@ func getISCSIDiscoveryCHAPInfo(spec *volume.Spec) (bool, error) {
 		return spec.PersistentVolume.Spec.ISCSI.DiscoveryCHAPAuth, nil
 	}
 
-	return false, fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return false, fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 // get iSCSI Session CHAP boolean
@@ -535,7 +535,7 @@ func getISCSISessionCHAPInfo(spec *volume.Spec) (bool, error) {
 		return spec.PersistentVolume.Spec.ISCSI.SessionCHAPAuth, nil
 	}
 
-	return false, fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return false, fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 // get iSCSI CHAP Secret info: secret name and namespace
@@ -558,7 +558,7 @@ func getISCSISecretNameAndNamespace(spec *volume.Spec, defaultSecretNamespace st
 		return "", "", nil
 	}
 
-	return "", "", fmt.Errorf("Spec does not reference an ISCSI volume type")
+	return "", "", fmt.Errorf("spec does not reference an ISCSI volume type")
 }
 
 func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, manager diskManager, secret map[string]string) (*iscsiDisk, error) {

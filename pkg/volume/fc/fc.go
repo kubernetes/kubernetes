@@ -489,7 +489,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.FCVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.FC, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a FibreChannel volume type")
+	return nil, false, fmt.Errorf("spec does not reference a FibreChannel volume type")
 }
 
 func createPersistentVolumeFromFCVolumeSource(volumeName string, fc v1.FCVolumeSource) *v1.PersistentVolume {
