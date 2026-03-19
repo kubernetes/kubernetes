@@ -17,10 +17,13 @@ limitations under the License.
 package validators
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 	"testing"
 
 	"k8s.io/gengo/v2/codetags"
+	"k8s.io/gengo/v2/generator"
 )
 
 func TestTypeCheck(t *testing.T) {
@@ -215,5 +218,18 @@ func TestTypeCheck(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestTagDocScopesAreSorted ensures that all registered tag validators return
+// sorted scope lists from Docs().Scopes. This guarantees deterministic output
+// when generating validation code and docs (see kubernetes/kubernetes#137405).
+func TestTagDocScopesAreSorted(t *testing.T) {
+	validator := InitGlobalValidator(&generator.Context{})
+	docs := validator.Docs()
+	for _, d := range docs {
+		if !slices.IsSortedFunc(d.Scopes, func(a, b Scope) int { return cmp.Compare(string(a), string(b)) }) {
+			t.Errorf("tag %q: Docs().Scopes is not sorted (got %v); use sets.List() for deterministic output", d.Tag, d.Scopes)
+		}
 	}
 }
