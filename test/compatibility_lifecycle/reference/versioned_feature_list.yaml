@@ -739,6 +739,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: HugepageAwareEviction
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: ImageMaximumGCAge
   versionedSpecs:
   - default: false
