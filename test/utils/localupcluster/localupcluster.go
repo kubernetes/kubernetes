@@ -156,6 +156,14 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		tCtx.ExpectNoError(os.MkdirAll(d, 0777), "create artifacts directory for local-up-cluster.sh")
 	}
 
+	// If KUBERNETES_SERVER_CACHE_DIR is set (the same variable used by the
+	// upgrade/downgrade test to cache server binaries), cfssl binary is placed there.
+	var cfsslCacheDir string
+	if serverCacheDir, ok := os.LookupEnv("KUBERNETES_SERVER_CACHE_DIR"); ok && serverCacheDir != "" {
+		cfsslCacheDir = path.Join(serverCacheDir, "cfssl")
+		tCtx.ExpectNoError(os.MkdirAll(cfsslCacheDir, 0777), "create cfssl cache directory for local-up-cluster.sh")
+	}
+
 	// Spawn local-up-cluster.sh in background, keep it running (for etcd!),
 	// parse output to pick up commands and run them in order.
 	lines := make(chan Output, 100)
@@ -190,6 +198,15 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		"TMP_DIR":  tmpDir,  // config files, service-account key, kubelet.yaml, …
 		"ETCD_DIR": etcdDir, // etcd data
 		"LOG_DIR":  c.dir,   // kube-apiserver-audit.log, kubelet.log, …
+	}
+	if cfsslCacheDir != "" {
+		// cfssl binaries are cached persistently so they are downloaded only once.
+		// kube::util::ensure-cfssl (called by local-up-cluster.sh) downloads to
+		// ${KUBE_TEMP}/cfssl when cfssl is not already in PATH. By pointing
+		// KUBE_TEMP at parent of cfsslCacheDir, we ensure that cfssl is downloaded
+		// only once and reused across runs.
+		envOverrides["KUBE_TEMP"] = path.Dir(cfsslCacheDir)
+		envOverrides["PATH"] = cfsslCacheDir + ":" + os.Getenv("PATH")
 	}
 	for k, v := range envOverrides {
 		if _, ok := cmd.AdditionalEnv[k]; !ok {
