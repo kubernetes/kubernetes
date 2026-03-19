@@ -71,6 +71,7 @@ message ApplyConfiguration {
   //
   // Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
   // Required.
+  // +optional
   optional string expression = 1;
 }
 
@@ -91,6 +92,7 @@ message AuditAnnotation {
   // will be discarded.
   //
   // Required.
+  // +required
   optional string key = 1;
 
   // valueExpression represents the expression which is evaluated by CEL to
@@ -108,6 +110,7 @@ message AuditAnnotation {
   // will be joined together in a comma-separated list.
   //
   // Required.
+  // +required
   optional string valueExpression = 2;
 }
 
@@ -116,11 +119,13 @@ message ExpressionWarning {
   // fieldRef is the path to the field that refers to the expression.
   // For example, the reference to the expression of the first item of
   // validations is "spec.validations[0].expression"
+  // +required
   optional string fieldRef = 2;
 
   // warning contains the content of type checking information in a human-readable form.
   // Each line of the warning contains the type that the expression is checked
   // against, followed by the type check error from the compiler.
+  // +required
   optional string warning = 3;
 }
 
@@ -190,6 +195,7 @@ message JSONPatch {
   //
   // Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
   // Required.
+  // +optional
   optional string expression = 1;
 }
 
@@ -324,6 +330,7 @@ message MutatingAdmissionPolicy {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the desired behavior of the MutatingAdmissionPolicy.
+  // +required
   optional MutatingAdmissionPolicySpec spec = 2;
 }
 
@@ -344,6 +351,7 @@ message MutatingAdmissionPolicyBinding {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the desired behavior of the MutatingAdmissionPolicyBinding.
+  // +required
   optional MutatingAdmissionPolicyBindingSpec spec = 2;
 }
 
@@ -363,6 +371,7 @@ message MutatingAdmissionPolicyBindingSpec {
   // policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
   // If the referenced resource does not exist, this binding is considered invalid and will be ignored
   // Required.
+  // +optional
   optional string policyName = 1;
 
   // paramRef specifies the parameter resource used to configure the admission control policy.
@@ -412,6 +421,7 @@ message MutatingAdmissionPolicySpec {
   // The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
   // '*' matches CREATE, UPDATE and CONNECT.
   // Required.
+  // +optional
   optional MatchResources matchConstraints = 2;
 
   // variables contain definitions of variables that can be used in composition of other expressions.
@@ -481,6 +491,7 @@ message MutatingAdmissionPolicySpec {
   // order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only
   // reinvoked when mutations change the object after this mutation is invoked.
   // Required.
+  // +optional
   optional string reinvocationPolicy = 7;
 }
 
@@ -491,16 +502,19 @@ message Mutation {
   // Required.
   //
   // +unionDiscriminator
+  // +required
   optional string patchType = 2;
 
   // applyConfiguration defines the desired configuration values of an object.
   // The configuration is applied to the admission object using
   // [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
   // A CEL expression is used to create apply configuration.
+  // +optional
   optional ApplyConfiguration applyConfiguration = 3;
 
   // jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
   // A CEL expression is used to create the JSON patch.
+  // +optional
   optional JSONPatch jsonPatch = 4;
 }
 
@@ -522,10 +536,12 @@ message ParamKind {
   // apiVersion is the API group version the resources belong to.
   // In format of "group/version".
   // Required.
+  // +optional
   optional string apiVersion = 1;
 
   // kind is the API kind the resources belong to.
   // Required.
+  // +optional
   optional string kind = 2;
 }
 
@@ -600,6 +616,7 @@ message ValidatingAdmissionPolicy {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the desired behavior of the ValidatingAdmissionPolicy.
+  // +required
   optional ValidatingAdmissionPolicySpec spec = 2;
 
   // status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
@@ -736,6 +753,7 @@ message ValidatingAdmissionPolicySpec {
   // However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
   // ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
   // Required.
+  // +optional
   optional MatchResources matchConstraints = 2;
 
   // validations contain CEL expressions which is used to apply the validation.
@@ -867,6 +885,7 @@ message Validation {
   //     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
   //     non-intersecting keys are appended, retaining their partial order.
   // Required.
+  // +required
   optional string Expression = 1;
 
   // message represents the message displayed when validation fails. The message is required if the Expression contains
@@ -907,10 +926,12 @@ message Variable {
   // name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
   // The variable can be accessed in other expressions through `variables`
   // For example, if name is "foo", the variable will be available as `variables.foo`
+  // +required
   optional string Name = 1;
 
   // expression is the expression that will be evaluated as the value of the variable.
   // The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+  // +required
   optional string Expression = 2;
 }
 
