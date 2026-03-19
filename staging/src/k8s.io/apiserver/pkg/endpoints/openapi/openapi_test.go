@@ -60,6 +60,36 @@ func TestGetDefinitionName(t *testing.T) {
 	assertEqual(t, e2, spec.Extensions(nil))
 }
 
+func TestGetDefinitionNameFallbackToRESTFriendlyName(t *testing.T) {
+	testType := openapitesting.TestType{}
+	s := runtime.NewScheme()
+	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
+	namer := NewDefinitionNamer(s)
+
+	expectedGVK := []interface{}{
+		map[string]interface{}{
+			"group":   "test",
+			"version": "v1",
+			"kind":    "TestType",
+		},
+	}
+
+	// When the code generator keys definitions by Go type path (with slashes)
+	// but the GVK map is keyed by the REST-friendly name (dots), the fallback
+	// should convert and find the match. This is the case for types that do
+	// not implement OpenAPIModelName().
+	goTypePath := "k8s.io/apiserver/pkg/endpoints/openapi/testing.TestType"
+	n, e := namer.GetDefinitionName(goTypePath)
+	assertEqual(t, "io.k8s.apiserver.pkg.endpoints.openapi.testing.TestType", n)
+	assertEqual(t, expectedGVK, e["x-kubernetes-group-version-kind"])
+
+	// Types not in the GVK map should still get their slashes converted to dots.
+	subTypePath := "example.com/api/apps/v1.SomeSpec"
+	n, e2 := namer.GetDefinitionName(subTypePath)
+	assertEqual(t, "com.example.api.apps.v1.SomeSpec", n)
+	assertEqual(t, e2, spec.Extensions(nil))
+}
+
 func TestToValidOperationID(t *testing.T) {
 	scenarios := []struct {
 		s                     string
