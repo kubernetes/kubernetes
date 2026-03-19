@@ -16,16 +16,13 @@ limitations under the License.
 
 package app
 
-// TODO: Replace these local CDI types with the official
-// tags.cncf.io/container-device-interface/specs-go package, which is now
-// vendored. The local types were introduced to minimize dependencies, but
-// that concern has been resolved.
-//
 // These definitions are sufficient to generate simple CDI files which set env
 // variables in a container, which is all that the test driver does.  A real
 // driver will either use pre-generated CDI files or can use the
 // github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
 // helper package to generate files.
+//
+// This is not done in Kubernetes to minimize dependencies.
 
 // spec is the base configuration for CDI.
 type spec struct {
