@@ -382,6 +382,79 @@ func TestBatchBasic(t *testing.T) {
 	}
 }
 
+func TestIsVeryLowResourcePod(t *testing.T) {
+	tests := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedFit bool
+		description string
+	}{
+		{
+			name: "pod with no resources doesn't get optimized",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			expectedFit: false,
+			description: "Pod with no resource requests should not be optimized (custom filter logic)",
+		},
+		{
+			name: "very low-resource pod gets optimized",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(5*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFit: true,
+			description: "Very low-resource pod (5m CPU, 5MB memory) should be optimized",
+		},
+		{
+			name: "low-resource pod doesn't get optimized",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(20*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFit: false,
+			description: "Low-resource pod (20m CPU, 20MB memory) should not be optimized",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			batch := newOpportunisticBatch(nil)
+			fits := batch.isVeryLowResourcePod(tt.pod)
+
+			if fits != tt.expectedFit {
+				t.Errorf("isVeryLowResourcePod() = %v, expected %v. %s", fits, tt.expectedFit, tt.description)
+			}
+		})
+	}
+}
+
 func TestPodLikelyFitsOnNode(t *testing.T) {
 	tests := []struct {
 		name            string

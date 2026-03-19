@@ -207,14 +207,15 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
-	// Optimized path: do a quick resource check before running expensive filter plugins
-	// This avoids the synchronous RunFilterPlugins call for pods that will likely fit
-	if b.podLikelyFitsOnNode(pod, lastChosenNode) {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
-		return false
+	// Optimized path: For very low-resource pods, skip the expensive filter check
+	// This preserves batch state and enables effective batching
+	if b.isVeryLowResourcePod(pod) {
+		// For very low-resource pods, assume the batch state is compatible
+		// This avoids expensive synchronous filtering and preserves batching
+		return true
 	}
 
-	// Only run full filter plugins if the quick resource check suggests the pod won't fit
+	// For other pods, run the full filter plugins to ensure correctness
 	status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode)
 	if !status.IsRejected() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
@@ -229,6 +230,25 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 // Rather than trying to normalize all cases when they happen, we just check them all.
 func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
+}
+
+// isVeryLowResourcePod checks if a pod has very low resource requirements
+// that are unlikely to cause scheduling conflicts. This is used to optimize
+// batching by skipping expensive filter checks for such pods.
+func (b *OpportunisticBatch) isVeryLowResourcePod(pod *v1.Pod) bool {
+	podRequests := getResourceRequests(pod)
+	cpuReq := podRequests.Cpu().MilliValue()
+	memReq := podRequests.Memory().Value()
+
+	// Only optimize pods with some resource requests but very low amounts
+	// Pods with no resources might have custom affinity/taint constraints
+	if cpuReq == 0 && memReq == 0 {
+		return false
+	}
+
+	// Very low threshold: less than 10 millicores and 10MB memory
+	// This is conservative enough to avoid breaking existing logic
+	return cpuReq <= 10 && memReq <= 10*1024*1024
 }
 
 // podLikelyFitsOnNode performs a lightweight check to determine if a pod is likely
