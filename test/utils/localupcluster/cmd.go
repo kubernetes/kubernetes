@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -94,6 +95,10 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	tCtx = tCtx.WithCancel()
 	c.cancel = tCtx.Cancel
 	c.cmd = exec.CommandContext(tCtx, c.CommandLine[0], c.CommandLine[1:]...)
+	// Put the process in its own process group so that Stop can kill the entire
+	// group. This matters when the command is wrapped by sudo: killing sudo alone
+	// orphans its children (e.g. kubelet), which keep running and holding ports.
+	setProcessGroup(c.cmd)
 	c.gathering = false
 
 	c.cmd.Env = os.Environ()
@@ -158,6 +163,10 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 		defer c.wg.Done()
 		// tCtx.Logf("Starting to wait for termination of command %s", c.Name)
 		c.result = c.cmd.Wait()
+		// Mark the process as no longer running immediately after Wait() so that
+		// Stop()'s killProcessGroup guard (c.running.Load()) sees the correct
+		// state as soon as the PID is released by the kernel and could be recycled.
+		c.running.Store(false)
 		tCtx.Logf("Command %s terminated, result: %v", c.Name, c.result)
 		now := time.Now()
 		if reader != nil {
@@ -177,7 +186,6 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 				}
 			}
 		}
-		c.running.Store(false)
 	}()
 }
 
@@ -199,6 +207,13 @@ func (c *Cmd) Stop(tCtx ktesting.TContext, reason string) string {
 			}()
 			_, _ = fmt.Fprintf(f, "%s: killing: %s\n", time.Now(), reason)
 		}
+	}
+	// Kill the entire process group so that children spawned by the command
+	// (e.g. kubelet launched by sudo) are also terminated. Guard with
+	// c.running to avoid signalling a recycled PID if the process already exited.
+	if c.cmd != nil && c.cmd.Process != nil && c.running.Load() {
+		useSudo := len(c.CommandLine) > 0 && filepath.Base(c.CommandLine[0]) == "sudo"
+		killProcessGroup(tCtx, c.cmd.Process.Pid, useSudo)
 	}
 	c.cancel(reason)
 	return c.wait(tCtx, true)
