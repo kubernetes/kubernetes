@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -376,6 +377,175 @@ func TestBatchBasic(t *testing.T) {
 				if nodesDiff != "" {
 					t.Fatalf("Diff between sortedNodes (-want,+got):\n%s", nodesDiff)
 				}
+			}
+		})
+	}
+}
+
+func TestPodLikelyFitsOnNode(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		nodeAllocatable *v1.ResourceList
+		nodeRequested   *framework.Resource
+		expectedFit     bool
+		description     string
+	}{
+		{
+			name: "pod with no resources doesn't get optimized",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			nodeAllocatable: &v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+			},
+			nodeRequested: &framework.Resource{
+				MilliCPU: 500,
+				Memory:   512 * 1024 * 1024,
+			},
+			expectedFit: false,
+			description: "Pod with no resource requests should not be optimized (custom filter logic)",
+		},
+		{
+			name: "very low-resource pod fits",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable: &v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+			},
+			nodeRequested: &framework.Resource{
+				MilliCPU: 400,
+				Memory:   400 * 1024 * 1024,
+			},
+			expectedFit: true,
+			description: "Very low-resource pod (<1% of remaining) should fit",
+		},
+		{
+			name: "low-resource pod doesn't fit optimistically",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewQuantity(10, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable: &v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+			},
+			nodeRequested: &framework.Resource{
+				MilliCPU: 400,
+				Memory:   400 * 1024 * 1024,
+			},
+			expectedFit: false,
+			description: "Low-resource pod (>1% of remaining) should not be optimized",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock node info
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Status: v1.NodeStatus{
+					Allocatable: *tt.nodeAllocatable,
+				},
+			}
+
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(node)
+
+			batch := newOpportunisticBatch(nil)
+			fits := batch.podLikelyFitsOnNode(tt.pod, nodeInfo)
+
+			if fits != tt.expectedFit {
+				t.Errorf("podLikelyFitsOnNode() = %v, expected %v. %s", fits, tt.expectedFit, tt.description)
+			}
+		})
+	}
+}
+
+func TestGetResourceRequests(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		expected v1.ResourceList
+	}{
+		{
+			name: "pod with no resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Resources: v1.ResourceRequirements{}},
+					},
+				},
+			},
+			expected: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
+			},
+		},
+		{
+			name: "pod with single container resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewQuantity(100, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getResourceRequests(tt.pod)
+
+			if !result.Cpu().Equal(*tt.expected.Cpu()) {
+				t.Errorf("CPU request = %v, expected %v", result.Cpu(), tt.expected.Cpu())
+			}
+			if !result.Memory().Equal(*tt.expected.Memory()) {
+				t.Errorf("Memory request = %v, expected %v", result.Memory(), tt.expected.Memory())
 			}
 		})
 	}

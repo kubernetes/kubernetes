@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -206,6 +207,14 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
+	// Optimized path: do a quick resource check before running expensive filter plugins
+	// This avoids the synchronous RunFilterPlugins call for pods that will likely fit
+	if b.podLikelyFitsOnNode(pod, lastChosenNode) {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
+		return false
+	}
+
+	// Only run full filter plugins if the quick resource check suggests the pod won't fit
 	status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode)
 	if !status.IsRejected() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
@@ -220,6 +229,98 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 // Rather than trying to normalize all cases when they happen, we just check them all.
 func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
+}
+
+// podLikelyFitsOnNode performs a lightweight check to determine if a pod is likely
+// to fit on a node based on resource requirements. This is an optimization to avoid
+// expensive filter plugin calls for pods that will clearly fit.
+// Returns true if the pod is likely to fit, false if it clearly won't fit.
+func (b *OpportunisticBatch) podLikelyFitsOnNode(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
+	// Quick check: if pod has no resource requests, we can't be sure it will fit
+	// because there might be custom filter logic (like affinity, taints, etc.)
+	// In this case, always defer to the full filter plugins
+	podRequests := getResourceRequests(pod)
+	cpuReq := podRequests.Cpu().MilliValue()
+	memReq := podRequests.Memory().Value()
+
+	if cpuReq == 0 && memReq == 0 {
+		// Pods with no resources are often subject to custom filter logic
+		// (e.g., affinity, taints, custom constraints). Always defer to full filters.
+		return false
+	}
+
+	// Get node allocatable resources
+	nodeAllocatable := nodeInfo.Node().Status.Allocatable
+
+	// Check if pod requests exceed node allocatable resources
+	if cpuReq > nodeAllocatable.Cpu().MilliValue() ||
+		memReq > nodeAllocatable.Memory().Value() {
+		return false
+	}
+
+	// Get remaining resources on the node
+	remaining := nodeInfo.GetAllocatable()
+	requested := nodeInfo.GetRequested()
+
+	// Calculate actual remaining resources
+	remainingMilliCPU := remaining.GetMilliCPU() - requested.GetMilliCPU()
+	remainingMemory := remaining.GetMemory() - requested.GetMemory()
+
+	// If pod requests exceed remaining resources, it won't fit
+	if cpuReq > remainingMilliCPU ||
+		memReq > remainingMemory {
+		return false
+	}
+
+	// For very low-resource pods (using less than 1% of any major resource),
+	// assume they'll fit to optimize batching
+	// Use a very conservative threshold to avoid breaking existing batching logic
+	if remainingMilliCPU > 0 && remainingMemory > 0 {
+		cpuRatio := float64(cpuReq) / float64(remainingMilliCPU)
+		memRatio := float64(memReq) / float64(remainingMemory)
+
+		// Only optimize for extremely low-resource pods (less than 1% of resources)
+		// This ensures we don't interfere with existing batching logic
+		if cpuRatio < 0.01 && memRatio < 0.01 {
+			return true
+		}
+	}
+
+	// For other cases, be conservative and let the full filter plugins decide
+	return false
+}
+
+// getResourceRequests extracts the total resource requests from a pod
+func getResourceRequests(pod *v1.Pod) v1.ResourceList {
+	requests := v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewQuantity(0, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for name, quantity := range container.Resources.Requests {
+			if existing, exists := requests[name]; exists {
+				existing.Add(quantity)
+				requests[name] = existing
+			} else {
+				requests[name] = quantity
+			}
+		}
+	}
+
+	// Add init containers
+	for _, container := range pod.Spec.InitContainers {
+		for name, quantity := range container.Resources.Requests {
+			if existing, exists := requests[name]; exists {
+				existing.Add(quantity)
+				requests[name] = existing
+			} else {
+				requests[name] = quantity
+			}
+		}
+	}
+
+	return requests
 }
 
 func newOpportunisticBatch(h fwk.Handle) *OpportunisticBatch {
