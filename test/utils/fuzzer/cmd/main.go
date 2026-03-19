@@ -31,6 +31,7 @@ import (
 
 func main() {
 	count := flag.Int("count", 1000, "Number of pods to generate")
+	offset := flag.Int("offset", 0, "Starting index for pod naming (prevents overwrites on multi-run)")
 	templatePath := flag.String("template", "test/utils/fuzzer/templates/representative-pod.yaml", "Path to the pod template YAML")
 	outDir := flag.String("out-dir", "", "Directory to write YAMLs (if specified, no cluster injection)")
 	concurrency := flag.Int("concurrency", 50, "Number of concurrent workers")
@@ -80,15 +81,15 @@ func main() {
 
 	start := time.Now()
 	if *outDir != "" {
-		fmt.Printf("Writing %d pod manifests to %s...\n", *count, *outDir)
-		dir, err := creator.WriteExemplaryPodsToDir(context.Background(), template, *count, *concurrency, *outDir, progress)
+		fmt.Printf("Writing %d pod manifests to %s (offset %d)...\n", *count, *outDir, *offset)
+		dir, err := creator.WriteExemplaryPodsToDir(context.Background(), template, *count, *offset, *concurrency, *outDir, progress)
 		if err != nil {
 			log.Fatalf("\nFailed to write pods: %v", err)
 		}
 		fmt.Printf("Successfully created %d pod manifests in: %s\n", *count, dir)
 	} else {
-		fmt.Printf("Injecting %d pods into cluster...\n", *count)
-		err := creator.CreateExemplaryPods(context.Background(), template, *count, *concurrency, progress)
+		fmt.Printf("Injecting %d pods into cluster (offset %d)...\n", *count, *offset)
+		err := creator.CreateExemplaryPods(context.Background(), template, *count, *offset, *concurrency, progress)
 		if err != nil {
 			log.Fatalf("\nFailed to inject pods: %v", err)
 		}

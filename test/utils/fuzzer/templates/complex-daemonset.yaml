@@ -2,7 +2,6 @@ name: "complex-daemonset-pod"
 envVarCount: 60
 managedFieldCount: 2
 baseSpec:
-  priorityClassName: "system-node-critical"
   serviceAccountName: "network-agent"
   hostNetwork: true
   dnsPolicy: "ClusterFirst"

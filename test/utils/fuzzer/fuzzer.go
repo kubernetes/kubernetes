@@ -327,15 +327,14 @@ func LoadTemplateFromFile(path string) (*ExemplaryPodTemplate, error) {
 }
 
 // CreateExemplaryPods creates a batch of pods concurrently based on a template.
-func (c *ExemplaryPodCreator) CreateExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, concurrency int, progress ProgressCallback) error {
-	return c.processExemplaryPods(ctx, template, count, concurrency, progress, func(pod *v1.Pod) error {
+func (c *ExemplaryPodCreator) CreateExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, progress ProgressCallback) error {
+	return c.processExemplaryPods(ctx, template, count, offset, concurrency, progress, func(pod *v1.Pod) error {
 		return utils.CreatePodWithRetries(c.client, pod.Namespace, pod)
 	})
 }
 
 // WriteExemplaryPodsToDir writes a batch of pod manifests to a directory.
-// If dirPath is empty, a temporary directory is created and returned.
-func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, template *ExemplaryPodTemplate, count int, concurrency int, dirPath string, progress ProgressCallback) (string, error) {
+func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, dirPath string, progress ProgressCallback) (string, error) {
 	if dirPath == "" {
 		var err error
 		dirPath, err = os.MkdirTemp("", "exemplary-pods-")
@@ -348,7 +347,7 @@ func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, templ
 		return "", fmt.Errorf("failed to create directory %s: %v", dirPath, err)
 	}
 
-	err := c.processExemplaryPods(ctx, template, count, concurrency, progress, func(pod *v1.Pod) error {
+	err := c.processExemplaryPods(ctx, template, count, offset, concurrency, progress, func(pod *v1.Pod) error {
 		data, err := yaml.Marshal(pod)
 		if err != nil {
 			return fmt.Errorf("failed to marshal pod %s: %v", pod.Name, err)
@@ -363,7 +362,7 @@ func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, templ
 	return dirPath, err
 }
 
-func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, concurrency int, progress ProgressCallback, processFunc func(*v1.Pod) error) error {
+func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, progress ProgressCallback, processFunc func(*v1.Pod) error) error {
 	g, ctx := errgroup.WithContext(ctx)
 	podsChan := make(chan int, count)
 
@@ -372,7 +371,8 @@ func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template
 		defer close(podsChan)
 		for i := 0; i < count; i++ {
 			select {
-			case podsChan <- i:
+			case podsChan <- i + offset:
+				// Pass the offset ID
 			case <-ctx.Done():
 				return
 			}

@@ -126,7 +126,7 @@ func TestWriteExemplaryPodsToDir(t *testing.T) {
 		Name: "test-pod",
 	}
 
-	dir, err := creator.WriteExemplaryPodsToDir(context.TODO(), template, 5, 2, "", nil)
+	dir, err := creator.WriteExemplaryPodsToDir(context.TODO(), template, 5, 0, 2, "", nil)
 	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 
