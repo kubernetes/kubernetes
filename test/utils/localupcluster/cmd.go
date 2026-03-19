@@ -94,6 +94,10 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	tCtx = tCtx.WithCancel()
 	c.cancel = tCtx.Cancel
 	c.cmd = exec.CommandContext(tCtx, c.CommandLine[0], c.CommandLine[1:]...)
+	// Put the process in its own process group so that Stop can kill the entire
+	// group. This matters when the command is wrapped by sudo: killing sudo alone
+	// orphans its children (e.g. kubelet), which keep running and holding ports.
+	setProcessGroup(c.cmd)
 	c.gathering = false
 
 	c.cmd.Env = os.Environ()
@@ -199,6 +203,11 @@ func (c *Cmd) Stop(tCtx ktesting.TContext, reason string) string {
 			}()
 			_, _ = fmt.Fprintf(f, "%s: killing: %s\n", time.Now(), reason)
 		}
+	}
+	// Kill the entire process group so that children spawned by the command
+	// (e.g. kubelet launched by sudo) are also terminated.
+	if c.cmd != nil && c.cmd.Process != nil {
+		killProcessGroup(c.cmd.Process.Pid)
 	}
 	c.cancel(reason)
 	return c.wait(tCtx, true)
