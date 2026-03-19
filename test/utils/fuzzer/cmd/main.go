@@ -57,10 +57,6 @@ func main() {
 				log.Fatalf("Failed to build kubeconfig: %v", err)
 			}
 		}
-		clientset, err = kubernetes.NewForConfig(config)
-		if err != nil {
-			log.Fatalf("Failed to create clientset: %v", err)
-		}
 		// Increase QPS and Burst
 		config.QPS = 500
 		config.Burst = 1000
@@ -71,7 +67,7 @@ func main() {
 	}
 
 	creator := fuzzer.NewExemplaryPodCreator(clientset, time.Now().UnixNano())
-	
+
 	progress := func(current, total int) {
 		fmt.Printf("\rProgress: %d/%d pods (%.1f%%)", current, total, float64(current)/float64(total)*100)
 		if current == total {

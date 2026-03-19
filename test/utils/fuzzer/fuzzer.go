@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -28,11 +29,11 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-	"sigs.k8s.io/yaml"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/utils"
+	"sigs.k8s.io/yaml"
 )
 
 // ExemplaryManagedFieldTemplate defines how to generate a ManagedFieldsEntry.
@@ -147,9 +148,7 @@ func (f *ExemplaryPodFuzzer) FuzzPod(template *ExemplaryPodTemplate, id int) *v1
 
 	if len(annos) > 0 {
 		pod.Annotations = make(map[string]string)
-		for k, v := range annos {
-			pod.Annotations[k] = v
-		}
+		maps.Copy(pod.Annotations, annos)
 	}
 
 	return pod
@@ -160,17 +159,14 @@ func (f *ExemplaryPodFuzzer) precomputeManagedFields(template *ExemplaryPodTempl
 		return nil
 	}
 
-	totalEntries := template.ManagedFieldCount
-	if totalEntries < len(template.ManagedFields) {
-		totalEntries = len(template.ManagedFields)
-	}
+	totalEntries := max(template.ManagedFieldCount, len(template.ManagedFields))
 
 	res := make([]metav1.ManagedFieldsEntry, totalEntries)
 	now := metav1.NewTime(time.Now())
 
-	for i := 0; i < totalEntries; i++ {
+	for i := range totalEntries {
 		mfTemplate := template.ManagedFields[i%len(template.ManagedFields)]
-		
+
 		// Build structurally complex FieldsV1
 		raw := f.buildComplexFieldsV1(mfTemplate)
 
@@ -204,9 +200,9 @@ func (f *ExemplaryPodFuzzer) buildComplexFieldsV1(tm ExemplaryManagedFieldTempla
 		if tm.Length > len(raw) {
 			bloat := f.randomString(tm.Length - len(raw) - 15)
 			if schema == "{}" {
-				return []byte(fmt.Sprintf(`{"fuzzBloat":"%s"}`, bloat))
+				return fmt.Appendf(nil, `{"fuzzBloat":"%s"}`, bloat)
 			}
-			return []byte(fmt.Sprintf(`{"fuzzBloat":"%s",%s`, bloat, schema[1:]))
+			return fmt.Appendf(nil, `{"fuzzBloat":"%s",%s`, bloat, schema[1:])
 		}
 		return raw
 	}
@@ -216,37 +212,37 @@ func (f *ExemplaryPodFuzzer) buildComplexFieldsV1(tm ExemplaryManagedFieldTempla
 	if depth <= 0 {
 		depth = 1
 	}
-	
+
 	// Create a map-based tree structure
 	tree := f.generateNestedMap(tm.FieldPathCount, depth)
-	
-	genJson, err := json.Marshal(tree)
+
+	genJSON, err := json.Marshal(tree)
 	if err != nil {
 		// Fallback to simple flat JSON if nesting fails
 		return []byte(`{"f:error":"generation_failed"}`)
 	}
-	
+
 	// If a target length is also specified, add a large bloat field
-	if tm.Length > len(genJson) {
-		bloat := f.randomString(tm.Length - len(genJson) - 17)
+	if tm.Length > len(genJSON) {
+		bloat := f.randomString(tm.Length - len(genJSON) - 17)
 		// Inject bloat at the start
-		res := fmt.Sprintf(`{"f:fuzzBloat":"%s",%s`, bloat, string(genJson)[1:])
+		res := fmt.Sprintf(`{"f:fuzzBloat":"%s",%s`, bloat, string(genJSON)[1:])
 		return []byte(res)
 	}
-	
-	return genJson
+
+	return genJSON
 }
 
 func (f *ExemplaryPodFuzzer) generateNestedMap(totalFields, maxDepth int) map[string]interface{} {
 	root := make(map[string]interface{})
 	fieldsCreated := 0
-	
+
 	for fieldsCreated < totalFields {
 		curr := root
 		// Pick a random depth for this specific field branch
 		branchDepth := f.rng.Intn(maxDepth) + 1
-		
-		for d := 0; d < branchDepth; d++ {
+
+		for d := range branchDepth {
 			key := fmt.Sprintf("f:node_%d_%d", d, f.rng.Intn(10)) // Use few branch nodes to force overlap
 			if d == branchDepth-1 {
 				// Leaf node
@@ -275,7 +271,7 @@ func (f *ExemplaryPodFuzzer) precomputeAnnotations(template *ExemplaryPodTemplat
 
 func (f *ExemplaryPodFuzzer) precomputeEnvVars(count int) []v1.EnvVar {
 	res := make([]v1.EnvVar, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		res[i] = v1.EnvVar{
 			Name:  fmt.Sprintf("FUZZ_GEN_VARIABLE_%03d", i),
 			Value: f.randomString(64),
@@ -317,11 +313,11 @@ func NewExemplaryPodCreator(client clientset.Interface, seed int64) *ExemplaryPo
 func LoadTemplateFromFile(path string) (*ExemplaryPodTemplate, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template file: %v", err)
+		return nil, fmt.Errorf("failed to read template file: %w", err)
 	}
 	var template ExemplaryPodTemplate
 	if err := yaml.Unmarshal(data, &template); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal template: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal template: %w", err)
 	}
 	return &template, nil
 }
@@ -339,22 +335,22 @@ func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, templ
 		var err error
 		dirPath, err = os.MkdirTemp("", "exemplary-pods-")
 		if err != nil {
-			return "", fmt.Errorf("failed to create temp dir: %v", err)
+			return "", fmt.Errorf("failed to create temp dir: %w", err)
 		}
 	}
 
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory %s: %v", dirPath, err)
+		return "", fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 	}
 
 	err := c.processExemplaryPods(ctx, template, count, offset, concurrency, progress, func(pod *v1.Pod) error {
 		data, err := yaml.Marshal(pod)
 		if err != nil {
-			return fmt.Errorf("failed to marshal pod %s: %v", pod.Name, err)
+			return fmt.Errorf("failed to marshal pod %s: %w", pod.Name, err)
 		}
 		filename := filepath.Join(dirPath, fmt.Sprintf("%s.yaml", pod.Name))
 		if err := os.WriteFile(filename, data, 0644); err != nil {
-			return fmt.Errorf("failed to write pod file %s: %v", filename, err)
+			return fmt.Errorf("failed to write pod file %s: %w", filename, err)
 		}
 		return nil
 	})
@@ -369,7 +365,7 @@ func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template
 	// Producer
 	go func() {
 		defer close(podsChan)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			select {
 			case podsChan <- i + offset:
 				// Pass the offset ID
@@ -381,7 +377,7 @@ func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template
 
 	// Consumers
 	var processed int64
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		g.Go(func() error {
 			for id := range podsChan {
 				pod := c.fuzzer.FuzzPod(template, id)

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -77,7 +78,7 @@ func TestExemplaryPodFuzzer(t *testing.T) {
 	// Verify ManagedFields (Generative Count)
 	assert.Len(t, pod1.ManagedFields, 5)
 	assert.Equal(t, "kube-scheduler-0", pod1.ManagedFields[0].Manager)
-	assert.Equal(t, pod1.ManagedFields[0].FieldsV1.Raw, pod2.ManagedFields[0].FieldsV1.Raw)
+	assert.Equal(t, pod1.ManagedFields[0].FieldsV1.GetRawBytes(), pod2.ManagedFields[0].FieldsV1.GetRawBytes())
 
 	// Verify Annotations
 	assert.Len(t, pod1.Annotations, 1)
@@ -105,8 +106,8 @@ func TestDeeplyNestedManagedFields(t *testing.T) {
 
 	pod := fuzzer.FuzzPod(template, 0)
 	assert.Len(t, pod.ManagedFields, 1)
-	
-	raw := string(pod.ManagedFields[0].FieldsV1.Raw)
+
+	raw := string(pod.ManagedFields[0].FieldsV1.GetRawBytes())
 	// Verify it contains multiple "f:" paths
 	assert.GreaterOrEqual(t, strings.Count(raw, "f:"), 50)
 	// Verify it contains multiple levels of nesting
@@ -115,7 +116,7 @@ func TestDeeplyNestedManagedFields(t *testing.T) {
 
 func TestLoadTemplateFromFile(t *testing.T) {
 	template, err := LoadTemplateFromFile("templates/representative-pod.yaml")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "representative-pod", template.Name)
 	assert.NotNil(t, template.BaseSpec)
 }
@@ -127,10 +128,12 @@ func TestWriteExemplaryPodsToDir(t *testing.T) {
 	}
 
 	dir, err := creator.WriteExemplaryPodsToDir(context.TODO(), template, 5, 0, 2, "", nil)
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	require.NoError(t, err)
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	files, err := os.ReadDir(dir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, files, 5)
 }
