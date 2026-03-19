@@ -63,7 +63,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
@@ -121,7 +120,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
-	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -644,20 +642,10 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
-	// Warn about MemoryQoS compatibility issues
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
-		if !kubeletutil.IsCgroup2UnifiedMode() {
-			logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
-		} else {
-			kernelVersion, err := utilkernel.GetVersion()
-			if err != nil {
-				logger.Error(err, "Failed to detect kernel version for MemoryQoS compatibility check")
-			} else if kernelVersion.LessThan(utilversion.MustParseGeneric(utilkernel.MemoryQoSMinKernelVersion)) {
-				logger.Info("Warning: MemoryQoS memory.high throttling may cause process livelock on older kernels",
-					"currentKernel", kernelVersion,
-					"minimumKernel", utilkernel.MemoryQoSMinKernelVersion)
-			}
-		}
+	// Warn if MemoryQoS enabled with cgroups v1
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
+		!kubeletutil.IsCgroup2UnifiedMode() {
+		logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
 	}
 	// Obtain Kubelet Lock File
 	if s.ExitOnLockContention && s.LockFilePath == "" {

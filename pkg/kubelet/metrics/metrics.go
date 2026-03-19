@@ -165,10 +165,6 @@ const (
 	DRAOperationsDurationKey     = "operations_duration_seconds"
 	DRAGRPCOperationsDurationKey = "grpc_operations_duration_seconds"
 
-	// Metric keys for MemoryQoS
-	MemoryQoSNodeMemoryMinBytesKey = "memory_qos_node_memory_min_bytes"
-	MemoryQoSNodeMemoryLowBytesKey = "memory_qos_node_memory_low_bytes"
-
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -954,26 +950,6 @@ var (
 		},
 	)
 
-	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
-	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
-		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           MemoryQoSNodeMemoryMinBytesKey,
-			Help:           "Total cgroup v2 memory.min in bytes for Guaranteed pods. This memory is hard-reserved and never reclaimed by the kernel.",
-			StabilityLevel: metrics.ALPHA,
-		},
-	)
-
-	// MemoryQoSNodeMemoryLowBytes tracks total cgroup v2 memory.low (soft protection) for Burstable pods.
-	MemoryQoSNodeMemoryLowBytes = metrics.NewGauge(
-		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           MemoryQoSNodeMemoryLowBytesKey,
-			Help:           "Total cgroup v2 memory.low in bytes for Burstable pods. This memory is soft-reserved and may be reclaimed under extreme pressure.",
-			StabilityLevel: metrics.ALPHA,
-		},
-	)
-
 	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
 	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -1382,10 +1358,6 @@ func Register() {
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
-			legacyregistry.MustRegister(MemoryQoSNodeMemoryMinBytes)
-			legacyregistry.MustRegister(MemoryQoSNodeMemoryLowBytes)
-		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
