@@ -207,11 +207,18 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
-	// Optimized path: For very low-resource pods, skip the expensive filter check
-	// This preserves batch state and enables effective batching
+	// Optimized path: For very low-resource pods, do a lightweight resource check first
+	// This avoids expensive filter plugins while still ensuring correctness
 	if b.isVeryLowResourcePod(pod) {
-		// For very low-resource pods, assume the batch state is compatible
-		// This avoids expensive synchronous filtering and preserves batching
+		// For very low-resource pods, do a quick resource-based check
+		// instead of running expensive filter plugins
+		if b.podCanFitOnNodeResources(pod, lastChosenNode) {
+			// Pod can fit on resources, but we still need to invalidate batch state
+			// because we don't know if it's the best node
+			b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
+			return false
+		}
+		// Pod cannot fit on resources, batch state is compatible
 		return true
 	}
 
@@ -230,6 +237,35 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 // Rather than trying to normalize all cases when they happen, we just check them all.
 func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
+}
+
+// podCanFitOnNodeResources performs a lightweight resource-based check
+// to determine if a pod can fit on a node based on resource requirements only.
+// This is much faster than running full filter plugins.
+func (b *OpportunisticBatch) podCanFitOnNodeResources(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
+	podRequests := getResourceRequests(pod)
+	cpuReq := podRequests.Cpu().MilliValue()
+	memReq := podRequests.Memory().Value()
+
+	// Get node allocatable resources from the node object directly
+	nodeAllocatable := nodeInfo.Node().Status.Allocatable
+
+	// Check if pod requests exceed node allocatable resources
+	if cpuReq > nodeAllocatable.Cpu().MilliValue() ||
+		memReq > nodeAllocatable.Memory().Value() {
+		return false
+	}
+
+	// Get remaining resources on the node
+	// Use the node's allocatable minus already requested resources
+	requested := nodeInfo.GetRequested()
+
+	// Calculate actual remaining resources
+	remainingMilliCPU := nodeAllocatable.Cpu().MilliValue() - requested.GetMilliCPU()
+	remainingMemory := nodeAllocatable.Memory().Value() - requested.GetMemory()
+
+	// If pod requests exceed remaining resources, it won't fit
+	return cpuReq <= remainingMilliCPU && memReq <= remainingMemory
 }
 
 // isVeryLowResourcePod checks if a pod has very low resource requirements

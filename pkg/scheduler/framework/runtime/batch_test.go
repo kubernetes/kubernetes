@@ -382,6 +382,100 @@ func TestBatchBasic(t *testing.T) {
 	}
 }
 
+func TestPodCanFitOnNodeResources(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		nodeAllocatable *v1.ResourceList
+		nodeRequested   *framework.Resource
+		expectedFit     bool
+		description     string
+	}{
+		{
+			name: "pod fits on node with plenty of resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable: &v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(4000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
+			},
+			nodeRequested: &framework.Resource{
+				MilliCPU: 1000,
+				Memory:   1 * 1024 * 1024 * 1024,
+			},
+			expectedFit: true,
+			description: "Pod should fit on node with sufficient remaining resources",
+		},
+		{
+			name: "pod doesn't fit due to insufficient CPU",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(5000, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable: &v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewQuantity(4000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
+			},
+			nodeRequested: &framework.Resource{
+				MilliCPU: 1000,
+				Memory:   1 * 1024 * 1024 * 1024,
+			},
+			expectedFit: false,
+			description: "Pod should not fit due to insufficient CPU",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock node info
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Status: v1.NodeStatus{
+					Allocatable: *tt.nodeAllocatable,
+				},
+			}
+
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(node)
+
+			// Manually set the requested resources for testing
+			// This simulates pods already running on the node
+			nodeInfo.Requested = tt.nodeRequested
+
+			batch := newOpportunisticBatch(nil)
+			fits := batch.podCanFitOnNodeResources(tt.pod, nodeInfo)
+
+			if fits != tt.expectedFit {
+				t.Errorf("podCanFitOnNodeResources() = %v, expected %v. %s", fits, tt.expectedFit, tt.description)
+			}
+		})
+	}
+}
+
 func TestIsVeryLowResourcePod(t *testing.T) {
 	tests := []struct {
 		name        string
