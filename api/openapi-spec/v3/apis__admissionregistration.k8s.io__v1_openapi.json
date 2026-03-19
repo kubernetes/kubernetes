@@ -171,6 +171,9 @@
             "kind": "MutatingAdmissionPolicy",
             "version": "v1"
           }
+        ],
+        "required": [
+          "spec"
         ]
       },
       "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyBinding": {
@@ -210,6 +213,9 @@
             "kind": "MutatingAdmissionPolicyBinding",
             "version": "v1"
           }
+        ],
+        "required": [
+          "spec"
         ]
       },
       "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyBindingList": {
@@ -866,6 +872,9 @@
             "kind": "ValidatingAdmissionPolicy",
             "version": "v1"
           }
+        ],
+        "required": [
+          "spec"
         ]
       },
       "io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicyBinding": {
