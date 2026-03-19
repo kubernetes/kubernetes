@@ -243,7 +243,14 @@ func (f *ExemplaryPodFuzzer) generateNestedMap(totalFields, maxDepth int) map[st
 		branchDepth := f.rng.Intn(maxDepth) + 1
 
 		for d := range branchDepth {
-			key := fmt.Sprintf("f:node_%d_%d", d, f.rng.Intn(10)) // Use few branch nodes to force overlap
+			var key string
+			// 10% chance to generate a keyed list entry "k:" to test SSA associative list logic
+			if f.rng.Intn(100) < 10 {
+				key = fmt.Sprintf("k:{\"id\":%d,\"name\":\"node-%d-%d\"}", d, d, f.rng.Intn(10))
+			} else {
+				key = fmt.Sprintf("f:node_%d_%d", d, f.rng.Intn(10)) // Use few branch nodes to force overlap
+			}
+
 			if d == branchDepth-1 {
 				// Leaf node
 				key = fmt.Sprintf("f:field_%04d", fieldsCreated)

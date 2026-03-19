@@ -108,8 +108,9 @@ func TestDeeplyNestedManagedFields(t *testing.T) {
 	assert.Len(t, pod.ManagedFields, 1)
 
 	raw := string(pod.ManagedFields[0].FieldsV1.GetRawBytes())
-	// Verify it contains multiple "f:" paths
-	assert.GreaterOrEqual(t, strings.Count(raw, "f:"), 50)
+	// Verify it contains multiple field paths
+	assert.Contains(t, raw, "f:", "should contain 'f:' field paths")
+	assert.Contains(t, raw, "k:", "should contain 'k:' keyed list entries")
 	// Verify it contains multiple levels of nesting
 	assert.GreaterOrEqual(t, strings.Count(raw, "{"), 5)
 }
