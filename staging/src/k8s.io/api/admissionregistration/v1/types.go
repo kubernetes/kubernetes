@@ -148,6 +148,7 @@ type ValidatingAdmissionPolicy struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
+	// +required
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
 	// behaves in the expected way.
@@ -1140,6 +1141,7 @@ type MutatingAdmissionPolicy struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the MutatingAdmissionPolicy.
+	// +required
 	Spec MutatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -1420,6 +1422,7 @@ type MutatingAdmissionPolicyBinding struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the MutatingAdmissionPolicyBinding.
+	// +required
 	Spec MutatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -1492,7 +1495,6 @@ type RuleWithOperations struct {
 	Operations []OperationType `json:"operations,omitempty" protobuf:"bytes,1,rep,name=operations,casttype=OperationType"`
 	// Rule is embedded, it describes other criteria of the rule, like
 	// APIGroups, APIVersions, Resources, etc.
-	// +required
 	Rule `json:",inline" protobuf:"bytes,2,opt,name=rule"`
 }
 
