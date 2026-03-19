@@ -148,6 +148,14 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 	c.running = make(map[KubeComponentName]*Cmd)
 	c.settings = make(map[string]string)
 
+	// Pre-create artifacts directories under c.dir so that local-up-cluster.sh
+	// uses them instead of creating unmanaged directories under /tmp.
+	tmpDir := path.Join(c.dir, "tmp")
+	etcdDir := path.Join(c.dir, "etcd")
+	for _, d := range []string{tmpDir, etcdDir} {
+		tCtx.ExpectNoError(os.MkdirAll(d, 0777), "create artifacts directory for local-up-cluster.sh")
+	}
+
 	// Spawn local-up-cluster.sh in background, keep it running (for etcd!),
 	// parse output to pick up commands and run them in order.
 	lines := make(chan Output, 100)
@@ -174,6 +182,19 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 	}
 	if kubeVerboseVal < 2 {
 		cmd.AdditionalEnv["KUBE_VERBOSE"] = "2" // Enables -x for configuration variable assignments.
+	}
+	// Redirect local-up-cluster.sh artifacts directories into c.dir so
+	// they are cleaned up automatically with the test. Only set if the caller
+	// hasn't already provided an override.
+	envOverrides := map[string]string{
+		"TMP_DIR":  tmpDir,  // config files, service-account key, kubelet.yaml, …
+		"ETCD_DIR": etcdDir, // etcd data
+		"LOG_DIR":  c.dir,   // kube-apiserver-audit.log, kubelet.log, …
+	}
+	for k, v := range envOverrides {
+		if _, ok := cmd.AdditionalEnv[k]; !ok {
+			cmd.AdditionalEnv[k] = v
+		}
 	}
 	cmd.Start(tCtx)
 	c.running[LocalUpCluster] = cmd
