@@ -1302,6 +1302,13 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 		scheduler.WithPodInitialBackoffSeconds(0))
 	cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
+	workload := st.MakeWorkload().Name("workload").Namespace(ns).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
+		Obj()
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create Workload: %v", err)
+	}
+
 	for i, step := range tt.steps {
 		t.Logf("Executing step %d: %s", i, step.name)
 		switch {
