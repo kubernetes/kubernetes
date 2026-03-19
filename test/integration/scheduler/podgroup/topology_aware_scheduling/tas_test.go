@@ -37,12 +37,21 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
+// makeWorkload creates a default workload with templates for all podgroups in this files.
+// NOTE: If your scenario creates a gang podgroup with minCount other than {2, 3}, you should add a new PG template in the workload.
+func makeWorkload() *schedulingapi.Workload {
+	return st.MakeWorkload().Name("workload").
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("gang-2").MinCount(2).Obj()).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("gang-3").MinCount(3).Obj()).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("basic").BasicPolicy().Obj()).Obj()
+}
+
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Obj()
+	return st.MakePodGroup().Name(podGroupName).TemplateRef(fmt.Sprintf("gang-%d", minCount), "workload").TopologyKey(topologyKey).MinCount(minCount).Obj()
 }
 
 func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").BasicPolicy().TopologyKey(topologyKey).Obj()
+	return st.MakePodGroup().Name(podGroupName).TemplateRef("basic", "workload").BasicPolicy().TopologyKey(topologyKey).Obj()
 }
 
 func makeNode(nodeName, rackLabel, zoneLabel string) *v1.Node {
@@ -75,6 +84,7 @@ func makeUnfittablePod(podName, podGroupName string) *v1.Pod {
 type step struct {
 	name                      string
 	createNodes               []*v1.Node
+	createWorkload            *schedulingapi.Workload
 	createPodGroup            *schedulingapi.PodGroup
 	createPods                []*v1.Pod
 	deletePods                []string
@@ -125,6 +135,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
@@ -162,6 +176,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
@@ -196,6 +214,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 						makeAssignedPod("existing1", "node1-rack1", "2"),
 						makeAssignedPod("existing2", "node3-rack1", "2"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
@@ -236,6 +258,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 						makeNode("node5-rack2", "rack-2", "zone-2"),
 						makeNode("node6-rack3", "rack-3", "zone-2"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
@@ -289,6 +315,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
@@ -332,6 +362,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 						makeNode("node4-rack2", "rack-2", "zone-1"),
 						makeNode("node5-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
@@ -391,6 +425,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 						makeNode("node3-rack1", "rack-1", "zone-1"),
 						makeNode("node4-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object (Gang with minCount=2) that should be scheduled on one rack",
@@ -454,6 +492,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
@@ -512,6 +554,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
@@ -564,6 +610,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object (Gang with minCount=2) that should be scheduled on one rack",
 					createPodGroup: makeGangPodGroup("pg1", "rack", 2),
 				},
@@ -602,6 +652,10 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 						makeNode("node5-rack2", "rack-2", "zone-1"),
 						makeNode("node6-rack3", "rack-3", "zone-2"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
@@ -673,6 +727,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -712,6 +770,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -745,6 +807,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node1-rack1", "rack-1", "zone-1"),
 						makeNode("node2-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -786,6 +852,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -811,6 +881,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node1-rack1", "rack-1", "zone-1"),
 						makeNode("node2-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -845,6 +919,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node4-rack2", "rack-2", "zone-2"),
 						makeNode("node5-rack2", "rack-2", "zone-2"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -904,6 +982,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -955,6 +1037,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -1000,6 +1086,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node3-rack1", "rack-1", "zone-1"),
 						makeNode("node4-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -1065,6 +1155,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					},
 				},
 				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
+				},
+				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
 					createPodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
@@ -1105,6 +1199,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node4-zone2", "rack-3", "zone-2"),
 						makeNode("node5-zone2", "rack-3", "zone-2"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -1159,6 +1257,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 						makeNode("node2-rack1", "rack-1", "zone-1"),
 						makeNode("node3-rack2", "rack-2", "zone-1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -1233,6 +1335,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					createPods: []*v1.Pod{
 						makeAssignedPod("existing1", "node1-rack1", "1"),
 					},
+				},
+				{
+					name:           "Create workload with podgroup templates matching all podgroups in this scenario",
+					createWorkload: makeWorkload(),
 				},
 				{
 					name:           "Create the PodGroup object that should be scheduled on one rack",
@@ -1320,6 +1426,12 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 					t.Fatalf("Step %d: Failed to create pod %s: %v", i, p.Name, err)
 				}
 			}
+		case step.createWorkload != nil:
+			step.createWorkload.Namespace = ns
+			if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, step.createWorkload, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create workload %s: %v", step.createWorkload.Name, err)
+			}
+
 		case step.createPodGroup != nil:
 			w := step.createPodGroup.DeepCopy()
 			w.Namespace = ns
