@@ -23,9 +23,11 @@ import (
 
 	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
@@ -104,10 +106,14 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
 	}
 
+	memory := rootStats.Memory
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugepageAwareEviction) {
+		memory = adjustForHugePages(memory, node)
+	}
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
+		Memory:           memory,
 		Swap:             rootStats.Swap,
 		Network:          networkStats,
 		StartTime:        sp.systemBootTime,
@@ -144,10 +150,14 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
 
+	memory := rootStats.Memory
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugepageAwareEviction) {
+		memory = adjustForHugePages(memory, node)
+	}
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
+		Memory:           memory,
 		Swap:             rootStats.Swap,
 		StartTime:        rootStats.StartTime,
 		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(ctx, nodeConfig, podStats, false),
@@ -157,4 +167,43 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 		Pods: podStats,
 	}
 	return &summary, nil
+}
+
+// adjustForHugePages returns a copy of memoryStats with AvailableBytes reduced
+// by the node's total hugepage capacity.
+//
+// The root cgroup's memory limit is set to MemTotal (which includes
+// hugepage-reserved RAM), but the memory cgroup controller does not track
+// hugetlb allocations in WorkingSet. This causes AvailableBytes
+// (limit - WorkingSet) to overstate real available regular memory by the
+// hugepage reservation amount, delaying eviction until the node is under
+// severe memory pressure.
+func adjustForHugePages(memory *statsapi.MemoryStats, node *v1.Node) *statsapi.MemoryStats {
+	if memory == nil || memory.AvailableBytes == nil || node == nil {
+		return memory
+	}
+
+	var totalHugePageBytes uint64
+	for name, quantity := range node.Status.Capacity {
+		if v1helper.IsHugePageResourceName(name) {
+			totalHugePageBytes += uint64(quantity.Value())
+		}
+	}
+	if totalHugePageBytes == 0 {
+		return memory
+	}
+
+	adjusted := *memory
+	if *adjusted.AvailableBytes > totalHugePageBytes {
+		available := *adjusted.AvailableBytes - totalHugePageBytes
+		adjusted.AvailableBytes = &available
+	} else {
+		// Defensive: this shouldn't happen in steady state because the kernel
+		// removes hugepage-reserved pages from the buddy allocator, but
+		// transient inconsistencies between cgroup stats and node capacity
+		// reporting could cause it.
+		available := uint64(0)
+		adjusted.AvailableBytes = &available
+	}
+	return &adjusted
 }
