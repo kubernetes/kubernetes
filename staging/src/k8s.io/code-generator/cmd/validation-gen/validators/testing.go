@@ -32,17 +32,24 @@ const (
 
 	// This tag always returns an error from ExtractValidations.
 	validateErrorTagName = "k8s:validateError"
+
+	// validate true alpha/beta  test tags.
+	validateAlphaTagName = "k8s:validateTrueAlpha"
+	validateBetaTagName  = "k8s:validateTrueBeta"
 )
 
 func init() {
 	RegisterTagValidator(fixedResultTagValidator{result: true})
 	RegisterTagValidator(fixedResultTagValidator{result: false})
 	RegisterTagValidator(fixedResultTagValidator{error: true})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelAlpha})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelBeta})
 }
 
 type fixedResultTagValidator struct {
-	result bool
-	error  bool
+	result    bool
+	error     bool
+	stability TagStabilityLevel
 }
 
 func (fixedResultTagValidator) Init(_ Config) {}
@@ -51,7 +58,14 @@ func (frtv fixedResultTagValidator) TagName() string {
 	if frtv.error {
 		return validateErrorTagName
 	} else if frtv.result {
-		return validateTrueTagName
+		switch frtv.stability {
+		case TagStabilityLevelAlpha:
+			return validateAlphaTagName
+		case TagStabilityLevelBeta:
+			return validateBetaTagName
+		default:
+			return validateTrueTagName
+		}
 	}
 	return validateFalseTagName
 }
@@ -125,9 +139,13 @@ func (fixedResultTagValidator) toFixedResultArgs(in codetags.Tag) (fixedResultAr
 }
 
 func (frtv fixedResultTagValidator) Docs() TagDoc {
+	tagStabilityLevel := TagStabilityLevelAlpha
+	if frtv.stability != "" {
+		tagStabilityLevel = frtv.stability
+	}
 	doc := TagDoc{
 		Tag:            frtv.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: tagStabilityLevel,
 		Scopes:         sets.List(frtv.ValidScopes()),
 	}
 	doc.PayloadsType = codetags.ValueTypeString

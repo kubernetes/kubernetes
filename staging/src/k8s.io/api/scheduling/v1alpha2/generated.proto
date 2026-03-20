@@ -49,7 +49,6 @@ message GangSchedulingPolicy {
 // PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
 // Workload.podGroupTemplates.
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
-// +k8s:validation-gen-nolint  // to allow pre-GA tags while this API is pre-GA
 message PodGroup {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -255,7 +254,6 @@ message TypedLocalObjectReference {
 // when managing the lifecycle of workloads from the scheduling perspective,
 // including scheduling, preemption, eviction and other phases.
 // Workload API enablement is toggled by the GenericWorkload feature gate.
-// +k8s:validation-gen-nolint  // to allow pre-GA tags while this API is pre-GA
 message Workload {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

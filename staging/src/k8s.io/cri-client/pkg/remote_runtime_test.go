@@ -51,7 +51,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider())
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), false)
 
 	require.NoError(t, err)
 
@@ -59,7 +59,7 @@ func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing
 }
 
 func createRemoteRuntimeServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, tp)
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, tp, false)
 	require.NoError(t, err)
 
 	return runtimeService

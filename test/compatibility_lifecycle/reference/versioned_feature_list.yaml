@@ -399,6 +399,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CRIListStreaming
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: CrossNamespaceVolumeDataSource
   versionedSpecs:
   - default: false
@@ -651,6 +657,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: EnableWorkloadWithJob
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: EnvFiles
   versionedSpecs:
   - default: false
@@ -1153,7 +1165,7 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.24"
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
@@ -1359,7 +1371,7 @@
     version: "1.36"
 - name: PLEGOnDemandRelist
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.36"

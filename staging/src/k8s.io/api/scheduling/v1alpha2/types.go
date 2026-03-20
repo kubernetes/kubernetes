@@ -27,7 +27,6 @@ import (
 // when managing the lifecycle of workloads from the scheduling perspective,
 // including scheduling, preemption, eviction and other phases.
 // Workload API enablement is toggled by the GenericWorkload feature gate.
-// +k8s:validation-gen-nolint  // to allow pre-GA tags while this API is pre-GA
 type Workload struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -187,7 +186,6 @@ type GangSchedulingPolicy struct {
 // PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
 // Workload.podGroupTemplates.
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
-// +k8s:validation-gen-nolint  // to allow pre-GA tags while this API is pre-GA
 type PodGroup struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

@@ -182,3 +182,51 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 		}
 	}
 }
+
+func TestJobControllerSchedulingRules(t *testing.T) {
+	cases := []struct {
+		name                  string
+		enableWorkloadWithJob bool
+		wantSchedulingRules   bool
+	}{
+		{
+			name:                  "feature gate disabled",
+			enableWorkloadWithJob: false,
+			wantSchedulingRules:   false,
+		},
+		{
+			name:                  "feature gate enabled",
+			enableWorkloadWithJob: true,
+			wantSchedulingRules:   true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:       tc.enableWorkloadWithJob,
+				features.EnableWorkloadWithJob: tc.enableWorkloadWithJob,
+			})
+			got := hasSchedulingRules(ControllerRoles())
+			if got != tc.wantSchedulingRules {
+				t.Errorf("hasSchedulingRules() = %v, want %v", got, tc.wantSchedulingRules)
+			}
+		})
+	}
+}
+
+func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
+	for _, role := range roles {
+		if role.Name != saRolePrefix+"job-controller" {
+			continue
+		}
+		for _, rule := range role.Rules {
+			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") &&
+				slices.Contains(rule.Resources, "workloads") &&
+				slices.Contains(rule.Resources, "podgroups") {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -83,6 +83,8 @@ type CoreResourceEnqueueTestCase struct {
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
 	// InitialDeviceClasses are the list of DeviceClass to be created at first.
 	InitialDeviceClasses []*resourceapi.DeviceClass
+	// InitialWorkloads is the list of Workloads to be created at first.
+	InitialWorkloads []*schedulingapi.Workload
 	// InitialPodGroups is the list of PodGroups to be created at first.
 	InitialPodGroups []*schedulingapi.PodGroup
 	// Pods are the list of Pods to be created.
@@ -2655,6 +2657,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
+		},
 		InitialPodGroups: []*schedulingapi.PodGroup{
 			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
 		},
@@ -2679,6 +2684,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
+		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
 		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
@@ -2823,6 +2831,13 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		pvc.Namespace = ns
 		if _, err := testutils.CreatePVC(cs, pvc); err != nil {
 			t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
+		}
+	}
+
+	for _, w := range tt.InitialWorkloads {
+		w.Namespace = ns
+		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a Workload %q: %v", w.Name, err)
 		}
 	}
 

@@ -84,7 +84,7 @@ type frameworkImpl struct {
 
 	clientSet        clientset.Interface
 	kubeConfig       *restclient.Config
-	eventRecorder    events.EventRecorder
+	eventRecorder    events.EventRecorderLogger
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
 	podGroupManager  fwk.PodGroupManager
@@ -148,7 +148,7 @@ type frameworkOptions struct {
 	componentConfigVersion string
 	clientSet              clientset.Interface
 	kubeConfig             *restclient.Config
-	eventRecorder          events.EventRecorder
+	eventRecorder          events.EventRecorderLogger
 	informerFactory        informers.SharedInformerFactory
 	sharedDRAManager       fwk.SharedDRAManager
 	sharedCSIManager       fwk.CSIManager
@@ -194,7 +194,7 @@ func WithKubeConfig(kubeConfig *restclient.Config) Option {
 }
 
 // WithEventRecorder sets clientSet for the scheduling frameworkImpl.
-func WithEventRecorder(recorder events.EventRecorder) Option {
+func WithEventRecorder(recorder events.EventRecorderLogger) Option {
 	return func(o *frameworkOptions) {
 		o.eventRecorder = recorder
 	}
@@ -2159,7 +2159,7 @@ func (f *frameworkImpl) KubeConfig() *restclient.Config {
 }
 
 // EventRecorder returns an event recorder.
-func (f *frameworkImpl) EventRecorder() events.EventRecorder {
+func (f *frameworkImpl) EventRecorder() events.EventRecorderLogger {
 	return f.eventRecorder
 }
 

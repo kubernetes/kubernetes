@@ -6931,4 +6931,104 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 			testKubeletRestartForRestartableInit(ctx, pod)
 		})
 	})
+
+	// Regression test for https://github.com/kubernetes/kubernetes/issues/136910
+	var _ = SIGDescribe(framework.WithSerial(), "Sidecar container restart after kubelet restart", framework.WithFeatureGate(features.ChangeContainerStatusOnKubeletRestart), func() {
+		f := framework.NewDefaultFramework("sidecar-container-restart-test-serial")
+		addAfterEachForCleaningUpPods(f)
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+		ginkgo.It("should restart regular containers when sidecar with startupProbe is running after kubelet restart", func(ctx context.Context) {
+			containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-with-sidecar-and-crashing-container",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							Image:         defaultImage,
+							Command:       []string{"sh", "-c", "while true; do sleep 1; done"},
+							RestartPolicy: &containerRestartPolicyAlways,
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/true"},
+									},
+								},
+								InitialDelaySeconds: 1,
+								PeriodSeconds:       1,
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "crasher",
+							Image:   defaultImage,
+							Command: []string{"/bin/sh", "-c", "trap 'exit 0' TERM; sleep 3600 & wait $!"},
+						},
+					},
+				},
+			}
+
+			client := e2epod.NewPodClient(f)
+			pod = client.Create(ctx, pod)
+
+			ginkgo.By("Waiting for the pod to be running and ready")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "PodReady", f.Timeouts.PodStart,
+				func(p *v1.Pod) (bool, error) {
+					if p.Status.Phase != v1.PodRunning {
+						return false, nil
+					}
+					for _, cond := range p.Status.Conditions {
+						if cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue {
+							return true, nil
+						}
+					}
+					return false, nil
+				})
+			framework.ExpectNoError(err)
+
+			// The grace period for kubelet startup is 10 seconds, so we wait here for 11 seconds.
+			time.Sleep(time.Second * 11)
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+
+			ginkgo.By("ensuring kubelet is healthy")
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+			ginkgo.By("Sending SIGTERM to PID 1 in the crasher container")
+			_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "crasher", "kill", "1")
+			framework.ExpectNoError(err, "failed to send SIGTERM to PID 1 in crasher container")
+
+			ginkgo.By("Waiting for the container to restart and be running again")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "ContainerRunningAfterRestart", f.Timeouts.PodStart,
+				func(p *v1.Pod) (bool, error) {
+					for _, status := range p.Status.ContainerStatuses {
+						if status.Name == "crasher" && status.RestartCount > 0 && status.State.Running != nil {
+							return true, nil
+						}
+					}
+					return false, nil
+				})
+			framework.ExpectNoError(err, "container should be restarted and running again")
+
+			ginkgo.By("Verifying sidecar is still running")
+			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(p.Status.InitContainerStatuses).ToNot(gomega.BeEmpty())
+			for _, status := range p.Status.InitContainerStatuses {
+				if status.Name == "sidecar" {
+					gomega.Expect(status.State.Running).ToNot(gomega.BeNil(), "sidecar should still be running")
+					gomega.Expect(status.RestartCount).To(gomega.BeZero(), "sidecar should not have restarted")
+				}
+			}
+		})
+	})
 })

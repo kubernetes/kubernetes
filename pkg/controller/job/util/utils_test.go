@@ -21,6 +21,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestFinishedCondition(t *testing.T) {
@@ -203,6 +204,79 @@ func TestIsJobSucceeded(t *testing.T) {
 			gotResult := IsJobSucceeded(&tc.job)
 			if tc.wantResult != gotResult {
 				t.Errorf("unexpected result, want=%v, got=%v", tc.wantResult, gotResult)
+			}
+		})
+	}
+}
+
+func TestIsGangSchedulingCandidate(t *testing.T) {
+	tests := map[string]struct {
+		parallelism        *int32
+		completions        *int32
+		isIndexed          bool
+		hasSchedulingGroup bool
+		want               bool
+	}{
+		"eligible: indexed, parallelism=completions>1": {
+			parallelism: ptr.To[int32](4),
+			completions: ptr.To[int32](4),
+			isIndexed:   true,
+			want:        true,
+		},
+		"eligible: minimum parallelism of 2": {
+			parallelism: ptr.To[int32](2),
+			completions: ptr.To[int32](2),
+			isIndexed:   true,
+			want:        true,
+		},
+		"not eligible: nil parallelism": {
+			parallelism: nil,
+			completions: ptr.To[int32](4),
+			isIndexed:   true,
+			want:        false,
+		},
+		"not eligible: parallelism=1": {
+			parallelism: ptr.To[int32](1),
+			completions: ptr.To[int32](1),
+			isIndexed:   true,
+			want:        false,
+		},
+		"not eligible: parallelism=0": {
+			parallelism: ptr.To[int32](0),
+			completions: ptr.To[int32](0),
+			isIndexed:   true,
+			want:        false,
+		},
+		"not eligible: non-indexed": {
+			parallelism: ptr.To[int32](4),
+			completions: ptr.To[int32](4),
+			isIndexed:   false,
+			want:        false,
+		},
+		"not eligible: nil completions": {
+			parallelism: ptr.To[int32](4),
+			completions: nil,
+			isIndexed:   true,
+			want:        false,
+		},
+		"not eligible: completions != parallelism": {
+			parallelism: ptr.To[int32](4),
+			completions: ptr.To[int32](8),
+			isIndexed:   true,
+			want:        false,
+		},
+		"not eligible: schedulingGroup already set": {
+			parallelism:        ptr.To[int32](4),
+			completions:        ptr.To[int32](4),
+			isIndexed:          true,
+			hasSchedulingGroup: true,
+			want:               false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := IsGangSchedulingCandidate(tc.parallelism, tc.completions, tc.isIndexed, tc.hasSchedulingGroup); got != tc.want {
+				t.Fatalf("IsGangSchedulingCandidate() = %v, want %v", got, tc.want)
 			}
 		})
 	}
