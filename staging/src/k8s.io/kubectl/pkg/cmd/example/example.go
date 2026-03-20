@@ -94,112 +94,74 @@ func stripZeroFields(m map[string]interface{}) {
 	}
 }
 
-var buildersByKind = map[string]func(string, string, int) ([]byte, error){
-	"pod": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildPod(name, image))
-	},
-	"pods": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildPod(name, image))
-	},
-	"po": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildPod(name, image))
-	},
-	"deployment": func(name, image string, replicas int) ([]byte, error) {
+// ResourceGenerator generates example YAML for a Kubernetes resource.
+type ResourceGenerator interface {
+	Generate(name, image string, replicas int) ([]byte, error)
+}
+
+// structGenerator wraps a builder function to implement ResourceGenerator.
+type structGenerator struct {
+	fn func(string, string, int) ([]byte, error)
+}
+
+func (g structGenerator) Generate(name, image string, replicas int) ([]byte, error) {
+	return g.fn(name, image, replicas)
+}
+
+var buildersByKind = map[string]ResourceGenerator{
+	"pod":  structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildPod(name, image)) }},
+	"pods": structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildPod(name, image)) }},
+	"po":   structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildPod(name, image)) }},
+
+	"deployment": structGenerator{fn: func(name, image string, replicas int) ([]byte, error) {
 		return marshalExample(buildDeployment(name, image, replicas))
-	},
-	"deployments": func(name, image string, replicas int) ([]byte, error) {
+	}},
+	"deployments": structGenerator{fn: func(name, image string, replicas int) ([]byte, error) {
 		return marshalExample(buildDeployment(name, image, replicas))
-	},
-	"deploy": func(name, image string, replicas int) ([]byte, error) {
+	}},
+	"deploy": structGenerator{fn: func(name, image string, replicas int) ([]byte, error) {
 		return marshalExample(buildDeployment(name, image, replicas))
-	},
-	"service": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildService(name))
-	},
-	"services": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildService(name))
-	},
-	"svc": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildService(name))
-	},
-	"persistentvolumeclaim": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildPVC(name))
-	},
-	"persistentvolumeclaims": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildPVC(name))
-	},
-	"pvc": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildPVC(name))
-	},
-	"secret": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildSecret(name))
-	},
-	"secrets": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildSecret(name))
-	},
-	"customresourcedefinition": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildCRD(name))
-	},
-	"customresourcedefinitions": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildCRD(name))
-	},
-	"crd": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildCRD(name))
-	},
-	"configmap": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildConfigMap(name))
-	},
-	"configmaps": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildConfigMap(name))
-	},
-	"cm": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildConfigMap(name))
-	},
-	"job": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildJob(name, image))
-	},
-	"jobs": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildJob(name, image))
-	},
-	"cronjob": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildCronJob(name, image))
-	},
-	"cronjobs": func(name, image string, _ int) ([]byte, error) {
-		return marshalExample(buildCronJob(name, image))
-	},
-	"ingress": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildIngress(name))
-	},
-	"ingresses": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildIngress(name))
-	},
-	"ing": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildIngress(name))
-	},
-	"networkpolicy": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildNetworkPolicy(name))
-	},
-	"networkpolicies": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildNetworkPolicy(name))
-	},
-	"netpol": func(name, _ string, _ int) ([]byte, error) {
-		return marshalExample(buildNetworkPolicy(name))
-	},
-	"gateway": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildGateway(name))
-	},
-	"gateways": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildGateway(name))
-	},
-	"gtw": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildGateway(name))
-	},
-	"httproute": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildHTTPRoute(name))
-	},
-	"httproutes": func(name, _ string, _ int) ([]byte, error) {
-		return yaml.Marshal(buildHTTPRoute(name))
-	},
+	}},
+
+	"service":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildService(name)) }},
+	"services": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildService(name)) }},
+	"svc":      structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildService(name)) }},
+
+	"persistentvolumeclaim":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildPVC(name)) }},
+	"persistentvolumeclaims": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildPVC(name)) }},
+	"pvc":                    structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildPVC(name)) }},
+
+	"secret":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildSecret(name)) }},
+	"secrets": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildSecret(name)) }},
+
+	"customresourcedefinition":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildCRD(name)) }},
+	"customresourcedefinitions": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildCRD(name)) }},
+	"crd":                       structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildCRD(name)) }},
+
+	"configmap":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildConfigMap(name)) }},
+	"configmaps": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildConfigMap(name)) }},
+	"cm":         structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildConfigMap(name)) }},
+
+	"job":  structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildJob(name, image)) }},
+	"jobs": structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildJob(name, image)) }},
+
+	"cronjob":  structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildCronJob(name, image)) }},
+	"cronjobs": structGenerator{fn: func(name, image string, _ int) ([]byte, error) { return marshalExample(buildCronJob(name, image)) }},
+
+	"ingress":   structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildIngress(name)) }},
+	"ingresses": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildIngress(name)) }},
+	"ing":       structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildIngress(name)) }},
+
+	"networkpolicy":   structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildNetworkPolicy(name)) }},
+	"networkpolicies": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildNetworkPolicy(name)) }},
+	"netpol":          structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return marshalExample(buildNetworkPolicy(name)) }},
+
+	"gateway":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildGateway(name)) }},
+	"gateways": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildGateway(name)) }},
+	"gtw":      structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildGateway(name)) }},
+
+	"httproute":  structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildHTTPRoute(name)) }},
+	"httproutes": structGenerator{fn: func(name, _ string, _ int) ([]byte, error) { return yaml.Marshal(buildHTTPRoute(name)) }},
 }
 
 // Flags represent CLI flags for the command.
@@ -271,7 +233,7 @@ func (o *Options) Run() error {
 	// First, attempt static offline fallback without any discovery.
 	if _, key, ok := fallbackResolve(userToken); ok {
 		builder := buildersByKind[key]
-		rendered, err := builder(defaultNameFor(key, o.Name), o.Image, o.Replicas)
+		rendered, err := builder.Generate(defaultNameFor(key, o.Name), o.Image, o.Replicas)
 		if err != nil {
 			return err
 		}
@@ -317,7 +279,7 @@ func (o *Options) Run() error {
 	}
 
 	builder := buildersByKind[key]
-	rendered, err := builder(defaultNameFor(key, o.Name), o.Image, o.Replicas)
+	rendered, err := builder.Generate(defaultNameFor(key, o.Name), o.Image, o.Replicas)
 	if err != nil {
 		return err
 	}

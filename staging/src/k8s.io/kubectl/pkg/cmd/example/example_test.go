@@ -497,6 +497,19 @@ func TestExampleGateway(t *testing.T) {
 	}
 }
 
+func TestResourceGeneratorInterface(t *testing.T) {
+	for key, gen := range buildersByKind {
+		var _ ResourceGenerator = gen
+		out, err := gen.Generate("test-"+key, "nginx:latest", 2)
+		if err != nil {
+			t.Fatalf("Generate failed for key %q: %v", key, err)
+		}
+		if len(out) == 0 {
+			t.Fatalf("Generate returned empty output for key %q", key)
+		}
+	}
+}
+
 func TestExampleHTTPRoute(t *testing.T) {
 	flags := newTestFlags()
 	flags.Name = "web-route"
