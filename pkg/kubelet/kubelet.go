@@ -430,6 +430,22 @@ func PreInitRuntimeService(ctx context.Context, kubeCfg *kubeletconfiginternal.K
 	return nil
 }
 
+// newNodeHasSyncedFunc returns an InformerSynced that reports true only once the
+// node object for this kubelet is present in the informer cache.
+func newNodeHasSyncedFunc(nodeLister corelisters.NodeLister, nodeName types.NodeName) cache.InformerSynced {
+	var synced atomic.Bool
+	return func() bool {
+		if synced.Load() {
+			return true
+		}
+		if _, err := nodeLister.Get(string(nodeName)); err == nil {
+			synced.Store(true)
+			return true
+		}
+		return false
+	}
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(ctx context.Context,
@@ -488,9 +504,7 @@ func NewMainKubelet(ctx context.Context,
 		}))
 		nodeInformer = kubeInformers.Core().V1().Nodes()
 		nodeLister = nodeInformer.Lister()
-		nodeHasSynced = func() bool {
-			return kubeInformers.Core().V1().Nodes().Informer().HasSynced()
-		}
+		nodeHasSynced = newNodeHasSyncedFunc(nodeLister, nodeName)
 		kubeInformers.Start(wait.NeverStop)
 		logger.Info("Attempting to sync node with API server")
 	} else {
