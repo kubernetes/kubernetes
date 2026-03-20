@@ -2,11 +2,10 @@
 
 approvers:
   - sig-instrumentation-approvers
-emeritus_approvers:
-  - logicalhan
 reviewers:
   - sig-instrumentation-reviewers
 emeritus_approvers:
+  - logicalhan
   - piosz
 labels:
   - sig/instrumentation
