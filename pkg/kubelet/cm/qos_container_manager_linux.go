@@ -322,12 +322,16 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 	kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(guaranteedRequests))
 	kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(burstableRequests))
 
-	// Guaranteed QoS class: memory.min = sum of guaranteed + burstable requests
-	// (parent must cover children's protection for it to be effective)
-	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests+burstableRequests)
+	// Guaranteed QoS class: memory.min = sum of guaranteed requests only
+	// (Burstable uses separate memory.low on its sibling cgroup)
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests)
 
 	// Burstable QoS class: memory.low = sum of burstable pod requests
 	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
+
+	// Root kubepods cgroup: memory.low = sum of all protected requests (Guaranteed + Burstable)
+	// This establishes the necessary parent umbrella protection for the siblings below.
+	setUnified(v1.PodQOSRoot, Cgroup2MemoryLow, guaranteedRequests+burstableRequests)
 }
 
 // reconcilePodMemoryProtection clears stale memory.min and memory.low on pod-level cgroups
