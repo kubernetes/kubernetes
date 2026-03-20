@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -38,7 +39,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
 	draclient "k8s.io/dynamic-resource-allocation/client"
+	"k8s.io/dynamic-resource-allocation/devicemetadata"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
@@ -470,6 +473,33 @@ func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string,
 			tCtx.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
 		}
 	}
+}
+
+func ReadContainerMetadataFile(tCtx ktesting.TContext, pod *v1.Pod, containerName, filePath string) metadata.DeviceMetadata {
+	tCtx.Helper()
+	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(tCtx, e2epod.ExecOptions{
+		Command:       []string{"cat", filePath},
+		Namespace:     pod.Namespace,
+		PodName:       pod.Name,
+		ContainerName: containerName,
+		CaptureStdout: true,
+		CaptureStderr: true,
+		Quiet:         true,
+	})
+	tCtx.ExpectNoError(err, "read metadata file %s in container %s", filePath, containerName)
+	tCtx.Expect(stderr).To(gomega.BeEmpty(), "metadata file stderr for container %s", containerName)
+
+	var md metadata.DeviceMetadata
+	tCtx.ExpectNoError(devicemetadata.DecodeMetadataFromStream(
+		json.NewDecoder(strings.NewReader(stdout)), &md,
+	), "decode metadata file %s", filePath)
+	return md
+}
+
+func TestContainerMetadataFile(tCtx ktesting.TContext, pod *v1.Pod, containerName, filePath string, match gomega.OmegaMatcher) {
+	tCtx.Helper()
+	md := ReadContainerMetadataFile(tCtx, pod, containerName, filePath)
+	tCtx.Expect(md).To(match, "metadata in %s", filePath)
 }
 
 func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
