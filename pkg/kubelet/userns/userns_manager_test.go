@@ -1,5 +1,3 @@
-//go:build !windows
-
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -528,4 +526,23 @@ func TestRecordBounds(t *testing.T) {
 	err = m.record(logger, types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "out of range")
+}
+
+func TestRecord_ToleratesLengthMismatch(t *testing.T) {
+	logger := klog.Background()
+
+	m := &UsernsManager{
+		userNsLength: 65536,
+		usedBy:       make(map[types.UID]uint32),
+		len:          10,
+		off:          0,
+	}
+
+	pod := types.UID("test-pod")
+
+	err := m.record(logger, pod, 0, 131072)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 }

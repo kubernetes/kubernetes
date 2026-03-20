@@ -240,7 +240,12 @@ func (m *UsernsManager) allocateOne(logger klog.Logger, pod types.UID) (firstID 
 // record stores the user namespace [from; from+length] to the specified pod.
 func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length uint32) (err error) {
 	if length != m.userNsLength {
-		return fmt.Errorf("wrong user namespace length %v", length)
+		logger.V(2).Info(
+			"user namespace length mismatch, tolerating existing pod",
+			"podUID", pod,
+			"foundLength", length,
+			"expectedLength", m.userNsLength,
+		)
 	}
 	if from%m.userNsLength != 0 {
 		return fmt.Errorf("wrong user namespace offset specified %v", from)
