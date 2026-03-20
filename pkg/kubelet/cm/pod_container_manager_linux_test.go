@@ -19,13 +19,17 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -294,4 +298,221 @@ func TestGetPodContainerName(t *testing.T) {
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 		})
 	}
+}
+
+func TestPodContainerManagerValidateDelegatesToCgroupManager(t *testing.T) {
+	pod := newBurstablePodForPodContainerManagerTest("pod-uid")
+	qosContainersInfo := podContainerManagerTestQOSContainersInfo()
+	expectedName := NewCgroupName(qosContainersInfo.Burstable, GetPodCgroupNameSuffix(pod.UID))
+	expectedErr := errors.New("pod cgroup validation failed")
+	cgroupManager := &recordingCgroupManager{validateErr: expectedErr}
+	pcm := &podContainerManagerImpl{
+		cgroupManager:     cgroupManager,
+		qosContainersInfo: qosContainersInfo,
+	}
+
+	err := pcm.Validate(pod)
+
+	validatedName, validateCalls, existsCalls := cgroupManager.snapshot()
+	require.ErrorIs(t, err, expectedErr)
+	require.Equal(t, 1, validateCalls)
+	require.Equal(t, expectedName, validatedName)
+	require.Zero(t, existsCalls)
+}
+
+func TestPodContainerManagerExistsUsesValidateResult(t *testing.T) {
+	pod := newBurstablePodForPodContainerManagerTest("pod-uid")
+	qosContainersInfo := podContainerManagerTestQOSContainersInfo()
+
+	testCases := []struct {
+		name          string
+		validateErr   error
+		expectedExist bool
+	}{
+		{
+			name:          "returns true when validation succeeds",
+			validateErr:   nil,
+			expectedExist: true,
+		},
+		{
+			name:          "returns false when validation fails",
+			validateErr:   errors.New("missing pod cgroup"),
+			expectedExist: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cgroupManager := &recordingCgroupManager{validateErr: tc.validateErr}
+			pcm := &podContainerManagerImpl{
+				cgroupManager:     cgroupManager,
+				qosContainersInfo: qosContainersInfo,
+			}
+
+			exists := pcm.Exists(pod)
+
+			_, validateCalls, existsCalls := cgroupManager.snapshot()
+			require.Equal(t, tc.expectedExist, exists)
+			require.Equal(t, 1, validateCalls)
+			require.Zero(t, existsCalls)
+		})
+	}
+}
+
+func TestPodContainerManagerNoopValidateAlwaysSucceeds(t *testing.T) {
+	pcm := &podContainerManagerNoop{}
+	pod := newBurstablePodForPodContainerManagerTest("pod-uid")
+
+	require.NoError(t, pcm.Validate(pod))
+	require.True(t, pcm.Exists(pod))
+}
+
+func TestFakePodContainerManagerUsesConfiguredResults(t *testing.T) {
+	t.Run("Validate", func(t *testing.T) {
+		validateErr := errors.New("validation failed")
+		manager := NewFakePodContainerManager()
+		manager.ValidateError = validateErr
+
+		err := manager.Validate(&v1.Pod{})
+
+		require.ErrorIs(t, err, validateErr)
+		require.Equal(t, []string{"Validate"}, manager.CalledFunctions)
+	})
+
+	t.Run("Exists", func(t *testing.T) {
+		existsResult := false
+		manager := NewFakePodContainerManager()
+		manager.ExistsResult = ptr.To(existsResult)
+
+		exists := manager.Exists(&v1.Pod{})
+
+		require.Equal(t, existsResult, exists)
+		require.Equal(t, []string{"Exists"}, manager.CalledFunctions)
+	})
+
+	t.Run("EnsureExists", func(t *testing.T) {
+		ensureExistsErr := errors.New("ensure exists failed")
+		manager := NewFakePodContainerManager()
+		manager.EnsureExistsErr = ensureExistsErr
+
+		err := manager.EnsureExists(klog.TODO(), &v1.Pod{})
+
+		require.ErrorIs(t, err, ensureExistsErr)
+		require.Equal(t, []string{"EnsureExists"}, manager.CalledFunctions)
+	})
+}
+
+func TestPodContainerManagerStubValidateAndExistsAreNoops(t *testing.T) {
+	manager := &podContainerManagerStub{}
+
+	require.NoError(t, manager.Validate(&v1.Pod{}))
+	require.True(t, manager.Exists(&v1.Pod{}))
+	require.NoError(t, manager.EnsureExists(klog.TODO(), &v1.Pod{}))
+}
+
+func podContainerManagerTestQOSContainersInfo() QOSContainersInfo {
+	return QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+func newBurstablePodForPodContainerManagerTest(uid types.UID) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uid,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1000m"),
+							v1.ResourceMemory: resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+type recordingCgroupManager struct {
+	mu            sync.Mutex
+	validatedName CgroupName
+	validateErr   error
+	validateCalls int
+	existsCalls   int
+}
+
+var _ CgroupManager = &recordingCgroupManager{}
+
+func (m *recordingCgroupManager) Create(_ klog.Logger, _ *CgroupConfig) error {
+	return nil
+}
+
+func (m *recordingCgroupManager) Destroy(_ klog.Logger, _ *CgroupConfig) error {
+	return nil
+}
+
+func (m *recordingCgroupManager) Update(_ klog.Logger, _ *CgroupConfig) error {
+	return nil
+}
+
+func (m *recordingCgroupManager) Validate(name CgroupName) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.validatedName = append(CgroupName(nil), name...)
+	m.validateCalls++
+	return m.validateErr
+}
+
+func (m *recordingCgroupManager) Exists(_ CgroupName) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.existsCalls++
+	return false
+}
+
+func (m *recordingCgroupManager) snapshot() (CgroupName, int, int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append(CgroupName(nil), m.validatedName...), m.validateCalls, m.existsCalls
+}
+
+func (m *recordingCgroupManager) Name(name CgroupName) string {
+	return strings.Join(name, "/")
+}
+
+func (m *recordingCgroupManager) CgroupName(name string) CgroupName {
+	if name == "" {
+		return nil
+	}
+	return strings.Split(name, "/")
+}
+
+func (m *recordingCgroupManager) Pids(_ klog.Logger, _ CgroupName) []int {
+	return nil
+}
+
+func (m *recordingCgroupManager) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
+	return nil
+}
+
+func (m *recordingCgroupManager) MemoryUsage(_ CgroupName) (int64, error) {
+	return 0, nil
+}
+
+func (m *recordingCgroupManager) GetCgroupConfig(_ CgroupName, _ v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+
+func (m *recordingCgroupManager) SetCgroupConfig(_ klog.Logger, _ CgroupName, _ *ResourceConfig) error {
+	return nil
+}
+
+func (m *recordingCgroupManager) Version() int {
+	return 0
 }
