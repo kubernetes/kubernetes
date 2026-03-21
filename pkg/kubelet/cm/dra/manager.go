@@ -392,6 +392,30 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		return err
 	}
 
+	// preparedByDriverEntry tracks a plugin together with the claims sent to
+	// it via NodePrepareResources in this prepare call.  On any failure we
+	// use this list to call NodeUnprepareResources for every driver that
+	// already completed, preventing partially-prepared state from
+	// accumulating when multiple drivers are involved.
+	type preparedByDriverEntry struct {
+		plugin *draplugin.DRAPlugin
+		claims []*drapb.Claim
+	}
+	var preparedByDriver []preparedByDriverEntry
+	// rollbackPrepared calls NodeUnprepareResources for every entry in
+	// preparedByDriver.  Errors are only logged so as not to shadow the
+	// original prepare error.
+	rollbackPrepared := func() {
+		for _, e := range preparedByDriver {
+			if _, rbErr := e.plugin.NodeUnprepareResources(
+				ctx, &drapb.NodeUnprepareResourcesRequest{Claims: e.claims},
+			); rbErr != nil {
+				logger.Error(rbErr, "NodeUnprepareResources rollback failed after partial prepare failure",
+					"driver", e.plugin.DriverName())
+			}
+		}
+	}
+
 	// Call NodePrepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
 	// We could try to continue, but that would make the code more complex.
@@ -400,14 +424,23 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		response, err := plugin.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
+			// Roll back every driver that already completed in this prepare call.
+			rollbackPrepared()
 			return fmt.Errorf("NodePrepareResources: %w", err)
 		}
 		for claimUID, result := range response.Claims {
 			reqClaim := lookupClaimRequest(claims, claimUID)
 			if reqClaim == nil {
+				// The driver returned a response so it may have prepared some
+				// claims already; include it in the rollback list.
+				preparedByDriver = append(preparedByDriver, preparedByDriverEntry{plugin: plugin, claims: claims})
+				rollbackPrepared()
 				return fmt.Errorf("NodePrepareResources returned result for unknown claim UID %s", claimUID)
 			}
 			if result.GetError() != "" {
+				// Same reasoning: the driver ran so roll back its claims too.
+				preparedByDriver = append(preparedByDriver, preparedByDriverEntry{plugin: plugin, claims: claims})
+				rollbackPrepared()
 				return fmt.Errorf("NodePrepareResources failed for ResourceClaim %s: %s", reqClaim.Name, result.Error)
 			}
 
@@ -428,14 +461,22 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			})
 			if err != nil {
 				// No wrapping, this is the error above.
+				preparedByDriver = append(preparedByDriver, preparedByDriverEntry{plugin: plugin, claims: claims})
+				rollbackPrepared()
 				return err
 			}
 		}
 
 		unfinished := len(claims) - len(response.Claims)
 		if unfinished != 0 {
+			preparedByDriver = append(preparedByDriver, preparedByDriverEntry{plugin: plugin, claims: claims})
+			rollbackPrepared()
 			return fmt.Errorf("NodePrepareResources skipped %d ResourceClaims", unfinished)
 		}
+
+		// This plugin fully completed; record it so that a failure in a later
+		// plugin can trigger a rollback for its already-prepared claims too.
+		preparedByDriver = append(preparedByDriver, preparedByDriverEntry{plugin: plugin, claims: claims})
 	}
 
 	// Atomically perform some operations on the claimInfo cache.
