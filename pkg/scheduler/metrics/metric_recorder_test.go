@@ -389,9 +389,8 @@ func TestNewMetricsAsyncRecorder(t *testing.T) {
 		closedAt := time.Now()
 		close(stop)
 		<-r.IsStoppedCh
-		expectedStopDelay := interval / 2
-		if actualStopDelay := time.Since(closedAt); actualStopDelay != expectedStopDelay {
-			t.Errorf("recorder was stopped halfway through its %v interval, expected it to stop after %v but it actually stopped after %v", interval, expectedStopDelay, actualStopDelay)
+		if actualStopDelay := time.Since(closedAt); actualStopDelay != 0 {
+			t.Errorf("recorder was stopped halfway through its %v interval, expected it to stop immediately but it actually stopped after %v", interval, actualStopDelay)
 		}
 
 		check("buffered metrics are not flushed after stopping")

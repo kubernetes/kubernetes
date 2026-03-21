@@ -251,14 +251,13 @@ func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value 
 // run flushes buffered metrics into Prometheus every second.
 func (r *MetricAsyncRecorder) run() {
 	for {
+		r.FlushMetrics()
 		select {
 		case <-r.stopCh:
 			close(r.IsStoppedCh)
 			return
-		default:
+		case <-time.After(r.interval):
 		}
-		r.FlushMetrics()
-		time.Sleep(r.interval)
 	}
 }
 
