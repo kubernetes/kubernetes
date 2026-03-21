@@ -1820,3 +1820,33 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 		}
 	}
 }
+
+// TestMustParseNearMaxInt64 ensures that MustParse panics instead of
+// silently returning wrong values for quantities that overflow int64.
+func TestMustParseNearMaxInt64(t *testing.T) {
+	mustPanic := func(t *testing.T, str string) {
+		t.Helper()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("MustParse(%q) did not panic on overflow", str)
+			}
+		}()
+		_ = MustParse(str)
+	}
+
+	// Case 1: plain integer just above MaxInt64 wraps negative
+	mustPanic(t, "9223372036854775808")
+
+	// Case 2: large suffixed value overflows via d.Dec path
+	mustPanic(t, "9999999999999999999G")
+
+	// Sanity check: MaxInt64 itself should NOT panic
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("MustParse(MaxInt64) panicked unexpectedly: %v", r)
+			}
+		}()
+		_ = MustParse("9223372036854775807")
+	}()
+}

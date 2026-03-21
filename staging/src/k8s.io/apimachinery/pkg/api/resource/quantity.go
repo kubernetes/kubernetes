@@ -141,6 +141,18 @@ func MustParse(str string) Quantity {
 	if err != nil {
 		panic(fmt.Errorf("cannot parse '%v': %v", str, err))
 	}
+	// overflow guard: detect silent int64 wraparound (#135487)
+	// Case 1: Value() went negative despite positive input (classic wrap)
+	// Case 2: d.Dec is set and exceeds math.MaxInt64 (large suffix like G/T)
+	if q.Value() < 0 && q.Sign() >= 0 {
+		panic(fmt.Errorf("cannot parse '%v': overflows int64", str))
+	}
+	if q.d.Dec != nil {
+		maxInt64 := inf.NewDec(math.MaxInt64, 0)
+		if q.d.Dec.Cmp(maxInt64) > 0 {
+			panic(fmt.Errorf("cannot parse '%v': overflows int64", str))
+		}
+	}
 	return q
 }
 
