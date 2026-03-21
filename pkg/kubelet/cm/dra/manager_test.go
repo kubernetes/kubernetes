@@ -2485,6 +2485,104 @@ func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 	}
 }
 
+
+// TestPrepareResourcesRollbackOnPartialFailure verifies that when a Pod requires
+// ResourceClaims managed by two different DRA drivers and the second driver fails
+// during NodePrepareResources, the kubelet calls NodeUnprepareResources on the
+// first (already-succeeded) driver to prevent a device leak.
+//
+// This is a regression test for https://github.com/kubernetes/kubernetes/issues/137819
+func TestPrepareResourcesRollbackOnPartialFailure(t *testing.T) {
+tCtx := ktesting.Init(t)
+backgroundCtx, cancel := context.WithCancel(tCtx)
+defer cancel()
+
+const (
+   = "driver-a"
+   = "driver-b"
+ame  = "claim-a"
+ame  = "claim-b"
+)
+
+claimAUID := types.UID(claimAName + "-uid")
+claimBUID := types.UID(claimBName + "-uid")
+
+fakeKubeClient := fake.NewClientset()
+manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+require.NoError(t, err)
+
+backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
+manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second)
+
+// Pod that references both claims.
+pod := genTestPodWithClaims(claimAName, claimBName)
+
+// Claim A belongs to driver A — will succeed.
+claimA := genTestClaim(claimAName, driverA, deviceName, string(pod.UID))
+// Claim B belongs to driver B — will fail with a per-claim error.
+claimB := genTestClaim(claimBName, driverB, deviceName, string(pod.UID))
+
+_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claimA, metav1.CreateOptions{})
+require.NoError(t, err)
+_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claimB, metav1.CreateOptions{})
+require.NoError(t, err)
+
+// Driver A: returns a valid prepare response (success).
+respA := &drapb.NodePrepareResourcesResponse{
+g]*drapb.NodePrepareResourceResponse{
+g(claimAUID): {
+ame:     poolName,
+ame:   deviceName,
+uestNames: []string{requestName},
+g{cdiID},
+:= setupFakeDRADriverGRPCServer(backgroundCtx, false, nil, respA, nil, nil)
+require.NoError(t, err)
+defer serverA.teardownFn()
+
+// Driver B: returns a per-claim error, simulating a driver failure after A succeeds.
+respB := &drapb.NodePrepareResourcesResponse{
+g]*drapb.NodePrepareResourceResponse{
+g(claimBUID): {
+tentional prepare failure for claim " + claimBName,
+:= setupFakeDRADriverGRPCServer(backgroundCtx, false, nil, respB, nil, nil)
+require.NoError(t, err)
+defer serverB.teardownFn()
+
+plg := manager.GetWatcherHandler()
+require.NoError(t, plg.RegisterPlugin(driverA, serverA.socketName, []string{drapb.DRAPluginService}, nil))
+require.NoError(t, plg.RegisterPlugin(driverB, serverB.socketName, []string{drapb.DRAPluginService}, nil))
+
+err = manager.PrepareResources(backgroundCtx, pod)
+
+// PrepareResources must return an error because driver B failed.
+require.ErrorContains(t, err, claimBName,
+return an error referencing the failing claim")
+
+// Driver A completed NodePrepareResources, so it must have received exactly one
+// NodeUnprepareResources call to roll back the partial prepare.
+assert.Equal(t, uint32(1), serverA.server.unprepareResourceCalls.Load(),
+must be rolled back via NodeUnprepareResources after driver B failed")
+
+// Driver B itself failed during prepare, so it must NOT be unprepared.
+assert.Equal(t, uint32(0), serverB.server.unprepareResourceCalls.Load(),
+must NOT be unprepared since its own NodePrepareResources returned an error")
+
+// The cache must not retain a prepared entry for either claim since the whole
+// prepare failed.
+_, okA := manager.cache.get(claimAName, namespace)
+_, okB := manager.cache.get(claimBName, namespace)
+// Claims may still be in the cache (tracked for reconciliation) but must NOT
+// be marked as prepared.
+if okA {
+foA, _ := manager.cache.get(claimAName, namespace)
+foA.isPrepared(), "claim A must not be marked as prepared after rollback")
+}
+if okB {
+foB, _ := manager.cache.get(claimBName, namespace)
+foB.isPrepared(), "claim B must not be marked as prepared after failed prepare")
+}
+}
+
 func TestTruncateHealthMessage(t *testing.T) {
 	testCases := map[string]struct {
 		input    string
