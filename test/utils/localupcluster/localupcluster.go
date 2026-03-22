@@ -462,17 +462,34 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	tCtx = tCtx.WithRESTConfig(restConfig)
 	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
 
+	// For the apiserver we use the admin client certificate with the cluster CA.
+	tlsConfig, err := restclient.TLSConfigFor(restConfig)
+	if err != nil {
+		tCtx.Fatalf("get TLS config for readiness check: %v", err)
+	}
+
+	// The kubelet requires client authentication for /healthz. Use the admin client
+	// certificate with InsecureSkipVerify because the kubelet uses a self-signed cert.
+	tlsConfigWithClientCert := tlsConfig.Clone()
+	tlsConfigWithClientCert.InsecureSkipVerify = true
+
+	// For other components we can skip TLS verification because they use self-signed certs.
+	insecureTLSConfig := &tls.Config{InsecureSkipVerify: true}
+
 	switch {
 	case strings.HasPrefix(cmd.Name, string(KubeAPIServer)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"], tlsConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeScheduler)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeControllerManager)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeProxy)):
-		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(Kubelet)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"], tlsConfigWithClientCert)
 
 		// Also wait for the node to be ready.
 		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*corev1.NodeList, error) {
@@ -484,22 +501,25 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	}
 }
 
-func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP, port string) {
-	url := fmt.Sprintf("%s://%s:%s/healthz", method, hostIP, port)
-	tCtx.WithStep(fmt.Sprintf("check health %s", url)).Eventually(func(tCtx ktesting.TContext) error {
+func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/healthz", tlsConfig)
+}
+
+func (c *Cluster) checkReadyz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/readyz", tlsConfig)
+}
+
+func (c *Cluster) checkEndpoint(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port, path string, tlsConfig *tls.Config) {
+	url := fmt.Sprintf("%s://%s:%s%s", scheme, hostIP, port, path)
+	tCtx.WithStep(fmt.Sprintf("check %s", url)).Eventually(func(tCtx ktesting.TContext) error {
 		if !cmd.Running() {
 			return gomega.StopTrying(fmt.Sprintf("%s stopped unexpectedly", cmd.Name))
 		}
-		// Like kube::util::wait_for_url in local-up-cluster.sh we use https,
-		// but don't check the certificate.
 		req, err := http.NewRequestWithContext(tCtx, http.MethodGet, url, nil)
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("get %s: %w", url, err)
@@ -507,7 +527,9 @@ func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP,
 		if err := resp.Body.Close(); err != nil {
 			return fmt.Errorf("close GET response: %w", err)
 		}
-		// Any response is fine, we just need to get here. In practice, we get a 403 Forbidden.
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%s returned %d, waiting for 200", url, resp.StatusCode)
+		}
 		return nil
 	}).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
 }
