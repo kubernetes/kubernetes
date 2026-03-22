@@ -531,7 +531,7 @@ func (c *Cluster) checkEndpoint(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP
 			return fmt.Errorf("%s returned %d, waiting for 200", url, resp.StatusCode)
 		}
 		return nil
-	}).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
+	}).WithPolling(time.Second).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
 }
 
 func dumpProcesses(tCtx ktesting.TContext) {
