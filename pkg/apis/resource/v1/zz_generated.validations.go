@@ -476,7 +476,7 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 	return errs
 }
 
-var unionMembershipFor_k8s_io_api_resource_v1_DeviceAttribute_ = validate.NewUnionMembership(validate.NewUnionMember("int"), validate.NewUnionMember("bool"), validate.NewUnionMember("string"), validate.NewUnionMember("version"))
+var unionMembershipFor_k8s_io_api_resource_v1_DeviceAttribute_ = validate.NewUnionMembership(validate.NewUnionMember("int"), validate.NewUnionMember("bool"), validate.NewUnionMember("string"), validate.NewUnionMember("version"), validate.NewUnionMember("ints"), validate.NewUnionMember("bools"), validate.NewUnionMember("strings"), validate.NewUnionMember("versions"))
 
 // Validate_DeviceAttribute validates an instance of DeviceAttribute according
 // to declarative validation rules in the API schema.
@@ -501,6 +501,26 @@ func Validate_DeviceAttribute(ctx context.Context, op operation.Operation, fldPa
 			return false
 		}
 		return obj.VersionValue != nil
+	}, func(obj *resourcev1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.IntValues) != 0
+	}, func(obj *resourcev1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.BoolValues) != 0
+	}, func(obj *resourcev1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.StringValues) != 0
+	}, func(obj *resourcev1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.VersionValues) != 0
 	}).MarkAlpha()...)
 
 	// field resourcev1.DeviceAttribute.IntValue
@@ -574,6 +594,78 @@ func Validate_DeviceAttribute(ctx context.Context, op operation.Operation, fldPa
 			}
 			return
 		}(fldPath.Child("version"), obj.VersionValue, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAttribute) *string { return oldObj.VersionValue }), oldObj != nil)...)
+
+	// field resourcev1.DeviceAttribute.IntValues
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []int64, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("ints"), obj.IntValues, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAttribute) []int64 { return oldObj.IntValues }), oldObj != nil)...)
+
+	// field resourcev1.DeviceAttribute.BoolValues
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []bool, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("bools"), obj.BoolValues, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAttribute) []bool { return oldObj.BoolValues }), oldObj != nil)...)
+
+	// field resourcev1.DeviceAttribute.StringValues
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("strings"), obj.StringValues, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAttribute) []string { return oldObj.StringValues }), oldObj != nil)...)
+
+	// field resourcev1.DeviceAttribute.VersionValues
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("versions"), obj.VersionValues, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAttribute) []string { return oldObj.VersionValues }), oldObj != nil)...)
 
 	return errs
 }

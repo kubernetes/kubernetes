@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/goleak v1.3.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.3
 	k8s.io/cri-api v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.0.0

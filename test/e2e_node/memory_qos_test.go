@@ -613,16 +613,23 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 
-			// Pod cgroup memory.low is reconciled by the periodic setMemoryQoS loop
+			// QoS-class cgroup memory.low is cleared by the periodic setMemoryQoS loop
 			// (periodicQOSCgroupUpdateInterval = 1 minute) plus kubelet startup time.
+			var burstableCgroupPath string
+			if cgroupDriver == "systemd" {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			} else {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods", "burstable")
+			}
 			gomega.Eventually(ctx, func() int64 {
-				val, _ := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+				val, _ := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
 				return val
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
-				"memory.low should reset to 0 when MemoryQoS is disabled")
+				"burstable QoS memory.low should reset to 0 when MemoryQoS is disabled")
 
-			// TODO(sohankunkerkar): Assert container-level memory.high resets to max once
-			// CRI runtimes support Unified map in UpdateContainerResources.
+			// NOTE: Pod-level and container-level memory.low values persist after rollback.
+			// Pod-level: clearing via systemd SetUnitProperties interferes with other cgroup settings.
+			// Container-level: requires CRI runtime support for Unified in UpdateContainerResources.
 		})
 	})
 

@@ -323,7 +323,10 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
 
 	// Also wait for the assume cache to catch up.
 	// Without this we cannot reliably store the result of

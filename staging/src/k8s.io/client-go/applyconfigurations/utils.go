@@ -1656,6 +1656,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("PoolStatus"):
+		return &resourcev1alpha3.PoolStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestSpec"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestStatus"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestStatusApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):

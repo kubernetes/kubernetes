@@ -127,7 +127,7 @@ func newExecutor(fh fwk.Handle) *Executor {
 			eventMessage += " (in kube-scheduler memory)."
 		}
 
-		fh.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
+		fh.EventRecorder().WithLogger(logger).Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
 		return nil
 	}

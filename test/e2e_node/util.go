@@ -54,6 +54,7 @@ import (
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -284,7 +285,8 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider())
+	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
+	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -294,7 +296,7 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider())
+	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -75,8 +75,6 @@ func unregisterForTesting(name string) {
 
 func init() {
 	internal.BalancerUnregister = unregisterForTesting
-	internal.ConnectedAddress = connectedAddress
-	internal.SetConnectedAddress = setConnectedAddress
 }
 
 // Get returns the resolver builder registered with the given name.

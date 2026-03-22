@@ -518,7 +518,8 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 				managedFieldsSize += f.Size()
 			}
 			specSize := createdSlice.Spec.Size()
-			tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+			tCtx.Logf("\n\nDevices: %d\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+				len(createdSlice.Spec.Devices),
 				resource.NewQuantity(int64(totalSize), resource.BinarySI),
 				resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
 				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),

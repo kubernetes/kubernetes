@@ -408,7 +408,7 @@ func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration,
 }
 
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
-	return func(name string) events.EventRecorder {
+	return func(name string) events.EventRecorderLogger {
 		return cc.EventBroadcaster.NewRecorder(name)
 	}
 }

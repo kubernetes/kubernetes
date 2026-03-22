@@ -1041,6 +1041,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
 		v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref),
 		v1alpha3.DeviceTaintSelector{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
+		v1alpha3.PoolStatus{}.OpenAPIModelName():                                                                        schema_k8sio_api_resource_v1alpha3_PoolStatus(ref),
+		v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref),
+		v1alpha3.ResourcePoolStatusRequestList{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref),
+		v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref),
+		v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref),
 		resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		resourcev1beta1.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		resourcev1beta1.BasicDevice{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
@@ -46925,7 +46930,7 @@ func schema_k8sio_api_resource_v1_CELDeviceSelector(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -47427,6 +47432,86 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -47800,14 +47885,14 @@ func schema_k8sio_api_resource_v1_DeviceConstraint(ref common.ReferenceCallback)
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as single-element lists for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49331,6 +49416,295 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PoolStatus contains status information for a single resource pool.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"generation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Generation is the pool generation observed across all ResourceSlices in this pool. Only the latest generation is reported. During a generation rollout, if not all slices at the latest generation have been published, the pool is included with a validationError and device counts unset.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"resourceSliceCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"totalDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"allocatedDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"unavailableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"validationError": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"driver", "poolName", "generation"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the filters for which pools to include in the status. The spec is immutable once created.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
+							Ref:         ref(v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"metadata", "spec"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName(), v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of ResourcePoolStatusRequests.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"limit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+							Default:     100,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"driver"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"poolCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolCount is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"pools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Pools contains the first `spec.limit` matching pools, sorted by driver then pool name. If `len(pools) < poolCount`, the list was truncated. When omitted, no pools matched the request filters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(v1alpha3.PoolStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"poolCount"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.PoolStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -49627,7 +50001,7 @@ func schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -49976,6 +50350,86 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -50351,14 +50805,14 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as singleton sets for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -51691,7 +52145,7 @@ func schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -52193,6 +52647,86 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -52566,14 +53100,14 @@ func schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref common.ReferenceCall
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as singleton sets for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

@@ -240,6 +240,23 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				Rules:      rules,
 			})
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourcePoolStatus) {
+			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
+				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcepoolstatusrequest-controller"},
+				Rules: []rbacv1.PolicyRule{
+					// Read and delete ResourcePoolStatusRequests (delete needed for TTL cleanup)
+					rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(resourceGroup).Resources("resourcepoolstatusrequests").RuleOrDie(),
+					// Update status after processing
+					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourcepoolstatusrequests/status").RuleOrDie(),
+					// Read ResourceSlices to calculate pool status
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
+					// Read ResourceClaims to calculate allocation counts
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+					eventsRule(),
+				},
+			})
+		}
 	}
 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
@@ -264,15 +281,21 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+	jobControllerRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
+		rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
+		rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/finalizers").RuleOrDie(),
+		rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		eventsRule(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		jobControllerRules = append(jobControllerRules,
+			rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie(),
+		)
+	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "job-controller"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("jobs/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
+		Rules:      jobControllerRules,
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "namespace-controller"},

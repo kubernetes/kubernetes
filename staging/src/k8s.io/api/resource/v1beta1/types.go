@@ -276,7 +276,14 @@ type ResourcePool struct {
 
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
-const ResourceSliceMaxDevicesWithTaintsOrConsumesCounters = 64
+
+// ResourceSliceMaxDevicesWithAdvancedFeatures defines the maximum number of devices in a ResourceSlice
+// if any of those devices uses advanced features:
+// - device taints (DRADeviceTaints feature gate)
+// - consuming counters (DRAPartitionableDevices feature gate)
+// - list attributes (DRAListTypeAttributes feature gate)
+const ResourceSliceMaxDevicesWithAdvancedFeatures = 64
+
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 const BindingConditionsMaxSize = 4
 const BindingFailureConditionsMaxSize = 4
@@ -641,6 +648,10 @@ type CapacityRequestPolicyRange struct {
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
+// Limit per device for the total number of string, version, bool or int values
+// in list and non-list attributes.
+const ResourceSliceMaxAttributeValuesPerDevice = 48
+
 // QualifiedName is the name of a device attribute or capacity.
 //
 // Attributes and capacities are defined either by the owner of the specific
@@ -705,6 +716,50 @@ type DeviceAttribute struct {
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
 	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
+
+	// IntValues is a non-empty list of numbers.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +featureGate=DRAListTypeAttributes
+	IntValues []int64 `json:"ints,omitempty" protobuf:"varint,6,opt,name=ints"`
+
+	// BoolValues is a non-empty list of true/false values.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +featureGate=DRAListTypeAttributes
+	BoolValues []bool `json:"bools,omitempty" protobuf:"varint,7,opt,name=bools"`
+
+	// StringValues is a non-empty list of strings.
+	// Each string must not be longer than 64 characters.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +featureGate=DRAListTypeAttributes
+	StringValues []string `json:"strings,omitempty" protobuf:"bytes,8,opt,name=strings"`
+
+	// VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0.
+	// Each version string must not be longer than 64 characters.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +featureGate=DRAListTypeAttributes
+	VersionValues []string `json:"versions,omitempty" protobuf:"bytes,9,opt,name=versions"`
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
@@ -1299,6 +1354,14 @@ type CELDeviceSelector struct {
 	//
 	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
 	//
+	// When the DRAListTypeAttributes feature gate is enabled,
+	// the includes() helper is available and it can work for both scalar
+	// and list-type attributes. It was introduced to support smooth migration
+	// from scalar attributes to list-type attributes while keeping
+	// CEL expressions simple. For example:
+	//
+	//     device.attributes["dra.example.com"].models.includes("some-model")
+	//
 	// The length of the expression must be smaller or equal to 10 Ki. The
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
@@ -1366,6 +1429,11 @@ type DeviceConstraint struct {
 	// its specification, but if one device doesn't, then it also will not be
 	// chosen.
 	//
+	// When the DRAListTypeAttributes feature gate is enabled, comparison uses
+	// set semantics(i.e., element order and duplicates are ignored): list-valued attributes
+	// match when the intersection across all devices is non-empty.
+	// Scalar values are treated as singleton sets for backward compatibility.
+	//
 	// Must include the domain qualifier.
 	//
 	// +optional
@@ -1386,6 +1454,11 @@ type DeviceConstraint struct {
 
 	// DistinctAttribute requires that all devices in question have this
 	// attribute and that its type and value are unique across those devices.
+	//
+	// When the DRAListTypeAttributes feature gate is enabled, comparison uses
+	// set semantics (i.e., element order and duplicates are ignored):
+	// list-valued attributes must be pairwise disjoint across devices.
+	// Scalar values are treated as singleton sets for backward compatibility.
 	//
 	// This acts as the inverse of MatchAttribute.
 	//

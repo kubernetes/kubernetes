@@ -83,12 +83,6 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 					Namespaced: new(true),
 					InitialSpec: &schedulingv1alpha2.PodGroup{
 						Spec: schedulingv1alpha2.PodGroupSpec{
-							PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-								Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
-									PodGroupTemplateName: "pg1",
-									WorkloadName:         "w1",
-								},
-							},
 							SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
 								Gang: &schedulingv1alpha2.GangSchedulingPolicy{
 									MinCount: 5,

@@ -12530,15 +12530,39 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bool
       type:
         scalar: boolean
+    - name: bools
+      type:
+        list:
+          elementType:
+            scalar: boolean
+          elementRelationship: atomic
     - name: int
       type:
         scalar: numeric
+    - name: ints
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
     - name: string
       type:
         scalar: string
+    - name: strings
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: version
       type:
         scalar: string
+    - name: versions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1.DeviceCapacity
   map:
     fields:
@@ -13089,6 +13113,94 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+- name: io.k8s.api.resource.v1alpha3.PoolStatus
+  map:
+    fields:
+    - name: allocatedDevices
+      type:
+        scalar: numeric
+    - name: availableDevices
+      type:
+        scalar: numeric
+    - name: driver
+      type:
+        scalar: string
+    - name: generation
+      type:
+        scalar: numeric
+      default: 0
+    - name: nodeName
+      type:
+        scalar: string
+    - name: poolName
+      type:
+        scalar: string
+    - name: resourceSliceCount
+      type:
+        scalar: numeric
+    - name: totalDevices
+      type:
+        scalar: numeric
+    - name: unavailableDevices
+      type:
+        scalar: numeric
+    - name: validationError
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequest
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestStatus
+- name: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestSpec
+  map:
+    fields:
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: limit
+      type:
+        scalar: numeric
+      default: 100
+    - name: poolName
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: poolCount
+      type:
+        scalar: numeric
+    - name: pools
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.PoolStatus
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.AllocatedDeviceStatus
   map:
     fields:
@@ -13298,15 +13410,39 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bool
       type:
         scalar: boolean
+    - name: bools
+      type:
+        list:
+          elementType:
+            scalar: boolean
+          elementRelationship: atomic
     - name: int
       type:
         scalar: numeric
+    - name: ints
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
     - name: string
       type:
         scalar: string
+    - name: strings
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: version
       type:
         scalar: string
+    - name: versions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.DeviceCapacity
   map:
     fields:
@@ -13983,15 +14119,39 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bool
       type:
         scalar: boolean
+    - name: bools
+      type:
+        list:
+          elementType:
+            scalar: boolean
+          elementRelationship: atomic
     - name: int
       type:
         scalar: numeric
+    - name: ints
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
     - name: string
       type:
         scalar: string
+    - name: strings
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: version
       type:
         scalar: string
+    - name: versions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta2.DeviceCapacity
   map:
     fields:

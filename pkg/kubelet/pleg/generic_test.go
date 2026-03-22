@@ -33,9 +33,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -835,6 +838,9 @@ kubelet_running_pods 2
 }
 
 func TestWorkerLoop(t *testing.T) {
+	// TODO: feature temporarily disabled by defaault but this test is for that feature
+	// Remove when we re-enable PLEGOnDemandRelist by default
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
 	synctest.Test(t, func(t *testing.T) {
 		runtimeMock := containertest.NewMockRuntime(t)
 		cache := kubecontainer.NewCache()

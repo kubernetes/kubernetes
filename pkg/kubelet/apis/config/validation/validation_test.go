@@ -626,21 +626,38 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority",
 		}, {
-			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
+			name: "enableSystemLogQuery is enabled with explicit default NodeLogQuery feature gate enabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": true}
+				conf.EnableSystemLogHandler = true
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
+			errMsg: "",
+		}, {
+			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": false}
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "cannot set feature gate NodeLogQuery to false, feature is locked to true",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"NodeLogQuery": true}
 				conf.EnableSystemLogHandler = false
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
 			errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
+		}, {
+			name: "enableSystemLogQuery is enabled with enableSystemLogHandler",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.EnableSystemLogHandler = true
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "",
 		}, {
 			name: "imageMaximumGCAge should not be negative",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

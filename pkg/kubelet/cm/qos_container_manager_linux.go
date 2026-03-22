@@ -305,12 +305,6 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
 		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
 		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
-		// Clear per-pod memory protection only when MemoryQoS feature gate is
-		// enabled but policy is None (rollback scenario). When the gate is off,
-		// pods never had protection set, so there's nothing to reconcile.
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
-			m.reconcilePodMemoryProtection(logger)
-		}
 		return
 	}
 
@@ -328,37 +322,6 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 
 	// Burstable QoS class: memory.low = sum of burstable pod requests
 	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
-}
-
-// reconcilePodMemoryProtection clears stale memory.min and memory.low on pod-level cgroups
-// when MemoryQoS is disabled or memoryReservationPolicy is not TieredReservation.
-func (m *qosContainerManagerImpl) reconcilePodMemoryProtection(logger klog.Logger) {
-	pods := m.activePods()
-	for _, pod := range pods {
-		podQOS := v1qos.GetPodQOS(pod)
-		var parentContainer CgroupName
-		switch podQOS {
-		case v1.PodQOSGuaranteed:
-			parentContainer = m.qosContainersInfo.Guaranteed
-		case v1.PodQOSBurstable:
-			parentContainer = m.qosContainersInfo.Burstable
-		case v1.PodQOSBestEffort:
-			parentContainer = m.qosContainersInfo.BestEffort
-		}
-		podCgroupName := NewCgroupName(parentContainer, GetPodCgroupNameSuffix(pod.UID))
-		podConfig := &CgroupConfig{
-			Name: podCgroupName,
-			ResourceParameters: &ResourceConfig{
-				Unified: map[string]string{
-					Cgroup2MemoryMin: "0",
-					Cgroup2MemoryLow: "0",
-				},
-			},
-		}
-		if err := m.cgroupManager.Update(logger, podConfig); err != nil {
-			logger.V(4).Info("Failed to reconcile pod memory protection", "pod", klog.KObj(pod), "err", err)
-		}
-	}
 }
 
 func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {

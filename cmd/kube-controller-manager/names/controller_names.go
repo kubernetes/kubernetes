@@ -83,6 +83,7 @@ const (
 	EphemeralVolumeController                          = "ephemeral-volume-controller"
 	StorageVersionGarbageCollectorController           = "storageversion-garbage-collector-controller"
 	ResourceClaimController                            = "resourceclaim-controller"
+	ResourcePoolStatusRequestController                = "resourcepoolstatusrequest-controller"
 	LegacyServiceAccountTokenCleanerController         = "legacy-serviceaccount-token-cleaner-controller"
 	ValidatingAdmissionPolicyStatusController          = "validatingadmissionpolicy-status-controller"
 	VolumeAttributesClassProtectionController          = "volumeattributesclass-protection-controller"

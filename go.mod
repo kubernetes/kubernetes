@@ -77,7 +77,7 @@ require (
 	golang.org/x/time v0.14.0
 	golang.org/x/tools v0.41.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.3
@@ -124,7 +124,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.24.0 // indirect
+	cel.dev/expr v0.25.1 // indirect
 	cyphar.com/go-pathrs v0.2.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
