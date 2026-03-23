@@ -24,31 +24,39 @@ import (
 	"os"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/test/utils/fuzzer"
+	"sigs.k8s.io/yaml"
 )
 
 func main() {
 	count := flag.Int("count", 1000, "Number of pods to generate")
-	offset := flag.Int("offset", 0, "Starting index for pod naming (prevents overwrites on multi-run)")
-	templatePath := flag.String("template", "test/utils/fuzzer/templates/representative-pod.yaml", "Path to the pod template YAML")
+	offset := flag.Int("offset", 0, "Starting index for pod naming")
+	basePodPath := flag.String("base-pod", "test/utils/fuzzer/templates/complex-daemonset.yaml", "Path to the real pod YAML to sanitize and clone")
+	namespace := flag.String("namespace", "fuzz-test", "Target namespace for fuzzed pods")
+	namePrefix := flag.String("name-prefix", "fuzzed-pod", "Prefix for generated pod names")
 	outDir := flag.String("out-dir", "", "Directory to write YAMLs (if specified, no cluster injection)")
 	concurrency := flag.Int("concurrency", 50, "Number of concurrent workers")
 	kubeconfig := flag.String("kubeconfig", "", "Path to the kubeconfig file for direct injection")
 
 	flag.Parse()
 
-	template, err := fuzzer.LoadTemplateFromFile(*templatePath)
+	// Load Base Pod
+	basePodData, err := os.ReadFile(*basePodPath)
 	if err != nil {
-		log.Fatalf("Failed to load template: %v", err)
+		log.Fatalf("Failed to read base pod file: %v", err)
+	}
+	var basePod v1.Pod
+	if err := yaml.Unmarshal(basePodData, &basePod); err != nil {
+		log.Fatalf("Failed to unmarshal base pod: %v", err)
 	}
 
 	var clientset *kubernetes.Clientset
 	if *outDir == "" {
 		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			// Try default path if not specified
 			if *kubeconfig == "" {
 				home, _ := os.UserHomeDir()
 				config, err = clientcmd.BuildConfigFromFlags("", home+"/.kube/config")
@@ -57,16 +65,15 @@ func main() {
 				log.Fatalf("Failed to build kubeconfig: %v", err)
 			}
 		}
-		// Increase QPS and Burst
 		config.QPS = 500
 		config.Burst = 1000
 		clientset, err = kubernetes.NewForConfig(config)
 		if err != nil {
-			log.Fatalf("Failed to create clientset with high QPS: %v", err)
+			log.Fatalf("Failed to create clientset: %v", err)
 		}
 	}
 
-	creator := fuzzer.NewExemplaryPodCreator(clientset, time.Now().UnixNano())
+	creator := fuzzer.NewExemplaryPodCreator(clientset, time.Now().UnixNano(), *namePrefix, *namespace)
 
 	progress := func(current, total int) {
 		fmt.Printf("\rProgress: %d/%d pods (%.1f%%)", current, total, float64(current)/float64(total)*100)
@@ -77,15 +84,15 @@ func main() {
 
 	start := time.Now()
 	if *outDir != "" {
-		fmt.Printf("Writing %d pod manifests to %s (offset %d)...\n", *count, *outDir, *offset)
-		dir, err := creator.WriteExemplaryPodsToDir(context.Background(), template, *count, *offset, *concurrency, *outDir, progress)
+		fmt.Printf("Writing %d fuzzed pod manifests to %s (base: %s)...\n", *count, *outDir, *basePodPath)
+		dir, err := creator.WriteExemplaryPodsToDir(context.Background(), &basePod, *count, *offset, *concurrency, *outDir, progress)
 		if err != nil {
 			log.Fatalf("\nFailed to write pods: %v", err)
 		}
 		fmt.Printf("Successfully created %d pod manifests in: %s\n", *count, dir)
 	} else {
-		fmt.Printf("Injecting %d pods into cluster (offset %d)...\n", *count, *offset)
-		err := creator.CreateExemplaryPods(context.Background(), template, *count, *offset, *concurrency, progress)
+		fmt.Printf("Injecting %d fuzzed pods into cluster (base: %s)...\n", *count, *basePodPath)
+		err := creator.CreateExemplaryPods(context.Background(), &basePod, *count, *offset, *concurrency, progress)
 		if err != nil {
 			log.Fatalf("\nFailed to inject pods: %v", err)
 		}

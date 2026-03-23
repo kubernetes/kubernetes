@@ -20,271 +20,156 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
 )
 
-// ExemplaryManagedFieldTemplate defines how to generate a ManagedFieldsEntry.
-type ExemplaryManagedFieldTemplate struct {
-	Manager    string `json:"manager"`
-	Operation  string `json:"operation"`
-	APIVersion string `json:"apiVersion"`
-	// FieldsSchema is a JSON string representing the FieldsV1 structure.
-	FieldsSchema string `json:"fieldsSchema"`
-	// Length specifies a target length for the FieldsV1.Raw data to simulate bloat.
-	Length int `json:"length"`
-	// FieldPathCount specifies the total number of "f:" fields to generate.
-	FieldPathCount int `json:"fieldPathCount"`
-	// FieldPathDepth specifies the maximum nesting depth for the "f:" fields.
-	FieldPathDepth int `json:"fieldPathDepth"`
-}
-
-// ExemplaryAnnotationTemplate defines how to generate an annotation.
-type ExemplaryAnnotationTemplate struct {
-	Key    string `json:"key"`
-	Length int    `json:"length"`
-}
-
-// ExemplaryPodTemplate defines the "shape" of pods to be created for fuzzing.
-type ExemplaryPodTemplate struct {
-	Name          string                          `json:"name"`
-	BaseSpec      *v1.PodSpec                     `json:"baseSpec"`
-	ManagedFields []ExemplaryManagedFieldTemplate `json:"managedFields"`
-	Annotations   []ExemplaryAnnotationTemplate   `json:"annotations"`
-	Namespace     string                          `json:"namespace"`
-
-	// Generative complexity settings
-	EnvVarCount       int `json:"envVarCount"`       // Number of unique environment variables to generate
-	ManagedFieldCount int `json:"managedFieldCount"` // Total number of ManagedFields entries to generate
-}
-
-// ExemplaryPodFuzzer generates fuzzed Pod objects based on a template.
+// ExemplaryPodFuzzer generates fuzzed Pod objects derived from a base pod.
 type ExemplaryPodFuzzer struct {
 	rng *rand.Rand
 
-	// Cache for identical data to test interning across multiple pods
-	mu          sync.Mutex
-	cachedMF    map[string][]metav1.ManagedFieldsEntry
-	cachedAnnos map[string]map[string]string
-	cachedEnv   map[string][]v1.EnvVar
+	// Settings for the generated pods
+	Namespace  string
+	NamePrefix string
+
+	// Cache for identical data to test interning across multiple pods.
+	// Maps BasePodName -> FuzzedPrototype
+	mu               sync.Mutex
+	cachedPrototypes map[string]*v1.Pod
 }
 
-// NewExemplaryPodFuzzer creates a new fuzzer with a seeded RNG.
-func NewExemplaryPodFuzzer(seed int64) *ExemplaryPodFuzzer {
-	return &ExemplaryPodFuzzer{
-		rng:         rand.New(rand.NewSource(seed)),
-		cachedMF:    make(map[string][]metav1.ManagedFieldsEntry),
-		cachedAnnos: make(map[string]map[string]string),
-		cachedEnv:   make(map[string][]v1.EnvVar),
-	}
-}
-
-// FuzzPod transforms an ExemplaryPodTemplate into a concrete v1.Pod object.
-func (f *ExemplaryPodFuzzer) FuzzPod(template *ExemplaryPodTemplate, id int) *v1.Pod {
-	podName := fmt.Sprintf("%s-%d", template.Name, id)
-	namespace := template.Namespace
+// NewExemplaryPodFuzzer creates a new fuzzer with a seeded RNG and global settings.
+func NewExemplaryPodFuzzer(seed int64, namePrefix, namespace string) *ExemplaryPodFuzzer {
 	if namespace == "" {
 		namespace = "default"
 	}
-
-	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-		},
+	return &ExemplaryPodFuzzer{
+		rng:              rand.New(rand.NewSource(seed)),
+		NamePrefix:       namePrefix,
+		Namespace:        namespace,
+		cachedPrototypes: make(map[string]*v1.Pod),
 	}
+}
 
-	// 1. Base Spec with Generative Environment Variables
-	if template.BaseSpec != nil {
-		pod.Spec = *template.BaseSpec.DeepCopy()
-	}
-
-	if template.EnvVarCount > 0 && len(pod.Spec.Containers) > 0 {
-		f.mu.Lock()
-		env, ok := f.cachedEnv[template.Name]
-		if !ok {
-			env = f.precomputeEnvVars(template.EnvVarCount)
-			f.cachedEnv[template.Name] = env
-		}
-		f.mu.Unlock()
-		// Inject into the primary container
-		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, env...)
-	}
-
-	// 2. Metadata Bloat: ManagedFields (Identical across pods for interning)
+// FuzzPod transforms a base pod into a concrete fuzzed v1.Pod object.
+func (f *ExemplaryPodFuzzer) FuzzPod(base *v1.Pod, id int) *v1.Pod {
 	f.mu.Lock()
-	mfEntries, ok := f.cachedMF[template.Name]
+	proto, ok := f.cachedPrototypes[base.Name]
 	if !ok {
-		mfEntries = f.precomputeManagedFields(template)
-		f.cachedMF[template.Name] = mfEntries
-	}
-	f.mu.Unlock()
-	pod.ManagedFields = mfEntries
-
-	// 3. Metadata Bloat: Annotations (Identical across pods for interning)
-	f.mu.Lock()
-	annos, ok := f.cachedAnnos[template.Name]
-	if !ok {
-		annos = f.precomputeAnnotations(template)
-		f.cachedAnnos[template.Name] = annos
+		proto = f.generatePrototype(base)
+		f.cachedPrototypes[base.Name] = proto
 	}
 	f.mu.Unlock()
 
-	if len(annos) > 0 {
-		pod.Annotations = make(map[string]string)
-		maps.Copy(pod.Annotations, annos)
-	}
+	pod := proto.DeepCopy()
+	pod.Name = fmt.Sprintf("%s-%d", f.NamePrefix, id)
+	pod.UID = types.UID(fmt.Sprintf("fuzzed-uid-%08d-%s", id, f.randomString(8)))
 
 	return pod
 }
 
-func (f *ExemplaryPodFuzzer) precomputeManagedFields(template *ExemplaryPodTemplate) []metav1.ManagedFieldsEntry {
-	if len(template.ManagedFields) == 0 {
-		return nil
+func (f *ExemplaryPodFuzzer) generatePrototype(base *v1.Pod) *v1.Pod {
+	pod := base.DeepCopy()
+
+	// 1. Sanitize Metadata
+	pod.Namespace = f.Namespace
+	pod.ResourceVersion = ""
+	pod.CreationTimestamp = metav1.Time{}
+	pod.GenerateName = ""
+
+	// Fuzz OwnerRefs
+	for i := range pod.OwnerReferences {
+		pod.OwnerReferences[i].Name = "fuzzed-owner-" + f.randomString(8)
+		pod.OwnerReferences[i].UID = types.UID("fuzzed-uid-" + f.randomString(8))
 	}
 
-	totalEntries := max(template.ManagedFieldCount, len(template.ManagedFields))
+	// Fuzz Annotations & Labels
+	for k := range pod.Annotations {
+		pod.Annotations[k] = "fuzzed-val-" + f.randomString(16)
+	}
+	for k := range pod.Labels {
+		pod.Labels[k] = "fuzzed-label-" + f.randomString(8)
+	}
 
-	res := make([]metav1.ManagedFieldsEntry, totalEntries)
-	now := metav1.NewTime(time.Now())
+	// 2. Sanitize Spec
+	pod.Spec.NodeName = "fuzzed-node-" + f.randomString(8)
+	pod.Spec.SchedulerName = "non-existent-fuzz-scheduler"
+	if pod.Spec.NodeSelector == nil {
+		pod.Spec.NodeSelector = make(map[string]string)
+	}
+	pod.Spec.NodeSelector["disktype"] = "non-existent-ssd"
 
-	for i := range totalEntries {
-		mfTemplate := template.ManagedFields[i%len(template.ManagedFields)]
-
-		// Build structurally complex FieldsV1
-		raw := f.buildComplexFieldsV1(mfTemplate)
-
-		apiVersion := mfTemplate.APIVersion
-		if apiVersion == "" {
-			apiVersion = "v1"
-		}
-
-		// Replicate "few managers, many entries" pattern by cycling suffixes
-		res[i] = metav1.ManagedFieldsEntry{
-			Manager:    fmt.Sprintf("%s-%d", mfTemplate.Manager, i/len(template.ManagedFields)),
-			Operation:  metav1.ManagedFieldsOperationType(mfTemplate.Operation),
-			APIVersion: apiVersion,
-			Time:       &now,
-			FieldsV1:   &metav1.FieldsV1{Raw: raw},
+	// Fuzz Env Vars (Keys and Values)
+	for i := range pod.Spec.Containers {
+		for j := range pod.Spec.Containers[i].Env {
+			pod.Spec.Containers[i].Env[j].Name = "FUZZED_ENV_" + f.randomString(8)
+			pod.Spec.Containers[i].Env[j].Value = f.randomString(64)
 		}
 	}
-	return res
+
+	// 3. Fuzz ManagedFields
+	for i := range pod.ManagedFields {
+		if pod.ManagedFields[i].FieldsV1 != nil {
+			pod.ManagedFields[i].FieldsV1.Raw = f.fuzzFieldsV1JSON(pod.ManagedFields[i].FieldsV1.Raw)
+		}
+	}
+
+	// Clear Status
+	pod.Status = v1.PodStatus{}
+
+	return pod
 }
 
-func (f *ExemplaryPodFuzzer) buildComplexFieldsV1(tm ExemplaryManagedFieldTemplate) []byte {
-	// Start with the provided schema if any
-	schema := tm.FieldsSchema
-	if schema == "" || schema == "{}" {
-		schema = "{}"
-	}
-
-	// If no generative fields requested, return as is (with optional bloat)
-	if tm.FieldPathCount <= 0 {
-		raw := []byte(schema)
-		if tm.Length > len(raw) {
-			bloat := f.randomString(tm.Length - len(raw) - 15)
-			if schema == "{}" {
-				return fmt.Appendf(nil, `{"fuzzBloat":"%s"}`, bloat)
-			}
-			return fmt.Appendf(nil, `{"fuzzBloat":"%s",%s`, bloat, schema[1:])
-		}
+func (f *ExemplaryPodFuzzer) fuzzFieldsV1JSON(raw []byte) []byte {
+	var data map[string]interface{}
+	if err := json.Unmarshal(raw, &data); err != nil {
 		return raw
 	}
-
-	// Build a complex NESTED structure
-	depth := tm.FieldPathDepth
-	if depth <= 0 {
-		depth = 1
-	}
-
-	// Create a map-based tree structure
-	tree := f.generateNestedMap(tm.FieldPathCount, depth)
-
-	genJSON, err := json.Marshal(tree)
-	if err != nil {
-		// Fallback to simple flat JSON if nesting fails
-		return []byte(`{"f:error":"generation_failed"}`)
-	}
-
-	// If a target length is also specified, add a large bloat field
-	if tm.Length > len(genJSON) {
-		bloat := f.randomString(tm.Length - len(genJSON) - 17)
-		// Inject bloat at the start
-		res := fmt.Sprintf(`{"f:fuzzBloat":"%s",%s`, bloat, string(genJSON)[1:])
-		return []byte(res)
-	}
-
-	return genJSON
-}
-
-func (f *ExemplaryPodFuzzer) generateNestedMap(totalFields, maxDepth int) map[string]interface{} {
-	root := make(map[string]interface{})
-	fieldsCreated := 0
-
-	for fieldsCreated < totalFields {
-		curr := root
-		// Pick a random depth for this specific field branch
-		branchDepth := f.rng.Intn(maxDepth) + 1
-
-		for d := range branchDepth {
-			var key string
-			// 10% chance to generate a keyed list entry "k:" to test SSA associative list logic
-			if f.rng.Intn(100) < 10 {
-				key = fmt.Sprintf("k:{\"id\":%d,\"name\":\"node-%d-%d\"}", d, d, f.rng.Intn(10))
-			} else {
-				key = fmt.Sprintf("f:node_%d_%d", d, f.rng.Intn(10)) // Use few branch nodes to force overlap
-			}
-
-			if d == branchDepth-1 {
-				// Leaf node
-				key = fmt.Sprintf("f:field_%04d", fieldsCreated)
-				curr[key] = map[string]interface{}{}
-				fieldsCreated++
-			} else {
-				// Intermediate node
-				if _, ok := curr[key]; !ok {
-					curr[key] = make(map[string]interface{})
-				}
-				curr = curr[key].(map[string]interface{})
-			}
-		}
-	}
-	return root
-}
-
-func (f *ExemplaryPodFuzzer) precomputeAnnotations(template *ExemplaryPodTemplate) map[string]string {
-	res := make(map[string]string)
-	for _, annTemplate := range template.Annotations {
-		res[annTemplate.Key] = f.randomString(annTemplate.Length)
-	}
+	f.fuzzMapRecursive(data)
+	res, _ := json.Marshal(data)
 	return res
 }
 
-func (f *ExemplaryPodFuzzer) precomputeEnvVars(count int) []v1.EnvVar {
-	res := make([]v1.EnvVar, count)
-	for i := range count {
-		res[i] = v1.EnvVar{
-			Name:  fmt.Sprintf("FUZZ_GEN_VARIABLE_%03d", i),
-			Value: f.randomString(64),
+func (f *ExemplaryPodFuzzer) fuzzMapRecursive(m map[string]interface{}) {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+
+	for _, oldKey := range keys {
+		val := m[oldKey]
+		delete(m, oldKey)
+
+		var newKey string
+		if strings.HasPrefix(oldKey, "k:") {
+			newKey = fmt.Sprintf("k:{\"id\":%d,\"name\":\"fuzzed-node-%s\"}", f.rng.Intn(100), f.randomString(4))
+		} else if strings.HasPrefix(oldKey, "f:") {
+			newKey = "f:fuzzed_field_" + f.randomString(4)
+		} else if oldKey == "." {
+			newKey = "."
+		} else {
+			newKey = oldKey
+		}
+
+		if subMap, ok := val.(map[string]interface{}); ok {
+			f.fuzzMapRecursive(subMap)
+			m[newKey] = subMap
+		} else {
+			m[newKey] = val
 		}
 	}
-	return res
 }
 
 func (f *ExemplaryPodFuzzer) randomString(length int) string {
@@ -308,36 +193,23 @@ type ExemplaryPodCreator struct {
 	fuzzer *ExemplaryPodFuzzer
 }
 
-// NewExemplaryPodCreator creates a new creator.
-func NewExemplaryPodCreator(client clientset.Interface, seed int64) *ExemplaryPodCreator {
+// NewExemplaryPodCreator creates a new creator with settings.
+func NewExemplaryPodCreator(client clientset.Interface, seed int64, namePrefix, namespace string) *ExemplaryPodCreator {
 	return &ExemplaryPodCreator{
 		client: client,
-		fuzzer: NewExemplaryPodFuzzer(seed),
+		fuzzer: NewExemplaryPodFuzzer(seed, namePrefix, namespace),
 	}
 }
 
-// LoadTemplateFromFile loads an ExemplaryPodTemplate from a YAML/JSON file.
-func LoadTemplateFromFile(path string) (*ExemplaryPodTemplate, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read template file: %w", err)
-	}
-	var template ExemplaryPodTemplate
-	if err := yaml.Unmarshal(data, &template); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal template: %w", err)
-	}
-	return &template, nil
-}
-
-// CreateExemplaryPods creates a batch of pods concurrently based on a template.
-func (c *ExemplaryPodCreator) CreateExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, progress ProgressCallback) error {
-	return c.processExemplaryPods(ctx, template, count, offset, concurrency, progress, func(pod *v1.Pod) error {
+// CreateExemplaryPods creates a batch of pods concurrently based on a base pod.
+func (c *ExemplaryPodCreator) CreateExemplaryPods(ctx context.Context, base *v1.Pod, count int, offset int, concurrency int, progress ProgressCallback) error {
+	return c.processExemplaryPods(ctx, base, count, offset, concurrency, progress, func(pod *v1.Pod) error {
 		return utils.CreatePodWithRetries(c.client, pod.Namespace, pod)
 	})
 }
 
 // WriteExemplaryPodsToDir writes a batch of pod manifests to a directory.
-func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, dirPath string, progress ProgressCallback) (string, error) {
+func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, base *v1.Pod, count int, offset int, concurrency int, dirPath string, progress ProgressCallback) (string, error) {
 	if dirPath == "" {
 		var err error
 		dirPath, err = os.MkdirTemp("", "exemplary-pods-")
@@ -350,7 +222,7 @@ func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, templ
 		return "", fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 	}
 
-	err := c.processExemplaryPods(ctx, template, count, offset, concurrency, progress, func(pod *v1.Pod) error {
+	err := c.processExemplaryPods(ctx, base, count, offset, concurrency, progress, func(pod *v1.Pod) error {
 		data, err := yaml.Marshal(pod)
 		if err != nil {
 			return fmt.Errorf("failed to marshal pod %s: %w", pod.Name, err)
@@ -365,7 +237,7 @@ func (c *ExemplaryPodCreator) WriteExemplaryPodsToDir(ctx context.Context, templ
 	return dirPath, err
 }
 
-func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template *ExemplaryPodTemplate, count int, offset int, concurrency int, progress ProgressCallback, processFunc func(*v1.Pod) error) error {
+func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, base *v1.Pod, count int, offset int, concurrency int, progress ProgressCallback, processFunc func(*v1.Pod) error) error {
 	g, ctx := errgroup.WithContext(ctx)
 	podsChan := make(chan int, count)
 
@@ -375,7 +247,6 @@ func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template
 		for i := range count {
 			select {
 			case podsChan <- i + offset:
-				// Pass the offset ID
 			case <-ctx.Done():
 				return
 			}
@@ -387,7 +258,7 @@ func (c *ExemplaryPodCreator) processExemplaryPods(ctx context.Context, template
 	for range concurrency {
 		g.Go(func() error {
 			for id := range podsChan {
-				pod := c.fuzzer.FuzzPod(template, id)
+				pod := c.fuzzer.FuzzPod(base, id)
 				if err := processFunc(pod); err != nil {
 					return err
 				}

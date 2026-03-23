@@ -25,110 +25,104 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestExemplaryPodFuzzer(t *testing.T) {
-	fuzzer := NewExemplaryPodFuzzer(42)
+	fuzzer := NewExemplaryPodFuzzer(42, "fuzzed-pod", "fuzzed-ns")
 
-	sharedSpec := &v1.PodSpec{
-		Containers: []v1.Container{
-			{
-				Name:  "web",
-				Image: "nginx",
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "original-pod",
+			Namespace: "original-ns",
+			Annotations: map[string]string{
+				"sensitive-info": "secret-data",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name: "original-owner",
+					UID:  "original-uid",
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "web",
+					Image: "nginx",
+					Env: []v1.EnvVar{
+						{Name: "DB_PASSWORD", Value: "password123"},
+					},
+				},
 			},
 		},
 	}
 
-	template := &ExemplaryPodTemplate{
-		Name:     "representative",
-		BaseSpec: sharedSpec,
-		ManagedFields: []ExemplaryManagedFieldTemplate{
-			{
-				Manager:      "kube-scheduler",
-				Operation:    "Update",
-				FieldsSchema: `{"f:spec":{"f:nodeName":{}}}`,
-			},
-		},
-		Annotations: []ExemplaryAnnotationTemplate{
-			{
-				Key:    "fuzz.metadata/blob",
-				Length: 100,
-			},
-		},
-		EnvVarCount:       10,
-		ManagedFieldCount: 5,
-	}
-
-	pod1 := fuzzer.FuzzPod(template, 1)
-	pod2 := fuzzer.FuzzPod(template, 2)
+	pod1 := fuzzer.FuzzPod(basePod, 1)
+	pod2 := fuzzer.FuzzPod(basePod, 2)
 
 	// Verify basic fields
-	assert.Equal(t, "representative-1", pod1.Name)
-	assert.Equal(t, "representative-2", pod2.Name)
+	assert.Equal(t, "fuzzed-pod-1", pod1.Name)
+	assert.Equal(t, "fuzzed-pod-2", pod2.Name)
+	assert.Equal(t, "fuzzed-ns", pod1.Namespace)
 
-	// Verify shared spec base (interning test)
-	assert.Equal(t, sharedSpec.Containers[0].Image, pod1.Spec.Containers[0].Image)
-	assert.Equal(t, pod1.Spec.Containers[0].Image, pod2.Spec.Containers[0].Image)
+	// Verify sanitization (no original names/data)
+	assert.NotEqual(t, "original-pod", pod1.Name)
+	assert.NotEqual(t, "secret-data", pod1.Annotations["sensitive-info"])
+	assert.Contains(t, pod1.Annotations["sensitive-info"], "fuzzed-val-")
 
-	// Verify Generative Env Vars
-	assert.Len(t, pod1.Spec.Containers[0].Env, 10)
-	assert.True(t, strings.HasPrefix(pod1.Spec.Containers[0].Env[0].Name, "FUZZ_GEN_VARIABLE_"))
-	assert.Equal(t, pod1.Spec.Containers[0].Env[0].Value, pod2.Spec.Containers[0].Env[0].Value)
+	// Verify Env Vars (Keys and Values fuzzed)
+	assert.Len(t, pod1.Spec.Containers[0].Env, 1)
+	assert.NotEqual(t, "DB_PASSWORD", pod1.Spec.Containers[0].Env[0].Name)
+	assert.NotEqual(t, "password123", pod1.Spec.Containers[0].Env[0].Value)
+	assert.Contains(t, pod1.Spec.Containers[0].Env[0].Name, "FUZZED_ENV_")
 
-	// Verify ManagedFields (Generative Count)
-	assert.Len(t, pod1.ManagedFields, 5)
-	assert.Equal(t, "kube-scheduler-0", pod1.ManagedFields[0].Manager)
-	assert.Equal(t, pod1.ManagedFields[0].FieldsV1.GetRawBytes(), pod2.ManagedFields[0].FieldsV1.GetRawBytes())
+	// Verify OwnerRefs
+	assert.Len(t, pod1.OwnerReferences, 1)
+	assert.Contains(t, pod1.OwnerReferences[0].Name, "fuzzed-owner-")
+	assert.Contains(t, string(pod1.OwnerReferences[0].UID), "fuzzed-uid-")
 
-	// Verify Annotations
-	assert.Len(t, pod1.Annotations, 1)
-	assert.Contains(t, pod1.Annotations, "fuzz.metadata/blob")
-	assert.Len(t, pod1.Annotations["fuzz.metadata/blob"], 100)
-
-	// Verify stability (interning test: identical strings across pods)
-	assert.Equal(t, pod1.Annotations["fuzz.metadata/blob"], pod2.Annotations["fuzz.metadata/blob"])
+	// Verify stability/interning (pod1 and pod2 should share identical strings for everything except Name/UID)
+	assert.Equal(t, pod1.Spec.Containers[0].Env[0].Name, pod2.Spec.Containers[0].Env[0].Name)
+	assert.Equal(t, pod1.Annotations["sensitive-info"], pod2.Annotations["sensitive-info"])
 }
 
 func TestDeeplyNestedManagedFields(t *testing.T) {
-	fuzzer := NewExemplaryPodFuzzer(42)
-	template := &ExemplaryPodTemplate{
-		Name: "nested-test",
-		ManagedFields: []ExemplaryManagedFieldTemplate{
-			{
-				Manager:        "nested-manager",
-				Operation:      "Apply",
-				FieldPathCount: 50,
-				FieldPathDepth: 5,
+	fuzzer := NewExemplaryPodFuzzer(42, "nested-test", "default")
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "base",
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "kubelet",
+					APIVersion: "v1",
+					FieldsV1: &metav1.FieldsV1{
+						Raw: []byte(`{"f:spec":{"f:containers":{"k:{\"name\":\"web\"}":{".":{},"f:image":{}}}}}`),
+					},
+				},
 			},
 		},
-		ManagedFieldCount: 1,
 	}
 
-	pod := fuzzer.FuzzPod(template, 0)
+	pod := fuzzer.FuzzPod(basePod, 0)
 	assert.Len(t, pod.ManagedFields, 1)
+	assert.Equal(t, "kubelet", pod.ManagedFields[0].Manager)
 
 	raw := string(pod.ManagedFields[0].FieldsV1.GetRawBytes())
-	// Verify it contains multiple field paths
-	assert.Contains(t, raw, "f:", "should contain 'f:' field paths")
-	assert.Contains(t, raw, "k:", "should contain 'k:' keyed list entries")
-	// Verify it contains multiple levels of nesting
-	assert.GreaterOrEqual(t, strings.Count(raw, "{"), 5)
-}
-
-func TestLoadTemplateFromFile(t *testing.T) {
-	template, err := LoadTemplateFromFile("templates/representative-pod.yaml")
-	require.NoError(t, err)
-	assert.Equal(t, "representative-pod", template.Name)
-	assert.NotNil(t, template.BaseSpec)
+	// Verify it contains fuzzed field paths
+	assert.Contains(t, raw, "f:fuzzed_field_")
+	assert.Contains(t, raw, "k:{\\\"id\\\":")
+	// Verify it preserves nesting (count {)
+	assert.Equal(t, strings.Count(string(basePod.ManagedFields[0].FieldsV1.Raw), "{"), strings.Count(raw, "{"))
 }
 
 func TestWriteExemplaryPodsToDir(t *testing.T) {
-	creator := NewExemplaryPodCreator(nil, 42)
-	template := &ExemplaryPodTemplate{
-		Name: "test-pod",
+	creator := NewExemplaryPodCreator(nil, 42, "test-pod", "default")
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "base"},
 	}
 
-	dir, err := creator.WriteExemplaryPodsToDir(context.TODO(), template, 5, 0, 2, "", nil)
+	dir, err := creator.WriteExemplaryPodsToDir(context.TODO(), basePod, 5, 0, 2, "", nil)
 	require.NoError(t, err)
 	defer func() {
 		_ = os.RemoveAll(dir)

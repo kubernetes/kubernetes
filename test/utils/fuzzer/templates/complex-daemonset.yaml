@@ -1,14 +1,25 @@
-name: "complex-daemonset-pod"
-envVarCount: 60
-managedFieldCount: 2
-baseSpec:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: complex-daemonset-base
+  namespace: default
+  annotations:
+    fuzzer.io/metadata-bloat: "will-be-fuzzed"
+  labels:
+    app: representative-agent
+  managedFields:
+  - manager: "system-controller-manager"
+    operation: "Update"
+    apiVersion: "v1"
+    fieldsV1:
+      Raw: '{"f:spec":{"f:containers":{"k:{\"name\":\"core-agent\"}":{".":{},"f:args":{},"f:image":{}}}}}'
+spec:
   serviceAccountName: "network-agent"
   hostNetwork: true
   dnsPolicy: "ClusterFirst"
   restartPolicy: "Always"
-  schedulerName: "non-existent-fuzz-scheduler"
+  schedulerName: "default-scheduler"
   nodeSelector:
-    disktype: "non-existent-ssd"
     kubernetes.io/os: "linux"
   initContainers:
   - name: "init-config-writer"
@@ -21,21 +32,6 @@ baseSpec:
     volumeMounts:
     - mountPath: "/etc/agent/config"
       name: "config-vol"
-  - name: "init-binary-setup"
-    image: "registry.k8s.io/pause:3.10"
-    command: ["/bin/install"]
-    resources: { requests: { cpu: "100m", memory: "10Mi" } }
-    volumeMounts:
-    - mountPath: "/host/opt/bin"
-      name: "bin-path"
-  - name: "init-state-cleanup"
-    image: "registry.k8s.io/pause:3.10"
-    command: ["/bin/cleanup"]
-    privileged: true
-    resources: { requests: { cpu: "100m", memory: "100Mi" } }
-    volumeMounts:
-    - mountPath: "/var/run/agent"
-      name: "run-path"
   containers:
   - name: "core-agent"
     image: "registry.k8s.io/pause:3.10"
@@ -43,66 +39,13 @@ baseSpec:
     env:
     - name: "AGENT_NAMESPACE"
       valueFrom: { fieldRef: { fieldPath: "metadata.namespace" } }
-    - name: "AGENT_CONFIG_MAP"
-      value: "/tmp/agent/config"
     resources:
       requests: { cpu: "200m", memory: "200Mi" }
-    securityContext:
-      privileged: true
-      capabilities: { add: ["NET_ADMIN", "SYS_MODULE"] }
-    livenessProbe:
-      httpGet: { path: "/healthz", port: 9879 }
-      initialDelaySeconds: 30
     volumeMounts:
-    - mountPath: "/etc/agent/certs"
-      name: "certs-vol"
-      readOnly: true
     - mountPath: "/var/run/agent"
       name: "run-path"
-    - mountPath: "/host/etc/net.d"
-      name: "net-conf-vol"
-  - name: "metrics-sidecar"
-    image: "registry.k8s.io/pause:3.10"
-    resources:
-      limits: { cpu: "500m", memory: "128Mi" }
-      requests: { cpu: "10m", memory: "64Mi" }
-    volumeMounts:
-    - mountPath: "/conf"
-      name: "metrics-conf-vol"
   volumes:
   - name: "config-vol"
     hostPath: { path: "/var/lib/agent/config", type: "DirectoryOrCreate" }
-  - name: "bin-path"
-    hostPath: { path: "/usr/local/bin", type: "Directory" }
   - name: "run-path"
     hostPath: { path: "/var/run/agent", type: "DirectoryOrCreate" }
-  - name: "certs-vol"
-    hostPath: { path: "/etc/ssl/certs", type: "Directory" }
-  - name: "net-conf-vol"
-    hostPath: { path: "/etc/cni/net.d", type: "DirectoryOrCreate" }
-  - name: "metrics-conf-vol"
-    configMap: { name: "agent-metrics-config" }
-  - name: "v-01"
-    hostPath: { path: "/var/lib/agent/v1", type: "DirectoryOrCreate" }
-  - name: "v-02"
-    hostPath: { path: "/var/lib/agent/v2", type: "DirectoryOrCreate" }
-  - name: "v-03"
-    hostPath: { path: "/var/lib/agent/v3", type: "DirectoryOrCreate" }
-  - name: "v-04"
-    hostPath: { path: "/var/lib/agent/v4", type: "DirectoryOrCreate" }
-  - name: "v-05"
-    hostPath: { path: "/var/lib/agent/v5", type: "DirectoryOrCreate" }
-
-managedFields:
-- manager: "system-controller-manager"
-  operation: "Update"
-  fieldPathCount: 2000 # Increased from 1100
-  fieldPathDepth: 7
-- manager: "node-agent"
-  operation: "Update"
-  fieldPathCount: 500  # Increased from 50
-  fieldPathDepth: 4
-
-annotations:
-- key: "fuzzer.io/metadata-bloat"
-  length: 40000 # Increased from 24000
