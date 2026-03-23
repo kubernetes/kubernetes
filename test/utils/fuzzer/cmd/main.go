@@ -55,16 +55,16 @@ func main() {
 
 	var clientset *kubernetes.Clientset
 	if *outDir == "" {
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		if err != nil {
-			if *kubeconfig == "" {
-				home, _ := os.UserHomeDir()
-				config, err = clientcmd.BuildConfigFromFlags("", home+"/.kube/config")
-			}
-			if err != nil {
-				log.Fatalf("Failed to build kubeconfig: %v", err)
-			}
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		if *kubeconfig != "" {
+			loadingRules.ExplicitPath = *kubeconfig
 		}
+		config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{}).ClientConfig()
+		if err != nil {
+			log.Fatalf("Failed to load kubeconfig: %v", err)
+		}
+
+		// Increase QPS and Burst for high-performance injection
 		config.QPS = 500
 		config.Burst = 1000
 		clientset, err = kubernetes.NewForConfig(config)
