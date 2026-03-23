@@ -19,6 +19,8 @@ package preemption
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"sort"
 	"sync"
 	"time"
 
@@ -133,6 +135,96 @@ func newExecutor(fh fwk.Handle) *Executor {
 	}
 
 	return e
+}
+
+// revokeLowerPriorityPodNominations intelligently clears nominated node names for lower-priority pods.
+// It simulates the preemption of victim pods and the presence of the preemptor pod to check if
+// nominated pods still fit on the target node. If a nominated pod no longer fits, its nominatedNodeName is cleared.
+func (e *Executor) revokeLowerPriorityPodNominations(ctx context.Context, cycleState fwk.CycleState, preemptorPod *v1.Pod, targetNodeName string, victimPods []*v1.Pod) {
+	logger := klog.FromContext(ctx)
+
+	// 1. Transform nominatedPods into two slices depending on priority.
+	var lowerPriorityNominatedPods, greaterOrEqualPriorityNominatedPods []fwk.PodInfo
+	preemptorPriority := corev1helpers.PodPriority(preemptorPod)
+	for _, npi := range e.fh.NominatedPodsForNode(targetNodeName) {
+		if corev1helpers.PodPriority(npi.GetPod()) < preemptorPriority {
+			lowerPriorityNominatedPods = append(lowerPriorityNominatedPods, npi)
+		} else {
+			greaterOrEqualPriorityNominatedPods = append(greaterOrEqualPriorityNominatedPods, npi)
+		}
+	}
+	if len(lowerPriorityNominatedPods) == 0 {
+		return
+	}
+
+	// 2. Take node info snapshot.
+	nodeInfo, err := e.fh.SnapshotSharedLister().NodeInfos().Get(targetNodeName)
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot get NodeInfo for target node", "node", targetNodeName)
+		return
+	}
+	nodeInfo = nodeInfo.Snapshot()
+	addPod := func(pod fwk.PodInfo) error {
+		nodeInfo.AddPodInfo(pod)
+		// TODO: Call other things like RunPreFilterExtensionAddPod
+		return nil
+	}
+	removePod := func(pod *v1.Pod) error {
+		return nodeInfo.RemovePod(logger, pod)
+		// TODO: Call other things like RunPreFilterExtensionRemovePod
+	}
+
+	// 3. Simulation setup: Remove victims pods.
+	for _, victim := range victimPods {
+		if victim.Spec.NodeName == targetNodeName {
+			if err := removePod(victim); err != nil {
+				// TODO: Error handling
+			}
+		}
+	}
+
+	// 4. Simulation setup: Add preemptor pod.
+	preemptorPodInfo, err := framework.NewPodInfo(preemptorPod)
+	if err != nil {
+		logger.V(5).Info("Pod cannot be added to node during simulation, fallbacking to old logic", "node", targetNodeName, "pod", klog.KObj(preemptorPod), "err", err)
+		//  TODO: Fallback to old logic.
+	}
+	if err := addPod(preemptorPodInfo); err != nil {
+		logger.V(5).Info("Pod cannot be added to node during simulation, fallbacking to old logic", "node", targetNodeName, "pod", klog.KObj(preemptorPod), "err", err)
+		//  TODO: Fallback to old logic.
+	}
+
+	// 5. Simulation setup: Add nominated pods with priority >= preemptorPod.priority.
+	for _, npi := range greaterOrEqualPriorityNominatedPods {
+		if err := addPod(npi); err != nil {
+			logger.V(5).Info("Pod cannot be added to node during simulation, skipping check for nominated pod", "node", targetNodeName, "pod", klog.KObj(npi.GetPod()), "err", err)
+			// TODO: Fallback to old logic.
+		}
+	}
+
+	// 6. Sort nominatedPods by priority in descending order and simulate scheduling them on the node.
+	sort.Slice(lowerPriorityNominatedPods, func(i, j int) bool {
+		return corev1helpers.PodPriority(lowerPriorityNominatedPods[i].GetPod()) > corev1helpers.PodPriority(lowerPriorityNominatedPods[j].GetPod())
+	})
+	podsToRevokeNomination := make([]fwk.PodInfo, 0, len(lowerPriorityNominatedPods))
+	for _, np := range lowerPriorityNominatedPods {
+		// Check if the nominated pod fits on the modified node.
+		// TODO: cycleState - ask Maciej
+		status := e.fh.RunFilterPlugins(ctx, cycleState, np.GetPod(), nodeInfo)
+		if !status.IsSuccess() {
+			logger.V(5).Info("Nominated pod no longer fits on node after preemption and preemptor simulation", "nominatedPod", klog.KObj(np.GetPod()), "node", targetNodeName, "status", status.Message())
+			podsToRevokeNomination = append(podsToRevokeNomination, np)
+			continue
+		}
+		addPod(np)
+	}
+
+	// 7. Revoke nominations for pods that didn't fit.
+	if len(podsToRevokeNomination) > 0 {
+		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), podsToRevokeNomination...); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field for some nominated pods after smart unnomination", "node", targetNodeName)
+		}
+	}
 }
 
 // prepareCandidateAsync triggers a goroutine for some preparation work:
@@ -318,9 +410,10 @@ func (e *Executor) IsPodRunningPreemption(podUID types.UID) bool {
 
 // clearNominatedNodeName internally submit a patch request to API server
 // to set each pods[*].Status.NominatedNodeName> to "".
-func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher fwk.APICacher, pods ...*v1.Pod) utilerrors.Aggregate {
+func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher fwk.APICacher, pods ...fwk.PodInfo) utilerrors.Aggregate {
 	var errs []error
-	for _, p := range pods {
+	for _, pi := range pods {
+		p := pi.GetPod()
 		if apiCacher != nil {
 			// When API cacher is available, use it to clear the NominatedNodeName.
 			_, err := apiCacher.PatchPodStatus(p, nil, &fwk.NominatingInfo{NominatedNodeName: "", NominatingMode: fwk.ModeOverride})
@@ -348,18 +441,18 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
+func getLowerPriorityNominatedPods(pn fwk.PodNominator, pod *v1.Pod, nodeName string) []fwk.PodInfo {
 	podInfos := pn.NominatedPodsForNode(nodeName)
 
 	if len(podInfos) == 0 {
 		return nil
 	}
 
-	var lowerPriorityPods []*v1.Pod
+	var lowerPriorityPods []fwk.PodInfo
 	podPriority := corev1helpers.PodPriority(pod)
 	for _, pi := range podInfos {
 		if corev1helpers.PodPriority(pi.GetPod()) < podPriority {
-			lowerPriorityPods = append(lowerPriorityPods, pi.GetPod())
+			lowerPriorityPods = append(lowerPriorityPods, pi)
 		}
 	}
 	return lowerPriorityPods
