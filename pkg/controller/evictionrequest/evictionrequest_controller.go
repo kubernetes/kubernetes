@@ -353,7 +353,7 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 	target := newTargetInfo(evictionRequest.Spec.Target, targetPod)
 	logger.V(4).Info("Target info", "evictionRequest", klog.KObj(evictionRequest), "targetName", target.targetName(), "desiredTargetUID", target.targetUID())
 
-	if evictionRequest.Status.ObservedGeneration == 0 {
+	if evictionRequest.Status.ObservedGeneration == nil {
 		failed, evicted := validate(c.clock, evictionRequest, target)
 		if failed != nil || evicted != nil {
 			return c.applyStatus(ctx, evictionRequest,
@@ -553,7 +553,7 @@ func validate(
 
 // computeConditions returns the full pair of Canceled and Evicted conditions.
 // Both are always set — defaulting to False until flipped to True.
-// Precondition checks run only on first sync (ObservedGeneration == 0).
+// Precondition checks run only on first sync (ObservedGeneration == nil).
 // Completion checks are skipped when deferCompletion is true.
 func computeConditions(
 	clock clock.PassiveClock,

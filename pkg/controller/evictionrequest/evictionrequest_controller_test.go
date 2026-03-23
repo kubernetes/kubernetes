@@ -398,7 +398,7 @@ func TestSyncHandler_PodDeleted_Evicted(t *testing.T) {
 	// Create EvictionRequest with TargetResponders already set (means validation passed before)
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
-	er.Status.ObservedGeneration = 1 // Simulate that we've already observed this request
+	er.Status.ObservedGeneration = ptr.To[int64](1) // Simulate that we've already observed this request
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
 		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
@@ -434,7 +434,7 @@ func TestSyncHandler_PodNotFound_MovesActiveResponderToProcessed(t *testing.T) {
 	// Create EvictionRequest with an active responder that has a heartbeat
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
-	er.Status.ObservedGeneration = 1
+	er.Status.ObservedGeneration = ptr.To[int64](1)
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
 		{Name: testResponder},
 		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
@@ -516,7 +516,7 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T
 	// Create EvictionRequest with an active responder that hasn't completed
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
-	er.Status.ObservedGeneration = 1
+	er.Status.ObservedGeneration = ptr.To[int64](1)
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
 		{Name: testResponder},
 		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
@@ -910,7 +910,7 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
 	er.Status.ActiveResponders = []string{activeEvictionResponderClass}
-	er.Status.ObservedGeneration = er.Generation
+	er.Status.ObservedGeneration = ptr.To[int64](er.Generation)
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
 			Name:          activeEvictionResponderClass,
@@ -1016,8 +1016,8 @@ func TestSyncHandler_ObservedGenerationSet(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if updated.Status.ObservedGeneration != 5 {
-		t.Errorf("expected ObservedGeneration to be 5, got %d", updated.Status.ObservedGeneration)
+	if ptr.Equal(updated.Status.ObservedGeneration, ptr.To[int64](5)) {
+		t.Errorf("expected ObservedGeneration to be 5, got %d", ptr.Deref(updated.Status.ObservedGeneration, -1))
 	}
 }
 
