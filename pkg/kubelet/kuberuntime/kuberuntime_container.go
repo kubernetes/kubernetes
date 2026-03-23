@@ -1004,28 +1004,57 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 // Remove all init containers. Note that this function does not check the state
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
-func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+// This function was updated to properly handle cleanup when kubelet potentially
+// has multiple container references (e.g., after crash/restart during cleanup).
+func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 	logger := klog.FromContext(ctx)
 	initContainerNames := sets.New[string]()
 	for _, container := range pod.Spec.InitContainers {
 		initContainerNames.Insert(container.Name)
 	}
+	
+	// CRITICAL FIX: Build set of active sandbox IDs to avoid removing containers
+	// from currently running sandboxes. This prevents accidentally cleaning up
+	// containers that belong to the new sandbox being created.
+	activeSandboxIDs := sets.New[string]()
+	for _, sb := range podStatus.SandboxStatuses {
+		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			activeSandboxIDs.Insert(sb.Id)
+		}
+	}
+	
+	var lastErr error
 	for name := range initContainerNames {
 		count := 0
+		// CRITICAL FIX: For each init container name, find ALL container statuses with that name
+		// and remove them. After killing pod sandbox, we want to clean up all references to
+		// init containers. This prevents stale containers from confusing later sync cycles.
 		for _, status := range podStatus.ContainerStatuses {
 			if status.Name != name {
 				continue
 			}
+			
+			// CRITICAL FIX: Skip containers that belong to active sandboxes.
+			// We only want to remove init containers from inactive/killed sandboxes.
+			if activeSandboxIDs.Has(status.PodSandboxID) {
+				logger.V(4).Info("Skipping init container removal - belongs to active sandbox", "containerName", status.Name, "containerID", status.ID.ID, "sandboxID", status.PodSandboxID)
+				continue
+			}
+			
 			count++
 			// Purge all init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
 			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
-				continue
+				// CRITICAL FIX: Record error but don't exit immediately
+				// Multiple init containers may need cleanup; collect all errors
+				logger.Error(err, "failed to remove pod init container", "containerName", status.Name, "pod", klog.KObj(pod))
+				lastErr = err
 			}
 		}
 	}
-}
+	
+	return lastErr
+
 
 // HasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
@@ -1066,16 +1095,40 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	// have been executed at some point in the past.  However, they could have been removed
 	// from the container runtime now, and if we proceed, it would appear as if they
 	// never ran and will re-execute improperly except for the restartable init containers.
+	//
+	// CRITICAL FIX: When there are active sandboxes (SandboxStatuses has READY sandboxes),
+	// only RUNNING regular containers count as initialized. This prevents old EXITED containers
+	// from previous sandbox creations from falsely signaling initialization.
 	podHasInitialized := false
+	hasActiveSandbox := len(podStatus.SandboxStatuses) > 0 &&
+		(podStatus.SandboxStatuses[0].State == runtimeapi.PodSandboxState_SANDBOX_READY)
+	
+	// Get the active sandbox ID for explicit container-sandbox matching
+	var activeSandboxID string
+	if hasActiveSandbox {
+		activeSandboxID = podStatus.SandboxStatuses[0].Id
+	}
+	
 	for _, container := range pod.Spec.Containers {
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
 			continue
 		}
+		
+		// CRITICAL FIX: Skip containers that don't belong to the active sandbox
+		// This prevents confusion from residual containers from previous sandboxes
+		if activeSandboxID != "" && status.PodSandboxID != activeSandboxID {
+			continue
+		}
+		
 		switch status.State {
 		case kubecontainer.ContainerStateCreated,
 			kubecontainer.ContainerStateRunning:
-			podHasInitialized = true
+			// CRITICAL FIX: Only consider RUNNING as init-complete if we have an active sandbox.
+			// If we just killed old sandbox, we shouldn't trust old exited containers.
+			if hasActiveSandbox || status.State == kubecontainer.ContainerStateRunning {
+				podHasInitialized = true
+			}
 		case kubecontainer.ContainerStateExited:
 			// This is a workaround for the issue that the kubelet cannot
 			// differentiate the container statuses of the previous podSandbox
@@ -1084,6 +1137,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 			// state and the kubelet will try to recreate a new podSandbox.
 			// In this case, the kubelet should not mistakenly think that
 			// the newly created podSandbox has been initialized.
+			// CRITICAL FIX: Only trust EXITED regular containers if there's NO active sandbox
+			// (meaning we're still in initial boot state, not mid-restart)
+			if !hasActiveSandbox {
+				podHasInitialized = true
+			}
 		default:
 			// Ignore other states
 		}

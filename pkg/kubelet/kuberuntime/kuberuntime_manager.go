@@ -1476,7 +1476,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		if podContainerChanges.CreateSandbox {
-			m.purgeInitContainers(ctx, pod, podStatus)
+			// CRITICAL FIX: If purgeInitContainers fails, it indicates problems with container cleanup
+			// We should not proceed with new sandbox creation as it may lead to permanent pod Init state
+			// Retry will happen in the next sync cycle after container runtime stabilizes
+			if err := m.purgeInitContainers(ctx, pod, podStatus); err != nil {
+				logger.Error(err, "Failed to purge init containers, aborting pod sync", "pod", klog.KObj(pod))
+				killResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, "purge-init-containers")
+				killResult.Fail(kubecontainer.ErrKillPodSandbox, fmt.Sprintf("failed to purge init containers: %v", err))
+				result.AddSyncResult(killResult)
+				return
+			}
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
