@@ -120,11 +120,7 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
-			// There is no good way to shut down the informers. They spawn
-			// various goroutines and some of them (in particular shared informer)
-			// become very unhappy ("close on closed channel") when using a context
-			// that gets cancelled. Therefore we just keep everything running.
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
 
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
@@ -142,6 +138,9 @@ func TestSyncHandler(t *testing.T) {
 			}
 			setupMetrics()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+			// cancel must be called before Shutdown to unblock informer goroutines.
+			defer informerFactory.Shutdown()
+			defer cancel()
 			podInformer := informerFactory.Core().V1().Pods()
 			pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 
@@ -150,6 +149,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
 			ec, _ := c.(*ephemeralController)
+			defer ec.queue.ShutDown()
 
 			// Ensure informers are up-to-date.
 			informerFactory.Start(ctx.Done())
