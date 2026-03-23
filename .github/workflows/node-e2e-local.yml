@@ -1,0 +1,161 @@
+name: Local Node E2E Testing - Issue #137722
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'test/e2e_node/**'
+      - 'pkg/kubelet/**'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'test/e2e_node/**'
+      - 'pkg/kubelet/**'
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: 'Test focus pattern'
+        required: false
+        default: ''
+      skip:
+        description: 'Test skip pattern'
+        required: false
+        default: '\[Flaky\]|\[Slow\]|\[Serial\]'
+      parallelism:
+        description: 'Number of parallel tests'
+        required: false
+        default: '2'
+      test_args:
+        description: 'Additional test arguments'
+        required: false
+        default: ''
+
+jobs:
+  node-e2e-local:
+    name: Node E2E Local Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.26.0'
+    
+    - name: Set KUBE_ROOT
+      run: |
+        echo "KUBE_ROOT=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+        echo "Kubernetes source root: $GITHUB_WORKSPACE"
+        cd $GITHUB_WORKSPACE
+        pwd
+        ls -la
+    
+    - name: Install containerd and dependencies
+      run: |
+        echo "Setting up containerd environment for local node e2e testing..."
+        sudo apt-get update
+        sudo apt-get install -y wget tar systemd
+        
+        wget -q https://github.com/containerd/containerd/releases/download/v1.7.18/containerd-1.7.18-linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf containerd-1.7.18-linux-amd64.tar.gz
+        rm containerd-1.7.18-linux-amd64.tar.gz
+        
+        wget -q https://github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz
+        sudo mkdir -p /opt/cni/bin
+        sudo tar -C /opt/cni/bin -xzf cni-plugins-linux-amd64-v1.4.0.tgz
+        rm cni-plugins-linux-amd64-v1.4.0.tgz
+        
+        sudo mkdir -p /etc/containerd
+        sudo tee /etc/containerd/config.toml > /dev/null << 'EOF'
+        version = 2
+        
+        [plugins]
+          [plugins."io.containerd.grpc.v1.cri"]
+            sandbox_image = "registry.k8s.io/pause:3.9"
+            
+            [plugins."io.containerd.grpc.v1.cri".containerd]
+              snapshotter = "overlayfs"
+              
+            [plugins."io.containerd.grpc.v1.cri".cni]
+              bin_dir = "/opt/cni/bin"
+              conf_dir = "/etc/cni/net.d"
+        
+          [plugins."io.containerd.grpc.v1.cri".registry]
+            [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+                endpoint = ["https://registry-1.docker.io"]
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
+                endpoint = ["https://registry.k8s.io"]
+        EOF
+        
+        sudo systemctl daemon-reload
+        sudo systemctl enable containerd
+        sudo systemctl start containerd
+        
+        # Wait for containerd to be ready
+        echo "Waiting for containerd to be ready..."
+        for i in {1..30}; do
+          if sudo ctr version >/dev/null 2>&1; then
+            echo "containerd is ready"
+            break
+          fi
+          echo "Waiting for containerd... ($i/30)"
+          sleep 2
+        done
+    
+    - name: Verify Kubernetes source root
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "KUBE_ROOT: $KUBE_ROOT"
+        if [ -f "Makefile" ]; then
+          echo "✅ Kubernetes source root detected"
+        else
+          echo "❌ Kubernetes source root not found"
+          exit 1
+        fi
+    
+    - name: Build dependencies
+      run: |
+        echo "Building Kubernetes dependencies..."
+        cd $KUBE_ROOT
+        make WHAT=cmd/kubelet cmd/kubectl
+        make WHAT=test/e2e_node/e2e_node.test
+    
+    - name: Run Node E2E Tests
+      env:
+        CONTAINER_RUNTIME_ENDPOINT: unix:///run/containerd/containerd.sock
+        IMAGE_SERVICE_ENDPOINT: unix:///run/containerd/containerd.sock
+        FOCUS: ${{ github.event.inputs.focus || '' }}
+        SKIP: ${{ github.event.inputs.skip || '\[Flaky\]|\[Slow\]|\[Serial\]' }}
+        PARALLELISM: ${{ github.event.inputs.parallelism || '2' }}
+        TEST_ARGS: ${{ github.event.inputs.test_args || '' }}
+      run: |
+        echo "Running node e2e tests locally - Solving issue #137722"
+        echo "Focus: $FOCUS"
+        echo "Skip: $SKIP"
+        echo "Parallelism: $PARALLELISM"
+        echo "Test Args: $TEST_ARGS"
+        echo "KUBE_ROOT: $KUBE_ROOT"
+        
+        cd $KUBE_ROOT
+        make test-e2e-node REMOTE=false \
+          FOCUS="$FOCUS" \
+          SKIP="$SKIP" \
+          PARALLELISM="$PARALLELISM" \
+          TEST_ARGS="$TEST_ARGS"
+    
+    - name: Upload Test Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: node-e2e-artifacts-${{ github.run_number }}
+        path: /tmp/node-e2e-artifacts/
+        retention-days: 7
