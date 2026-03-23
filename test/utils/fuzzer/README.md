@@ -24,12 +24,20 @@ go run test/utils/fuzzer/cmd/main.go \
 ```
 
 ### 2. Direct Cluster Injection
-To inject 50,000 pods directly into a test cluster:
+To inject 50,000 pods directly into a test cluster (uses the current context from your default kubeconfig):
 ```bash
 go run test/utils/fuzzer/cmd/main.go \
   --base-pod test/utils/fuzzer/templates/complex-daemonset.yaml \
   --count 50000 \
   --concurrency 100
+```
+
+To target a specific cluster or use a different kubeconfig:
+```bash
+go run test/utils/fuzzer/cmd/main.go \
+  --base-pod test/utils/fuzzer/templates/complex-daemonset.yaml \
+  --count 50000 \
+  --kubeconfig /path/to/custom/kubeconfig
 ```
 
 ## Flags
@@ -40,6 +48,7 @@ go run test/utils/fuzzer/cmd/main.go \
 - `--count`: Number of pods to generate.
 - `--offset`: Starting index for naming (useful for incremental runs).
 - `--concurrency`: Number of concurrent workers (default: 50).
+- `--kubeconfig`: Path to the kubeconfig file. If not provided, the tool defaults to `$HOME/.kube/config` and uses the **current active context**.
 - `--out-dir`: If specified, write YAMLs to this directory instead of injecting into a cluster.
 
 ## Verification & Metrics
