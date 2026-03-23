@@ -27,31 +27,31 @@ import (
 const EvictionRequestControllerSubsystem = "evictionrequest_controller"
 
 var (
-	// ActiveInterceptor tracks the active interceptor per EvictionRequest.
+	// ActiveResponder tracks the active responder per EvictionRequest.
 	// Combined with the EvictionRequest creationTimestamp, this can help
-	// identify stuck evictions. The interceptor label identifies which
-	// interceptor is currently active.
-	ActiveInterceptor = metrics.NewGaugeVec(
+	// identify stuck evictions. The responder label identifies which
+	// responder is currently active.
+	ActiveResponder = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "active_interceptor",
-			Help:           "Whether the named interceptor is active for the EvictionRequest (1 = active)",
+			Name:           "active_responder",
+			Help:           "Whether the named responder is active for the EvictionRequest (1 = active)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target", "interceptor"},
+		[]string{"namespace", "evictionrequest", "target", "responder"},
 	)
 
-	// ProcessedInterceptor tracks whether an interceptor has been processed
-	// for a given EvictionRequest. The interceptor label identifies which
-	// interceptor has been processed.
-	ProcessedInterceptor = metrics.NewGaugeVec(
+	// ProcessedResponder tracks whether an responder has been processed
+	// for a given EvictionRequest. The responder label identifies which
+	// responder has been processed.
+	ProcessedResponder = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "processed_interceptor",
-			Help:           "Whether the named interceptor has been processed for the EvictionRequest (1 = processed)",
+			Name:           "processed_responder",
+			Help:           "Whether the named responder has been processed for the EvictionRequest (1 = processed)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target", "interceptor"},
+		[]string{"namespace", "evictionrequest", "target", "responder"},
 	)
 
 	// ActiveRequester tracks active requesters per EvictionRequest.
@@ -66,13 +66,13 @@ var (
 		[]string{"namespace", "evictionrequest", "target", "requester"},
 	)
 
-	// PodInterceptors tracks the number of available interceptors for the
+	// PodResponders tracks the number of available responders for the
 	// target pod of an EvictionRequest.
-	PodInterceptors = metrics.NewGaugeVec(
+	PodResponders = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "target_interceptors",
-			Help:           "Number of available interceptors for the target",
+			Name:           "target_responders",
+			Help:           "Number of available responders for the target",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"namespace", "evictionrequest", "target"},
@@ -84,9 +84,9 @@ var registerMetrics sync.Once
 // Register registers EvictionRequest controller metrics.
 func Register() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ActiveInterceptor)
-		legacyregistry.MustRegister(ProcessedInterceptor)
+		legacyregistry.MustRegister(ActiveResponder)
+		legacyregistry.MustRegister(ProcessedResponder)
 		legacyregistry.MustRegister(ActiveRequester)
-		legacyregistry.MustRegister(PodInterceptors)
+		legacyregistry.MustRegister(PodResponders)
 	})
 }

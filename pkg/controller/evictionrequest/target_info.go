@@ -136,12 +136,12 @@ func (t targetInfo) isTerminal() bool {
 	return false
 }
 
-// evictionInterceptors returns the interceptors declared on the target, or nil
+// evictionResponders returns the responders declared on the target, or nil
 // if the target is unavailable.
-func (t targetInfo) evictionInterceptors() []v1.EvictionInterceptor {
+func (t targetInfo) evictionResponders() []v1.EvictionResponder {
 	switch {
 	case t.pod != nil:
-		return t.pod.Spec.EvictionInterceptors
+		return t.pod.Spec.EvictionResponders
 	}
 	return nil
 }

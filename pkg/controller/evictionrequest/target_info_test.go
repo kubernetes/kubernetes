@@ -227,29 +227,29 @@ func TestTargetType(t *testing.T) {
 	}
 }
 
-func TestEvictionInterceptors(t *testing.T) {
+func TestEvictionResponders(t *testing.T) {
 	tests := []struct {
 		name   string
 		target targetInfo
-		want   []v1.EvictionInterceptor
+		want   []v1.EvictionResponder
 	}{
 		{
-			name: "pod with interceptors",
+			name: "pod with responders",
 			target: func() targetInfo {
 				pod := testPod("my-pod", "uid-1")
-				pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-					{Name: "interceptor-a"},
-					{Name: "interceptor-b"},
+				pod.Spec.EvictionResponders = []v1.EvictionResponder{
+					{Name: "responder-a"},
+					{Name: "responder-b"},
 				}
 				return newTargetInfo(makePodTarget("my-pod", "uid-1"), pod)
 			}(),
-			want: []v1.EvictionInterceptor{
-				{Name: "interceptor-a"},
-				{Name: "interceptor-b"},
+			want: []v1.EvictionResponder{
+				{Name: "responder-a"},
+				{Name: "responder-b"},
 			},
 		},
 		{
-			name:   "pod without interceptors",
+			name:   "pod without responders",
 			target: newTargetInfo(makePodTarget("my-pod", "uid-1"), testPod("my-pod", "uid-1")),
 			want:   nil,
 		},
@@ -261,13 +261,13 @@ func TestEvictionInterceptors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.target.evictionInterceptors()
+			got := tt.target.evictionResponders()
 			if len(got) != len(tt.want) {
-				t.Fatalf("evictionInterceptors() returned %d items, want %d", len(got), len(tt.want))
+				t.Fatalf("evictionResponders() returned %d items, want %d", len(got), len(tt.want))
 			}
 			for i := range got {
 				if got[i].Name != tt.want[i].Name {
-					t.Errorf("evictionInterceptors()[%d].Name = %q, want %q", i, got[i].Name, tt.want[i].Name)
+					t.Errorf("evictionResponders()[%d].Name = %q, want %q", i, got[i].Name, tt.want[i].Name)
 				}
 			}
 		})

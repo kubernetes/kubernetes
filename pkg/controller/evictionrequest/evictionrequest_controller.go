@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package evictionrequest implements the eviction request controller.
 // The eviction request controller watches EvictionRequest objects and coordinates
-// the graceful eviction of pods by managing interceptors.
+// the graceful eviction of pods by managing responders.
 //
 // See KEP-4563 for more details: https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4563-eviction-request-api
 package evictionrequest
@@ -51,27 +51,27 @@ import (
 )
 
 const (
-	// InterceptorHeartbeatTimeout is the timeout for interceptor heartbeat.
-	// If an interceptor doesn't update its heartbeat within this duration, it's considered timed out.
-	InterceptorHeartbeatTimeout = 20 * time.Minute
+	// ResponderHeartbeatTimeout is the timeout for responder heartbeat.
+	// If an responder doesn't update its heartbeat within this duration, it's considered timed out.
+	ResponderHeartbeatTimeout = 20 * time.Minute
 
 	// GracefulCompletionDelay is the delay before setting the Evicted condition when
-	// a pod is deleted or terminal while an active interceptor hasn't reported completion.
-	// This gives the interceptor time to report its final status.
+	// a pod is deleted or terminal while an active responder hasn't reported completion.
+	// This gives the responder time to report its final status.
 	GracefulCompletionDelay = 5 * time.Second
 )
 
 // EvictionRequestController is the eviction request controller implementation.
 // It watches EvictionRequest objects and coordinates the graceful eviction of pods
-// by managing interceptors.
+// by managing responders.
 //
 // The controller uses two separate reconciliation loops:
-// 1. Main loop (queue) - handles validation and interceptor selection
+// 1. Main loop (queue) - handles validation and responder selection
 // 2. Label sync loop (labelSyncQueue) - synchronizes pod labels to EvictionRequest
 //
 // Responsibilities (per KEP-4563):
 // 1. Validation - verify target pod exists, reject invalid requests
-// 2. Interceptor management - select active interceptors, handle timeouts, advance through list
+// 2. Responder management - select active responders, handle timeouts, advance through list
 // 3. Label synchronization - sync pod labels to EvictionRequest
 // 4. Observation of target lifecycle (Pod) and status reporting
 type EvictionRequestController struct {
@@ -85,12 +85,12 @@ type EvictionRequestController struct {
 	podListerSynced cache.InformerSynced
 
 	// queue is the main work queue for EvictionRequest reconciliation.
-	// Handles validation and interceptor selection.
+	// Handles validation and responder selection.
 	queue workqueue.TypedRateLimitingInterface[string]
 
 	// labelSyncQueue handles synchronization of pod labels to EvictionRequest.
 	// This is kept separate because UpdateStatus() blocks label updates (see
-	// evictionRequestStatusStrategy.GetResetFields) to prevent interceptors from
+	// evictionRequestStatusStrategy.GetResetFields) to prevent responders from
 	// mutating labels. We use Server-Side Apply in a separate queue to work around this.
 	labelSyncQueue workqueue.TypedRateLimitingInterface[string]
 
@@ -313,7 +313,7 @@ func (c *EvictionRequestController) processNextLabelSyncWorkItem(ctx context.Con
 }
 
 // sync reconciles an EvictionRequest for the main loop.
-// Handles validation and interceptor management.
+// Handles validation and responder management.
 func (c *EvictionRequestController) sync(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -376,7 +376,7 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 // syncLabels reconciles EvictionRequests for label synchronization based on a Pod key.
 // Syncs target pod's .metadata.labels to EvictionRequest's .metadata.labels.
 // This overwrites any conflicting labels in the EvictionRequest, allowing
-// interceptors to use custom label selectors when watching eviction requests.
+// responders to use custom label selectors when watching eviction requests.
 func (c *EvictionRequestController) syncLabels(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -454,49 +454,49 @@ func (c *EvictionRequestController) computeStatus(
 		logger.V(4).Info("Terminal condition reached", "evictionRequest", klog.KObj(evictionRequest))
 	}
 
-	targetInterceptors := computeTargetInterceptors(evictionRequest, target)
-	active, processed, progressionResync := computeInterceptorProgression(evictionRequest, targetInterceptors, isTerminal, c.clock)
+	targetResponders := computeTargetResponders(evictionRequest, target)
+	active, processed, progressionResync := computeResponderProgression(evictionRequest, targetResponders, isTerminal, c.clock)
 
 	// Report metrics per KEP-4563
 	targetEntityType := target.targetType()
 	if len(active) > 0 {
-		metrics.ActiveInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), active[0]).Set(1)
+		metrics.ActiveResponder.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), active[0]).Set(1)
 	}
 	for _, p := range processed {
-		metrics.ProcessedInterceptor.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), p).Set(1)
+		metrics.ProcessedResponder.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), p).Set(1)
 	}
 	for _, r := range evictionRequest.Spec.Requesters {
 		metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), r.Name).Set(1)
 	}
-	metrics.PodInterceptors.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String()).Set(float64(len(targetInterceptors)))
+	metrics.PodResponders.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String()).Set(float64(len(targetResponders)))
 
 	resyncAfter := progressionResync
 	if completionResync > 0 {
 		resyncAfter = completionResync
 	}
 
-	for _, ti := range targetInterceptors {
-		statusApply.WithTargetInterceptors(coordinationapply.TargetInterceptor().WithName(ti))
+	for _, ti := range targetResponders {
+		statusApply.WithTargetResponders(coordinationapply.TargetResponder().WithName(ti))
 	}
 
-	statusApply.WithActiveInterceptors(active...)
-	statusApply.WithProcessedInterceptors(processed...)
+	statusApply.WithActiveResponders(active...)
+	statusApply.WithProcessedResponders(processed...)
 
-	// Include interceptor entries for all target interceptors so SSA doesn't
+	// Include responder entries for all target responders so SSA doesn't
 	// remove them. Only set Name and StartTime — other fields (HeartbeatTime,
-	// CompletionTime, Message) are owned by the interceptors via their own
+	// CompletionTime, Message) are owned by the responders via their own
 	// field manager.
-	for _, ti := range targetInterceptors {
-		isApply := coordinationapply.InterceptorStatus().WithName(ti)
+	for _, ti := range targetResponders {
+		isApply := coordinationapply.ResponderStatus().WithName(ti)
 
-		existing := findInterceptorStatus(evictionRequest.Status.Interceptors, ti)
+		existing := findResponderStatus(evictionRequest.Status.Responders, ti)
 		if existing != nil && existing.StartTime != nil {
 			isApply.WithStartTime(*existing.StartTime)
 		} else if len(active) > 0 && ti == active[0] {
 			isApply.WithStartTime(metav1.NewTime(c.clock.Now()))
 		}
 
-		statusApply.WithInterceptors(isApply)
+		statusApply.WithResponders(isApply)
 	}
 
 	return statusApply, resyncAfter
@@ -587,20 +587,20 @@ func computeConditions(
 }
 
 // shouldDeferCompletion returns how long to wait before setting the completion
-// condition, giving the active interceptor time to report its final status
+// condition, giving the active responder time to report its final status
 // before the eviction is finalized. Returns 0 when no deferral is needed.
 func shouldDeferCompletion(
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
 	target targetInfo,
 	clock clock.PassiveClock,
 ) time.Duration {
-	if len(evictionRequest.Status.ActiveInterceptors) == 0 {
+	if len(evictionRequest.Status.ActiveResponders) == 0 {
 		return 0
 	}
 
-	activeInterceptor := evictionRequest.Status.ActiveInterceptors[0]
-	interceptorStatus := findInterceptorStatus(evictionRequest.Status.Interceptors, activeInterceptor)
-	if interceptorStatus != nil && interceptorStatus.CompletionTime != nil {
+	activeResponder := evictionRequest.Status.ActiveResponders[0]
+	responderStatus := findResponderStatus(evictionRequest.Status.Responders, activeResponder)
+	if responderStatus != nil && responderStatus.CompletionTime != nil {
 		return 0
 	}
 
@@ -615,79 +615,79 @@ func shouldDeferCompletion(
 	return 0
 }
 
-// computeTargetInterceptors computes the target interceptors list.
-// Returns the existing list if already initialized, or a new list from the target's eviction interceptors.
-func computeTargetInterceptors(
+// computeTargetResponders computes the target responders list.
+// Returns the existing list if already initialized, or a new list from the target's eviction responders.
+func computeTargetResponders(
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
 	target targetInfo,
 ) []string {
-	// TargetInterceptors is immutable after first initialization
-	if len(evictionRequest.Status.TargetInterceptors) > 0 {
-		targets := make([]string, len(evictionRequest.Status.TargetInterceptors))
-		for i, ti := range evictionRequest.Status.TargetInterceptors {
+	// TargetResponders is immutable after first initialization
+	if len(evictionRequest.Status.TargetResponders) > 0 {
+		targets := make([]string, len(evictionRequest.Status.TargetResponders))
+		for i, ti := range evictionRequest.Status.TargetResponders {
 			targets[i] = ti.Name
 		}
 		return targets
 	}
 
-	// Target may be unavailable if it was deleted before TargetInterceptors were initialized
+	// Target may be unavailable if it was deleted before TargetResponders were initialized
 	// (e.g., precondition failure on first sync, then re-queued after status update).
 	if target.isGone() {
 		return nil
 	}
 
-	interceptors := target.evictionInterceptors()
-	targets := make([]string, 0, len(interceptors)+1)
-	for _, ei := range interceptors {
+	responders := target.evictionResponders()
+	targets := make([]string, 0, len(responders)+1)
+	for _, ei := range responders {
 		targets = append(targets, ei.Name)
 	}
-	// Default imperative-eviction interceptor triggers actual pod eviction
-	targets = append(targets, string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
+	// Default imperative-eviction responder triggers actual pod eviction
+	targets = append(targets, string(coordinationv1alpha1.EvictionResponderImperativeEviction))
 	return targets
 }
 
-// computeInterceptorProgression computes the active and processed interceptors.
-// When isComplete is true, moves any active interceptor to processed and clears active.
-func computeInterceptorProgression(evictionRequest *coordinationv1alpha1.EvictionRequest, targetInterceptors []string, isComplete bool, clock clock.PassiveClock) (active []string, processed []string, resyncAfter time.Duration) {
-	processed = slices.Clone(evictionRequest.Status.ProcessedInterceptors)
+// computeResponderProgression computes the active and processed responders.
+// When isComplete is true, moves any active responder to processed and clears active.
+func computeResponderProgression(evictionRequest *coordinationv1alpha1.EvictionRequest, targetResponders []string, isComplete bool, clock clock.PassiveClock) (active []string, processed []string, resyncAfter time.Duration) {
+	processed = slices.Clone(evictionRequest.Status.ProcessedResponders)
 
-	activeInterceptor := ""
-	if len(evictionRequest.Status.ActiveInterceptors) > 0 {
-		activeInterceptor = evictionRequest.Status.ActiveInterceptors[0]
+	activeResponder := ""
+	if len(evictionRequest.Status.ActiveResponders) > 0 {
+		activeResponder = evictionRequest.Status.ActiveResponders[0]
 	}
 
-	// Completion: move active interceptor to processed (if any) and clear active.
+	// Completion: move active responder to processed (if any) and clear active.
 	if isComplete {
-		if activeInterceptor != "" && !slices.Contains(processed, activeInterceptor) {
-			processed = append(processed, activeInterceptor)
+		if activeResponder != "" && !slices.Contains(processed, activeResponder) {
+			processed = append(processed, activeResponder)
 		}
 		return nil, processed, 0
 	}
 
-	// No target interceptors: nothing to activate
-	if len(targetInterceptors) == 0 {
+	// No target responders: nothing to activate
+	if len(targetResponders) == 0 {
 		return nil, processed, 0
 	}
 
-	activeInterceptorStatus := findInterceptorStatus(evictionRequest.Status.Interceptors, activeInterceptor)
-	shouldAdvance, resyncAfter := shouldAdvanceInterceptor(activeInterceptorStatus, clock)
+	activeResponderStatus := findResponderStatus(evictionRequest.Status.Responders, activeResponder)
+	shouldAdvance, resyncAfter := shouldAdvanceResponder(activeResponderStatus, clock)
 
-	// Keep current active interceptor: not yet complete and hasn't timed out
+	// Keep current active responder: not yet complete and hasn't timed out
 	if !shouldAdvance {
-		return []string{activeInterceptor}, processed, resyncAfter
+		return []string{activeResponder}, processed, resyncAfter
 	}
 
-	// Advance to next interceptor: mark current as processed, then select next unprocessed
-	if activeInterceptor != "" && !slices.Contains(processed, activeInterceptor) {
-		processed = append(processed, activeInterceptor)
+	// Advance to next responder: mark current as processed, then select next unprocessed
+	if activeResponder != "" && !slices.Contains(processed, activeResponder) {
+		processed = append(processed, activeResponder)
 	}
-	active = selectNextUnprocessed(targetInterceptors, processed)
+	active = selectNextUnprocessed(targetResponders, processed)
 	return active, processed, 0
 }
 
-// selectNextUnprocessed finds the first unprocessed interceptor from the target list.
-func selectNextUnprocessed(targetInterceptors, processed []string) []string {
-	for _, ti := range targetInterceptors {
+// selectNextUnprocessed finds the first unprocessed responder from the target list.
+func selectNextUnprocessed(targetResponders, processed []string) []string {
+	for _, ti := range targetResponders {
 		if !slices.Contains(processed, ti) {
 			return []string{ti}
 		}
@@ -695,8 +695,8 @@ func selectNextUnprocessed(targetInterceptors, processed []string) []string {
 	return nil
 }
 
-// findInterceptorStatus finds the status for a given interceptor name.
-func findInterceptorStatus(statuses []coordinationv1alpha1.InterceptorStatus, name string) *coordinationv1alpha1.InterceptorStatus {
+// findResponderStatus finds the status for a given responder name.
+func findResponderStatus(statuses []coordinationv1alpha1.ResponderStatus, name string) *coordinationv1alpha1.ResponderStatus {
 	for i := range statuses {
 		if statuses[i].Name == name {
 			return &statuses[i]
@@ -705,15 +705,15 @@ func findInterceptorStatus(statuses []coordinationv1alpha1.InterceptorStatus, na
 	return nil
 }
 
-// shouldAdvanceInterceptor determines if we should advance from the current interceptor.
+// shouldAdvanceResponder determines if we should advance from the current responder.
 // Returns (shouldAdvance, resyncAfter). If not advancing, resyncAfter indicates when to check again.
-func shouldAdvanceInterceptor(status *coordinationv1alpha1.InterceptorStatus, clock clock.PassiveClock) (bool, time.Duration) {
-	// Advance as there is no current active interceptor
+func shouldAdvanceResponder(status *coordinationv1alpha1.ResponderStatus, clock clock.PassiveClock) (bool, time.Duration) {
+	// Advance as there is no current active responder
 	if status == nil {
 		return true, 0
 	}
 
-	// Advance as interceptor has completed
+	// Advance as responder has completed
 	if status.CompletionTime != nil {
 		return true, 0
 	}
@@ -726,14 +726,14 @@ func shouldAdvanceInterceptor(status *coordinationv1alpha1.InterceptorStatus, cl
 	if t != nil {
 		elapsed := clock.Since(t.Time)
 		// Advance as heartbeat timeout has been reached
-		if elapsed >= InterceptorHeartbeatTimeout {
+		if elapsed >= ResponderHeartbeatTimeout {
 			return true, 0
 		}
 		// Schedule resync when timeout would occur
-		return false, InterceptorHeartbeatTimeout - elapsed
+		return false, ResponderHeartbeatTimeout - elapsed
 	}
 
-	// Should not be reached, as an active interceptor is initialized with a StartTime
+	// Should not be reached, as an active responder is initialized with a StartTime
 	return false, 0
 }
 

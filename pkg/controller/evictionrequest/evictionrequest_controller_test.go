@@ -160,7 +160,7 @@ func hasEvictedCondition(er *coordinationv1alpha1.EvictionRequest) bool {
 // getLastStatusPatch finds the last patch action targeting the status subresource
 // and unmarshals it into an EvictionRequest. This is needed because the fake client
 // doesn't implement SSA field ownership tracking, so fields absent from the apply
-// config (e.g. cleared ActiveInterceptors) aren't removed from the stored object.
+// config (e.g. cleared ActiveResponders) aren't removed from the stored object.
 func getLastStatusPatch(t *testing.T, client *fake.Clientset) *coordinationv1alpha1.EvictionRequest {
 	t.Helper()
 	for i := len(client.Actions()) - 1; i >= 0; i-- {
@@ -395,12 +395,12 @@ func TestSyncHandler_PodTerminal_Evicted(t *testing.T) {
 func TestSyncHandler_PodDeleted_Evicted(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	// Create EvictionRequest with TargetInterceptors already set (means validation passed before)
+	// Create EvictionRequest with TargetResponders already set (means validation passed before)
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1 // Simulate that we've already observed this request
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
 
 	// Pod doesn't exist (deleted)
@@ -426,29 +426,29 @@ func TestSyncHandler_PodDeleted_Evicted(t *testing.T) {
 	}
 }
 
-func TestSyncHandler_PodNotFound_MovesActiveInterceptorToProcessed(t *testing.T) {
+func TestSyncHandler_PodNotFound_MovesActiveResponderToProcessed(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	testInterceptor := "cleanup-interceptor.example.com"
+	testResponder := "cleanup-responder.example.com"
 	now := metav1.Now()
 
-	// Create EvictionRequest with an active interceptor that has a heartbeat
+	// Create EvictionRequest with an active responder that has a heartbeat
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: testInterceptor},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: testResponder},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{testInterceptor}
-	// Set interceptor status with heartbeat so it doesn't auto-advance
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.ActiveResponders = []string{testResponder}
+	// Set responder status with heartbeat so it doesn't auto-advance
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:          testInterceptor,
+			Name:          testResponder,
 			HeartbeatTime: &now,
 		},
 	}
 
-	// Pod doesn't exist (deleted while interceptor was active)
+	// Pod doesn't exist (deleted while responder was active)
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, nil, nil)
 
 	// Sync
@@ -466,43 +466,43 @@ func TestSyncHandler_PodNotFound_MovesActiveInterceptorToProcessed(t *testing.T)
 		t.Error("expected Evicted condition to be set when pod deleted")
 	}
 
-	// Active interceptors should be cleared (not present in apply config)
-	if len(updated.Status.ActiveInterceptors) != 0 {
-		t.Errorf("expected active interceptors to be cleared, got %v", updated.Status.ActiveInterceptors)
+	// Active responders should be cleared (not present in apply config)
+	if len(updated.Status.ActiveResponders) != 0 {
+		t.Errorf("expected active responders to be cleared, got %v", updated.Status.ActiveResponders)
 	}
 
-	// The active interceptor should be moved to processed
-	if len(updated.Status.ProcessedInterceptors) != 1 {
-		t.Fatalf("expected 1 processed interceptor, got %d", len(updated.Status.ProcessedInterceptors))
+	// The active responder should be moved to processed
+	if len(updated.Status.ProcessedResponders) != 1 {
+		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
 	}
-	if updated.Status.ProcessedInterceptors[0] != testInterceptor {
-		t.Errorf("expected %s in processed, got %s", testInterceptor, updated.Status.ProcessedInterceptors[0])
+	if updated.Status.ProcessedResponders[0] != testResponder {
+		t.Errorf("expected %s in processed, got %s", testResponder, updated.Status.ProcessedResponders[0])
 	}
 
-	// The interceptor status entry should still exist (controller includes all entries
+	// The responder status entry should still exist (controller includes all entries
 	// by Name to prevent SSA removal), but HeartbeatTime and CompletionTime are NOT
-	// included — those are interceptor-owned fields.
-	var interceptorStatus *coordinationv1alpha1.InterceptorStatus
-	for i := range updated.Status.Interceptors {
-		if updated.Status.Interceptors[i].Name == testInterceptor {
-			interceptorStatus = &updated.Status.Interceptors[i]
+	// included — those are responder-owned fields.
+	var responderStatus *coordinationv1alpha1.ResponderStatus
+	for i := range updated.Status.Responders {
+		if updated.Status.Responders[i].Name == testResponder {
+			responderStatus = &updated.Status.Responders[i]
 			break
 		}
 	}
-	if interceptorStatus == nil {
-		t.Fatalf("expected interceptor status entry to exist")
+	if responderStatus == nil {
+		t.Fatalf("expected responder status entry to exist")
 	}
-	if interceptorStatus.CompletionTime != nil {
-		t.Error("expected controller to NOT include CompletionTime (interceptor-owned)")
+	if responderStatus.CompletionTime != nil {
+		t.Error("expected controller to NOT include CompletionTime (responder-owned)")
 	}
-	if interceptorStatus.HeartbeatTime != nil {
-		t.Error("expected controller to NOT include HeartbeatTime (interceptor-owned)")
+	if responderStatus.HeartbeatTime != nil {
+		t.Error("expected controller to NOT include HeartbeatTime (responder-owned)")
 	}
 }
 
-func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing.T) {
+func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	testInterceptor := "cleanup-interceptor.example.com"
+	testResponder := "cleanup-responder.example.com"
 
 	now := time.Now()
 	fakeClock := testingclock.NewFakeClock(now)
@@ -513,19 +513,19 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing
 	pod.DeletionTimestamp = &deletionTime
 	pod.Status.Phase = v1.PodSucceeded
 
-	// Create EvictionRequest with an active interceptor that hasn't completed
+	// Create EvictionRequest with an active responder that hasn't completed
 	er := newEvictionRequest("default", "deleted-pod", "deleted-uid")
 	er.Generation = 1
 	er.Status.ObservedGeneration = 1
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: testInterceptor},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: testResponder},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{testInterceptor}
+	er.Status.ActiveResponders = []string{testResponder}
 	heartbeatTime := metav1.NewTime(now.Add(-10 * time.Second))
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:          testInterceptor,
+			Name:          testResponder,
 			HeartbeatTime: &heartbeatTime,
 		},
 	}
@@ -543,14 +543,14 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	// Should NOT be Evicted yet as we're giving the interceptor grace time to complete
+	// Should NOT be Evicted yet as we're giving the responder grace time to complete
 	if hasEvictedCondition(updated) {
 		t.Error("expected Evicted condition to NOT be set yet (grace period not elapsed)")
 	}
 
-	// Active interceptor should still be active
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Errorf("expected 1 active interceptor during grace period, got %d", len(updated.Status.ActiveInterceptors))
+	// Active responder should still be active
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Errorf("expected 1 active responder during grace period, got %d", len(updated.Status.ActiveResponders))
 	}
 
 	// Advance clock past the grace period — this makes the delayed resync item ready
@@ -571,7 +571,7 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing
 	}
 
 	// Use getLastStatusPatch because the fake client doesn't implement SSA field
-	// ownership (cleared ActiveInterceptors won't be reflected via Get).
+	// ownership (cleared ActiveResponders won't be reflected via Get).
 	updated = getLastStatusPatch(t, client)
 
 	// Now it should be Evicted
@@ -579,21 +579,21 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveInterceptor(t *testing
 		t.Error("expected Evicted condition after grace period elapsed")
 	}
 
-	// Active should be cleared and the interceptor should be moved to processed
-	if len(updated.Status.ActiveInterceptors) != 0 {
-		t.Errorf("expected active interceptors to be cleared, got %v", updated.Status.ActiveInterceptors)
+	// Active should be cleared and the responder should be moved to processed
+	if len(updated.Status.ActiveResponders) != 0 {
+		t.Errorf("expected active responders to be cleared, got %v", updated.Status.ActiveResponders)
 	}
-	if len(updated.Status.ProcessedInterceptors) != 1 || updated.Status.ProcessedInterceptors[0] != testInterceptor {
-		t.Errorf("expected %s in processed, got %s", testInterceptor, updated.Status.ProcessedInterceptors[0])
+	if len(updated.Status.ProcessedResponders) != 1 || updated.Status.ProcessedResponders[0] != testResponder {
+		t.Errorf("expected %s in processed, got %s", testResponder, updated.Status.ProcessedResponders[0])
 	}
 }
 
-func TestSyncHandler_InitializeTargetInterceptors(t *testing.T) {
+func TestSyncHandler_InitializeTargetResponders(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: "custom-interceptor.example.com"},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: "custom-responder.example.com"},
 	}
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
@@ -605,52 +605,52 @@ func TestSyncHandler_InitializeTargetInterceptors(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify TargetInterceptors initialized
+	// Verify TargetResponders initialized
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.TargetInterceptors) != 2 {
-		t.Errorf("expected 2 target interceptors, got %d", len(updated.Status.TargetInterceptors))
+	if len(updated.Status.TargetResponders) != 2 {
+		t.Errorf("expected 2 target responders, got %d", len(updated.Status.TargetResponders))
 	}
 
-	if updated.Status.TargetInterceptors[0].Name != "custom-interceptor.example.com" {
-		t.Errorf("expected first interceptor to be custom, got %s", updated.Status.TargetInterceptors[0].Name)
+	if updated.Status.TargetResponders[0].Name != "custom-responder.example.com" {
+		t.Errorf("expected first responder to be custom, got %s", updated.Status.TargetResponders[0].Name)
 	}
 
-	if updated.Status.TargetInterceptors[1].Name != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected last interceptor to be imperative, got %s", updated.Status.TargetInterceptors[1].Name)
+	if updated.Status.TargetResponders[1].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected last responder to be imperative, got %s", updated.Status.TargetResponders[1].Name)
 	}
 
-	// Verify interceptor statuses were initialized for ALL target interceptors
-	if len(updated.Status.Interceptors) != 2 {
-		t.Fatalf("expected 2 interceptor statuses, got %d", len(updated.Status.Interceptors))
+	// Verify responder statuses were initialized for ALL target responders
+	if len(updated.Status.Responders) != 2 {
+		t.Fatalf("expected 2 responder statuses, got %d", len(updated.Status.Responders))
 	}
 
-	// Active interceptor (first one) should have StartTime set
-	customStatus := findInterceptorStatus(updated.Status.Interceptors, "custom-interceptor.example.com")
+	// Active responder (first one) should have StartTime set
+	customStatus := findResponderStatus(updated.Status.Responders, "custom-responder.example.com")
 	if customStatus == nil {
-		t.Fatal("expected interceptor status for custom interceptor")
+		t.Fatal("expected responder status for custom responder")
 	}
 	if customStatus.StartTime == nil {
-		t.Error("expected active interceptor to have start time initialized")
+		t.Error("expected active responder to have start time initialized")
 	}
 	if customStatus.HeartbeatTime != nil {
-		t.Error("expected active interceptor to not have heartbeat time set by controller")
+		t.Error("expected active responder to not have heartbeat time set by controller")
 	}
 
-	// Non-active interceptor should have status entry but no StartTime
-	imperativeStatus := findInterceptorStatus(updated.Status.Interceptors, string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
+	// Non-active responder should have status entry but no StartTime
+	imperativeStatus := findResponderStatus(updated.Status.Responders, string(coordinationv1alpha1.EvictionResponderImperativeEviction))
 	if imperativeStatus == nil {
-		t.Fatal("expected interceptor status for imperative interceptor")
+		t.Fatal("expected responder status for imperative responder")
 	}
 	if imperativeStatus.StartTime != nil {
-		t.Error("expected non-active interceptor to not have start time set")
+		t.Error("expected non-active responder to not have start time set")
 	}
 }
 
-func TestSyncHandler_SelectFirstInterceptor(t *testing.T) {
+func TestSyncHandler_SelectFirstResponder(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	pod := newPod("default", "test-pod", "test-uid")
@@ -664,61 +664,61 @@ func TestSyncHandler_SelectFirstInterceptor(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify ActiveInterceptors set to first interceptor
+	// Verify ActiveResponders set to first responder
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Errorf("expected 1 active interceptor, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Errorf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	// Since pod has no EvictionInterceptors, first should be imperative
-	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected active interceptor to be imperative, got %s", updated.Status.ActiveInterceptors[0])
+	// Since pod has no EvictionResponders, first should be imperative
+	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to be imperative, got %s", updated.Status.ActiveResponders[0])
 	}
 
-	// Verify interceptor status was initialized
-	if len(updated.Status.Interceptors) != 1 {
-		t.Fatalf("expected 1 interceptor status, got %d", len(updated.Status.Interceptors))
+	// Verify responder status was initialized
+	if len(updated.Status.Responders) != 1 {
+		t.Fatalf("expected 1 responder status, got %d", len(updated.Status.Responders))
 	}
 
-	interceptorStatus := updated.Status.Interceptors[0]
-	if interceptorStatus.Name != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected interceptor status name to be %s, got %s",
-			string(coordinationv1alpha1.EvictionInterceptorImperativeEviction), interceptorStatus.Name)
+	responderStatus := updated.Status.Responders[0]
+	if responderStatus.Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected responder status name to be %s, got %s",
+			string(coordinationv1alpha1.EvictionResponderImperativeEviction), responderStatus.Name)
 	}
 
-	if interceptorStatus.StartTime == nil {
-		t.Error("expected interceptor status to have start time initialized")
+	if responderStatus.StartTime == nil {
+		t.Error("expected responder status to have start time initialized")
 	}
 
-	if interceptorStatus.HeartbeatTime != nil {
-		t.Error("expected interceptor status to not have heartbeat time set")
+	if responderStatus.HeartbeatTime != nil {
+		t.Error("expected responder status to not have heartbeat time set")
 	}
 }
 
 func TestSyncHandler_AdvanceOnCompletion(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	testEvictionInterceptorClass := "first-interceptor.example.com"
+	testEvictionResponderClass := "first-responder.example.com"
 
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: testEvictionInterceptorClass},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: testEvictionResponderClass},
 	}
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	// Set up status as if first interceptor is active and completed
+	// Set up status as if first responder is active and completed
 	now := metav1.Now()
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: testEvictionInterceptorClass},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: testEvictionResponderClass},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{testEvictionInterceptorClass}
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.ActiveResponders = []string{testEvictionResponderClass}
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:           testEvictionInterceptorClass,
+			Name:           testEvictionResponderClass,
 			CompletionTime: &now, // Completed
 			Message:        "done",
 		},
@@ -732,57 +732,57 @@ func TestSyncHandler_AdvanceOnCompletion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify advanced to next interceptor
+	// Verify advanced to next responder
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Fatalf("expected 1 active interceptor, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected active interceptor to advance to imperative, got %s", updated.Status.ActiveInterceptors[0])
+	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative, got %s", updated.Status.ActiveResponders[0])
 	}
 
-	// Verify first interceptor is in ProcessedInterceptors
-	if len(updated.Status.ProcessedInterceptors) != 1 {
-		t.Fatalf("expected 1 processed interceptor, got %d", len(updated.Status.ProcessedInterceptors))
+	// Verify first responder is in ProcessedResponders
+	if len(updated.Status.ProcessedResponders) != 1 {
+		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
 	}
-	if updated.Status.ProcessedInterceptors[0] != testEvictionInterceptorClass {
-		t.Errorf("expected first interceptor in processed, got %s", updated.Status.ProcessedInterceptors[0])
+	if updated.Status.ProcessedResponders[0] != testEvictionResponderClass {
+		t.Errorf("expected first responder in processed, got %s", updated.Status.ProcessedResponders[0])
 	}
 
-	// Verify newly active interceptor (imperative) has StartTime set
-	imperativeStatus := findInterceptorStatus(updated.Status.Interceptors, string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
+	// Verify newly active responder (imperative) has StartTime set
+	imperativeStatus := findResponderStatus(updated.Status.Responders, string(coordinationv1alpha1.EvictionResponderImperativeEviction))
 	if imperativeStatus == nil {
-		t.Fatal("expected interceptor status for newly active imperative interceptor")
+		t.Fatal("expected responder status for newly active imperative responder")
 	}
 	if imperativeStatus.StartTime == nil {
-		t.Error("expected newly active interceptor to have start time set")
+		t.Error("expected newly active responder to have start time set")
 	}
 	if imperativeStatus.HeartbeatTime != nil {
-		t.Error("expected newly active interceptor to not have heartbeat time set by controller")
+		t.Error("expected newly active responder to not have heartbeat time set by controller")
 	}
 
-	// Verify completed interceptor entry is preserved (by Name) but the controller
-	// does NOT include interceptor-owned fields like CompletionTime or Message.
-	// In a real cluster, those fields would still exist under the interceptor's
+	// Verify completed responder entry is preserved (by Name) but the controller
+	// does NOT include responder-owned fields like CompletionTime or Message.
+	// In a real cluster, those fields would still exist under the responder's
 	// own field manager — they just aren't part of the controller's apply config.
-	firstStatus := findInterceptorStatus(updated.Status.Interceptors, testEvictionInterceptorClass)
+	firstStatus := findResponderStatus(updated.Status.Responders, testEvictionResponderClass)
 	if firstStatus == nil {
-		t.Fatal("expected interceptor status entry to be preserved")
+		t.Fatal("expected responder status entry to be preserved")
 	}
 }
 
 func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	slowEvictionInterceptorClass := "slow-interceptor.example.com"
+	slowEvictionResponderClass := "slow-responder.example.com"
 
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: slowEvictionInterceptorClass},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: slowEvictionResponderClass},
 	}
 
 	// Create fake clock first so we can set heartbeat time before creating controller
@@ -790,14 +790,14 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 	heartbeatTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: slowEvictionInterceptorClass},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: slowEvictionResponderClass},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{slowEvictionInterceptorClass}
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.ActiveResponders = []string{slowEvictionResponderClass}
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:          slowEvictionInterceptorClass,
+			Name:          slowEvictionResponderClass,
 			HeartbeatTime: &heartbeatTime,
 			Message:       "still working",
 		},
@@ -806,7 +806,7 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, fakeClock)
 
 	// Advance clock past the timeout
-	fakeClock.Step(2 * InterceptorHeartbeatTimeout)
+	fakeClock.Step(2 * ResponderHeartbeatTimeout)
 
 	// Sync
 	err := c.syncHandler(ctx, "default/test-uid")
@@ -814,48 +814,48 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify advanced to next interceptor due to timeout
+	// Verify advanced to next responder due to timeout
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Fatalf("expected 1 active interceptor, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected active interceptor to advance to imperative after timeout, got %s", updated.Status.ActiveInterceptors[0])
+	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative after timeout, got %s", updated.Status.ActiveResponders[0])
 	}
 
-	// Verify slow interceptor is in ProcessedInterceptors
-	if len(updated.Status.ProcessedInterceptors) != 1 {
-		t.Fatalf("expected 1 processed interceptor, got %d", len(updated.Status.ProcessedInterceptors))
+	// Verify slow responder is in ProcessedResponders
+	if len(updated.Status.ProcessedResponders) != 1 {
+		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
 	}
 }
 
 func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	staleInterceptor := "stale-interceptor.example.com"
+	staleResponder := "stale-responder.example.com"
 
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: staleInterceptor},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: staleResponder},
 	}
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	startTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: staleInterceptor},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: staleResponder},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{staleInterceptor}
-	// Interceptor has StartTime but never heartbeated
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.ActiveResponders = []string{staleResponder}
+	// Responder has StartTime but never heartbeated
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:      staleInterceptor,
+			Name:      staleResponder,
 			StartTime: &startTime,
 		},
 	}
@@ -863,7 +863,7 @@ func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, fakeClock)
 
 	// Advance clock past the timeout
-	fakeClock.Step(2 * InterceptorHeartbeatTimeout)
+	fakeClock.Step(2 * ResponderHeartbeatTimeout)
 
 	// Sync
 	err := c.syncHandler(ctx, "default/test-uid")
@@ -871,33 +871,33 @@ func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify advanced to next interceptor due to StartTime-based timeout
+	// Verify advanced to next responder due to StartTime-based timeout
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Fatalf("expected 1 active interceptor, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected active interceptor to advance to imperative after StartTime timeout, got %s", updated.Status.ActiveInterceptors[0])
+	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative after StartTime timeout, got %s", updated.Status.ActiveResponders[0])
 	}
 
-	// Verify stale interceptor is in ProcessedInterceptors
-	if len(updated.Status.ProcessedInterceptors) != 1 {
-		t.Fatalf("expected 1 processed interceptor, got %d", len(updated.Status.ProcessedInterceptors))
+	// Verify stale responder is in ProcessedResponders
+	if len(updated.Status.ProcessedResponders) != 1 {
+		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
 	}
 }
 
 func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	activeEvictionInterceptorClass := "active-interceptor.example.com"
+	activeEvictionResponderClass := "active-responder.example.com"
 
 	pod := newPod("default", "test-pod", "test-uid")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: activeEvictionInterceptorClass},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: activeEvictionResponderClass},
 	}
 
 	// Create fake clock first so we can set heartbeat time before creating controller
@@ -905,15 +905,15 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 	heartbeatTime := metav1.NewTime(fakeClock.Now())
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: activeEvictionInterceptorClass},
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: activeEvictionResponderClass},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{activeEvictionInterceptorClass}
+	er.Status.ActiveResponders = []string{activeEvictionResponderClass}
 	er.Status.ObservedGeneration = er.Generation
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:          activeEvictionInterceptorClass,
+			Name:          activeEvictionResponderClass,
 			HeartbeatTime: &heartbeatTime,
 			Message:       "working",
 		},
@@ -922,7 +922,7 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, fakeClock)
 
 	// Advance clock but NOT past the timeout
-	fakeClock.Step(InterceptorHeartbeatTimeout / 4)
+	fakeClock.Step(ResponderHeartbeatTimeout / 4)
 
 	// Clear actions
 	client.ClearActions()
@@ -933,41 +933,41 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify interceptor was NOT advanced (still the same)
+	// Verify responder was NOT advanced (still the same)
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveInterceptors) != 1 {
-		t.Fatalf("expected 1 active interceptor, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 1 {
+		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	if updated.Status.ActiveInterceptors[0] != activeEvictionInterceptorClass {
-		t.Errorf("expected active interceptor to remain unchanged before timeout, got %s", updated.Status.ActiveInterceptors[0])
+	if updated.Status.ActiveResponders[0] != activeEvictionResponderClass {
+		t.Errorf("expected active responder to remain unchanged before timeout, got %s", updated.Status.ActiveResponders[0])
 	}
 
-	// Verify ProcessedInterceptors is empty
-	if len(updated.Status.ProcessedInterceptors) != 0 {
-		t.Fatalf("expected no processed interceptors before timeout, got %d", len(updated.Status.ProcessedInterceptors))
+	// Verify ProcessedResponders is empty
+	if len(updated.Status.ProcessedResponders) != 0 {
+		t.Fatalf("expected no processed responders before timeout, got %d", len(updated.Status.ProcessedResponders))
 	}
 }
 
-func TestSyncHandler_AllInterceptorsProcessed(t *testing.T) {
+func TestSyncHandler_AllRespondersProcessed(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	pod := newPod("default", "test-pod", "test-uid")
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	// Set up status where all interceptors are processed
+	// Set up status where all responders are processed
 	now := metav1.Now()
-	er.Status.TargetInterceptors = []coordinationv1alpha1.TargetInterceptor{
-		{Name: string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)},
+	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
 	}
-	er.Status.ActiveInterceptors = []string{string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)}
-	er.Status.Interceptors = []coordinationv1alpha1.InterceptorStatus{
+	er.Status.ActiveResponders = []string{string(coordinationv1alpha1.EvictionResponderImperativeEviction)}
+	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
-			Name:           string(coordinationv1alpha1.EvictionInterceptorImperativeEviction),
+			Name:           string(coordinationv1alpha1.EvictionResponderImperativeEviction),
 			CompletionTime: &now,
 			Message:        "done",
 		},
@@ -982,16 +982,16 @@ func TestSyncHandler_AllInterceptorsProcessed(t *testing.T) {
 	}
 
 	// Use getLastStatusPatch because the fake client doesn't implement SSA field
-	// ownership (cleared ActiveInterceptors won't be reflected via Get).
+	// ownership (cleared ActiveResponders won't be reflected via Get).
 	updated := getLastStatusPatch(t, client)
 
-	if len(updated.Status.ActiveInterceptors) != 0 {
-		t.Errorf("expected no active interceptors when all processed, got %d", len(updated.Status.ActiveInterceptors))
+	if len(updated.Status.ActiveResponders) != 0 {
+		t.Errorf("expected no active responders when all processed, got %d", len(updated.Status.ActiveResponders))
 	}
 
-	// Verify imperative interceptor is in ProcessedInterceptors
-	if len(updated.Status.ProcessedInterceptors) != 1 {
-		t.Errorf("expected 1 processed interceptor, got %d", len(updated.Status.ProcessedInterceptors))
+	// Verify imperative responder is in ProcessedResponders
+	if len(updated.Status.ProcessedResponders) != 1 {
+		t.Errorf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
 	}
 }
 
