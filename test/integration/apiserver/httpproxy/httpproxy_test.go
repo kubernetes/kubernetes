@@ -22,6 +22,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"k8s.io/client-go/rest"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -226,7 +228,15 @@ func TestEgressToWebhookWithProxy(t *testing.T) {
 	serverB := kastesting.StartTestServerOrDie(t, kastesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins=ServiceAccount"}, etcd)
 	defer serverB.TearDownFn()
 
-	clientB, err := kubernetes.NewForConfig(serverB.ClientConfig)
+	// Force a distinct client config for the NO_PROXY phase so this request
+	// does not accidentally benefit from previously cached transport state.
+
+	cfgB := rest.CopyConfig(serverB.ClientConfig)
+	if cfgB.Dial == nil {
+		cfgB.Dial = (&net.Dialer{}).DialContext
+	}
+
+	clientB, err := kubernetes.NewForConfig(cfgB)
 	if err != nil {
 		t.Fatalf("failed to create kubernetes client: %v", err)
 	}
