@@ -75,7 +75,7 @@ func (f *ExemplaryPodFuzzer) FuzzPod(base *v1.Pod, id int) *v1.Pod {
 
 	pod := proto.DeepCopy()
 	pod.Name = fmt.Sprintf("%s-%d", f.NamePrefix, id)
-	pod.UID = types.UID(fmt.Sprintf("fuzzed-uid-%08d-%s", id, f.randomString(8)))
+	pod.UID = types.UID(fmt.Sprintf("fuzzed-uid-%08d-%s", id, strings.ToLower(f.randomString(8))))
 
 	return pod
 }
@@ -91,8 +91,8 @@ func (f *ExemplaryPodFuzzer) generatePrototype(base *v1.Pod) *v1.Pod {
 
 	// Fuzz OwnerRefs
 	for i := range pod.OwnerReferences {
-		pod.OwnerReferences[i].Name = "fuzzed-owner-" + f.randomString(8)
-		pod.OwnerReferences[i].UID = types.UID("fuzzed-uid-" + f.randomString(8))
+		pod.OwnerReferences[i].Name = "fuzzed-owner-" + strings.ToLower(f.randomString(8))
+		pod.OwnerReferences[i].UID = types.UID("fuzzed-uid-" + strings.ToLower(f.randomString(8)))
 	}
 
 	// Fuzz Annotations & Labels
@@ -104,7 +104,7 @@ func (f *ExemplaryPodFuzzer) generatePrototype(base *v1.Pod) *v1.Pod {
 	}
 
 	// 2. Sanitize Spec
-	pod.Spec.NodeName = "fuzzed-node-" + f.randomString(8)
+	pod.Spec.NodeName = "fuzzed-node-" + strings.ToLower(f.randomString(8))
 	pod.Spec.SchedulerName = "non-existent-fuzz-scheduler"
 	if pod.Spec.NodeSelector == nil {
 		pod.Spec.NodeSelector = make(map[string]string)
@@ -116,6 +116,15 @@ func (f *ExemplaryPodFuzzer) generatePrototype(base *v1.Pod) *v1.Pod {
 		for j := range pod.Spec.Containers[i].Env {
 			pod.Spec.Containers[i].Env[j].Name = "FUZZED_ENV_" + f.randomString(8)
 			pod.Spec.Containers[i].Env[j].Value = f.randomString(64)
+			pod.Spec.Containers[i].Env[j].ValueFrom = nil // Critical: cannot have both Value and ValueFrom
+		}
+	}
+
+	for i := range pod.Spec.InitContainers {
+		for j := range pod.Spec.InitContainers[i].Env {
+			pod.Spec.InitContainers[i].Env[j].Name = "FUZZED_ENV_" + f.randomString(8)
+			pod.Spec.InitContainers[i].Env[j].Value = f.randomString(64)
+			pod.Spec.InitContainers[i].Env[j].ValueFrom = nil
 		}
 	}
 

@@ -10,10 +10,56 @@ The Exemplary Pod Fuzzer is a high-fidelity synthetic pod generator designed to 
 - **Safety by Default**: Forces pods to be unschedulable (Pending state) using non-existent nodeSelectors and schedulerNames.
 - **Performance Optimized**: Uses high-performance `client-go` settings (500 QPS / 1000 Burst) and precomputes "Fuzzed Prototypes" to ensure string interning memory optimizations are correctly triggered.
 
-## Usage
+## Benchmarking with Kind
 
-### 1. Generate Pod Manifests
-To generate 1,000 fuzzed manifests based on a real pod:
+To perform a realistic 50,000 pod stress test on a local `kind` cluster, follow these steps:
+
+### 1. Create a Large-Scale Kind Cluster
+Standard `kind` clusters have a default `etcd` quota that is too small for 50k heavy pods. Use this configuration to increase the quota to 8GB:
+
+```bash
+cat <<EOF > kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    etcd:
+      local:
+        extraArgs:
+          quota-backend-bytes: "8589934592"
+EOF
+
+kind create cluster --config kind-config.yaml --name fuzzer-test
+```
+
+### 2. Prepare the Namespace and Dependencies
+Real production pods (like the templates in this repo) often have dependencies like specific **Namespaces** or **ServiceAccounts**. The fuzzer preserves these references. You must create them before injecting pods:
+
+```bash
+# Example: Using the complex-daemonset.yaml base
+kubectl create namespace fuzz-test
+kubectl create serviceaccount cilium -n fuzz-test
+```
+
+### 3. Run the Fuzzer
+Inject the pods using high concurrency.
+
+```bash
+go run test/utils/fuzzer/cmd/main.go \
+  --base-pod test/utils/fuzzer/templates/complex-daemonset.yaml \
+  --namespace fuzz-test \
+  --name-prefix representative-pod \
+  --count 50000 \
+  --concurrency 100
+```
+
+## Usage (General)
+
+### Generate Pod Manifests to Disk
+To generate fuzzed manifests for manual inspection:
 ```bash
 go run test/utils/fuzzer/cmd/main.go \
   --base-pod path/to/real-pod.yaml \
@@ -21,23 +67,6 @@ go run test/utils/fuzzer/cmd/main.go \
   --namespace my-test-ns \
   --count 1000 \
   --out-dir ./generated-pods
-```
-
-### 2. Direct Cluster Injection
-To inject 50,000 pods directly into a test cluster (uses the current context from your default kubeconfig):
-```bash
-go run test/utils/fuzzer/cmd/main.go \
-  --base-pod test/utils/fuzzer/templates/complex-daemonset.yaml \
-  --count 50000 \
-  --concurrency 100
-```
-
-To target a specific cluster or use a different kubeconfig:
-```bash
-go run test/utils/fuzzer/cmd/main.go \
-  --base-pod test/utils/fuzzer/templates/complex-daemonset.yaml \
-  --count 50000 \
-  --kubeconfig /path/to/custom/kubeconfig
 ```
 
 ## Flags
@@ -48,7 +77,7 @@ go run test/utils/fuzzer/cmd/main.go \
 - `--count`: Number of pods to generate.
 - `--offset`: Starting index for naming (useful for incremental runs).
 - `--concurrency`: Number of concurrent workers (default: 50).
-- `--kubeconfig`: Path to the kubeconfig file. If not provided, the tool defaults to `$HOME/.kube/config` and uses the **current active context**.
+- `--kubeconfig`: Path to the kubeconfig file. Defaults to `$HOME/.kube/config`.
 - `--out-dir`: If specified, write YAMLs to this directory instead of injecting into a cluster.
 
 ## Verification & Metrics
@@ -56,4 +85,9 @@ go run test/utils/fuzzer/cmd/main.go \
 To quickly verify the number of pods in the API server storage without timing out:
 ```bash
 kubectl get --raw /metrics | grep 'apiserver_storage_objects{resource="pods"}'
+```
+
+To measure control plane memory usage:
+```bash
+docker exec fuzzer-test-control-plane ps aux | grep -E "kube-apiserver|etcd|kube-scheduler"
 ```
