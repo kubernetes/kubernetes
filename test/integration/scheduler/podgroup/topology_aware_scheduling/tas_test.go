@@ -26,15 +26,20 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/ptr"
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
@@ -1295,11 +1300,32 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	// TODO: Add tests for at least one non-default scoring strategy.
+	// Scenarios in this file assume NodeResourcesFit uses MostAllocated.
+	// The scheduler's default is LeastAllocated, which would prefer emptier topology
+	// domains and break those expectations.
+	schedCfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			PluginConfig: []configv1.PluginConfig{{
+				Name: noderesources.Name,
+				Args: runtime.RawExtension{Object: &configv1.NodeResourcesFitArgs{
+					ScoringStrategy: &configv1.ScoringStrategy{
+						Type: configv1.MostAllocated,
+						Resources: []configv1.ResourceSpec{
+							{Name: string(v1.ResourceCPU), Weight: 1},
+							{Name: string(v1.ResourceMemory), Weight: 1},
+						},
+					},
+				}},
+			}},
+		}},
+	})
+
 	testCtx := testutils.InitTestSchedulerWithNS(t, "tas",
 		// Disable backoff - it doesn't impact the end scheduling result.
 		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithPodInitialBackoffSeconds(0))
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithProfiles(schedCfg.Profiles...))
 	cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
 	workload := st.MakeWorkload().Name("workload").Namespace(ns).
