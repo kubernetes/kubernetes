@@ -59,9 +59,9 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 	}
 
 	// serviceIPEndpoints maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs) and Service Port
-	// to the set of serving endpoints (Endpoint IP and Port).
+	// to the set of endpoints (Endpoint IP and Port).
 	serviceIPEndpoints := make(map[string]sets.Set[string])
-	// serviceNodePortEndpoints maps service NodePort to the set of serving endpoints  (Endpoint IP and Port).
+	// serviceNodePortEndpoints maps service NodePort to the set of endpoints (Endpoint IP and Port).
 	serviceNodePortEndpoints := make(map[int]sets.Set[string])
 
 	for svcName, svc := range svcPortMap {
@@ -72,15 +72,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 		endpoints := sets.New[string]()
 		for _, endpoint := range endpointsMap[svcName] {
-			// We need to remove all the conntrack entries for a Service (IP or NodePort)
-			// that are not pointing to a serving endpoint.
-			// We map all the serving endpoints of the service and clear all the conntrack
-			// entries which are destined for the service and are not DNATed to these endpoints.
-			// Changes to the service should not affect existing flows, so we do not take
-			// traffic policies, topology, or terminating status of the service into account.
-			// This ensures that the behavior of UDP services remains consistent with TCP
-			// services.
-			if endpoint.IsServing() {
+			if endpoint.IsServing() || !endpoint.IsTerminating() {
 				portStr := strconv.Itoa(int(endpoint.Port()))
 				endpoints.Insert(net.JoinHostPort(endpoint.IP(), portStr))
 			}
@@ -129,7 +121,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 		// if the original destination (--orig-dst) of the entry is service IP (ClusterIP,
 		// LoadBalancerIPs or ExternalIPs) and (--orig-port-dst) is service Port and
 		// the reply source IP (--reply-src) and port (--reply-port-src) does not
-		// represent a serving endpoint of the service, we clear the entry.
+		// represent an endpoint of the service, we clear the entry.
 		endpoints, ok := serviceIPEndpoints[net.JoinHostPort(origDst, origPortDstStr)]
 		if ok && !endpoints.Has(net.JoinHostPort(replySrc, replyPortSrcStr)) {
 			flows = append(flows, entry)
@@ -138,7 +130,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 		// if the original destination port (--orig-port-dst) of the entry is service
 		// NodePort and the reply source IP (--reply-src) and port (--reply-port-src)
-		// does not represent a serving endpoint of the service, we clear the entry.
+		// does not represent an endpoint of the service, we clear the entry.
 		endpoints, ok = serviceNodePortEndpoints[origPortDst]
 		if ok && !endpoints.Has(net.JoinHostPort(replySrc, replyPortSrcStr)) {
 			flows = append(flows, entry)

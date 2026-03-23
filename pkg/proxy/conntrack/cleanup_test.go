@@ -152,7 +152,7 @@ func TestCleanStaleEntries(t *testing.T) {
 			},
 			{
 				Addresses:  []string{testNonServingEndpointIP},
-				Conditions: discovery.EndpointConditions{Serving: ptr.To(false)},
+				Conditions: discovery.EndpointConditions{Serving: ptr.To(false), Terminating: ptr.To(false)},
 			},
 		},
 		Ports: []discovery.EndpointPort{
@@ -242,6 +242,9 @@ func TestCleanStaleEntries(t *testing.T) {
 		if endpointsMap[svcPortName][1].IsServing() {
 			t.Fatalf("expected endpointsMap[%q][1] to be not serving", svcPortName.String())
 		}
+		if endpointsMap[svcPortName][1].IsTerminating() {
+			t.Fatalf("expected endpointsMap[%q][1] to be not terminating", svcPortName.String())
+		}
 	}
 
 	// The following mock conntrack flow entries `entriesBeforeCleanup` and `entriesAfterCleanup`
@@ -267,9 +270,9 @@ func TestCleanStaleEntries(t *testing.T) {
 				for _, port := range []uint16{testServicePort, testNonServicePort} {
 					entry := generateConntrackEntry(origDest, port, dnatDest, testEndpointPort, proto)
 					entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
-					if proto == unix.IPPROTO_UDP && port == testServicePort && dnatDest != testServingEndpointIP {
-						// we do not expect UDP entries with destination port `testServicePort` and DNATed destination
-						// address not an address of serving endpoint to be present after cleanup.
+					if proto == unix.IPPROTO_UDP && port == testServicePort && dnatDest == testDeletedEndpointIP {
+						// only the deleted endpoint (terminating) entries should be cleared.
+						// non-serving but non-terminating endpoints (e.g., load shedding) should preserve their flows.
 					} else {
 						entriesAfterCleanup = append(entriesAfterCleanup, entry)
 					}
@@ -278,9 +281,9 @@ func TestCleanStaleEntries(t *testing.T) {
 
 			entry := generateConntrackEntry("", testServiceNodePort, dnatDest, testEndpointPort, proto)
 			entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
-			if proto == unix.IPPROTO_UDP && dnatDest != testServingEndpointIP {
-				// we do not expect UDP entries with DNATed destination address not
-				// an address of serving endpoint to be present after cleanup.
+			if proto == unix.IPPROTO_UDP && dnatDest == testDeletedEndpointIP {
+				// only the deleted endpoint (terminating) entries should be cleared.
+				// non-serving but non-terminating endpoints (e.g., load shedding) should preserve their flows.
 			} else {
 				entriesAfterCleanup = append(entriesAfterCleanup, entry)
 			}
