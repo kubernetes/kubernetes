@@ -1,6 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
+  name: representative-infrastructure-pod-0
+  namespace: default
+  uid: fuzzed-uid-00000000-9pPfd2dd
   annotations:
     cluster-autoscaler.kubernetes.io/enable-ds-eviction: fuzzed-val-o6U5ghpJSbYGbte5
     components.gke.io/component-name: fuzzed-val-E38Wq2JBHd5rDGSS
@@ -710,8 +713,6 @@ metadata:
     operation: Update
     subresource: status
     time: "2026-02-09T03:29:49Z"
-  name: representative-infrastructure-pod-0
-  namespace: default
   ownerReferences:
   - apiVersion: apps/v1
     blockOwnerDeletion: true
@@ -719,7 +720,6 @@ metadata:
     kind: DaemonSet
     name: fuzzed-owner-xh64Xk3K
     uid: fuzzed-uid-vPTLPxoE
-  uid: fuzzed-uid-00000000-9pPfd2dd
 spec:
   affinity:
     nodeAffinity:
