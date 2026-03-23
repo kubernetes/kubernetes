@@ -593,12 +593,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
-- name: DRANodePreparation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.36"
 - name: DRAListTypeAttributes
   versionedSpecs:
   - default: false
@@ -606,6 +600,12 @@
     preRelease: Alpha
     version: "1.36"
 - name: DRANodeAllocatableResources
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
+- name: DRANodePreparation
   versionedSpecs:
   - default: false
     lockToDefault: false
