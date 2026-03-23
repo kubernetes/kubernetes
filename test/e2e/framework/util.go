@@ -613,26 +613,7 @@ func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeLi
 	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	ExpectNoError(err, "error reading all nodes")
 
-	var cpNodes v1.NodeList
-
-	for _, node := range allNodes.Items {
-		// Check for the control plane label
-		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
-			cpNodes.Items = append(cpNodes.Items, node)
-			continue
-		}
-
-		// Check for the specific taint
-		for _, taint := range node.Spec.Taints {
-			// NOTE the taint key is the same as the control plane label
-			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
-				cpNodes.Items = append(cpNodes.Items, node)
-				continue
-			}
-		}
-	}
-
-	return &cpNodes
+	return filterControlPlaneNodes(allNodes)
 }
 
 // WaitForControlPlaneNodes returns a list of control plane nodes, retrying retryable errors up to a structured timeout
@@ -649,25 +630,33 @@ func WaitForControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.No
 			return false, err // fail fast on non-retryable errors
 		}
 
-		var nodes v1.NodeList
-		for _, node := range allNodes.Items {
-			if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
-				nodes.Items = append(nodes.Items, node)
-				continue
-			}
-			for _, taint := range node.Spec.Taints {
-				if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
-					nodes.Items = append(nodes.Items, node)
-					continue
-				}
-			}
-		}
-		cpNodes = &nodes
+		cpNodes = filterControlPlaneNodes(allNodes)
 		return true, nil
 	})
 	ExpectNoError(err, "error reading all nodes")
 
 	return cpNodes
+}
+
+func filterControlPlaneNodes(allNodes *v1.NodeList) *v1.NodeList {
+	var cpNodes v1.NodeList
+	for _, node := range allNodes.Items {
+		// Check for the control plane label
+		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
+			cpNodes.Items = append(cpNodes.Items, node)
+			continue
+		}
+
+		// Check for the specific taint
+		for _, taint := range node.Spec.Taints {
+			// NOTE the taint key is the same as the control plane label
+			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+				cpNodes.Items = append(cpNodes.Items, node)
+				continue
+			}
+		}
+	}
+	return &cpNodes
 }
 
 // PrettyPrintJSON converts metrics to JSON format.
