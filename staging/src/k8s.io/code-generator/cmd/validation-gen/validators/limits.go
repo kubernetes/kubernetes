@@ -23,6 +23,8 @@ import (
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
+	"math"
+	"strconv"
 )
 
 const (
@@ -288,14 +290,42 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := util.ParseInt(tag.Value)
-	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	if isUnsignedInt(t) {
+		uintVal, err := strconv.ParseUint(tag.Value, 10, 64)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload as uint: %w", err)
+		}
+
+		// range validation
+		switch t.Name.Name {
+		case "uint32":
+			if uintVal > math.MaxUint32 {
+				return result, fmt.Errorf("value %d does not fit in uint32", uintVal)
+			}
+		case "uint64":
+			// valid
+		}
+
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal))
+
+	} else {
+		intVal, err := strconv.ParseInt(tag.Value, 10, 64)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		}
+
+		// range validation
+		switch t.Name.Name {
+		case "int32":
+			if intVal < math.MinInt32 || intVal > math.MaxInt32 {
+				return result, fmt.Errorf("value %d does not fit in int32", intVal)
+			}
+		case "int64":
+			// valid
+		}
+
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal))
 	}
-	if isUnsignedInt(t) && intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero for unsigned types (%s)", rootTypeString(context.Type, t))
-	}
-	result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal))
 	return result, nil
 }
 
@@ -340,14 +370,43 @@ func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := util.ParseInt(tag.Value)
-	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	if isUnsignedInt(t) {
+		uintVal, err := strconv.ParseUint(tag.Value, 10, 64)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload as uint: %w", err)
+		}
+
+		// range validation
+		switch t.Name.Name {
+		case "uint32":
+			if uintVal > math.MaxUint32 {
+				return result, fmt.Errorf("value %d does not fit in uint32", uintVal)
+			}
+		case "uint64":
+			// valid
+		}
+
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal))
+
+	} else {
+		intVal, err := strconv.ParseInt(tag.Value, 10, 64)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		}
+
+		// range validation
+		switch t.Name.Name {
+		case "int32":
+			if intVal < math.MinInt32 || intVal > math.MaxInt32 {
+				return result, fmt.Errorf("value %d does not fit in int32", intVal)
+			}
+		case "int64":
+			// valid
+		}
+
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal))
 	}
-	if isUnsignedInt(t) && intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero for unsigned types (%s)", rootTypeString(context.Type, t))
-	}
-	result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal))
+
 	return result, nil
 }
 

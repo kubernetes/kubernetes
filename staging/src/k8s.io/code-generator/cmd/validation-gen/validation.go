@@ -1515,8 +1515,45 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	// are quoted.
 
 	switch v := value.(type) {
-	case uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, float32, float64, bool:
-		sw.Do(fmt.Sprintf("%v", value), nil)
+
+	case int64:
+		sw.Do(fmt.Sprintf("int64(%d)", v), nil)
+
+	case int32:
+		sw.Do(fmt.Sprintf("int32(%d)", v), nil)
+
+	case int16:
+		sw.Do(fmt.Sprintf("int16(%d)", v), nil)
+
+	case int8:
+		sw.Do(fmt.Sprintf("int8(%d)", v), nil)
+
+	case int:
+		sw.Do(fmt.Sprintf("int(%d)", v), nil)
+
+	case uint64:
+		sw.Do(fmt.Sprintf("uint64(%d)", v), nil)
+
+	case uint32:
+		sw.Do(fmt.Sprintf("uint32(%d)", v), nil)
+
+	case uint16:
+		sw.Do(fmt.Sprintf("uint16(%d)", v), nil)
+
+	case uint8:
+		sw.Do(fmt.Sprintf("uint8(%d)", v), nil)
+
+	case uint:
+		sw.Do(fmt.Sprintf("uint(%d)", v), nil)
+
+	case float32:
+		sw.Do(fmt.Sprintf("float32(%v)", v), nil)
+
+	case float64:
+		sw.Do(fmt.Sprintf("float64(%v)", v), nil)
+
+	case bool:
+		sw.Do(fmt.Sprintf("%v", v), nil)
 	case string:
 		// If the incoming string was quoted, we still do it ourselves, JIC.
 		str := value.(string)
