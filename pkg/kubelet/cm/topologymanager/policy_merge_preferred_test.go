@@ -268,3 +268,18 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 		})
 	}
 }
+
+func TestHintMergerMergePreferredEmptyHints(t *testing.T) {
+	numaInfo := commonNUMAInfoTwoNodes()
+	hints := [][]TopologyHint{}
+
+	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
+	preferred := merger.mergePreferred(klog.Background())
+	if preferred == nil {
+		t.Fatalf("expected preferred hint, got nil")
+	}
+	best := merger.Merge(klog.Background())
+	if !preferred.IsEqual(best) || preferred.Score != best.Score {
+		t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v", *preferred, best)
+	}
+}

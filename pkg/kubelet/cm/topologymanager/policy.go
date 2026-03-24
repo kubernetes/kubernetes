@@ -375,8 +375,10 @@ func (m HintMerger) mergePreferred(logger klog.Logger) *TopologyHint {
 		}
 	}
 
+	// defaultAffinity represents all NUMA nodes on the machine.
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
+	// bestHint tracks the best preferred merged hint found so far.
 	var bestHint *TopologyHint
 	permutation := make([]TopologyHint, len(preferredHints))
 	// dim: current dimension index; baseAffinity: first non-nil preferred affinity chosen so far.
