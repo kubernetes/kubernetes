@@ -155,10 +155,12 @@ func TestWatch(t *testing.T) {
 		// matching fields
 		[]fields.Set{
 			{"metadata.name": "foo"},
+			{"spec.nodeName": "valid-node"},
 		},
 		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
+			{"spec.nodeName": "invalid-node"},
 		},
 	)
 }
