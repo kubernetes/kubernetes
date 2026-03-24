@@ -155,7 +155,8 @@ type remoteSubnetInfo struct {
 }
 
 const (
-	NETWORK_TYPE_OVERLAY = "overlay"
+	NETWORK_TYPE_OVERLAY  = "overlay"
+	NETWORK_TYPE_L2BRIDGE = "L2Bridge"
 	// MAX_COUNT_STALE_LOADBALANCERS is the maximum number of stale loadbalancers which cleanedup in single syncproxyrules.
 	// If there are more stale loadbalancers to clean, it will go to next iteration of syncproxyrules.
 	MAX_COUNT_STALE_LOADBALANCERS = 20
@@ -1170,7 +1171,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	_ = proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	// Query HNS for endpoints and load balancers
-	queriedEndpoints, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
+	queriedEndpoints, remoteEPsWithDupIP, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
+	defer hns.deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP)
+
 	if err != nil {
 		klog.ErrorS(err, "Querying HNS for endpoints failed")
 		return
@@ -1715,23 +1718,30 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 
 	// remove stale endpoint refcount entries
-	for epIP := range proxier.terminatedEndpoints {
-		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
-		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
-			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
-				if err != nil {
-					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
-				} else {
-					klog.V(3).InfoS("Deleting unreferenced remote endpoint succeeded", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
-				}
-			}
-		}
-	}
+	proxier.deleteTerminatedEndpoints(queriedEndpoints)
+
 	// This will cleanup stale load balancers which are pending delete
 	// in last iteration
 	proxier.cleanupStaleLoadbalancers()
 	return
+}
+
+func (proxier *Proxier) deleteTerminatedEndpoints(queriedEndpoints map[string]*(endpointInfo)) {
+	for epIP := range proxier.terminatedEndpoints {
+		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
+		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
+			refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID)
+			if refCount == nil || *refCount == 0 {
+				if err := proxier.hns.deleteEndpoint(epToDelete.hnsID); err != nil {
+					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				} else {
+					klog.V(3).InfoS("Deleting unreferenced remote endpoint succeeded", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
+				}
+			} else {
+				klog.V(3).InfoS("Not deleting remote endpoint as it is still referenced", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip, "refCount", refCount)
+			}
+		}
+	}
 }
 
 // deleteExistingLoadBalancer checks whether loadbalancer delete is needed or not.
