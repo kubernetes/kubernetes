@@ -20,12 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apiserver/pkg/registry/rest"
-
-	"k8s.io/apimachinery/pkg/api/operation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
