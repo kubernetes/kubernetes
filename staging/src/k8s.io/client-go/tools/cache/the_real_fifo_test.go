@@ -1210,8 +1210,8 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
 	const unlimitedBatchSize = 999999
-	sucessObj1 := mkFifoObj("foo1", 5)
-	sucessObj2 := mkFifoObj("foo2", 5)
+	successObj1 := mkFifoObj("foo1", 5)
+	successObj2 := mkFifoObj("foo2", 5)
 	failObj3 := mkFifoObj("foo3", 5)
 	failObj4 := mkFifoObj("foo4", 5)
 	testDeltaType := Added
@@ -1233,30 +1233,30 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 		{
 			name: "nth item is broken",
 			incomingItems: []testFifoObject{
-				sucessObj1, sucessObj2, failObj3,
+				successObj1, successObj2, failObj3,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+				{{testDeltaType, successObj1}, {testDeltaType, successObj2}, {testDeltaType, failObj3}},
 			},
 		},
 		{
 			name: "multiple nth items are broken",
 			incomingItems: []testFifoObject{
-				sucessObj1, sucessObj2, failObj3, failObj4,
+				successObj1, successObj2, failObj3, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+				{{testDeltaType, successObj1}, {testDeltaType, successObj2}, {testDeltaType, failObj3}},
 				{{testDeltaType, failObj4}},
 			},
 		},
 		{
 			name: "mixed 1st and nth items are broken",
 			incomingItems: []testFifoObject{
-				failObj3, sucessObj1, failObj4,
+				failObj3, successObj1, failObj4,
 			},
 			expectedBatches: [][]Delta{
 				{{testDeltaType, failObj3}},
-				{{testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
+				{{testDeltaType, successObj1}, {testDeltaType, failObj4}},
 			},
 		},
 	}
