@@ -848,6 +848,16 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup cpu config for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
+	// When the pod container manager does not manage pod-level cgroups
+	// (e.g. cgroupsPerQOS=false), GetPodCgroupConfig returns nil.
+	// Track this so we skip pod-level cgroup updates in resizeContainers.
+	podCgroupsManaged := currentPodMemoryConfig != nil && currentPodCPUConfig != nil
+	if currentPodMemoryConfig == nil {
+		currentPodMemoryConfig = &cm.ResourceConfig{}
+	}
+	if currentPodCPUConfig == nil {
+		currentPodCPUConfig = &cm.ResourceConfig{}
+	}
 
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
@@ -960,13 +970,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
-		if newPodCgLimValue > currPodCgLimValue {
+		if podCgroupsManaged && newPodCgLimValue > currPodCgLimValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
-		if newPodCgReqValue > currPodCgReqValue {
+		if podCgroupsManaged && newPodCgReqValue > currPodCgReqValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
@@ -980,13 +990,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
-		if newPodCgReqValue < currPodCgReqValue {
+		if podCgroupsManaged && newPodCgReqValue < currPodCgReqValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
-		if newPodCgLimValue < currPodCgLimValue {
+		if podCgroupsManaged && newPodCgLimValue < currPodCgLimValue {
 			// TODO(#127825): Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
@@ -1011,7 +1021,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			// TODO(#128675): This does not support removing limits.
 			podResources.Memory = currentPodMemoryConfig.Memory
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
+		var currentMemoryLimit, desiredMemoryLimit int64
+		if currentPodMemoryConfig.Memory != nil {
+			currentMemoryLimit = *currentPodMemoryConfig.Memory
+		}
+		if podResources.Memory != nil {
+			desiredMemoryLimit = *podResources.Memory
+		}
+		if errResize := resizeContainers(v1.ResourceMemory, currentMemoryLimit, desiredMemoryLimit, 0, 0); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
 		}
@@ -1030,8 +1047,19 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		if podResources.CPUQuota == nil {
 			podResources.CPUQuota = currentPodCPUConfig.CPUQuota
 		}
-		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCPUConfig.CPUQuota, *podResources.CPUQuota,
-			int64(*currentPodCPUConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
+		var currentCPUQuota, desiredCPUQuota int64
+		if currentPodCPUConfig.CPUQuota != nil {
+			currentCPUQuota = *currentPodCPUConfig.CPUQuota
+		}
+		if podResources.CPUQuota != nil {
+			desiredCPUQuota = *podResources.CPUQuota
+		}
+		var currentCPUShares int64
+		if currentPodCPUConfig.CPUShares != nil {
+			currentCPUShares = int64(*currentPodCPUConfig.CPUShares)
+		}
+		if errResize := resizeContainers(v1.ResourceCPU, currentCPUQuota, desiredCPUQuota,
+			currentCPUShares, int64(*podResources.CPUShares)); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
 		}
