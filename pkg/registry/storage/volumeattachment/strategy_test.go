@@ -575,7 +575,7 @@ func TestIndexers(t *testing.T) {
 	if indexers == nil {
 		t.Fatal("expected non-nil indexers")
 	}
-	if _, ok := (*indexers)["field:spec.nodeName"]; !ok {
-		t.Error("expected indexer for field:spec.nodeName")
+	if _, ok := (*indexers)["f:spec.nodeName"]; !ok {
+		t.Error("expected indexer for f:spec.nodeName")
 	}
 }
