@@ -105,6 +105,17 @@ var (
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
+	// requestContentTypeCounter tracks the migration from JSON to Protobuf.
+	// It is intended to identify clients that haven't moved to Protobuf yet.
+	requestContentTypeCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "request_content_type_total",
+			Help:           "Counter of apiserver requests broken out for each verb, resource and media type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "resource", "media_type"},
+	)
 	requestSloLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
@@ -299,6 +310,7 @@ var (
 		requestCounter,
 		longRunningRequestsGauge,
 		requestLatencies,
+		requestContentTypeCounter,
 		requestSloLatencies,
 		requestSliLatencies,
 		fieldValidationRequestLatencies,
@@ -590,6 +602,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), verb, req, requestInfo)
 
 	dryRun := cleanDryRun(req.URL)
+	contentType := cleanContentType(req.Header.Get("Content-Type"))
 	elapsedSeconds := elapsed.Seconds()
 	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode)).Inc()
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
@@ -605,6 +618,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	requestContentTypeCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, contentType).Inc()
 	fieldValidation := cleanFieldValidation(req.URL)
 	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation)
 
@@ -963,4 +977,18 @@ func codeToString(s int) string {
 	default:
 		return strconv.Itoa(s)
 	}
+}
+
+func cleanContentType(contentType string) string {
+	if contentType == "" {
+		return ""
+	}
+	lowered := strings.ToLower(contentType)
+	if strings.HasPrefix(lowered, "application/json") {
+		return "application/json"
+	}
+	if strings.HasPrefix(lowered, "application/vnd.kubernetes.protobuf") {
+		return "application/vnd.kubernetes.protobuf"
+	}
+	return "other"
 }

@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -523,6 +524,115 @@ func TestCleanListScope(t *testing.T) {
 			actualScope := CleanListScope(scenario.ctx, scenario.opts)
 			if actualScope != scenario.expectedScope {
 				t.Errorf("unexpected scope = %s, expected = %s", actualScope, scenario.expectedScope)
+			}
+		})
+	}
+}
+
+func TestCleanContentType(t *testing.T) {
+	testCases := []struct {
+		contentType string
+		expected    string
+	}{
+		{
+			contentType: "",
+			expected:    "",
+		},
+		{
+			contentType: "application/json",
+			expected:    "application/json",
+		},
+		{
+			contentType: "application/JSON",
+			expected:    "application/json",
+		},
+		{
+			contentType: "application/json; charset=utf-8",
+			expected:    "application/json",
+		},
+		{
+			contentType: "application/vnd.kubernetes.protobuf",
+			expected:    "application/vnd.kubernetes.protobuf",
+		},
+		{
+			contentType: "application/VND.KUBERNETES.PROTOBUF",
+			expected:    "application/vnd.kubernetes.protobuf",
+		},
+		{
+			contentType: "application/vnd.kubernetes.protobuf; something=else",
+			expected:    "application/vnd.kubernetes.protobuf",
+		},
+		{
+			contentType: "text/plain",
+			expected:    "other",
+		},
+		{
+			contentType: "application/yaml",
+			expected:    "other",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.contentType, func(t *testing.T) {
+			actual := cleanContentType(tc.contentType)
+			if actual != tc.expected {
+				t.Errorf("expected %s, got %s", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestRequestContentTypeCounter(t *testing.T) {
+	Register()
+
+	testCases := []struct {
+		desc        string
+		contentType string
+		labels      map[string]string
+	}{
+		{
+			desc:        "JSON content type",
+			contentType: "application/json",
+			labels: map[string]string{
+				"verb":       "POST",
+				"resource":   "myresource",
+				"media_type": "application/json",
+			},
+		},
+		{
+			desc:        "Protobuf content type",
+			contentType: "application/vnd.kubernetes.protobuf",
+			labels: map[string]string{
+				"verb":       "POST",
+				"resource":   "myresource",
+				"media_type": "application/vnd.kubernetes.protobuf",
+			},
+		},
+		{
+			desc:        "Other content type",
+			contentType: "application/yaml",
+			labels: map[string]string{
+				"verb":       "POST",
+				"resource":   "myresource",
+				"media_type": "other",
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			requestContentTypeCounter.Reset()
+
+			req, _ := http.NewRequest(http.MethodPost, "/api/v1/myresource", nil)
+			req.Header.Set("Content-Type", test.contentType)
+
+			MonitorRequest(req, http.MethodPost, "mygroup", "v1", "myresource", "", "cluster", "apiserver", false, "", 201, 100, 1*time.Millisecond)
+
+			count, err := testutil.GetCounterMetricValue(requestContentTypeCounter.WithLabelValues(test.labels["verb"], test.labels["resource"], test.labels["media_type"]))
+			if err != nil {
+				t.Fatalf("Failed to get counter value: %v", err)
+			}
+			if count != 1 {
+				t.Errorf("Expected counter value 1, got %v", count)
 			}
 		})
 	}
