@@ -276,7 +276,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:deprecated=1.37
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
+// ClusterTrustBundle is a cluster-scoped container for X509(formerly X.509) trust anchors
 // (root certificates).
 //
 // ClusterTrustBundle objects are considered to be readable by any authenticated
