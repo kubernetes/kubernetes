@@ -28,6 +28,10 @@ type FakeSchedulingV1alpha2 struct {
 	*testing.Fake
 }
 
+func (c *FakeSchedulingV1alpha2) CompositePodGroups(namespace string) v1alpha2.CompositePodGroupInterface {
+	return newFakeCompositePodGroups(c, namespace)
+}
+
 func (c *FakeSchedulingV1alpha2) PodGroups(namespace string) v1alpha2.PodGroupInterface {
 	return newFakePodGroups(c, namespace)
 }

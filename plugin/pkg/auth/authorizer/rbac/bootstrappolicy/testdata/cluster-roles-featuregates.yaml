@@ -263,6 +263,7 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - compositepodgroups
     - podgroups
     - workloads
     verbs:
@@ -428,6 +429,8 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - compositepodgroups
+    - compositepodgroups/status
     - podgroups
     - podgroups/status
     - workloads
@@ -1007,6 +1010,7 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - compositepodgroups
     - podgroups
     verbs:
     - get
@@ -1015,6 +1019,7 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - compositepodgroups/status
     - podgroups/status
     verbs:
     - patch

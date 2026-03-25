@@ -72,7 +72,10 @@
     ],
     "disruptionMode": "disruptionModeValue",
     "priorityClassName": "priorityClassNameValue",
-    "priority": 7
+    "priority": 7,
+    "parentRef": {
+      "compositePodGroupName": "compositePodGroupNameValue"
+    }
   },
   "status": {
     "conditions": [

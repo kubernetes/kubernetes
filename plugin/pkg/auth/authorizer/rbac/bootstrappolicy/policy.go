@@ -147,7 +147,11 @@ func viewRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
+		resources := []string{"workloads", "podgroups", "podgroups/status"}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			resources = append(resources, "compositepodgroups", "compositepodgroups/status")
+		}
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources(resources...).RuleOrDie())
 	}
 	return rules
 }
@@ -191,7 +195,11 @@ func editRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
+		resources := []string{"workloads", "podgroups"}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			resources = append(resources, "compositepodgroups")
+		}
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources(resources...).RuleOrDie())
 	}
 	return rules
 }
@@ -664,8 +672,14 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
+		resources := []string{"podgroups"}
+		subresources := []string{"podgroups/status"}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			resources = append(resources, "compositepodgroups")
+			subresources = append(subresources, "compositepodgroups/status")
+		}
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources(resources...).RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources(subresources...).RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

@@ -1842,8 +1842,24 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha2
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupStatusApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupTemplateApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("CompositePodGroupTemplateReference"):
+		return &applyconfigurationsschedulingv1alpha2.CompositePodGroupTemplateReferenceApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("GangGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha2.GangGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1alpha2.GangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("ParentReference"):
+		return &applyconfigurationsschedulingv1alpha2.ParentReferenceApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroup"):
 		return &applyconfigurationsschedulingv1alpha2.PodGroupApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupResourceClaim"):
@@ -1868,6 +1884,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha2.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha2.WorkloadApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("WorkloadCompositePodGroupTemplateReference"):
+		return &applyconfigurationsschedulingv1alpha2.WorkloadCompositePodGroupTemplateReferenceApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("WorkloadPodGroupTemplateReference"):
 		return &applyconfigurationsschedulingv1alpha2.WorkloadPodGroupTemplateReferenceApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("WorkloadSpec"):

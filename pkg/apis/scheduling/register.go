@@ -48,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodGroup{},
 		&PodGroupList{},
+		&CompositePodGroup{},
+		&CompositePodGroupList{},
 		&PriorityClass{},
 		&PriorityClassList{},
 		&Workload{},

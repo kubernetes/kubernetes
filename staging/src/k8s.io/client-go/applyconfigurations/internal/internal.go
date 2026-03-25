@@ -14711,6 +14711,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha2.BasicGroupSchedulingPolicy
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha2.BasicSchedulingPolicy
   map:
     elementType:
@@ -14723,6 +14735,109 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroup
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupStatus
+      default: {}
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroupSchedulingPolicy
+  map:
+    fields:
+    - name: basic
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.BasicGroupSchedulingPolicy
+    - name: gang
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.GangGroupSchedulingPolicy
+    unions:
+    - fields:
+      - fieldName: basic
+        discriminatorValue: Basic
+      - fieldName: gang
+        discriminatorValue: Gang
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroupSpec
+  map:
+    fields:
+    - name: compositePodGroupTemplateReference
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupTemplateReference
+    - name: parentRef
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.ParentReference
+    - name: schedulingPolicy
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupSchedulingPolicy
+      default: {}
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroupStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroupTemplate
+  map:
+    fields:
+    - name: compositePodGroupTemplates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupTemplate
+          elementRelationship: associative
+          keys:
+          - name
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: podGroupTemplates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupTemplate
+          elementRelationship: associative
+          keys:
+          - name
+    - name: schedulingPolicy
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupSchedulingPolicy
+      default: {}
+- name: io.k8s.api.scheduling.v1alpha2.CompositePodGroupTemplateReference
+  map:
+    fields:
+    - name: workload
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.WorkloadCompositePodGroupTemplateReference
+    unions:
+    - fields:
+      - fieldName: workload
+        discriminatorValue: Workload
+- name: io.k8s.api.scheduling.v1alpha2.GangGroupSchedulingPolicy
+  map:
+    fields:
+    - name: minGroupCount
+      type:
+        scalar: numeric
 - name: io.k8s.api.scheduling.v1alpha2.GangSchedulingPolicy
   map:
     fields:
@@ -14730,6 +14845,13 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha2.ParentReference
+  map:
+    fields:
+    - name: compositePodGroupName
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.scheduling.v1alpha2.PodGroup
   map:
     fields:
@@ -14805,6 +14927,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: Pod
+    - name: parentRef
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha2.ParentReference
     - name: podGroupTemplateRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupTemplateReference
@@ -14927,6 +15052,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.WorkloadSpec
       default: {}
+- name: io.k8s.api.scheduling.v1alpha2.WorkloadCompositePodGroupTemplateReference
+  map:
+    fields:
+    - name: compositePodGroupTemplateName
+      type:
+        scalar: string
+      default: ""
+    - name: workloadName
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.scheduling.v1alpha2.WorkloadPodGroupTemplateReference
   map:
     fields:
@@ -14941,6 +15077,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1alpha2.WorkloadSpec
   map:
     fields:
+    - name: compositePodGroupTemplates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.CompositePodGroupTemplate
+          elementRelationship: associative
+          keys:
+          - name
     - name: controllerRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.TypedLocalObjectReference
