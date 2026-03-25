@@ -131,8 +131,9 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 						switch credsPolicy {
 						case kubeletconfig.NeverVerifyAllowlistedImages:
 							framework.Context("[NeverVerifyAllowListedImages specific tests]", func() {
-								tempRemoveImagePulledRecord(f, &testImageID)
-								tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+								// This BeforeEach runs after the outer tempSetCurrentKubeletConfig,
+								// so getCurrentKubeletConfig reads the already-applied policy as the base.
+								tempRemoveImagePulledRecordAndSetKubeletConfig(f, &testImageID, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 									initialConfig.ImagePullCredentialsVerificationPolicy = string(credsPolicy)
 									initialConfig.PreloadedImagesVerificationAllowlist = []string{path.Join(registryAddress, "pause")}
 								})

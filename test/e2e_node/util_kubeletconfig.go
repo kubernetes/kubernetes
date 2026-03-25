@@ -98,19 +98,45 @@ func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletCon
 	})
 }
 
+const pulledRecordsDir = "/var/lib/kubelet/image_manager/pulled"
+
+func pulledRecordFilenameFromID(imageID string) string {
+	return fmt.Sprintf("sha256-%x", sha256.Sum256([]byte(imageID)))
+}
+
 func tempRemoveImagePulledRecord(f *framework.Framework, imageID *string) {
-	pulledRecordFilenameFromID := func(imageID string) string {
-		return fmt.Sprintf("sha256-%x", sha256.Sum256([]byte(imageID)))
+	tempRemoveImagePulledRecordAndSetKubeletConfig(f, imageID, nil)
+}
+
+// tempRemoveImagePulledRecordAndSetKubeletConfig removes the image pulled record file and
+// optionally updates the kubelet configuration in a single kubelet stop/start cycle.
+// This avoids an extra kubelet restart when both operations are needed.
+//
+// When updateFunction is non-nil, an explicit AfterEach is used for config
+// restoration so it runs in the first cleanup pass alongside the outer
+// tempSetCurrentKubeletConfig's AfterEach (ordered by descending nesting level).
+// DeferCleanup runs in a second pass and would clobber the outer's
+// already-restored config.
+func tempRemoveImagePulledRecordAndSetKubeletConfig(f *framework.Framework, imageID *string, updateFunction func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration)) {
+	var oldCfg *kubeletconfig.KubeletConfiguration
+
+	if updateFunction != nil {
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if oldCfg != nil {
+				updateKubeletConfig(ctx, f, oldCfg, true)
+			}
+		})
 	}
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		pulledRecordsDir := "/var/lib/kubelet/image_manager/pulled"
 		fileName := pulledRecordFilenameFromID(*imageID)
 		origPath := filepath.Join(pulledRecordsDir, fileName)
 		tempPath := filepath.Join(pulledRecordsDir, "temp_"+fileName)
 
-		// wait for the kubelet to create the record
-		err := wait.PollUntilContextTimeout(ctx, time.Second, 5*time.Second, true, func(_ context.Context) (bool, error) {
+		// Wait for the kubelet to create the record. Use a generous timeout because
+		// the preceding kubelet restart (from tempSetCurrentKubeletConfig) can be slow
+		// on loaded CI nodes, and the file must exist on disk before we can rename it.
+		err := wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(_ context.Context) (bool, error) {
 			if _, err := os.Stat(origPath); err != nil {
 				return false, nil
 			}
@@ -118,10 +144,27 @@ func tempRemoveImagePulledRecord(f *framework.Framework, imageID *string) {
 		})
 		framework.ExpectNoError(err, "the file with the pulled record for the image ID never appeared")
 
+		if updateFunction != nil {
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+		}
+
 		withStoppedKubelet(ctx, f, false, func() {
 			err := os.Rename(origPath, tempPath)
 			framework.ExpectNoError(err, "failed to move the ImagePulledRecord file")
 
+			if updateFunction != nil {
+				newCfg := oldCfg.DeepCopy()
+				updateFunction(ctx, newCfg)
+
+				deleteStateFile(cpuManagerStateFile)
+				deleteStateFile(memoryManagerStateFile)
+				deleteStateFile(usernsStateFiles)
+				framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			}
+
+			// Restore the file on cleanup. Config restoration (when applicable) is
+			// handled by the AfterEach above to maintain correct Ginkgo cleanup ordering.
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				withStoppedKubelet(ctx, f, false, func() {
 					err := os.Rename(tempPath, origPath)
