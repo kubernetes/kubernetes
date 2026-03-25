@@ -24,6 +24,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/klog/v2"
+
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
@@ -195,7 +197,7 @@ users:
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 
-	store, err := certificate.NewFileStore("kubelet-client", dir, dir, "", "")
+	store, err := certificate.NewFileStoreWithLogger(klog.Background(), "kubelet-client", dir, dir, "", "")
 	if err != nil {
 		t.Errorf("unable to build bootstrap cert store")
 	}

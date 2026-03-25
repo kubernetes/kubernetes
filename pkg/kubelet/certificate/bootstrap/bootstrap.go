@@ -66,7 +66,7 @@ func LoadClientConfig(logger klog.Logger, kubeconfigPath, bootstrapPath, certDir
 		return clientConfig, restclient.CopyConfig(clientConfig), nil
 	}
 
-	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
+	store, err := certificate.NewFileStoreWithLogger(logger, "kubelet-client", certDir, certDir, "", "")
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to build bootstrap cert store")
 	}
@@ -130,7 +130,7 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
 
-	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
+	store, err := certificate.NewFileStoreWithLogger(logger, "kubelet-client", certDir, certDir, "", "")
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap cert store")
 	}
