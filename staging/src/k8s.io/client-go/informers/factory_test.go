@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func TestWithReflectorConfigSetsFactory(t *testing.T) {
+func TestWithReflectionOptionsSetsFactory(t *testing.T) {
 	client := fake.NewClientset()
 
 	backoff := &wait.Backoff{
@@ -35,37 +35,27 @@ func TestWithReflectorConfigSetsFactory(t *testing.T) {
 		Steps:    10,
 		Cap:      30 * time.Second,
 	}
-	cfg := ReflectorConfig{
+	cfg := cache.ReflectionOptions{
 		Backoff:              backoff,
 		BackoffResetDuration: 2 * time.Minute,
 		MinWatchTimeout:      6 * time.Minute,
 		MaxWatchTimeout:      12 * time.Minute,
 	}
 
-	factory := NewSharedInformerFactoryWithOptions(client, 0, WithReflectorConfig(cfg))
+	factory := NewSharedInformerFactoryWithOptions(client, 0, WithReflectionOptions(cfg))
 	f := factory.(*sharedInformerFactory)
 
-	if f.reflectorConfig.Backoff == nil {
+	if f.reflectionOptions.Backoff == nil {
 		t.Error("expected Backoff to be set on factory")
 	}
-	if f.reflectorConfig.MinWatchTimeout != 6*time.Minute {
-		t.Errorf("expected MinWatchTimeout=6m, got %v", f.reflectorConfig.MinWatchTimeout)
+	if f.reflectionOptions.MinWatchTimeout != 6*time.Minute {
+		t.Errorf("expected MinWatchTimeout=6m, got %v", f.reflectionOptions.MinWatchTimeout)
 	}
-	if f.reflectorConfig.MaxWatchTimeout != 12*time.Minute {
-		t.Errorf("expected MaxWatchTimeout=12m, got %v", f.reflectorConfig.MaxWatchTimeout)
+	if f.reflectionOptions.MaxWatchTimeout != 12*time.Minute {
+		t.Errorf("expected MaxWatchTimeout=12m, got %v", f.reflectionOptions.MaxWatchTimeout)
 	}
-	if f.reflectorConfig.BackoffResetDuration != 2*time.Minute {
-		t.Errorf("expected BackoffResetDuration=2m, got %v", f.reflectorConfig.BackoffResetDuration)
+	if f.reflectionOptions.BackoffResetDuration != 2*time.Minute {
+		t.Errorf("expected BackoffResetDuration=2m, got %v", f.reflectionOptions.BackoffResetDuration)
 	}
 }
 
-
-func TestReflectorConfigIsTypeAliasForCacheReflectorConfig(t *testing.T) {
-	// Verify that informers.ReflectorConfig is the same type as cache.ReflectorConfig.
-	// This is tested at compile time by the type alias declaration.
-	var cfg ReflectorConfig
-	var cacheCfg cache.ReflectorConfig
-	cacheCfg = cfg
-	cfg = cacheCfg
-	_ = cfg
-}

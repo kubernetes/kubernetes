@@ -56,10 +56,6 @@ import (
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
 type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
 
-// ReflectorConfig holds configuration for the underlying Reflector's backoff and timeout behavior.
-// It is an alias for cache.ReflectorConfig.
-type ReflectorConfig = cache.ReflectorConfig
-
 type sharedInformerFactory struct {
 	client           kubernetes.Interface
 	namespace        string
@@ -69,7 +65,7 @@ type sharedInformerFactory struct {
 	customResync     map[reflect.Type]time.Duration
 	transform        cache.TransformFunc
 	informerName     *cache.InformerName
-	reflectorConfig  ReflectorConfig
+	reflectionOptions  cache.ReflectionOptions
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -131,11 +127,11 @@ func (f *sharedInformerFactory) InformerName() *cache.InformerName {
 	return f.informerName
 }
 
-// WithReflectorConfig sets custom reflector configuration for all informers created by the factory.
+// WithReflectionOptions sets custom reflector configuration for all informers created by the factory.
 // This controls backoff behavior and watch request timeouts for the underlying reflectors.
-func WithReflectorConfig(config ReflectorConfig) SharedInformerOption {
+func WithReflectionOptions(config cache.ReflectionOptions) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
-		factory.reflectorConfig = config
+		factory.reflectionOptions = config
 		return factory
 	}
 }
@@ -274,7 +270,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	if f.transform != nil {
 		informer.SetTransform(f.transform)
 	}
-	informer.SetReflectorConfig(f.reflectorConfig)
+	informer.SetReflectionOptions(f.reflectionOptions)
 	f.informers[informerType] = informer
 
 	return informer

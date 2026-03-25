@@ -176,13 +176,8 @@ func (r *Reflector) Name() string {
 }
 
 // watchTimeoutSeconds computes a random watch timeout in [minWatchTimeout, maxWatchTimeout].
-// maxWatchTimeout defaults to 2*minWatchTimeout when not set.
 func (r *Reflector) watchTimeoutSeconds() float64 {
-	maxTimeout := r.minWatchTimeout * 2
-	if r.maxWatchTimeout > r.minWatchTimeout {
-		maxTimeout = r.maxWatchTimeout
-	}
-	return r.minWatchTimeout.Seconds() + rand.Float64()*(maxTimeout-r.minWatchTimeout).Seconds()
+	return r.minWatchTimeout.Seconds() + rand.Float64()*(r.maxWatchTimeout-r.minWatchTimeout).Seconds()
 }
 
 func (r *Reflector) TypeDescription() string {

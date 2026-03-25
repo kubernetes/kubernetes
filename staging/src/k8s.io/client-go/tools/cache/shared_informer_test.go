@@ -1386,11 +1386,11 @@ func numOccurrences(hay, needle string) int {
 	}
 }
 
-func TestSetReflectorConfigBeforeStart(t *testing.T) {
+func TestSetReflectionOptionsBeforeStart(t *testing.T) {
 	lw := &fcache.FakeControllerSource{}
 	informer := NewSharedIndexInformer(lw, &v1.Pod{}, 0, Indexers{})
 
-	cfg := ReflectorConfig{
+	cfg := ReflectionOptions{
 		MinWatchTimeout: 10 * time.Minute,
 		MaxWatchTimeout: 20 * time.Minute,
 		Backoff: &wait.Backoff{
@@ -1403,26 +1403,26 @@ func TestSetReflectorConfigBeforeStart(t *testing.T) {
 		BackoffResetDuration: 1 * time.Minute,
 	}
 
-	if err := informer.SetReflectorConfig(cfg); err != nil {
+	if err := informer.SetReflectionOptions(cfg); err != nil {
 		t.Fatalf("expected no error setting reflector config before start, got: %v", err)
 	}
 
 	si := informer.(*sharedIndexInformer)
-	if si.reflectorConfig.MinWatchTimeout != 10*time.Minute {
-		t.Errorf("MinWatchTimeout not set: got %v", si.reflectorConfig.MinWatchTimeout)
+	if si.reflectionOptions.MinWatchTimeout != 10*time.Minute {
+		t.Errorf("MinWatchTimeout not set: got %v", si.reflectionOptions.MinWatchTimeout)
 	}
-	if si.reflectorConfig.MaxWatchTimeout != 20*time.Minute {
-		t.Errorf("MaxWatchTimeout not set: got %v", si.reflectorConfig.MaxWatchTimeout)
+	if si.reflectionOptions.MaxWatchTimeout != 20*time.Minute {
+		t.Errorf("MaxWatchTimeout not set: got %v", si.reflectionOptions.MaxWatchTimeout)
 	}
-	if si.reflectorConfig.Backoff == nil {
+	if si.reflectionOptions.Backoff == nil {
 		t.Error("Backoff not set")
 	}
-	if si.reflectorConfig.BackoffResetDuration != 1*time.Minute {
-		t.Errorf("BackoffResetDuration not set: got %v", si.reflectorConfig.BackoffResetDuration)
+	if si.reflectionOptions.BackoffResetDuration != 1*time.Minute {
+		t.Errorf("BackoffResetDuration not set: got %v", si.reflectionOptions.BackoffResetDuration)
 	}
 }
 
-func TestSetReflectorConfigAfterStartReturnsError(t *testing.T) {
+func TestSetReflectionOptionsAfterStartReturnsError(t *testing.T) {
 	lw := &fcache.FakeControllerSource{}
 	informer := NewSharedIndexInformer(lw, &v1.Pod{}, 0, Indexers{})
 
@@ -1432,7 +1432,7 @@ func TestSetReflectorConfigAfterStartReturnsError(t *testing.T) {
 	si.started = true
 	si.startedLock.Unlock()
 
-	if err := informer.SetReflectorConfig(ReflectorConfig{}); err == nil {
+	if err := informer.SetReflectionOptions(ReflectionOptions{}); err == nil {
 		t.Error("expected error when setting reflector config after start, got nil")
 	}
 }
