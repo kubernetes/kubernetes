@@ -386,6 +386,17 @@ func TestPodGroupProtectionController(t *testing.T) {
 			go ctrl.Run(ctx, 1)
 
 			if test.podToDelete != "" {
+				if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					for _, action := range client.Actions() {
+						if action.GetVerb() == "watch" && action.GetResource().Resource == "pods" {
+							return true, nil
+						}
+					}
+					return false, nil
+				}); err != nil {
+					t.Fatalf("timed out waiting for pod informer watch to start: %v", err)
+				}
+
 				if err := client.CoreV1().Pods(defaultNS).Delete(ctx, test.podToDelete, metav1.DeleteOptions{}); err != nil {
 					t.Fatalf("deleting pod: %v", err)
 				}
