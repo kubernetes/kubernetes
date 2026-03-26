@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
+	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -671,6 +672,152 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						})),
 					})))
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		})
+	})
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		driver.EnableDeviceMetadata = true
+		b := drautils.NewBuilder(f, driver)
+
+		ginkgo.It("must mount device metadata for resource claims", func(ctx context.Context) {
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(f.TContext(ctx), claim, pod)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			expectedPath := metadata.ResourceClaimFilePath(driver.Name, claim.Name, "my-request")
+			drautils.TestContainerMetadataFile(f.TContext(ctx), pod, "with-resource", expectedPath,
+				gomega.And(
+					gomega.HaveField("PodClaimName", gomega.BeNil()),
+					gomega.HaveField("Requests", gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Name": gomega.Equal("my-request"),
+							"Devices": gomega.ConsistOf(
+								gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"Driver": gomega.Equal(driver.Name),
+									"Pool":   gomega.Equal(nodes.NodeNames[0]),
+									"Name":   gomega.Equal("device-00"),
+									"Attributes": gomega.Equal(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"driverName": {StringValue: ptr.To(driver.Name)},
+										"pool":       {StringValue: ptr.To(nodes.NodeNames[0])},
+										"device":     {StringValue: ptr.To("device-00")},
+									}),
+								}),
+							),
+						}),
+					)),
+				))
+		})
+
+		ginkgo.It("must mount device metadata for resource claim templates", func(ctx context.Context) {
+			pod, template := b.PodInline()
+			b.Create(f.TContext(ctx), template, pod)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			expectedPath := metadata.ResourceClaimTemplateFilePath(driver.Name, "my-inline-claim", "my-request")
+			drautils.TestContainerMetadataFile(f.TContext(ctx), pod, "with-resource", expectedPath,
+				gomega.And(
+					gomega.HaveField("PodClaimName", gomega.Equal(ptr.To("my-inline-claim"))),
+					gomega.HaveField("Requests", gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Name": gomega.Equal("my-request"),
+							"Devices": gomega.ConsistOf(
+								gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"Driver": gomega.Equal(driver.Name),
+									"Pool":   gomega.Equal(nodes.NodeNames[0]),
+									"Name":   gomega.Equal("device-00"),
+									"Attributes": gomega.Equal(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"driverName": {StringValue: ptr.To(driver.Name)},
+										"pool":       {StringValue: ptr.To(nodes.NodeNames[0])},
+										"device":     {StringValue: ptr.To("device-00")},
+									}),
+								}),
+							),
+						}),
+					)),
+				))
+		})
+	})
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+
+		driverA := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		driverA.NameSuffix = "-a"
+		driverA.EnableDeviceMetadata = true
+
+		driverB := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		driverB.NameSuffix = "-b"
+		driverB.EnableDeviceMetadata = true
+
+		bA := drautils.NewBuilder(f, driverA)
+
+		ginkgo.It("must not race when multiple drivers write metadata for the same request", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			sharedClass := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: f.Namespace.Name + "-shared-class"},
+				Spec: resourceapi.DeviceClassSpec{
+					Selectors: []resourceapi.DeviceSelector{{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.driver == "%s" || device.driver == "%s"`, driverA.Name, driverB.Name),
+						},
+					}},
+				},
+			}
+
+			claim := &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "multi-driver-claim",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{{
+							Name: "my-request",
+							Exactly: &resourceapi.ExactDeviceRequest{
+								DeviceClassName: sharedClass.Name,
+								AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+								Count:           2,
+							},
+						}},
+					},
+				},
+			}
+
+			pod := bA.PodExternal(claim.Name)
+			bA.Create(tCtx, sharedClass, claim, pod)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			for _, driverName := range []string{driverA.Name, driverB.Name} {
+				expectedPath := metadata.ResourceClaimFilePath(driverName, claim.Name, "my-request")
+				drautils.TestContainerMetadataFile(tCtx, pod, "with-resource", expectedPath,
+					gomega.And(
+						gomega.HaveField("PodClaimName", gomega.BeNil()),
+						gomega.HaveField("Requests", gomega.ConsistOf(
+							gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Name": gomega.Equal("my-request"),
+								"Devices": gomega.ConsistOf(
+									gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+										"Driver": gomega.Equal(driverName),
+										"Attributes": gomega.HaveKeyWithValue(
+											resourceapi.QualifiedName("driverName"),
+											resourceapi.DeviceAttribute{StringValue: ptr.To(driverName)},
+										),
+									}),
+								),
+							}),
+						)),
+					))
+			}
 		})
 	})
 
