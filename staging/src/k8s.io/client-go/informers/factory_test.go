@@ -28,15 +28,14 @@ import (
 func TestWithReflectionOptionsSetsFactory(t *testing.T) {
 	client := fake.NewClientset()
 
-	backoff := &wait.Backoff{
-		Duration: 500 * time.Millisecond,
-		Factor:   2.0,
-		Jitter:   1.0,
-		Steps:    10,
-		Cap:      30 * time.Second,
-	}
 	cfg := cache.ReflectionOptions{
-		Backoff:              backoff,
+		Backoff: wait.Backoff{
+			Duration: 500 * time.Millisecond,
+			Factor:   2.0,
+			Jitter:   1.0,
+			Steps:    10,
+			Cap:      30 * time.Second,
+		},
 		BackoffResetDuration: 2 * time.Minute,
 		MinWatchTimeout:      6 * time.Minute,
 		MaxWatchTimeout:      12 * time.Minute,
@@ -45,7 +44,7 @@ func TestWithReflectionOptionsSetsFactory(t *testing.T) {
 	factory := NewSharedInformerFactoryWithOptions(client, 0, WithReflectionOptions(cfg))
 	f := factory.(*sharedInformerFactory)
 
-	if f.reflectionOptions.Backoff == nil {
+	if f.reflectionOptions.Backoff == (wait.Backoff{}) {
 		t.Error("expected Backoff to be set on factory")
 	}
 	if f.reflectionOptions.MinWatchTimeout != 6*time.Minute {

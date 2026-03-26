@@ -258,11 +258,11 @@ type SharedInformer interface {
 // All fields are optional; zero values select appropriate defaults.
 type ReflectionOptions struct {
 	// Backoff configures the backoff strategy for retrying list/watch errors.
-	// If zero (Duration == 0), the default exponential backoff is used (initial: 800ms, cap: 30s, factor: 2.0, jitter: 1.0).
+	// If zero, the default exponential backoff is used (initial: 800ms, cap: 30s, factor: 2.0, jitter: 1.0).
 	Backoff wait.Backoff
 
 	// BackoffResetDuration is how long without backoff activity before the backoff delay is
-	// reset to its initial value. Only used when Backoff.Duration is non-zero.
+	// reset to its initial value. Only used when Backoff is non-zero.
 	// If zero, defaults to 2 minutes.
 	BackoffResetDuration time.Duration
 
@@ -774,6 +774,12 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.fifoMetricsProvider)
 
+		var backoff *wait.Backoff
+		if s.reflectionOptions.Backoff != (wait.Backoff{}) {
+			b := s.reflectionOptions.Backoff
+			backoff = &b
+		}
+
 		cfg := &Config{
 			Queue:             fifo,
 			ListerWatcher:     s.listerWatcher,
@@ -784,7 +790,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 			MinWatchTimeout:      s.reflectionOptions.MinWatchTimeout,
 			MaxWatchTimeout:      s.reflectionOptions.MaxWatchTimeout,
-			Backoff:              s.reflectionOptions.Backoff,
+			Backoff:              backoff,
 			BackoffResetDuration: s.reflectionOptions.BackoffResetDuration,
 
 			Process: func(obj interface{}, isInInitialList bool) error {

@@ -1393,7 +1393,7 @@ func TestSetReflectionOptionsBeforeStart(t *testing.T) {
 	cfg := ReflectionOptions{
 		MinWatchTimeout: 10 * time.Minute,
 		MaxWatchTimeout: 20 * time.Minute,
-		Backoff: &wait.Backoff{
+		Backoff: wait.Backoff{
 			Duration: 500 * time.Millisecond,
 			Factor:   2.0,
 			Jitter:   1.0,
@@ -1414,7 +1414,7 @@ func TestSetReflectionOptionsBeforeStart(t *testing.T) {
 	if si.reflectionOptions.MaxWatchTimeout != 20*time.Minute {
 		t.Errorf("MaxWatchTimeout not set: got %v", si.reflectionOptions.MaxWatchTimeout)
 	}
-	if si.reflectionOptions.Backoff == nil {
+	if si.reflectionOptions.Backoff == (wait.Backoff{}) {
 		t.Error("Backoff not set")
 	}
 	if si.reflectionOptions.BackoffResetDuration != 1*time.Minute {
