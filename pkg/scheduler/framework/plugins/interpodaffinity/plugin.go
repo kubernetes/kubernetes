@@ -50,6 +50,7 @@ type InterPodAffinity struct {
 	sharedLister                                       fwk.SharedLister
 	nsLister                                           listersv1.NamespaceLister
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableInterPodAffinityHostnameFastPath             bool
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -113,6 +114,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		sharedLister: h.SnapshotSharedLister(),
 		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		enableInterPodAffinityHostnameFastPath:             fts.EnableInterPodAffinityHostnameFastPath,
 	}
 
 	return pl, nil
@@ -133,7 +135,7 @@ func getArgs(obj runtime.Object) (config.InterPodAffinityArgs, error) {
 // is set to Nothing()) or is Empty(), which means match everything. Therefore,
 // there when matching against this term, there is no need to lookup the existing
 // pod's namespace labels to match them against term's namespaceSelector explicitly.
-func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at fwk.AffinityTerm) error {
+func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at *fwk.AffinityTerm) error {
 	if at.NamespaceSelector.Empty() {
 		return nil
 	}

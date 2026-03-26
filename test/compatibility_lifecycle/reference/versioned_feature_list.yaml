@@ -967,6 +967,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+- name: InterPodAffinityHostnameFastPath
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: JobManagedBy
   versionedSpecs:
   - default: false

@@ -60,6 +60,10 @@ func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]fwk.N
 	return nil, nil
 }
 
+func (c *nodeInfoListerContract) HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]fwk.NodeInfo, error) {
+	return nil, nil
+}
+
 func (c *nodeInfoListerContract) Get(_ string) (fwk.NodeInfo, error) {
 	return nil, nil
 }
