@@ -29,6 +29,9 @@ import (
 func Init(fs *flag.FlagSet) {
 	var allFlags flag.FlagSet
 	klog.InitFlags(&allFlags)
+	// Opt into fixed stderrthreshold behavior (kubernetes/klog#212).
+	_ = allFlags.Set("legacy_stderr_threshold_behavior", "false")
+	_ = allFlags.Set("stderrthreshold", "INFO")
 	if fs == nil {
 		fs = flag.CommandLine
 	}
