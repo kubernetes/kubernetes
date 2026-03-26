@@ -34,9 +34,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -3738,5 +3741,170 @@ func TestCache_GetRootKeyForGroup(t *testing.T) {
 				t.Errorf("GetRootKeyForGroup() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCache_HavePodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
+	testCases := []struct {
+		name                            string
+		nodes                           []*v1.Node
+		pods                            []*v1.Pod
+		expectedNodesIfFastPathEnabled  sets.Set[string]
+		expectedNodesIfFastPathDisabled sets.Set[string]
+	}{
+		{
+			name: "1 node, pod with non-host-scoped AA",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod-1").UID("pod-1").Node("node-1").
+					PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
+			},
+			expectedNodesIfFastPathEnabled:  sets.New("node-1"),
+			expectedNodesIfFastPathDisabled: sets.New[string](),
+		},
+		{
+			name: "2 nodes, each with 1 pod with non-host-scoped AA",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Obj(),
+				st.MakeNode().Name("node-2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod-1").UID("pod-1").Node("node-1").
+					PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
+				st.MakePod().Name("pod-2").UID("pod-2").Node("node-2").
+					PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
+			},
+			expectedNodesIfFastPathEnabled:  sets.New("node-1", "node-2"),
+			expectedNodesIfFastPathDisabled: sets.New[string](),
+		},
+		{
+			name: "1 node, pod with host-scoped AA",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod-1").UID("pod-1").Node("node-1").
+					PodAntiAffinityExists("label", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
+			},
+			expectedNodesIfFastPathEnabled:  sets.New[string](),
+			expectedNodesIfFastPathDisabled: sets.New[string](),
+		},
+		{
+			name: "2 nodes, 1 with pod with non-host-scoped AA and the other one with pod with no AA at all",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Obj(),
+				st.MakeNode().Name("node-2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod-1").UID("pod-1").Node("node-1").
+					PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
+				st.MakePod().Name("pod-2").UID("pod-2").Node("node-2").Obj(),
+			},
+			expectedNodesIfFastPathEnabled:  sets.New("node-1"),
+			expectedNodesIfFastPathDisabled: sets.New[string](),
+		},
+	}
+
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("%s (InterPodAffinityHostnameFastPath=%v)", tc.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+				logger, _ := ktesting.NewTestContext(t)
+				cache := newCache(context.Background(), time.Second, nil, false, false)
+				for _, node := range tc.nodes {
+					cache.AddNode(logger, node)
+				}
+
+				snapshot := NewEmptySnapshot()
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot failed: %v", err)
+				}
+				antiAffinityList, err := snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+				if err != nil {
+					t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+				}
+				if len(antiAffinityList) != 0 {
+					t.Errorf("expected 0 nodes before adding pods, got %d", len(antiAffinityList))
+				}
+
+				// Add pods
+				for _, pod := range tc.pods {
+					if err := cache.AddPod(logger, pod); err != nil {
+						t.Fatalf("AddPod failed: %v", err)
+					}
+				}
+
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot failed: %v", err)
+				}
+				antiAffinityList, err = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+				if err != nil {
+					t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+				}
+
+				expectedNodeNames := tc.expectedNodesIfFastPathDisabled
+				if interPodAffinityHostnameFastPathEnabled {
+					expectedNodeNames = tc.expectedNodesIfFastPathEnabled
+				}
+
+				gotNodeNames := sets.New[string]()
+				for _, nodeInfo := range antiAffinityList {
+					gotNodeNames.Insert(nodeInfo.Node().Name)
+				}
+				if !expectedNodeNames.Equal(gotNodeNames) {
+					t.Errorf("Unexpected node list after adding pods (-want +got):\n%s", cmp.Diff(expectedNodeNames, gotNodeNames))
+				}
+
+				// Update all pods, leaving the anti-affinity constraints untouched.
+				var updatedPods []*v1.Pod
+				for _, pod := range tc.pods {
+					updatedPod := pod.DeepCopy()
+					if updatedPod.Labels == nil {
+						updatedPod.Labels = make(map[string]string)
+					}
+					updatedPod.Labels["foo"] = "bar"
+					if err := cache.UpdatePod(logger, pod, updatedPod); err != nil {
+						t.Fatalf("UpdatePod failed: %v", err)
+					}
+					updatedPods = append(updatedPods, updatedPod)
+				}
+
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot failed: %v", err)
+				}
+				antiAffinityList, err = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+				if err != nil {
+					t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+				}
+
+				gotNodeNames = sets.New[string]()
+				for _, nodeInfo := range antiAffinityList {
+					gotNodeNames.Insert(nodeInfo.Node().Name)
+				}
+				if !expectedNodeNames.Equal(gotNodeNames) {
+					t.Errorf("Unexpected node list after updating pods (-want +got):\n%s", cmp.Diff(expectedNodeNames, gotNodeNames))
+				}
+
+				// Remove all pods
+				for _, pod := range updatedPods {
+					if err := cache.RemovePod(logger, pod); err != nil {
+						t.Fatalf("RemovePod failed: %v", err)
+					}
+				}
+
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot failed: %v", err)
+				}
+				antiAffinityList, err = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+				if err != nil {
+					t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+				}
+				if len(antiAffinityList) != 0 {
+					t.Errorf("expected 0 nodes after removal, got %d", len(antiAffinityList))
+				}
+			})
+		}
 	}
 }

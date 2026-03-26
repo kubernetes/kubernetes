@@ -558,6 +558,11 @@ const (
 	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
 	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = "InPlacePodVerticalScalingSchedulerPreemption"
 
+	// owner: @tetianakh
+	//
+	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
+	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
+
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
@@ -1692,6 +1697,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	InterPodAffinityHostnameFastPath: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2650,6 +2659,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
+
+	InterPodAffinityHostnameFastPath: {},
 
 	JobManagedBy: {},
 
