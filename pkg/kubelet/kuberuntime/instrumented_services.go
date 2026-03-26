@@ -53,11 +53,14 @@ func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 }
 
-// recordError records error for metric if an error occurred.
+// recordError records error for metric. It always observes the label so the
+// metric is present from the first operation, even when no errors have occurred.
 func recordError(operation string, err error) {
+	var n float64
 	if err != nil {
-		metrics.RuntimeOperationsErrors.WithLabelValues(operation).Inc()
+		n = 1
 	}
+	metrics.RuntimeOperationsErrors.WithLabelValues(operation).Add(n)
 }
 
 func (in instrumentedRuntimeService) Version(ctx context.Context, apiVersion string) (*runtimeapi.VersionResponse, error) {
