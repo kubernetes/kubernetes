@@ -46,8 +46,12 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/utils/dump"
+
 	// TODO we need to remove this linkage and create our own scheme
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
+
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -1953,5 +1957,125 @@ func TestStdinMultiUseError(t *testing.T) {
 	}
 	if got, want := newUnstructuredDefaultBuilder().StdinInUse().Stdin().Do().Err(), StdinMultiUseError; !errors.Is(got, want) {
 		t.Errorf("got: %q, want: %q", got, want)
+	}
+}
+
+func TestBuilderPreferServerVersionAndDecodingVersions(t *testing.T) {
+	v1beta1GV := schema.GroupVersion{Group: "apps", Version: "v1beta1"}
+	v1beta2GV := schema.GroupVersion{Group: "apps", Version: "v1beta2"}
+	v1GV := schema.GroupVersion{Group: "apps", Version: "v1"}
+
+	// RESTMapper where v1 is preferred over v1beta1 and v1beta2
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{v1GV, v1beta1GV, v1beta2GV})
+	mapper.Add(v1beta1GV.WithKind("Deployment"), meta.RESTScopeNamespace)
+	mapper.Add(v1beta2GV.WithKind("Deployment"), meta.RESTScopeNamespace)
+	mapper.Add(v1GV.WithKind("Deployment"), meta.RESTScopeNamespace)
+
+	priorityMapper := meta.PriorityRESTMapper{
+		Delegate:         mapper,
+		ResourcePriority: []schema.GroupVersionResource{v1GV.WithResource(meta.AnyResource), v1beta1GV.WithResource(meta.AnyResource), v1beta2GV.WithResource(meta.AnyResource)},
+		KindPriority:     []schema.GroupVersionKind{v1GV.WithKind(meta.AnyKind), v1beta1GV.WithKind(meta.AnyKind), v1beta2GV.WithKind(meta.AnyKind)},
+	}
+
+	tests := []struct {
+		name             string
+		decodingVersions []schema.GroupVersion
+		requestArg       string
+		requestURL       string
+		requestObjGV     schema.GroupVersion
+		requestObj       runtime.Object
+		expectedMapping  schema.GroupVersionKind
+		expectedError    bool
+	}{
+		{
+			name:             "preferred version is decodable, returns preferred version immediately",
+			decodingVersions: []schema.GroupVersion{v1GV, v1beta1GV},
+			requestArg:       "deployments.v1beta2.apps",
+			requestURL:       "/namespaces/test/deployments",
+			requestObjGV:     v1beta2GV,
+			requestObj: &appsv1beta2.DeploymentList{
+				Items: []appsv1beta2.Deployment{{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}},
+			},
+			expectedMapping: v1GV.WithKind("Deployment"),
+		},
+		{
+			name:             "match in decodingVersions",
+			decodingVersions: []schema.GroupVersion{v1beta1GV},
+			requestArg:       "deployments.v1beta2.apps",
+			requestURL:       "/namespaces/test/deployments",
+			requestObjGV:     v1beta2GV,
+			requestObj: &appsv1beta2.DeploymentList{
+				Items: []appsv1beta2.Deployment{{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}},
+			},
+			expectedMapping: v1beta1GV.WithKind("Deployment"),
+		},
+		{
+			name: "multiple match in decodingVersions, returns highest priority match",
+			decodingVersions: []schema.GroupVersion{
+				v1beta2GV,
+				v1beta1GV,
+			},
+			requestArg:   "deployments.v1.apps",
+			requestURL:   "/namespaces/test/deployments",
+			requestObjGV: v1GV,
+			requestObj: &appsv1.DeploymentList{
+				Items: []appsv1.Deployment{{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}},
+			},
+			expectedMapping: v1beta2GV.WithKind("Deployment"), // Since v1 is not in decodingVersions, it falls back to the client's highest priority decodable version (v1beta2)
+		},
+		{
+			name:             "no match in decodingVersions returns first mapping",
+			decodingVersions: []schema.GroupVersion{{Group: "apps", Version: "v2"}},
+			requestArg:       "deployments.v1beta2.apps",
+			requestURL:       "/namespaces/test/deployments",
+			requestObjGV:     v1beta2GV,
+			requestObj: &appsv1beta2.DeploymentList{
+				Items: []appsv1beta2.Deployment{{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}},
+			},
+			expectedMapping: v1GV.WithKind("Deployment"), // Since v2 not found, returns highest priority which is v1
+		},
+		{
+			name:         "error from RESTMappings",
+			requestArg:   "deployments.v1beta2.apps",
+			requestURL:   "/namespaces/test/deployments",
+			requestObjGV: v1GV,
+			requestObj: &appsv1.DaemonSetList{
+				Items: []appsv1.DaemonSet{{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			codec := scheme.Codecs.LegacyCodec(tt.requestObjGV)
+			jsonBytes := runtime.EncodeOrDie(codec, tt.requestObj)
+
+			infos, err := NewFakeBuilder(
+				fakeClientWith("", t, map[string]string{
+					tt.requestURL: string(jsonBytes),
+				}),
+				func() (meta.RESTMapper, error) { return priorityMapper, nil },
+				func() (restmapper.CategoryExpander, error) { return FakeCategoryExpander, nil },
+			).WithScheme(scheme.Scheme, tt.decodingVersions...).
+				NamespaceParam("test").DefaultNamespace().
+				PreferServerVersion().
+				Flatten().
+				ResourceTypeOrNameArgs(true, tt.requestArg).
+				Do().
+				Infos()
+
+			if (err != nil) != tt.expectedError {
+				t.Fatalf("expected error: %v, got: %v", tt.expectedError, err)
+			}
+			if !tt.expectedError {
+				if len(infos) != 1 {
+					t.Fatalf("expected 1 info, got %d", len(infos))
+				}
+				if infos[0].Mapping.GroupVersionKind != tt.expectedMapping {
+					t.Errorf("expected mapping: %v, got: %v", tt.expectedMapping, infos[0].Mapping.GroupVersionKind)
+				}
+			}
+		})
 	}
 }

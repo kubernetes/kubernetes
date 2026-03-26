@@ -34,6 +34,13 @@ type mapper struct {
 	restMapperFn RESTMapperFunc
 	clientFn     func(version schema.GroupVersion) (RESTClient, error)
 	decoder      runtime.Decoder
+
+	// preferServerVersion indicates that we should use the preferred version
+	// for a resource instead of the one specified in the object.
+	preferServerVersion bool
+
+	// decodingVersions are the versions we are permitted to decode into.
+	decodingVersions []schema.GroupVersion
 }
 
 // InfoForData creates an Info object for the given data. An error is returned
@@ -63,7 +70,8 @@ func (m *mapper) infoForData(data []byte, source string) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+
+		mapping, err := m.mappingForGVK(restMapper, *gvk)
 		if err != nil {
 			if _, ok := err.(*meta.NoKindMatchError); ok {
 				return nil, fmt.Errorf("resource mapping not found for name: %q namespace: %q from %q: %w\nensure CRDs are installed first",
@@ -73,7 +81,7 @@ func (m *mapper) infoForData(data []byte, source string) (*Info, error) {
 		}
 		ret.Mapping = mapping
 
-		client, err := m.clientFn(gvk.GroupVersion())
+		client, err := m.clientFn(mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
@@ -113,13 +121,14 @@ func (m *mapper) infoForObject(obj runtime.Object, typer runtime.ObjectTyper, pr
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+
+		mapping, err := m.mappingForGVK(restMapper, gvk)
 		if err != nil {
 			return nil, fmt.Errorf("unable to recognize %v", err)
 		}
 		ret.Mapping = mapping
 
-		client, err := m.clientFn(gvk.GroupVersion())
+		client, err := m.clientFn(mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
@@ -127,6 +136,43 @@ func (m *mapper) infoForObject(obj runtime.Object, typer runtime.ObjectTyper, pr
 	}
 
 	return ret, nil
+}
+
+func (m *mapper) mappingForGVK(restMapper meta.RESTMapper, gvk schema.GroupVersionKind) (*meta.RESTMapping, error) {
+	if !m.preferServerVersion {
+		return restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	}
+
+	// 1. Fetch the server's preferred version (strictly prioritized)
+	preferredMapping, err := restMapper.RESTMapping(gvk.GroupKind())
+	if err != nil {
+		return nil, err
+	}
+
+	// If the client can decode the server's preferred version, use it immediately.
+	for _, allowed := range m.decodingVersions {
+		if preferredMapping.GroupVersionKind.GroupVersion() == allowed {
+			return preferredMapping, nil
+		}
+	}
+
+	// 2. Fetch all supported versions (unordered) to find a decodable fallback
+	mappings, err := restMapper.RESTMappings(gvk.GroupKind())
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the client's highest-priority decodable version from the available mappings.
+	for _, allowed := range m.decodingVersions {
+		for _, mapping := range mappings {
+			if mapping.GroupVersionKind.GroupVersion() == allowed {
+				return mapping, nil
+			}
+		}
+	}
+
+	// 3. Fallback: Return the preferred mapping even if we cannot decode it.
+	return preferredMapping, nil
 }
 
 // preferredObjectKind picks the possibility that most closely matches the priority list in this order:

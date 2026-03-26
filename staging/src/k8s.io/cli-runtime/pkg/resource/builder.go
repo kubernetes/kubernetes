@@ -102,6 +102,8 @@ type Builder struct {
 	flatten bool
 	latest  bool
 
+	preferServerVersion bool
+
 	requireObject bool
 
 	singleResourceType bool
@@ -312,10 +314,11 @@ func (b *Builder) Unstructured() *Builder {
 	}
 	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
 	b.mapper = &mapper{
-		localFn:      b.isLocal,
-		restMapperFn: b.restMapperFn,
-		clientFn:     b.getClient,
-		decoder:      &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
+		localFn:             b.isLocal,
+		restMapperFn:        b.restMapperFn,
+		clientFn:            b.getClient,
+		decoder:             &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
+		preferServerVersion: b.preferServerVersion,
 	}
 
 	return b
@@ -339,10 +342,12 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 	b.negotiatedSerializer = negotiatedSerializer
 
 	b.mapper = &mapper{
-		localFn:      b.isLocal,
-		restMapperFn: b.restMapperFn,
-		clientFn:     b.getClient,
-		decoder:      codecFactory.UniversalDecoder(decodingVersions...),
+		localFn:             b.isLocal,
+		restMapperFn:        b.restMapperFn,
+		clientFn:            b.getClient,
+		decoder:             codecFactory.UniversalDecoder(decodingVersions...),
+		preferServerVersion: b.preferServerVersion,
+		decodingVersions:    decodingVersions,
 	}
 
 	return b
@@ -742,6 +747,16 @@ func (b *Builder) Flatten() *Builder {
 // Latest will fetch the latest copy of any objects loaded from URLs or files from the server.
 func (b *Builder) Latest() *Builder {
 	b.latest = true
+	return b
+}
+
+// PreferServerVersion will attempt to load the preferred version of any objects
+// loaded from URLs or files from the server.
+func (b *Builder) PreferServerVersion() *Builder {
+	b.preferServerVersion = true
+	if b.mapper != nil {
+		b.mapper.preferServerVersion = true
+	}
 	return b
 }
 
