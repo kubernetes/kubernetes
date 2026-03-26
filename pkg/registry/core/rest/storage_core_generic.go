@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -63,6 +64,24 @@ type GenericConfig struct {
 
 	LoopbackClientConfig *restclient.Config
 	Informers            informers.SharedInformerFactory
+
+	// SkipServiceAccount skips serviceaccount storage creation in NewRESTStorage.
+	// Used by legacyProvider which creates serviceaccount storage with real pod/node getters.
+	SkipServiceAccount bool
+
+	eventOnce    sync.Once
+	eventStorage *eventstore.REST
+	eventErr     error
+}
+
+// GetEventStorage returns event storage, creating it on first call. Subsequent calls
+// return the same instance. This allows sharing a single event storage between core/v1
+// and events.k8s.io/v1 API groups, avoiding duplicate etcd stores and watch caches.
+func (c *GenericConfig) GetEventStorage(restOptionsGetter generic.RESTOptionsGetter) (*eventstore.REST, error) {
+	c.eventOnce.Do(func() {
+		c.eventStorage, c.eventErr = eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	})
+	return c.eventStorage, c.eventErr
 }
 
 func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -87,7 +106,7 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, opts...)
 	}
 
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	eventStorage, err := c.GetEventStorage(restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -107,16 +126,6 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	}
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), c.ExtendExpiration, c.MaxExtendedExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false, c.MaxExtendedExpiration)
-	}
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -141,10 +150,22 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		storage[resource] = secretStorage
 	}
 
-	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = serviceAccountStorage
-		if serviceAccountStorage.Token != nil {
-			storage[resource+"/token"] = serviceAccountStorage.Token
+	if !c.SkipServiceAccount {
+		var serviceAccountStorage *serviceaccountstore.REST
+		if c.ServiceAccountIssuer != nil {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), c.ExtendExpiration, c.MaxExtendedExpiration)
+		} else {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false, c.MaxExtendedExpiration)
+		}
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
+		if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+			storage[resource] = serviceAccountStorage
+			if serviceAccountStorage.Token != nil {
+				storage[resource+"/token"] = serviceAccountStorage.Token
+			}
 		}
 	}
 

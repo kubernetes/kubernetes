@@ -152,6 +152,9 @@ func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
 }
 
 func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+	// Skip serviceaccount creation in GenericConfig; we create it below with
+	// the correct pod/node/secret getters, avoiding duplicate storage initialization.
+	p.GenericConfig.SkipServiceAccount = true
 	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
@@ -219,7 +222,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		storage = map[string]rest.Storage{}
 	}
 
-	// potentially override the generic serviceaccount storage with one that supports pods
+	// Create serviceaccount storage once with the correct getters.
+	// When ServiceAccountIssuer is configured, use real pod/node/secret getters
+	// for token creation support. Otherwise use notFoundGetter placeholders.
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
 		var nodeGetter rest.Getter
@@ -228,9 +233,11 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			nodeGetter = nodeStorage.Node.Store
 		}
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
-		if err != nil {
-			return genericapiserver.APIGroupInfo{}, err
-		}
+	} else {
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false, p.MaxExtendedExpiration)
+	}
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	if resource := "pods"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
@@ -271,14 +278,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		}
 	}
 
-	// potentially override generic storage for service account (with pod support)
-	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		// don't leak go routines
-		storage[resource].Destroy()
-		if storage[resource+"/token"] != nil {
-			storage[resource+"/token"].Destroy()
-		}
-
+	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
 			storage[resource+"/token"] = serviceAccountStorage.Token

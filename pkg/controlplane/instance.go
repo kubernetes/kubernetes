@@ -431,7 +431,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
-		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
+		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL, GetEventStorage: legacyRESTStorageProvider.GetEventStorage},
 		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
 	}
 
