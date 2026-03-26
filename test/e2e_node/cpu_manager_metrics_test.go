@@ -113,7 +113,6 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				deletePodSyncByName(ctx, f, testPod.Name)
 				waitForContainerRemoval(ctx, testPod.Spec.Containers[0].Name, testPod.Name, testPod.Namespace)
 			}
-			updateKubeletConfig(ctx, f, oldCfg, true)
 		})
 
 		ginkgo.It("should report zero pinning counters after a fresh restart", func(ctx context.Context) {
@@ -405,7 +404,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				},
 			)
 
-			updateKubeletConfig(ctx, f, newCfg, true)
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles: true,
+			})
 
 			ginkgo.By("Checking the cpumanager allocation per NUMA metric right after the kubelet restart, with no pods running")
 			numaNodes, _, _, _ := hostCheck()
@@ -445,7 +446,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				},
 			)
 
-			updateKubeletConfig(ctx, f, newCfg, true)
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles: true,
+			})
 
 			numaNodes, _, _, cpusNumPerNUMA := hostCheck()
 

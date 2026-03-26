@@ -32,7 +32,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -205,9 +204,9 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		newCfg.CgroupsPerQOS = true
 		newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-		restartKubelet(ctx, true)
-		waitForKubeletToStart(ctx, f)
+		updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+			deleteStateFiles: true,
+		})
 	}
 
 	// configureMemoryQoSWithPolicy restarts kubelet with MemoryQoS and a specific memoryReservationPolicy.
@@ -222,22 +221,12 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		newCfg.CgroupsPerQOS = true
 		newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-		restartKubelet(ctx, true)
-		waitForKubeletToStart(ctx, f)
-	}
-
-	restoreConfig := func(ctx context.Context) {
-		if oldCfg != nil {
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-			restartKubelet(ctx, true)
-			waitForKubeletToStart(ctx, f)
-		}
+		updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+			deleteStateFiles: true,
+		})
 	}
 
 	f.Describe("memory protection [memoryReservationPolicy=TieredReservation]", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should set memory.low = requests.memory for Burstable pod containers", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
@@ -413,8 +402,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("memory.high throttling", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should set memory.high for Burstable pod using formula", func(ctx context.Context) {
 			throttlingFactor := 0.9
 			configureMemoryQoS(ctx, throttlingFactor)
@@ -548,8 +535,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("memory.events observability", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should have memory.events file with expected counters", func(ctx context.Context) {
 			configureMemoryQoS(ctx, 0.9)
 
@@ -584,8 +569,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("feature rollback", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should reset memory protection to 0 when MemoryQoS is disabled", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
@@ -609,9 +592,9 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-			restartKubelet(ctx, true)
-			waitForKubeletToStart(ctx, f)
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles: true,
+			})
 
 			// QoS-class cgroup memory.low is cleared by the periodic setMemoryQoS loop
 			// (periodicQOSCgroupUpdateInterval = 1 minute) plus kubelet startup time.
@@ -634,8 +617,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("memory.high formula verification across request/limit ratios", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should correctly compute memory.high for various request/limit combinations", func(ctx context.Context) {
 			throttlingFactor := 0.9
 			configureMemoryQoS(ctx, throttlingFactor)
@@ -696,8 +677,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("memoryReservationPolicy", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should NOT set memory protection when policy is None", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.NoneMemoryReservationPolicy)
 
@@ -806,8 +785,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("memory.high throttling behavior", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should increment memory.events high counter when usage exceeds memory.high", func(ctx context.Context) {
 			configureMemoryQoS(ctx, 0.9)
 
@@ -915,8 +892,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	})
 
 	f.Describe("tiered protection edge cases", func() {
-		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
-
 		ginkgo.It("should use memory.low for Burstable pod where memory req == limit but CPU differs", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
@@ -1054,9 +1029,9 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-			restartKubelet(ctx, true)
-			waitForKubeletToStart(ctx, f)
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles: true,
+			})
 
 			gomega.Eventually(ctx, func() int64 {
 				val, _ := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryLow)

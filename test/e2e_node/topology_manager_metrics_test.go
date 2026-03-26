@@ -65,7 +65,6 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 			if testPod != nil {
 				deletePodSyncByName(ctx, f, testPod.Name)
 			}
-			updateKubeletConfig(ctx, f, oldCfg, true)
 		})
 
 		ginkgo.It("should report zero admission counters after a fresh restart", func(ctx context.Context) {

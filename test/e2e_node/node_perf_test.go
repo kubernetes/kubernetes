@@ -28,10 +28,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
 	"github.com/onsi/ginkgo/v2"
@@ -46,26 +44,6 @@ func makeNodePerfPod(w workloads.NodePerfWorkload) *v1.Pod {
 		},
 		Spec: w.PodSpec(),
 	}
-}
-
-func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
-	if cfg != nil {
-		// Update the Kubelet configuration.
-		ginkgo.By("Stopping the kubelet")
-		restartKubelet := mustStopKubelet(ctx, f)
-
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
-
-		ginkgo.By("Restarting the kubelet")
-		restartKubelet(ctx)
-	}
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
-		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 }
 
 // Serial because the test updates kubelet configuration.
@@ -86,7 +64,9 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		framework.ExpectNoError(err)
 		newCfg, err = wl.KubeletConfig(oldCfg)
 		framework.ExpectNoError(err)
-		setKubeletConfig(ctx, f, newCfg)
+		updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+			deleteStateFiles: true,
+		})
 	})
 
 	cleanup := func(ctx context.Context) {
@@ -107,7 +87,6 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		ginkgo.By("running the post test exec from the workload")
 		err := wl.PostTestExec()
 		framework.ExpectNoError(err)
-		setKubeletConfig(ctx, f, oldCfg)
 	}
 
 	runWorkload := func(ctx context.Context) {

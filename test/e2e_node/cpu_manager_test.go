@@ -166,10 +166,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		framework.Logf("runtime: %s", e2enodeRuntimeName)
 	})
 
-	ginkgo.AfterAll(func(ctx context.Context) {
-		updateKubeletConfig(ctx, f, oldCfg, true)
-	})
-
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
 		podMap = make(map[string]*v1.Pod)
@@ -2004,10 +2000,6 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		e2enodeRuntimeName = version.GetRuntimeName()
 		framework.Logf("runtime: %s", e2enodeRuntimeName)
-	})
-
-	ginkgo.AfterAll(func(ctx context.Context) {
-		updateKubeletConfig(ctx, f, oldCfg, true)
 	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {

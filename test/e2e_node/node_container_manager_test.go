@@ -98,19 +98,6 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			oldCfg, err = getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)
 
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if oldCfg != nil {
-					// Update the Kubelet configuration.
-					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-
-					ginkgo.By("Restarting the kubelet")
-					restartKubelet(ctx, true)
-
-					waitForKubeletToStart(ctx, f)
-					ginkgo.By("Started the kubelet")
-				}
-			})
-
 			newCfg := oldCfg.DeepCopy()
 			// Change existing kubelet configuration
 			newCfg.CPUManagerPolicy = "none"
@@ -118,17 +105,10 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			newCfg.FailCgroupV1 = true // extra safety. We want to avoid false negatives though, so we added the skip check earlier
 
 			// Update the Kubelet configuration.
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-			ginkgo.By("Restarting the kubelet")
-			restartKubelet(ctx, true)
-
-			waitForKubeletToStart(ctx, f)
-			ginkgo.By("Started the kubelet")
-
-			gomega.Consistently(ctx, func(ctx context.Context) bool {
-				return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
-			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles:          true,
+				ensureConsistentReadyNode: true,
+			})
 		})
 	})
 })
@@ -238,24 +218,10 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		if oldCfg != nil {
-			// Update the Kubelet configuration.
-			ginkgo.By("Stopping the kubelet")
-			restartKubelet := mustStopKubelet(ctx, f)
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
-
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-
-			ginkgo.By("Restarting the kubelet")
-			restartKubelet(ctx)
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+			updateKubeletConfigWithOptions(ctx, f, oldCfg, updateKubeletOptions{
+				deleteStateFiles: true,
+				skipCleanup:      true, // This is the cleanup.
+			})
 		}
 	})
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {

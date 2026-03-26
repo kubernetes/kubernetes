@@ -29,7 +29,6 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -77,9 +76,6 @@ var _ = SIGDescribe("KubletTLS", framework.WithSerial(), framework.WithNodeConfo
 			tempDir = t.TempDir()
 			cfg, err := getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {
-				updateKubeletConfig(ctx, f, cfg, true)
-			}, cfg.DeepCopy())
 
 			certPath, keyPath, err := createCertAndKeyFiles(tempDir)
 			framework.ExpectNoError(err)

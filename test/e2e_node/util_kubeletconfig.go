@@ -71,25 +71,49 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 }
 
 type updateKubeletOptions struct {
-	deleteStateFiles          bool
+	deleteStateFiles bool
+	// In addition to the standard ready node check, ensure that the node stays consistently ready.
 	ensureConsistentReadyNode bool
+	// Whether to skip the cleanup step. This should only be used in special circumstances.
+	skipCleanup bool
 	// TODO: add option to use systemctl stop, now we only use systemctl kill for historical reasons
 }
 
 func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
 	ginkgo.GinkgoHelper()
 
-	withStoppedKubelet(ctx, f, opts.ensureConsistentReadyNode, func() {
-		// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-		if opts.deleteStateFiles {
-			deleteStateFile(cpuManagerStateFile)
-			deleteStateFile(memoryManagerStateFile)
-			deleteStateFile(usernsStateFiles)
-		}
+	updateConfig := func(ctx context.Context, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
+		withStoppedKubelet(ctx, f, opts.ensureConsistentReadyNode, func() {
+			if opts.deleteStateFiles {
+				deleteStateFiles()
+			}
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+		})
+	}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
-	})
+	if !opts.skipCleanup {
+		oldCfg, err := getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			// We just need the initial readiness check to succeed.
+			opts.ensureConsistentReadyNode = false
+			// A failure to successfully restore the kubelet is a fatal error.
+			err := gomega.InterceptGomegaFailure(func() {
+				updateConfig(ctx, oldCfg, opts)
+			})
+			if err != nil {
+				ginkgo.AbortSuite(fmt.Sprintf("Fatal Error: Failed to restore kubelet: %v", err.Error()))
+			}
+		})
+	}
 
+	updateConfig(ctx, kubeletConfig, opts)
+}
+
+func deleteStateFiles() {
+	deleteStateFile(cpuManagerStateFile)
+	deleteStateFile(memoryManagerStateFile)
+	deleteStateFile(usernsStateFiles)
 }
 
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {

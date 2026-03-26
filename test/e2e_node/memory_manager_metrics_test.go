@@ -76,7 +76,6 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				if testPod != nil {
 					deletePodSyncByName(ctx, f, testPod.Name)
 				}
-				updateKubeletConfig(ctx, f, oldCfg, true)
 			})
 
 			count := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
