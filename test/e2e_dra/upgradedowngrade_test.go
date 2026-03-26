@@ -315,7 +315,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 	// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 	// TODO
-	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), "1-"+gitVersion, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
+	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), "1-"+gitVersion, localupcluster.ModifyOptions{BinDir: dir})
 
 	// kubelet wipes all resource slices because it doesn't know which drivers were running.
 	// We need to wait for them to be recreated.

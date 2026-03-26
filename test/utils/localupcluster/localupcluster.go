@@ -342,10 +342,6 @@ type ModifyOptions struct {
 
 	// FileByComponent overrides BinDir for those components which are specified here.
 	FileByComponent map[KubeComponentName]string
-
-	// Upgrade determines whether the apiserver gets updated first (upgrade)
-	// or last (downgrade).
-	Upgrade bool
 }
 
 func (m ModifyOptions) GetComponentFile(component KubeComponentName) string {
@@ -373,24 +369,19 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 		FileByComponent: make(map[KubeComponentName]string),
 	}
 
-	restore.Upgrade = !options.Upgrade
-	components := slices.Clone(KubeClusterComponents)
-	if !options.Upgrade {
-		slices.Reverse(components)
-	}
-	for _, component := range components {
-		c.modifyComponent(tCtx, state, options, component, &restore)
-	}
-	return restore
-}
-
-func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options ModifyOptions, component KubeComponentName, restore *ModifyOptions) {
-	tCtx.Helper()
-	tCtx = tCtx.WithStep(fmt.Sprintf("modify %s", component))
-
 	// We could also do things like turning feature gates on or off.
 	// For now we only support replacing the file.
-	if fileName := options.GetComponentFile(component); fileName != "" {
+	updated := make(map[KubeComponentName]*Cmd)
+
+	// Phase 1: stop all components that need modification in reverse order
+	// so that dependent components (KCM, scheduler) are stopped before the
+	// apiserver they depend on.
+	for _, component := range slices.Backward(KubeClusterComponents) {
+		fileName := options.GetComponentFile(component)
+		if fileName == "" {
+			continue
+		}
+		tCtx := tCtx.WithStep(fmt.Sprintf("stop %s", component))
 		cmd, ok := c.running[component]
 		if !ok {
 			tCtx.Fatal("not running")
@@ -418,9 +409,19 @@ func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options 
 		cmd.Name = string(component) + "-" + state
 		cmd.CommandLine = cmdLine
 		cmd.LogFile = path.Join(c.dir, fmt.Sprintf("%s-%s.log", component, state))
-
-		c.runComponentWithRetry(tCtx, component, cmd)
+		updated[component] = cmd
 	}
+
+	// Phase 2: start all stopped components in the standard startup order
+	// (apiserver first) so that each component starts against a fully-ready
+	// apiserver.
+	for _, component := range KubeClusterComponents {
+		if cmd, ok := updated[component]; ok {
+			c.runComponentWithRetry(tCtx, component, cmd)
+		}
+	}
+
+	return restore
 }
 
 func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeComponentName, cmd *Cmd) {
