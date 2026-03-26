@@ -38,8 +38,8 @@ func TestHintMergerMergePreferredFound(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best == nil {
+	best, ok := merger.mergePreferred(klog.Background())
+	if !ok {
 		t.Fatalf("expected a preferred hint, got nil")
 	}
 	if !best.Preferred {
@@ -62,9 +62,9 @@ func TestHintMergerMergePreferredNotFound(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best != nil {
-		t.Fatalf("expected nil, got %v", best)
+	_, ok := merger.mergePreferred(klog.Background())
+	if ok {
+		t.Fatalf("expected false, got ok=true")
 	}
 }
 
@@ -80,9 +80,9 @@ func TestHintMergerMergePreferredNoPreferredDimension(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best != nil {
-		t.Fatalf("expected nil, got %v", best)
+	_, ok := merger.mergePreferred(klog.Background())
+	if ok {
+		t.Fatalf("expected false, got ok=true")
 	}
 }
 
@@ -98,9 +98,9 @@ func TestHintMergerMergePreferredEmptyMergedAffinity(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best != nil {
-		t.Fatalf("expected nil, got %v", best)
+	_, ok := merger.mergePreferred(klog.Background())
+	if ok {
+		t.Fatalf("expected false, got ok=true")
 	}
 }
 
@@ -116,9 +116,9 @@ func TestHintMergerMergePreferredAllNilPreferred(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best == nil {
-		t.Fatalf("expected preferred hint, got nil")
+	best, ok := merger.mergePreferred(klog.Background())
+	if !ok {
+		t.Fatalf("expected preferred hint, got zero")
 	}
 	if !best.NUMANodeAffinity.IsEqual(NewTestBitMask(0, 1)) {
 		t.Fatalf("expected affinity %v, got %v", NewTestBitMask(0, 1), best.NUMANodeAffinity)
@@ -140,9 +140,9 @@ func TestHintMergerMergePreferredMixedNilAndMask(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best == nil {
-		t.Fatalf("expected preferred hint, got nil")
+	best, ok := merger.mergePreferred(klog.Background())
+	if !ok {
+		t.Fatalf("expected preferred hint, got zero")
 	}
 	if !best.NUMANodeAffinity.IsEqual(NewTestBitMask(0)) {
 		t.Fatalf("expected affinity %v, got %v", NewTestBitMask(0), best.NUMANodeAffinity)
@@ -165,9 +165,9 @@ func TestHintMergerMergePreferredComplexPreferredHints(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best == nil {
-		t.Fatalf("expected preferred hint, got nil")
+	best, ok := merger.mergePreferred(klog.Background())
+	if !ok {
+		t.Fatalf("expected preferred hint, got zero")
 	}
 	if !best.NUMANodeAffinity.IsEqual(NewTestBitMask(0)) {
 		t.Fatalf("expected affinity %v, got %v", NewTestBitMask(0), best.NUMANodeAffinity)
@@ -189,8 +189,8 @@ func TestHintMergerMergePreferredAggregatesScore(t *testing.T) {
 	}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyRestricted, PolicyOptions{})
-	best := merger.mergePreferred(klog.Background())
-	if best == nil {
+	best, ok := merger.mergePreferred(klog.Background())
+	if !ok {
 		t.Fatalf("expected a preferred hint, got nil")
 	}
 	if best.Score != 60 {
@@ -252,17 +252,16 @@ func TestHintMergerMergePreferredEquivalentToMerge(t *testing.T) {
 				}
 
 				merger := NewHintMerger(numaInfo, hints, policyName, PolicyOptions{})
-				preferred := merger.mergePreferred(klog.Background())
+				preferred, ok := merger.mergePreferred(klog.Background())
 				best := merger.Merge(klog.Background())
-				hasPreferred := preferred != nil
-				if hasPreferred != best.Preferred {
-					t.Fatalf("expected mergePreferred found=%v to match Merge Preferred=%v; full=%v hints=%v", hasPreferred, best.Preferred, best, hints)
+				if ok != best.Preferred {
+					t.Fatalf("expected mergePreferred ok=%v to match Merge Preferred=%v; full=%v hints=%v", ok, best.Preferred, best, hints)
 				}
-				if !hasPreferred {
+				if !ok {
 					continue
 				}
 				if !preferred.IsEqual(best) || preferred.Score != best.Score {
-					t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v hints=%v", *preferred, best, hints)
+					t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v hints=%v", preferred, best, hints)
 				}
 			}
 		})
@@ -274,12 +273,12 @@ func TestHintMergerMergePreferredEmptyHints(t *testing.T) {
 	hints := [][]TopologyHint{}
 
 	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
-	preferred := merger.mergePreferred(klog.Background())
-	if preferred == nil {
-		t.Fatalf("expected preferred hint, got nil")
+	preferred, ok := merger.mergePreferred(klog.Background())
+	if !ok {
+		t.Fatalf("expected preferred hint, got zero")
 	}
 	best := merger.Merge(klog.Background())
 	if !preferred.IsEqual(best) || preferred.Score != best.Score {
-		t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v", *preferred, best)
+		t.Fatalf("expected mergePreferred() == Merge(); got preferred=%v full=%v", preferred, best)
 	}
 }
