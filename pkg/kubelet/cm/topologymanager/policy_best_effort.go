@@ -45,10 +45,10 @@ func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 func (p *bestEffortPolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(logger, providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
-	bestPreferred := merger.mergePreferred()
+	bestPreferred, ok := merger.mergePreferred()
 	var bestHint TopologyHint
-	if bestPreferred != nil {
-		bestHint = *bestPreferred
+	if ok {
+		bestHint = bestPreferred
 	} else {
 		bestHint = merger.Merge()
 	}

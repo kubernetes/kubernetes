@@ -46,10 +46,10 @@ func (p *restrictedPolicy) Merge(logger klog.Logger, providersHints []map[string
 	// If any preferred merged hint exists, it will always win over any non-preferred
 	// merged hint, so search preferred space first and fall back to full search only
 	// when needed.
-	bestPreferred := merger.mergePreferred()
+	bestPreferred, ok := merger.mergePreferred()
 	var bestHint TopologyHint
-	if bestPreferred != nil {
-		bestHint = *bestPreferred
+	if ok {
+		bestHint = bestPreferred
 	} else {
 		bestHint = merger.Merge()
 	}

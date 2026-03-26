@@ -325,10 +325,10 @@ func (m HintMerger) Merge() TopologyHint {
 // It is intended as an optimization for policies where any preferred merged hint
 // will always beat any non-preferred merged hint according to compare().
 //
-// Returning nil means: no preferred merged hint exists (or no preferred merged
+// Returning ok=false means: no preferred merged hint exists (or no preferred merged
 // hint with non-empty affinity exists), and the caller should fall back to the
 // full Merge() search to preserve existing behavior.
-func (m HintMerger) mergePreferred() *TopologyHint {
+func (m HintMerger) mergePreferred() (TopologyHint, bool) {
 	preferredHints := make([][]TopologyHint, len(m.Hints))
 	for i, providerHints := range m.Hints {
 		// Collect preferred hints per dimension; empty means no preferred permutation exists.
@@ -338,7 +338,7 @@ func (m HintMerger) mergePreferred() *TopologyHint {
 			}
 		}
 		if len(preferredHints[i]) == 0 {
-			return nil
+			return TopologyHint{}, false
 		}
 	}
 
@@ -385,7 +385,10 @@ func (m HintMerger) mergePreferred() *TopologyHint {
 	}
 
 	iterate(0, nil)
-	return bestHint
+	if bestHint == nil {
+		return TopologyHint{}, false
+	}
+	return *bestHint, true
 }
 
 // Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
