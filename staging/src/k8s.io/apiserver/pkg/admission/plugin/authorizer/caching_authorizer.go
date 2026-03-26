@@ -43,7 +43,7 @@ type cachingAuthorizer struct {
 // of the authorizers use. Intended to be used for short-lived operations such as
 // the handling of a request in the admission chain, and then discarded.
 //
-// For cache key stability, this normalizes user.Groups and each user.Extra value
+// For cache key stability, this sorts user.Groups and each user.Extra value
 // slice before key construction. This means ordering of user.Info.Extra values is
 // treated as insignificant by this authorizer.
 func NewCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
