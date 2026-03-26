@@ -34,6 +34,8 @@ type NodeInfoLister interface {
 	HavePodsWithAffinityList() ([]NodeInfo, error)
 	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
 	HavePodsWithRequiredAntiAffinityList() ([]NodeInfo, error)
+	// HavePodsWithRequiredNonHostScopedAntiAffinityList returns nodes containing pods that require a wider topology scan (topologyKey other than hostname). PreFilter uses this to identify nodes that could potentially conflict with the incoming pod's rules across the wider cluster, allowing it to skip scanning nodes that cannot possibly conflict.
+	HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
 	Get(nodeName string) (NodeInfo, error)
 }

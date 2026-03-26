@@ -64,6 +64,12 @@ func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeIn
 	return nodes, nil
 }
 
+// HavePodsWithRequiredNonHostScopedAntiAffinityList is supposed to list nodes with at least one pod with
+// required non-host-scoped anti-affinity. For the fake lister we just return everything.
+func (nodes nodeInfoLister) HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]fwk.NodeInfo, error) {
+	return nodes, nil
+}
+
 type sharedLister struct {
 	nodes nodeInfoLister
 }
