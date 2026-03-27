@@ -1220,6 +1220,68 @@ func TestFastPathLeaderElection(t *testing.T) {
 			// then renewal 2: update (fast path again)
 			expectedLockOps: []string{"get", "update", "update", "get", "update", "update"},
 		},
+		{
+			name:        "Fast path conflict when server sets PreferredHolder (end of term)",
+			coordinated: true,
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj.DeepCopyObject(), nil
+						}
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj.DeepCopyObject(), nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						switch updates {
+						case 1:
+							// First update: acquire succeeds.
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							return true, lockObj.DeepCopyObject(), nil
+						case 2:
+							// Second update: fast-path renewal succeeds normally.
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							// After this write, the CLE server sets PreferredHolder
+							// on the canonical lease (bumping rv in a real apiserver).
+							preferred := "other-candidate"
+							lockObj.(*coordinationv1.Lease).Spec.PreferredHolder = &preferred
+							return true, action.(fakeclient.UpdateAction).GetObject().DeepCopyObject(), nil
+						case 3:
+							// Third update: fast-path conflicts because the server
+							// modified the lease (set PreferredHolder, bumped rv).
+							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "server set PreferredHolder", nil)
+						case 4:
+							cancelFunc()
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							return true, lockObj.DeepCopyObject(), nil
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+						return true, lockObj.DeepCopyObject(), nil
+					},
+				},
+			},
+			// acquire: get + update
+			// renewal 1: update (fast path succeeds)
+			// renewal 2: update (fast path, rv conflict from server PreferredHolder write)
+			//   → slow path: get (sees PreferredHolder) → returns false
+			// renewal 3-4: fast path skipped (PreferredHolder in observed) → slow path:
+			//   get → PreferredHolder → returns false (retries until RenewDeadline expires)
+			expectedLockOps: []string{"get", "update", "update", "update", "get", "get", "get"},
+		},
 	}
 
 	for i := range tests {
