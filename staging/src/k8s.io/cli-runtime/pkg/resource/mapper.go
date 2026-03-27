@@ -19,6 +19,7 @@ package resource
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,10 +151,8 @@ func (m *mapper) mappingForGVK(restMapper meta.RESTMapper, gvk schema.GroupVersi
 	}
 
 	// If the client can decode the server's preferred version, use it immediately.
-	for _, allowed := range m.decodingVersions {
-		if preferredMapping.GroupVersionKind.GroupVersion() == allowed {
-			return preferredMapping, nil
-		}
+	if slices.Contains(m.decodingVersions, preferredMapping.GroupVersionKind.GroupVersion()) {
+		return preferredMapping, nil
 	}
 
 	// 2. Fetch all supported versions (unordered) to find a decodable fallback
