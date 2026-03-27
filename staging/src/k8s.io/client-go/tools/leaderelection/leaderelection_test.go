@@ -1038,6 +1038,7 @@ func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
 
 func TestFastPathLeaderElection(t *testing.T) {
 	objectType := "leases"
+	identity := "baz"
 	var (
 		lockObj    runtime.Object
 		updates    int
@@ -1050,21 +1051,10 @@ func TestFastPathLeaderElection(t *testing.T) {
 		lockOps = []string{}
 		cancelFunc = nil
 	}
-	lec := LeaderElectionConfig{
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 2 * time.Second,
-		RetryPeriod:   1 * time.Second,
-
-		Callbacks: LeaderCallbacks{
-			OnNewLeader:      func(identity string) {},
-			OnStoppedLeading: func() {},
-			OnStartedLeading: func(context.Context) {
-			},
-		},
-	}
 
 	tests := []struct {
 		name            string
+		coordinated     bool
 		reactors        []Reactor
 		expectedLockOps []string
 	}{
@@ -1149,83 +1139,9 @@ func TestFastPathLeaderElection(t *testing.T) {
 			},
 			expectedLockOps: []string{"get", "create", "update", "update", "get", "update", "update"},
 		},
-	}
-
-	for i := range tests {
-		test := &tests[i]
-		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-
-			resetVars()
-
-			recorder := record.NewFakeRecorder(100)
-			resourceLockConfig := rl.ResourceLockConfig{
-				Identity:      "baz",
-				EventRecorder: recorder,
-			}
-			c := &fake.Clientset{}
-			for _, reactor := range test.reactors {
-				c.AddReactor(reactor.verb, objectType, reactor.reaction)
-			}
-			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
-				t.Errorf("unreachable action. testclient called too many times: %+v", action)
-				return true, nil, fmt.Errorf("unreachable action")
-			})
-			lock, err := rl.New("leases", "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
-			if err != nil {
-				t.Fatal("resourcelock.New() = ", err)
-			}
-
-			lec.Lock = lock
-			elector, err := NewLeaderElector(lec)
-			if err != nil {
-				t.Fatal("Failed to create leader elector: ", err)
-			}
-
-			ctx, cancel := context.WithCancel(ctx)
-			cancelFunc = cancel
-
-			elector.Run(ctx)
-			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
-		})
-	}
-}
-
-func TestCoordinatedFastPathLeaderElection(t *testing.T) {
-	objectType := "leases"
-	identity := "baz"
-	var (
-		lockObj    runtime.Object
-		updates    int
-		lockOps    []string
-		cancelFunc func()
-	)
-	resetVars := func() {
-		lockObj = nil
-		updates = 0
-		lockOps = []string{}
-		cancelFunc = nil
-	}
-	lec := LeaderElectionConfig{
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 2 * time.Second,
-		RetryPeriod:   1 * time.Second,
-		Coordinated:   true,
-
-		Callbacks: LeaderCallbacks{
-			OnNewLeader:      func(identity string) {},
-			OnStoppedLeading: func() {},
-			OnStartedLeading: func(context.Context) {},
-		},
-	}
-
-	tests := []struct {
-		name            string
-		reactors        []Reactor
-		expectedLockOps []string
-	}{
 		{
-			name: "Exercise fast path after coordinated lock acquired",
+			name:        "Exercise fast path after coordinated lock acquired",
+			coordinated: true,
 			reactors: []Reactor{
 				{
 					verb:       "get",
@@ -1235,7 +1151,7 @@ func TestCoordinatedFastPathLeaderElection(t *testing.T) {
 						if lockObj != nil {
 							return true, lockObj, nil
 						}
-						// Pre-existing lease held by this identity (coordinated leases are created externally)
+						// Coordinated leases are created externally; return a pre-existing lease
 						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
 							HolderIdentity:       identity,
 							LeaseDurationSeconds: 15,
@@ -1251,8 +1167,6 @@ func TestCoordinatedFastPathLeaderElection(t *testing.T) {
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
 						updates++
 						lockOps = append(lockOps, "update")
-						// After acquiring (first update), subsequent renewals should be fast path (update only).
-						// Cancel after 3 updates: 1 acquire + 2 renewals.
 						if updates == 3 {
 							cancelFunc()
 						}
@@ -1265,7 +1179,8 @@ func TestCoordinatedFastPathLeaderElection(t *testing.T) {
 			expectedLockOps: []string{"get", "update", "update", "update"},
 		},
 		{
-			name: "Fallback to slow path after coordinated fast path conflict",
+			name:        "Fallback to slow path after coordinated fast path conflict",
+			coordinated: true,
 			reactors: []Reactor{
 				{
 					verb:       "get",
@@ -1292,7 +1207,6 @@ func TestCoordinatedFastPathLeaderElection(t *testing.T) {
 						lockOps = append(lockOps, "update")
 						switch updates {
 						case 2:
-							// First renewal fast path: return conflict to force slow path fallback
 							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "fake conflict", nil)
 						case 4:
 							cancelFunc()
@@ -1333,7 +1247,18 @@ func TestCoordinatedFastPathLeaderElection(t *testing.T) {
 				t.Fatal("resourcelock.New() = ", err)
 			}
 
-			lec.Lock = lock
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 15 * time.Second,
+				RenewDeadline: 2 * time.Second,
+				RetryPeriod:   1 * time.Second,
+				Coordinated:   test.coordinated,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader:      func(identity string) {},
+					OnStoppedLeading: func() {},
+					OnStartedLeading: func(context.Context) {},
+				},
+			}
 			elector, err := NewLeaderElector(lec)
 			if err != nil {
 				t.Fatal("Failed to create leader elector: ", err)
