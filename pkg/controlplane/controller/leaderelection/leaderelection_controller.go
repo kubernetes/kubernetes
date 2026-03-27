@@ -258,14 +258,11 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 
 	// Check if an election is really needed by looking at the current lease and candidates
 	needElection, err := c.electionNeeded(candidates, leaseNN)
-	if !needElection {
-		if err != nil {
-			return defaultRequeueInterval, err
-		}
-		return c.requeueForHealthyLease(leaseNN), nil
-	}
 	if err != nil {
 		return defaultRequeueInterval, err
+	}
+	if !needElection {
+		return c.requeueForHealthyLease(leaseNN), nil
 	}
 
 	now := c.clock.Now()
