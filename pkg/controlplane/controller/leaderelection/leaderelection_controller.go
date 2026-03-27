@@ -300,17 +300,9 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return defaultRequeueInterval, err
 	}
 	if !canVoteYet {
-		// Requeue when the earliest pending ping expires
-		earliest := electionDuration
-		for _, candidate := range candidates {
-			if candidate.Spec.PingTime != nil {
-				remaining := candidate.Spec.PingTime.Add(electionDuration).Sub(now)
-				if remaining > 0 && remaining < earliest {
-					earliest = remaining
-				}
-			}
-		}
-		return earliest, nil
+		// Candidate acks arrive via informer events. Requeue after electionDuration
+		// as a timeout in case candidates don't respond.
+		return electionDuration, nil
 	}
 
 	// election is ongoing as long as unexpired PingTimes exist
