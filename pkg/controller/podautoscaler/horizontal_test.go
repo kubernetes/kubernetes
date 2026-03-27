@@ -727,7 +727,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 		}
 		return v >= 1, nil
 	}); err != nil {
-		t.Fatalf("reconciliations_total metric was not recorded for action=%s, error=%s", actionStr, errorStr)
+		t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsTotal.Name, actionStr, errorStr)
 	}
 
 	if tc.verifyReconciliationDuration {
@@ -738,7 +738,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 			}
 			return count >= 1, nil
 		}); err != nil {
-			t.Fatalf("reconciliation_duration_seconds metric was not recorded for action=%s, error=%s", actionStr, errorStr)
+			t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsDuration.Name, actionStr, errorStr)
 		}
 	}
 
