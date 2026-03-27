@@ -29,7 +29,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -202,9 +205,6 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 		return fmt.Errorf("failed to listen on the unix socket, error: %w", err)
 	}
 
-	ginkgo.By("Wait enough for unix socket to be open")
-	time.Sleep(time.Second)
-
 	ginkgo.By("Create a new gRPC server")
 	dp.server = grpc.NewServer()
 	ginkgo.By("Register the device plugin with the server")
@@ -231,9 +231,6 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 		gomega.Expect(err).To(gomega.Succeed())
 	}()
 
-	ginkgo.By("Wait enough for gRPC server unix scoket to be open")
-	time.Sleep(time.Second)
-
 	ginkgo.By("Create a client for the kubelet")
 	client := kubeletdevicepluginv1beta1.NewRegistrationClient(conn)
 
@@ -244,11 +241,23 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 	}
 
 	ginkgo.By("Register the device plugin with the kubelet")
-	_, err = client.Register(ctx, reqt)
-	if err != nil {
-		return err
+	// kubelet's device-plugin socket only listens once
+	// initializeRuntimeDependentModules completes; that can take several seconds
+	// after /healthz is up if container-runtime recovery is slow. Poll for it
+	// rather than sleeping a fixed duration.
+	var registerErr error
+	timeouts := framework.NewTimeoutContext()
+	pollErr := wait.PollUntilContextTimeout(ctx, timeouts.Poll, timeouts.PodStart, true, func(ctx context.Context) (bool, error) {
+		_, registerErr = client.Register(ctx, reqt)
+		if status.Code(registerErr) == codes.Unavailable {
+			return false, nil
+		}
+		return true, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("timed out waiting for kubelet device-plugin socket: %w", registerErr)
 	}
-	return nil
+	return registerErr
 }
 
 func (dp *DevicePlugin) Stop() {
