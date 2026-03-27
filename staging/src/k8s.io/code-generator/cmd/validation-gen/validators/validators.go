@@ -280,22 +280,18 @@ const (
 	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
 )
 
-// Min returns the minimum of two stability levels, or an error if either
+// Compare returns an integer comparing two stability levels, or an error if either
 // stability level is unknown.
-func (s TagStabilityLevel) Min(other TagStabilityLevel) (TagStabilityLevel, error) {
+func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
 	sOrder, okS := stabilityOrder[s]
 	if !okS {
-		return "", fmt.Errorf("unknown stability level %q", s)
+		return 0, fmt.Errorf("unknown stability level %q", s)
 	}
 	otherOrder, okOther := stabilityOrder[other]
 	if !okOther {
-		return "", fmt.Errorf("unknown stability level %q", other)
+		return 0, fmt.Errorf("unknown stability level %q", other)
 	}
-
-	if sOrder < otherOrder {
-		return s, nil
-	}
-	return other, nil
+	return sOrder - otherOrder, nil
 }
 
 // TagDoc describes a comment-tag and its usage.

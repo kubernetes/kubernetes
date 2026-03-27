@@ -651,6 +651,40 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "gang does not schedule on a single rack when preemption could free up enough resources",
+			steps: []step{
+				{
+					name: "Create single rack that can hold pod group pods",
+					createNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+					},
+				},
+				{
+					name: "Create an assigned pod in rack1, making rack1 unable to fit 2 additional pods",
+					createPods: []*v1.Pod{
+						makeAssignedPod("existing1", "node2-rack1", "2"),
+					},
+				},
+				{
+					name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
+					createPodGroup: makeGangPodGroup("pg1", "rack", 3),
+				},
+				{
+					name: "Create all pods belonging to the podgroup",
+					createPods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg1"),
+					},
+				},
+				{
+					name:                     "Verify the entire gang is unschedulable",
+					waitForPodsUnschedulable: []string{"p1", "p2", "p3"},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1301,6 +1335,13 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
 	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	workload := st.MakeWorkload().Name("workload").Namespace(ns).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
+		Obj()
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create Workload: %v", err)
+	}
 
 	for i, step := range tt.steps {
 		t.Logf("Executing step %d: %s", i, step.name)

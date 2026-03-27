@@ -951,6 +951,13 @@ items:
     verbs:
     - create
     - delete
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/binding
+    verbs:
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

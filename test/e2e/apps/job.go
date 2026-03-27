@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1377,6 +1378,103 @@ done`}
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
+
+	framework.It("should create Workload and PodGroup for gang-eligible Job",
+		framework.WithFeatureGate(features.GenericWorkload),
+		framework.WithFeatureGate(features.EnableWorkloadWithJob),
+		func(ctx context.Context) {
+			parallelism := int32(4)
+			completions := int32(4)
+			backoffLimit := int32(6)
+
+			ginkgo.By("Creating an indexed job with parallelism=completions")
+			job := e2ejob.NewTestJob("succeed", "gang-create", v1.RestartPolicyNever,
+				parallelism, completions, nil, backoffLimit)
+			job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+			job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+			ginkgo.By("Waiting for Workload to be created")
+			var workload *schedulingv1alpha2.Workload
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				workloads, listErr := f.ClientSet.SchedulingV1alpha2().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if listErr != nil {
+					return listErr
+				}
+				for i := range workloads.Items {
+					for _, ref := range workloads.Items[i].OwnerReferences {
+						if ref.UID == job.UID && ref.Kind == "Job" {
+							workload = &workloads.Items[i]
+							return nil
+						}
+					}
+				}
+				return fmt.Errorf("workload not found for job %s", job.Name)
+			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Waiting for PodGroup to be created")
+			var podGroup *schedulingv1alpha2.PodGroup
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				podGroups, listErr := f.ClientSet.SchedulingV1alpha2().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if listErr != nil {
+					return listErr
+				}
+				for i := range podGroups.Items {
+					for _, ref := range podGroups.Items[i].OwnerReferences {
+						if ref.UID == job.UID && ref.Kind == "Job" {
+							podGroup = &podGroups.Items[i]
+							return nil
+						}
+					}
+				}
+				return fmt.Errorf("podgroup not found for job %s", job.Name)
+			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying PodGroup ownerReferences")
+			gomega.Expect(podGroup.OwnerReferences).To(gomega.HaveLen(2))
+			var hasJobOwner, hasWorkloadOwner bool
+			for _, ref := range podGroup.OwnerReferences {
+				if ref.UID == job.UID && ref.Kind == "Job" {
+					hasJobOwner = true
+				}
+				if ref.UID == workload.UID && ref.Kind == "Workload" {
+					hasWorkloadOwner = true
+				}
+			}
+			gomega.Expect(hasJobOwner).To(gomega.BeTrueBecause("PodGroup should have Job ownerReference with UID %s", job.UID))
+			gomega.Expect(hasWorkloadOwner).To(gomega.BeTrueBecause("PodGroup should have Workload ownerReference with UID %s", workload.UID))
+
+			ginkgo.By("Verifying pods have schedulingGroup set")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pods, listErr := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+				if listErr != nil {
+					return listErr
+				}
+				if len(pods.Items) < int(parallelism) {
+					return fmt.Errorf("expected %d pods, got %d", parallelism, len(pods.Items))
+				}
+				for _, pod := range pods.Items {
+					if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+						return fmt.Errorf("pod %s missing schedulingGroup", pod.Name)
+					}
+					if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+						return fmt.Errorf("pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
+					}
+				}
+				return nil
+			}).WithTimeout(framework.PodStartTimeout).WithPolling(time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Waiting for job to complete")
+			err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
+			framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring job has no active pods")
+			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "failed to get job")
+			gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
+			gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
+			gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		})
 
 	/*
 		Testname: Allow updating pod resources for suspended Jobs

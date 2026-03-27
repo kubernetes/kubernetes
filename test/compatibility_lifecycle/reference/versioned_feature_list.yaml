@@ -399,6 +399,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CRIListStreaming
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: CrossNamespaceVolumeDataSource
   versionedSpecs:
   - default: false
@@ -587,6 +593,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: DRAListTypeAttributes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: DRANodeAllocatableResources
   versionedSpecs:
   - default: false
@@ -627,12 +639,30 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: DRAResourceClaimGranularStatusAuthorization
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: DRAResourcePoolStatus
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: DRASchedulerFilterTimeout
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: DRAWorkloadResourceClaims
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false
@@ -651,6 +681,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: EnableWorkloadWithJob
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: EnvFiles
   versionedSpecs:
   - default: false
@@ -813,6 +849,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
@@ -1153,7 +1193,7 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.24"
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
@@ -1293,6 +1333,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: NodeSwap
   versionedSpecs:
   - default: false

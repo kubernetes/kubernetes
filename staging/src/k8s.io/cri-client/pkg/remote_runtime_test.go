@@ -19,6 +19,7 @@ package cri
 import (
 	"context"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider())
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), false)
 
 	require.NoError(t, err)
 
@@ -59,7 +60,7 @@ func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing
 }
 
 func createRemoteRuntimeServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, tp)
+	runtimeService, err := NewRemoteRuntimeService(ctx, endpoint, defaultConnectionTimeout, tp, false)
 	require.NoError(t, err)
 
 	return runtimeService
@@ -107,4 +108,29 @@ func TestVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, apitest.FakeVersion, version.Version)
 	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
+}
+
+func TestNewRemoteRuntimeServiceUnixSocketEndpoint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket regression test is not applicable on windows")
+	}
+
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+		// clear endpoint file
+		if addr, _, err := util.GetAddressAndDialer(endpoint); err == nil {
+			if _, err := os.Stat(addr); err == nil {
+				if err := os.Remove(addr); err != nil {
+					t.Errorf("remove %q: %v", addr, err)
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	rtSvc := createRemoteRuntimeService(ctx, endpoint, t)
+	version, err := rtSvc.Version(ctx, apitest.FakeVersion)
+	require.NoError(t, err)
+	assert.Equal(t, apitest.FakeVersion, version.Version)
 }

@@ -2268,6 +2268,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "resourcepoolstatusrequests",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourcePoolStatusRequest",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourcepoolstatusrequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourcePoolStatusRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1alpha3"

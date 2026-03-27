@@ -1442,10 +1442,10 @@ func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.C
 
 // fakePermitPlugin only implements PermitPlugin interface.
 type fakePermitPlugin struct {
-	eventRecorder events.EventRecorder
+	eventRecorder events.EventRecorderLogger
 }
 
-func newFakePermitPlugin(eventRecorder events.EventRecorder) frameworkruntime.PluginFactory {
+func newFakePermitPlugin(eventRecorder events.EventRecorderLogger) frameworkruntime.PluginFactory {
 	return func(ctx context.Context, configuration runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 		pl := &fakePermitPlugin{
 			eventRecorder: eventRecorder,
@@ -1466,7 +1466,7 @@ const (
 func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	defer func() {
 		// Send event with podWaiting reason to broadcast this pod is already waiting in the permit stage.
-		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
+		f.eventRecorder.WithLogger(klog.FromContext(ctx)).Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
 	return fwk.NewStatus(fwk.Wait), permitTimeout

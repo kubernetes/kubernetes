@@ -19,6 +19,7 @@ package podgroup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,15 +27,21 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	configv1 "k8s.io/kube-scheduler/config/v1"
+	framework "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/ptr"
 )
 
 // podInUnschedulablePods checks if the given Pod is in the unschedulable pods pool.
@@ -50,19 +57,22 @@ func podInUnschedulablePods(t *testing.T, queue queue.SchedulingQueue, podName s
 }
 
 func TestPodGroupScheduling(t *testing.T) {
-	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	node := st.MakeNode().Name("node").Label("topology.kubernetes.io/zone", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	workload := st.MakeWorkload().Name("workload").
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t2").BasicPolicy().Obj()).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t-mid").MinCount(2).Obj()).
 		Obj()
 	otherWorkload := st.MakeWorkload().Name("other-workload").
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(3).Obj()).
 		Obj()
 
-	gangPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").MinCount(3).Obj()
+	gangPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").
+		Priority(100).MinCount(3).Obj()
 
-	otherGangPodGroup := st.MakePodGroup().Name("pg2").TemplateRef("t", "other-workload").MinCount(3).Obj()
+	otherGangPodGroup := st.MakePodGroup().Name("pg2").TemplateRef("t", "other-workload").
+		Priority(100).MinCount(3).Obj()
 
 	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").BasicPolicy().Obj()
 
@@ -81,6 +91,29 @@ func TestPodGroupScheduling(t *testing.T) {
 		ZeroTerminationGracePeriod().Priority(100).Obj()
 	lowPriorityBlockerPod := st.MakePod().Name("low-priority-blocker").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").
 		ZeroTerminationGracePeriod().Priority(10).Obj()
+
+	lowP1 := st.MakePod().Name("low-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(10).Obj()
+	lowP2 := st.MakePod().Name("low-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(10).Obj()
+	lowP3 := st.MakePod().Name("low-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(10).Obj()
+	lowP4 := st.MakePod().Name("low-p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(10).Obj()
+
+	veryLowP1 := st.MakePod().Name("very-low-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(5).Obj()
+	veryLowP2 := st.MakePod().Name("very-low-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		ZeroTerminationGracePeriod().Priority(5).Obj()
+	midP1 := st.MakePod().Name("mid-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		PodGroupName("mid-pg").Priority(50).Obj()
+	midP2 := st.MakePod().Name("mid-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		PodGroupName("mid-pg").Priority(50).Obj()
+
+	midPodGroup := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+		Priority(50).MinCount(2).Obj()
+	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+		Priority(50).MinCount(2).TopologyKey("topology.kubernetes.io/zone").Obj()
 
 	otherP1 := st.MakePod().Name("other-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("pg2").Priority(100).Obj()
@@ -110,15 +143,16 @@ func TestPodGroupScheduling(t *testing.T) {
 		waitForPodsGatedOnPreEnqueue []string
 		waitForPodsUnschedulable     []string
 		waitForPodsScheduled         []string
+		waitForPodsRemoved           []string
 		waitForAnyPodsScheduled      *waitForAnyPodsScheduled
 		waitForPodGroupCondition     *podGroupConditionCheck
 	}
 
 	tests := []struct {
-		name string
-		// Enabling TAS disables preemption, therefore tests verifying preemption logic need to be run with TAS disabled.
-		disableTopologyAwareScheduling bool
-		steps                          []step
+		name                          string
+		enableWorkloadAwarePreemption bool
+		requiresTAS                   bool
+		steps                         []step
 	}{
 		{
 			name: "gang schedules when pod group and resources are available",
@@ -311,8 +345,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:                           "gang schedules with preemption",
-			disableTopologyAwareScheduling: true,
+			name: "gang schedules with preemption",
 			steps: []step{
 				{
 					name:       "Create a low priority pod taking all resources",
@@ -341,6 +374,10 @@ func TestPodGroupScheduling(t *testing.T) {
 						conditionStatus: metav1.ConditionTrue,
 						reason:          "Scheduled",
 					},
+				},
+				{
+					name:               "Verify preemption victims were removed",
+					waitForPodsRemoved: []string{"low-priority-blocker"},
 				},
 			},
 		},
@@ -411,8 +448,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:                           "basic group schedules with preemption",
-			disableTopologyAwareScheduling: true,
+			name: "basic group schedules with preemption",
 			steps: []step{
 				{
 					name:       "Create a low priority pod taking all resources",
@@ -434,21 +470,168 @@ func TestPodGroupScheduling(t *testing.T) {
 					name:                 "Verify all group's pods are scheduled successfully (after preemption)",
 					waitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
 				},
+				{
+					name:               "Verify preemption victims were removed",
+					waitForPodsRemoved: []string{"low-priority-blocker"},
+				},
+			},
+		},
+		{
+			name: "basic group schedules with workload-aware preemption",
+			steps: []step{
+				{
+					name:       "Create a low priority pod taking all resources",
+					createPods: []*v1.Pod{lowPriorityBlockerPod},
+				},
+				{
+					name:                 "Schedule the low priority resource-blocking pod",
+					waitForPodsScheduled: []string{"low-priority-blocker"},
+				},
+				{
+					name:           "Create the PodGroup object",
+					createPodGroup: basicPodGroup,
+				},
+				{
+					name:       "Create high priority group's pods",
+					createPods: []*v1.Pod{p1, p2, p3, p4},
+				},
+				{
+					name:                 "Verify all group's pods are scheduled successfully (after preemption)",
+					waitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					name:               "Verify preemption victims were removed",
+					waitForPodsRemoved: []string{"low-priority-blocker"},
+				},
+			},
+		},
+		{
+			name:                          "gang schedules with workload-aware preemption",
+			enableWorkloadAwarePreemption: true,
+			steps: []step{
+				{
+					name:       "Create low priority pods that take up all node resources",
+					createPods: []*v1.Pod{lowP1, lowP2, lowP3, lowP4},
+				},
+				{
+					name:                 "Wait for all low priority pods to be scheduled",
+					waitForPodsScheduled: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
+				},
+				{
+					name:           "Create the Workload object",
+					createPodGroup: gangPodGroup,
+				},
+				{
+					name:       "Create high priority gang pods",
+					createPods: []*v1.Pod{p1, p2, p3, p4},
+				},
+				{
+					name:                 "Verify all gang pods are scheduled successfully (after workload-aware preemption)",
+					waitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					name:               "Verify preemption victims were removed",
+					waitForPodsRemoved: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
+				},
+			},
+		},
+		{
+			name:                          "gang schedules with partial workload-aware preemption",
+			enableWorkloadAwarePreemption: true,
+			steps: []step{
+				{
+					name:       "Create very low and low priority pods that take up all node resources",
+					createPods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
+				},
+				{
+					name:                 "Wait for all very low and low priority pods to be scheduled",
+					waitForPodsScheduled: []string{"very-low-p1", "very-low-p2", "low-p1", "low-p2"},
+				},
+				{
+					name:           "Create the mid PodGroup object",
+					createPodGroup: midPodGroup,
+				},
+				{
+					name:       "Create mid priority gang pods",
+					createPods: []*v1.Pod{midP1, midP2},
+				},
+				{
+					name:                 "Verify mid priority pods and low priority pods are scheduled",
+					waitForPodsScheduled: []string{"mid-p1", "mid-p2", "low-p1", "low-p2"},
+				},
+				{
+					name:               "Verify very low priority preemption victims were removed",
+					waitForPodsRemoved: []string{"very-low-p1", "very-low-p2"},
+				},
+			},
+		},
+		{
+			name:        "tas gang with constraint does not use pod by pod preemption",
+			requiresTAS: true,
+			steps: []step{
+				{
+					name:       "Create very low and low priority pods that take up all node resources",
+					createPods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
+				},
+				{
+					name:                 "Wait for all very low and low priority pods to be scheduled",
+					waitForPodsScheduled: []string{"very-low-p1", "very-low-p2", "low-p1", "low-p2"},
+				},
+				{
+					name:           "Create the mid PodGroup object with constraint",
+					createPodGroup: midPodGroupWithConstraint,
+				},
+				{
+					name:       "Create mid priority gang pods",
+					createPods: []*v1.Pod{midP1, midP2},
+				},
+				{
+					name:                     "Verify the entire gang becomes unschedulable",
+					waitForPodsUnschedulable: []string{"mid-p1", "mid-p2"},
+				},
+			},
+		},
+		{
+			name:                          "tas gang with constraint does not use workload preemption",
+			enableWorkloadAwarePreemption: true,
+			requiresTAS:                   true,
+			steps: []step{
+				{
+					name:       "Create very low and low priority pods that take up all node resources",
+					createPods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
+				},
+				{
+					name:                 "Wait for all very low and low priority pods to be scheduled",
+					waitForPodsScheduled: []string{"very-low-p1", "very-low-p2", "low-p1", "low-p2"},
+				},
+				{
+					name:           "Create the mid PodGroup object with constraint",
+					createPodGroup: midPodGroupWithConstraint,
+				},
+				{
+					name:       "Create mid priority gang pods",
+					createPods: []*v1.Pod{midP1, midP2},
+				},
+				{
+					name:                     "Verify the entire gang becomes unschedulable",
+					waitForPodsUnschedulable: []string{"mid-p1", "mid-p2"},
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		runWithTasFlagSettings := []bool{true, false}
-		if tt.disableTopologyAwareScheduling {
-			runWithTasFlagSettings = []bool{false}
-		}
 		for _, tasEnabled := range runWithTasFlagSettings {
+			if tt.requiresTAS && !tasEnabled {
+				continue
+			}
 			t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling enabled: %v)", tt.name, tasEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.GenericWorkload:                 true,
 					features.GangScheduling:                  true,
 					features.TopologyAwareWorkloadScheduling: tasEnabled,
+					features.WorkloadAwarePreemption:         tt.enableWorkloadAwarePreemption,
 				})
 
 				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
@@ -537,6 +720,14 @@ func TestPodGroupScheduling(t *testing.T) {
 								t.Fatalf("Step %d: Failed to wait for pod %s to be scheduled: %v", i, podName, err)
 							}
 						}
+					case step.waitForPodsRemoved != nil:
+						for _, podName := range step.waitForPodsRemoved {
+							err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+								testutils.PodDeleted(testCtx.Ctx, cs, ns, podName))
+							if err != nil {
+								t.Fatalf("Step %d: Failed to wait for pod %s to be removed: %v", i, podName, err)
+							}
+						}
 					case step.waitForAnyPodsScheduled != nil:
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 							func(ctx context.Context) (bool, error) {
@@ -594,5 +785,227 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 			}
 		}
 		return false, nil
+	}
+}
+
+func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:         true,
+		features.GangScheduling:          true,
+		features.WorkloadAwarePreemption: true,
+	})
+
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
+		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+
+	// Low priority pods taking up all resources
+	lowPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+	}
+
+	// High priority pods belonging to a group
+	highPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+	}
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "wap-inv",
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodInitialBackoffSeconds(0))
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 1. Create low priority pods
+	for _, p := range lowPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// Wait for low priority pods to be scheduled
+	for _, p := range lowPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+		}
+	}
+
+	// 2. Create workload
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	// 3. Create PodGroup
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// 4. Create high priority pods
+	for _, p := range highPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 5. Verify that WorkloadAwarePreemption was called
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		for _, pod := range lowPods {
+			events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
+				FieldSelector: "involvedObject.name=" + pod.Name,
+			})
+			if err != nil {
+				return false, err
+			}
+			for _, event := range events.Items {
+				if event.Reason == "Preempted" && strings.HasPrefix(event.Message, "Preempted by podgroup") {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("WorkloadAwarePreemption was not called within timeout")
+	}
+
+	t.Logf("WorkloadAwarePreemption was called (verified via events)")
+}
+
+// mockPostFilterPlugin is a custom PostFilter plugin that just counts invocations.
+type mockPostFilterPlugin struct {
+	count int
+}
+
+func (m *mockPostFilterPlugin) Name() string {
+	return "MockPostFilter"
+}
+
+func (m *mockPostFilterPlugin) PostFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+	m.count++
+	return nil, framework.NewStatus(framework.Unschedulable)
+}
+
+func TestPostFilterInvocationCount(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:         true,
+		features.GangScheduling:          true,
+		features.WorkloadAwarePreemption: true,
+	})
+
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
+		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+
+	// Low priority pods taking up all resources
+	lowPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+	}
+
+	// High priority pods belonging to a group
+	highPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+	}
+
+	mockPlugin := &mockPostFilterPlugin{}
+	registry := frameworkruntime.Registry{
+		"MockPostFilter": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+			return mockPlugin, nil
+		},
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				PostFilter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: "MockPostFilter"},
+						{Name: "DefaultPreemption"},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "post-filter-count",
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithProfiles(cfg.Profiles...),
+	)
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 1. Create low priority pods
+	for _, p := range lowPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// Wait for low priority pods to be scheduled
+	for _, p := range lowPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+		}
+	}
+
+	// 2. Create workload
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	// 3. Create PodGroup
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// 4. Create high priority pods
+	for _, p := range highPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 5. Verify that MockPostFilter was called exactly 3 times
+	// It should be called for each pod from pod group in pod group cycle
+	// but should not be called in WAP.
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		if mockPlugin.count == 3 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.count)
 	}
 }

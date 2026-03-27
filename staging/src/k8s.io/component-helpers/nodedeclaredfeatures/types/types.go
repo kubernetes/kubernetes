@@ -63,12 +63,21 @@ type Feature interface {
 type FeatureRequirements struct {
 	// EnabledFeatureGates lists feature gate strings that the feature depends on.
 	EnabledFeatureGates []string
+	// RequiredRuntimeFeatures lists runtime capabilities that must be true for the
+	// feature to be declared. Nil means the feature has no runtime requirements.
+	RequiredRuntimeFeatures *RuntimeFeatures
 }
 
 // FeatureGate is an interface that abstracts feature gate checking.
 type FeatureGate interface {
 	// Enabled returns true if the named feature gate is enabled.
 	Enabled(key string) bool
+}
+
+// RuntimeFeatures provides information about CRI runtime-level capabilities.
+type RuntimeFeatures struct {
+	// UserNamespacesHostNetwork indicates if the runtime supports user namespaces with host network.
+	UserNamespacesHostNetwork bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
@@ -85,6 +94,8 @@ type NodeConfiguration struct {
 	// Version holds the current node version. This is used for full semantic version comparisons
 	// with Feature.MaxVersion() to determine if a feature needs to be reported.
 	Version *version.Version
+	// RuntimeFeatures holds runtime-level capabilities discovered from CRI.
+	RuntimeFeatures RuntimeFeatures
 }
 
 // FeatureGateMap is provided as a convenience implementation of FeatureGate

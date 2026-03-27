@@ -291,14 +291,14 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 
 		if mustCheckOwner {
-			if err = resourceclaim.IsForPod(pod, resourceClaim); err != nil {
+			if err = resourceclaim.IsForPod(pod, resourceClaim, m.podGroupResourceClaimsEnabled()); err != nil {
 				// No wrapping, error is already informative.
 				return err
 			}
 		}
 
 		// Check if pod is in the ReservedFor for the claim
-		if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, resourceClaim, m.podGroupResourceClaimsEnabled()) {
 			return fmt.Errorf("pod %s (%s) is not allowed to use ResourceClaim %s (%s)",
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
@@ -1089,4 +1089,8 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 func (m *Manager) Updates() <-chan resourceupdates.Update {
 	// Return the internal channel that HandleWatchResourcesStream writes to.
 	return m.update
+}
+
+func (*Manager) podGroupResourceClaimsEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAWorkloadResourceClaims)
 }

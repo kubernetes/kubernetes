@@ -151,6 +151,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 		ruleInformer,
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
+		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 
 	var numExistingPods atomic.Int64

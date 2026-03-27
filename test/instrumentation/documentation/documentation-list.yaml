@@ -6524,6 +6524,17 @@
 - name: etcd_bookmark_counts
   help: Number of etcd bookmarks (progress notify events) split by kind.
   type: Gauge
+  deprecatedVersion: 1.36.0
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: etcd_bookmark_total
+  help: Number of etcd bookmarks (progress notify events) split by kind.
+  type: Counter
   stabilityLevel: ALPHA
   labels:
   - group

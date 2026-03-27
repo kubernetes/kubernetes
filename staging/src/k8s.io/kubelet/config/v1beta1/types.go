@@ -804,7 +804,6 @@ type KubeletConfiguration struct {
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
 	// Default: false
-	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the

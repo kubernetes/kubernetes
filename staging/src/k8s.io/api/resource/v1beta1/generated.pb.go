@@ -919,6 +919,43 @@ func (m *DeviceAttribute) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.VersionValues) > 0 {
+		for iNdEx := len(m.VersionValues) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.VersionValues[iNdEx])
+			copy(dAtA[i:], m.VersionValues[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.VersionValues[iNdEx])))
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
+	if len(m.StringValues) > 0 {
+		for iNdEx := len(m.StringValues) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.StringValues[iNdEx])
+			copy(dAtA[i:], m.StringValues[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.StringValues[iNdEx])))
+			i--
+			dAtA[i] = 0x42
+		}
+	}
+	if len(m.BoolValues) > 0 {
+		for iNdEx := len(m.BoolValues) - 1; iNdEx >= 0; iNdEx-- {
+			i--
+			if m.BoolValues[iNdEx] {
+				dAtA[i] = 1
+			} else {
+				dAtA[i] = 0
+			}
+			i--
+			dAtA[i] = 0x38
+		}
+	}
+	if len(m.IntValues) > 0 {
+		for iNdEx := len(m.IntValues) - 1; iNdEx >= 0; iNdEx-- {
+			i = encodeVarintGenerated(dAtA, i, uint64(m.IntValues[iNdEx]))
+			i--
+			dAtA[i] = 0x30
+		}
+	}
 	if m.VersionValue != nil {
 		i -= len(*m.VersionValue)
 		copy(dAtA[i:], *m.VersionValue)
@@ -2900,6 +2937,26 @@ func (m *DeviceAttribute) Size() (n int) {
 		l = len(*m.VersionValue)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if len(m.IntValues) > 0 {
+		for _, e := range m.IntValues {
+			n += 1 + sovGenerated(uint64(e))
+		}
+	}
+	if len(m.BoolValues) > 0 {
+		n += 2 * len(m.BoolValues)
+	}
+	if len(m.StringValues) > 0 {
+		for _, s := range m.StringValues {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.VersionValues) > 0 {
+		for _, s := range m.VersionValues {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -3758,6 +3815,10 @@ func (this *DeviceAttribute) String() string {
 		`BoolValue:` + valueToStringGenerated(this.BoolValue) + `,`,
 		`StringValue:` + valueToStringGenerated(this.StringValue) + `,`,
 		`VersionValue:` + valueToStringGenerated(this.VersionValue) + `,`,
+		`IntValues:` + fmt.Sprintf("%v", this.IntValues) + `,`,
+		`BoolValues:` + fmt.Sprintf("%v", this.BoolValues) + `,`,
+		`StringValues:` + fmt.Sprintf("%v", this.StringValues) + `,`,
+		`VersionValues:` + fmt.Sprintf("%v", this.VersionValues) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6777,6 +6838,216 @@ func (m *DeviceAttribute) Unmarshal(dAtA []byte) error {
 			}
 			s := string(dAtA[iNdEx:postIndex])
 			m.VersionValue = &s
+			iNdEx = postIndex
+		case 6:
+			if wireType == 0 {
+				var v int64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= int64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.IntValues = append(m.IntValues, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.IntValues) == 0 {
+					m.IntValues = make([]int64, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v int64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= int64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.IntValues = append(m.IntValues, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field IntValues", wireType)
+			}
+		case 7:
+			if wireType == 0 {
+				var v int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.BoolValues = append(m.BoolValues, bool(v != 0))
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				elementCount = packedLen
+				if elementCount != 0 && len(m.BoolValues) == 0 {
+					m.BoolValues = make([]bool, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.BoolValues = append(m.BoolValues, bool(v != 0))
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field BoolValues", wireType)
+			}
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StringValues", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StringValues = append(m.StringValues, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VersionValues", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VersionValues = append(m.VersionValues, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

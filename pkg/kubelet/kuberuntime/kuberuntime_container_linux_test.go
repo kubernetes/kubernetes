@@ -2087,7 +2087,7 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	runtimePod, err := m.GetPod(tCtx, pod.UID)

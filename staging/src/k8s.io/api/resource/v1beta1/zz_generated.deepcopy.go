@@ -418,6 +418,26 @@ func (in *DeviceAttribute) DeepCopyInto(out *DeviceAttribute) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.IntValues != nil {
+		in, out := &in.IntValues, &out.IntValues
+		*out = make([]int64, len(*in))
+		copy(*out, *in)
+	}
+	if in.BoolValues != nil {
+		in, out := &in.BoolValues, &out.BoolValues
+		*out = make([]bool, len(*in))
+		copy(*out, *in)
+	}
+	if in.StringValues != nil {
+		in, out := &in.StringValues, &out.StringValues
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.VersionValues != nil {
+		in, out := &in.VersionValues, &out.VersionValues
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

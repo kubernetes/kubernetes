@@ -311,7 +311,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthorizer = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-windows, sig-node
+	// kep: https://kep.k8s.io/2271
+	// Marks tests that require the kubelet to have enableSystemLogQuery set to true
+	// in the kubelet configuration. This handler is off by default.
 	NodeLogQuery = framework.WithFeature(framework.ValidFeatures.Add("NodeLogQuery"))
 
 	// Owner: sig-node

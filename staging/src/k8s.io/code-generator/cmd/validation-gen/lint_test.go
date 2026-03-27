@@ -191,6 +191,7 @@ func TestRuleStability(t *testing.T) {
 	tests := []struct {
 		name     string
 		comments []string
+		pkg      string
 		wantMsg  string
 	}{
 		{
@@ -210,24 +211,58 @@ func TestRuleStability(t *testing.T) {
 		},
 		{
 			name:     "alpha context, alpha tag",
-			comments: []string{"+k8s:alpha=+k8s:validateTrue"}, // Alpha context, Alpha tag
+			comments: []string{"+k8s:alpha=+k8s:validateTrueAlpha"}, // Alpha context, Alpha tag
 			wantMsg:  "",
 		},
 		{
 			name:     "stable context, alpha tag",
-			comments: []string{"+k8s:validateTrue"}, // Stable context, Alpha tag
-			wantMsg:  `tag "k8s:validateTrue" with stability level "Alpha" cannot be used in Stable validation`,
+			comments: []string{"+k8s:validateTrueAlpha"}, // Stable context, Alpha tag
+			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Stable validation`,
 		},
 		{
 			name:     "beta context, alpha tag",
-			comments: []string{"+k8s:beta=+k8s:validateTrue"}, // Beta context, Alpha tag
-			wantMsg:  `tag "k8s:validateTrue" with stability level "Alpha" cannot be used in Beta validation`,
+			comments: []string{"+k8s:beta=+k8s:validateTrueAlpha"}, // Beta context, Alpha tag
+			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
+		},
+		{
+			name:     "alpha pkg context, beta tag (allowed)",
+			comments: []string{"+k8s:validateTrueBeta"}, // Beta tag in Alpha package
+			pkg:      "k8s.io/api/apps/v1alpha1",
+			wantMsg:  "",
+		},
+		{
+			name:     "alpha pkg context, alpha tag (allowed)",
+			comments: []string{"+k8s:validateTrueAlpha"}, // Alpha tag in Alpha package
+			pkg:      "k8s.io/api/apps/v1alpha1",
+			wantMsg:  "",
+		},
+		{
+			name:     "beta pkg context, beta tag (allowed)",
+			comments: []string{"+k8s:validateTrueBeta"}, // Beta tag in Beta package
+			pkg:      "k8s.io/api/apps/v1beta1",
+			wantMsg:  "",
+		},
+		{
+			name:     "beta pkg context, alpha tag (fails)",
+			comments: []string{"+k8s:validateTrueAlpha"}, // Alpha tag in Beta package
+			pkg:      "k8s.io/api/apps/v1beta1",
+			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
+		},
+		{
+			name:     "ifEnabled context allows beta tag",
+			comments: []string{"+k8s:ifEnabled(SomeFeature)=+k8s:validateTrueBeta"}, // Beta tag in ifEnabled
+			wantMsg:  "",
+		},
+		{
+			name:     "ifEnabled context fails alpha tag",
+			comments: []string{"+k8s:ifEnabled(SomeFeature)=+k8s:validateTrueAlpha"}, // Alpha tag in ifEnabled
+			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dummyType := &types.Type{Name: types.Name{Name: "Dummy"}}
+			dummyType := &types.Type{Name: types.Name{Package: tt.pkg, Name: "Dummy"}}
 			rule := validationStability()
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
 			msg, err := rule(nil, dummyType, tags)

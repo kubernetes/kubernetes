@@ -33,7 +33,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)", func() {
+// Requires WithSerial as test sets up external metrics server
+var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)", framework.WithSerial(), func() {
 	var (
 		rc                *e2eautoscaling.ResourceConsumer
 		metricsController *e2eautoscaling.ExternalMetricsController
@@ -89,7 +90,8 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 	})
 })
 
-var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZero),
+// Requires WithSerial as test sets up external metrics server
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZero), framework.WithSerial(),
 	"Horizontal pod autoscaling (scale to zero)", func() {
 		var (
 			rc                *e2eautoscaling.ResourceConsumer

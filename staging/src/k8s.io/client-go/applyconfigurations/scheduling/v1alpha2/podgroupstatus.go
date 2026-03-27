@@ -44,6 +44,8 @@ type PodGroupStatusApplyConfiguration struct {
 	// - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
 	// higher-priority PodGroups or Pods.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// Status of resource claims.
+	ResourceClaimStatuses []PodGroupResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 
 // PodGroupStatusApplyConfiguration constructs a declarative configuration of the PodGroupStatus type for use with
@@ -61,6 +63,19 @@ func (b *PodGroupStatusApplyConfiguration) WithConditions(values ...*v1.Conditio
 			panic("nil value passed to WithConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithResourceClaimStatuses adds the given value to the ResourceClaimStatuses field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceClaimStatuses field.
+func (b *PodGroupStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodGroupResourceClaimStatusApplyConfiguration) *PodGroupStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceClaimStatuses")
+		}
+		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
 	return b
 }

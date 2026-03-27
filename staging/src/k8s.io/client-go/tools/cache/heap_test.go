@@ -43,7 +43,7 @@ func compareInts(val1 interface{}, val2 interface{}) bool {
 
 func TestHeapDataLessBounds(t *testing.T) {
 	h := NewHeap(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 1))
+	_ = h.Add(mkHeapObj("foo", 1))
 
 	if h.data.Less(-1, 0) {
 		t.Fatalf("expected Less to return false for negative index")

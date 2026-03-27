@@ -248,3 +248,210 @@ message DeviceTaintSelector {
   optional string device = 4;
 }
 
+// PoolStatus contains status information for a single resource pool.
+message PoolStatus {
+  // Driver is the DRA driver name for this pool.
+  // Must be a DNS subdomain (e.g., "gpu.example.com").
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name-caseless
+  optional string driver = 1;
+
+  // PoolName is the name of the pool.
+  // Must be a valid resource pool name (DNS subdomains separated by "/").
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-resource-pool-name
+  optional string poolName = 2;
+
+  // Generation is the pool generation observed across all ResourceSlices
+  // in this pool. Only the latest generation is reported. During a generation
+  // rollout, if not all slices at the latest generation have been published,
+  // the pool is included with a validationError and device counts unset.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int64 generation = 9;
+
+  // ResourceSliceCount is the number of ResourceSlices that make up this pool.
+  // May be unset when validationError is set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=1
+  optional int32 resourceSliceCount = 8;
+
+  // TotalDevices is the total number of devices in the pool across all slices.
+  // A value of 0 means the pool has no devices.
+  // May be unset when validationError is set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=0
+  optional int32 totalDevices = 4;
+
+  // AllocatedDevices is the number of devices currently allocated to claims.
+  // A value of 0 means no devices are allocated.
+  // May be unset when validationError is set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=0
+  optional int32 allocatedDevices = 5;
+
+  // AvailableDevices is the number of devices available for allocation.
+  // This equals TotalDevices - AllocatedDevices - UnavailableDevices.
+  // A value of 0 means no devices are currently available.
+  // May be unset when validationError is set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=0
+  optional int32 availableDevices = 6;
+
+  // UnavailableDevices is the number of devices that are not available
+  // due to taints or other conditions, but are not allocated.
+  // A value of 0 means all unallocated devices are available.
+  // May be unset when validationError is set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=0
+  optional int32 unavailableDevices = 7;
+
+  // NodeName is the node this pool is associated with.
+  // When omitted, the pool is not associated with a specific node.
+  // Must be a valid DNS subdomain name (RFC1123).
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-long-name
+  optional string nodeName = 3;
+
+  // ValidationError is set when the pool's data could not be fully
+  // validated (e.g., incomplete slice publication). When set, device
+  // count fields and ResourceSliceCount may be unset.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:maxBytes=256
+  optional string validationError = 10;
+}
+
+// ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
+// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// Users should delete and recreate requests to get updated information.
+message ResourcePoolStatusRequest {
+  // Standard object metadata
+  // +required
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the filters for which pools to include in the status.
+  // The spec is immutable once created.
+  //
+  // +required
+  // +k8s:immutable
+  optional ResourcePoolStatusRequestSpec spec = 2;
+
+  // Status is populated by the controller with the calculated pool status.
+  // When status is non-nil, the request is considered complete and the
+  // entire object becomes immutable.
+  //
+  // +optional
+  // +k8s:optional
+  optional ResourcePoolStatusRequestStatus status = 3;
+}
+
+// ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.
+message ResourcePoolStatusRequestList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of ResourcePoolStatusRequests.
+  repeated ResourcePoolStatusRequest items = 2;
+}
+
+// ResourcePoolStatusRequestSpec defines the filters for the pool status request.
+message ResourcePoolStatusRequestSpec {
+  // Driver specifies the DRA driver name to filter pools.
+  // Only pools from ResourceSlices with this driver will be included.
+  // Must be a DNS subdomain (e.g., "gpu.example.com").
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name-caseless
+  optional string driver = 1;
+
+  // PoolName optionally filters to a specific pool name.
+  // If not specified, all pools from the specified driver are included.
+  // When specified, must be a non-empty valid resource pool name
+  // (DNS subdomains separated by "/").
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-resource-pool-name
+  optional string poolName = 2;
+
+  // Limit optionally specifies the maximum number of pools to return in the status.
+  // If more pools match the filter criteria, the response will be truncated
+  // (i.e., len(status.pools) < status.poolCount).
+  //
+  // Default: 100
+  // Minimum: 1
+  // Maximum: 1000
+  //
+  // +optional
+  // +k8s:optional
+  // +default=100
+  // +k8s:minimum=1
+  // +k8s:maximum=1000
+  optional int32 limit = 3;
+}
+
+// ResourcePoolStatusRequestStatus contains the calculated pool status information.
+message ResourcePoolStatusRequestStatus {
+  // PoolCount is the total number of pools that matched the filter criteria,
+  // regardless of truncation. This helps users understand how many pools exist
+  // even when the response is truncated. A value of 0 means no pools matched
+  // the filter criteria.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int32 poolCount = 6;
+
+  // Pools contains the first `spec.limit` matching pools, sorted by driver
+  // then pool name. If `len(pools) < poolCount`, the list was truncated.
+  // When omitted, no pools matched the request filters.
+  //
+  // +optional
+  // +k8s:optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:maxItems=1000
+  repeated PoolStatus pools = 2;
+
+  // Conditions provide information about the state of the request.
+  // A condition with type=Complete or type=Failed will always be set
+  // when the status is populated.
+  //
+  // Known condition types:
+  // - "Complete": True when the request has been processed successfully
+  // - "Failed": True when the request could not be processed
+  //
+  // +optional
+  // +k8s:optional
+  // +listType=map
+  // +k8s:listType=map
+  // +listMapKey=type
+  // +k8s:listMapKey=type
+  // +patchStrategy=merge
+  // +patchMergeKey=type
+  // +k8s:maxItems=10
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
+}
+

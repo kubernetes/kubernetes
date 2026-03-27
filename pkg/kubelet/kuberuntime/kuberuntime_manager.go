@@ -481,6 +481,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOptions) (map[kubetypes.UID]*kubecontainer.Pod, error) {
 	logger := klog.FromContext(ctx)
 	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
+	timestamp := time.Now()
 	sandboxes, err := m.getSandboxes(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -499,6 +500,7 @@ func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOption
 				ID:        podUID,
 				Name:      s.Metadata.Name,
 				Namespace: s.Metadata.Namespace,
+				Timestamp: timestamp,
 			}
 		}
 		p := pods[podUID]
@@ -536,6 +538,7 @@ func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOption
 				ID:        labelledInfo.PodUID,
 				Name:      labelledInfo.PodName,
 				Namespace: labelledInfo.PodNamespace,
+				Timestamp: timestamp,
 			}
 			pods[labelledInfo.PodUID] = pod
 		}
@@ -950,12 +953,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// Update our tracking of the current state.
 		currentPodResources = mergedPodResources
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-			if err = updateActuatedPodLevelResources(rName); err != nil {
-				logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
-			}
-		}
 		return nil
 	}
 
@@ -984,6 +981,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				return err
 			}
 		}
+
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
@@ -995,6 +993,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			// TODO(#127825): Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
+			}
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && podContainerChanges.UpdatePodLevelResources {
+			if err = updateActuatedPodLevelResources(rName); err != nil {
+				logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
 			}
 		}
 		return err
@@ -2018,7 +2022,12 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, pod *kubec
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
 	containerStatuses := []*kubecontainer.Status{}
 	activeContainerStatuses := []*kubecontainer.Status{}
-	timestamp := time.Now()
+
+	// Since we rely on the sandbox & container IDs in the kubecontainer.Pod, we must be
+	// conservative and use it's timestamp as the status timestamp. Otherwise, we risk reporting a
+	// newer PodStatus timestamp that is missing Sandboxes or Containers that should have been
+	// present at that time.
+	timestamp := pod.Timestamp
 
 	podIPs := []string{}
 	var activePodSandboxID string

@@ -110,6 +110,18 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: device attribute version": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/version", resource.DeviceAttribute{VersionValue: ptr.To("1.2.3")})),
 				},
+				"valid: device attribute list of ints": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_ints", resource.DeviceAttribute{IntValues: []int64{1, 2, 3}})),
+				},
+				"valid: device attribute list of bools": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_bools", resource.DeviceAttribute{BoolValues: []bool{true, false, true}})),
+				},
+				"valid: device attribute list of strings": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{StringValues: []string{"a", "b", "c"}})),
+				},
+				"valid: device attribute list of versions": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{VersionValues: []string{"1.2.3", "2.3.4"}})),
+				},
 				"invalid: device attribute with multiple values": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{IntValue: ptr.To[int64](123), BoolValue: ptr.To(true)})),
 					expectedErrs: field.ErrorList{
@@ -120,6 +132,14 @@ func TestDeclarativeValidate(t *testing.T) {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{})),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", "").WithOrigin("union").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list with multiple value types": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_multiple", resource.DeviceAttribute{IntValues: []int64{1, 2}, BoolValues: []bool{true, false}})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_multiple"), "", "",
+						).WithOrigin("union").MarkAlpha(),
 					},
 				},
 				// spec.sharedCounters
@@ -219,7 +239,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+					apitesting.VerifyValidationEquivalence(
+						t, ctx, &tc.input, strategy.Validate, tc.expectedErrs,
+						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
+						apitesting.WithIgnoreObjectConversionErrors(),
+					)
 				})
 			}
 		})

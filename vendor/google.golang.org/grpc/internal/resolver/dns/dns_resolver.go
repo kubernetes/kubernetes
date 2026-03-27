@@ -125,7 +125,10 @@ func (b *dnsBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts 
 	// IP address.
 	if ipAddr, err := formatIP(host); err == nil {
 		addr := []resolver.Address{{Addr: ipAddr + ":" + port}}
-		cc.UpdateState(resolver.State{Addresses: addr})
+		cc.UpdateState(resolver.State{
+			Addresses: addr,
+			Endpoints: []resolver.Endpoint{{Addresses: addr}},
+		})
 		return deadResolver{}, nil
 	}
 
@@ -342,7 +345,15 @@ func (d *dnsResolver) lookup() (*resolver.State, error) {
 		return nil, hostErr
 	}
 
-	state := resolver.State{Addresses: addrs}
+	eps := make([]resolver.Endpoint, 0, len(addrs))
+	for _, addr := range addrs {
+		eps = append(eps, resolver.Endpoint{Addresses: []resolver.Address{addr}})
+	}
+
+	state := resolver.State{
+		Addresses: addrs,
+		Endpoints: eps,
+	}
 	if len(srv) > 0 {
 		state = grpclbstate.Set(state, &grpclbstate.State{BalancerAddresses: srv})
 	}

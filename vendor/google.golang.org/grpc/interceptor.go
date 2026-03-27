@@ -97,8 +97,12 @@ type StreamServerInfo struct {
 	IsServerStream bool
 }
 
-// StreamServerInterceptor provides a hook to intercept the execution of a streaming RPC on the server.
-// info contains all the information of this RPC the interceptor can operate on. And handler is the
-// service method implementation. It is the responsibility of the interceptor to invoke handler to
-// complete the RPC.
+// StreamServerInterceptor provides a hook to intercept the execution of a
+// streaming RPC on the server.
+//
+// srv is the service implementation on which the RPC was invoked, and needs to
+// be passed to handler, and not used otherwise. ss is the server side of the
+// stream. info contains all the information of this RPC the interceptor can
+// operate on. And handler is the service method implementation. It is the
+// responsibility of the interceptor to invoke handler to complete the RPC.
 type StreamServerInterceptor func(srv any, ss ServerStream, info *StreamServerInfo, handler StreamHandler) error

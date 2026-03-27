@@ -230,6 +230,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	// feature gated
 	register(newStorageVersionGarbageCollectorControllerDescriptor())
 	register(newResourceClaimControllerDescriptor())
+	register(newResourcePoolStatusRequestControllerDescriptor())
 	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())

@@ -84,7 +84,19 @@
             "int": 2,
             "bool": true,
             "string": "stringValue",
-            "version": "versionValue"
+            "version": "versionValue",
+            "ints": [
+              6
+            ],
+            "bools": [
+              true
+            ],
+            "strings": [
+              "stringsValue"
+            ],
+            "versions": [
+              "versionsValue"
+            ]
           }
         },
         "capacity": {

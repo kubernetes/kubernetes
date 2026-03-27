@@ -81,6 +81,7 @@ var SupportedFeatures = internal.Features{
 	DeviceTaints:           true,
 	DeviceBindingAndStatus: true,
 	ConsumableCapacity:     true,
+	ListTypeAttributes:     true,
 }
 
 type Allocator struct {
@@ -292,6 +293,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: matchAttribute,
+					features:      a.features,
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
@@ -305,6 +307,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: distinctAttribute,
+					features:      a.features,
 					attributes:    make(map[string]resourceapi.DeviceAttribute),
 				}
 				constraints[i] = m
@@ -760,6 +763,97 @@ type constraint interface {
 	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
 }
 
+// deviceAttributeListAsSet is set-based representation of DeviceAttributeListType.
+// This has the same structure as DeviceAttributeListType, but uses sets.Set instead of slices.
+type deviceAttributeListAsSet struct {
+	intValue     sets.Set[int64]
+	boolValue    sets.Set[bool]
+	stringValue  sets.Set[string]
+	versionValue sets.Set[string]
+}
+
+// hasIntersection checks if two attribute sets have common elements.
+// Returns true if there is at least one common element.
+func (s *deviceAttributeListAsSet) hasIntersection(other *deviceAttributeListAsSet) bool {
+	if s == nil || other == nil {
+		return false
+	}
+
+	switch {
+	case s.intValue != nil && other.intValue != nil:
+		return s.intValue.Intersection(other.intValue).Len() > 0
+	case s.boolValue != nil && other.boolValue != nil:
+		return s.boolValue.Intersection(other.boolValue).Len() > 0
+	case s.stringValue != nil && other.stringValue != nil:
+		return s.stringValue.Intersection(other.stringValue).Len() > 0
+	case s.versionValue != nil && other.versionValue != nil:
+		return s.versionValue.Intersection(other.versionValue).Len() > 0
+	default:
+		// Type mismatch
+		return false
+	}
+}
+
+// updateToIntersection updates current set to intersection with the given set.
+func (s *deviceAttributeListAsSet) updateToIntersection(other *deviceAttributeListAsSet) {
+	if s == nil || other == nil {
+		return
+	}
+
+	switch {
+	case s.intValue != nil && other.intValue != nil:
+		s.intValue = s.intValue.Intersection(other.intValue)
+	case s.boolValue != nil && other.boolValue != nil:
+		s.boolValue = s.boolValue.Intersection(other.boolValue)
+	case s.stringValue != nil && other.stringValue != nil:
+		s.stringValue = s.stringValue.Intersection(other.stringValue)
+	case s.versionValue != nil && other.versionValue != nil:
+		s.versionValue = s.versionValue.Intersection(other.versionValue)
+	}
+}
+
+// attributeAsSet creates deviceAttributeListAsSet from DeviceAttribute.
+// Both scalar and list attributes are converted to set representation.
+// For scalar values, creates a single-element set.
+// For list values, creates a set from all elements.
+// Returns nil if the attribute type is unknown or empty.
+func attributeAsSet(attribute *resourceapi.DeviceAttribute) *deviceAttributeListAsSet {
+	if attribute == nil {
+		return nil
+	}
+
+	result := &deviceAttributeListAsSet{}
+
+	switch {
+	case len(attribute.IntValues) > 0:
+		result.intValue = sets.New(attribute.IntValues...)
+		return result
+	case len(attribute.BoolValues) > 0:
+		result.boolValue = sets.New(attribute.BoolValues...)
+		return result
+	case len(attribute.StringValues) > 0:
+		result.stringValue = sets.New(attribute.StringValues...)
+		return result
+	case len(attribute.VersionValues) > 0:
+		result.versionValue = sets.New(attribute.VersionValues...)
+		return result
+	case attribute.IntValue != nil:
+		result.intValue = sets.New(*attribute.IntValue)
+		return result
+	case attribute.BoolValue != nil:
+		result.boolValue = sets.New(*attribute.BoolValue)
+		return result
+	case attribute.StringValue != nil:
+		result.stringValue = sets.New(*attribute.StringValue)
+		return result
+	case attribute.VersionValue != nil:
+		result.versionValue = sets.New(*attribute.VersionValue)
+		return result
+	default:
+		return nil
+	}
+}
+
 // matchAttributeConstraint compares an attribute value across devices.
 // All devices must share the same value. When the set of devices is
 // empty, any device that has the attribute can be added. After that,
@@ -771,8 +865,14 @@ type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
 	attributeName resourceapi.FullyQualifiedName
+	features      Features
 
-	attribute  *resourceapi.DeviceAttribute
+	// For scalar values (existing behavior)
+	attribute *resourceapi.DeviceAttribute
+
+	// For list values (when DRAListTypeAttributes feature gate is enabled)
+	intersection *deviceAttributeListAsSet
+
 	numDevices int
 }
 
@@ -792,40 +892,68 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 
 	if m.numDevices == 0 {
 		// The first device can always get picked.
-		m.attribute = attribute
+		// Initialize either scalar attribute or list set based on the attribute type.
+		if m.features.ListTypeAttributes {
+			// Convert attribute to set representation (both scalar and list)
+			m.intersection = attributeAsSet(attribute)
+			if m.intersection == nil {
+				m.logger.V(7).Info("Attribute type unknown")
+				return false
+			}
+		} else {
+			// Scalar attribute: use existing behavior
+			m.attribute = attribute
+		}
 		m.numDevices = 1
 		m.logger.V(7).Info("First in set")
 		return true
 	}
 
-	switch {
-	case attribute.StringValue != nil:
-		if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
-			m.logger.V(7).Info("String values different")
+	// Check if we are matching with set-based logic or scalar-based logic
+	if m.features.ListTypeAttributes {
+		// Set-based matching: check if there is non-empty intersection
+		newSet := attributeAsSet(attribute)
+		if newSet == nil {
+			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-	case attribute.IntValue != nil:
-		if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
-			m.logger.V(7).Info("Int values different")
+		if !m.intersection.hasIntersection(newSet) {
+			m.logger.V(7).Info("Attribute values have no common elements")
 			return false
 		}
-	case attribute.BoolValue != nil:
-		if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
-			m.logger.V(7).Info("Bool values different")
+		// Update to intersection
+		m.intersection.updateToIntersection(newSet)
+	} else {
+		// Scalar matching: use existing behavior
+		switch {
+		case attribute.StringValue != nil:
+			if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
+				m.logger.V(7).Info("String values different")
+				return false
+			}
+		case attribute.IntValue != nil:
+			if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
+				m.logger.V(7).Info("Int values different")
+				return false
+			}
+		case attribute.BoolValue != nil:
+			if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
+				m.logger.V(7).Info("Bool values different")
+				return false
+			}
+		case attribute.VersionValue != nil:
+			// semver 2.0.0 requires that version strings are in their
+			// minimal form (in particular, no leading zeros). Therefore a
+			// strict "exact equal" check can do a string comparison.
+			if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
+				m.logger.V(7).Info("Version values different")
+				return false
+			}
+		default:
+			// Unknown value type, cannot match.
+			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-	case attribute.VersionValue != nil:
-		// semver 2.0.0 requires that version strings are in their
-		// minimal form (in particular, no leading zeros). Therefore a
-		// strict "exact equal" check can do a string comparison.
-		if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-			m.logger.V(7).Info("Version values different")
-			return false
-		}
-	default:
-		// Unknown value type, cannot match.
-		m.logger.V(7).Info("Match attribute type unknown")
-		return false
 	}
 
 	m.numDevices++

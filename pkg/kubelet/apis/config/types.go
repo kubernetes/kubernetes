@@ -451,7 +451,6 @@ type KubeletConfiguration struct {
 	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
-	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.

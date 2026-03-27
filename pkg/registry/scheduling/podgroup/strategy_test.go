@@ -18,12 +18,10 @@ package podgroup
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,29 +50,22 @@ var podGroup = &scheduling.PodGroup{
 	},
 }
 
-var podGroupWithSchedulingConstraints = &scheduling.PodGroup{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "foo",
-		Namespace: metav1.NamespaceDefault,
-	},
-	Spec: scheduling.PodGroupSpec{
-		PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-			Workload: &scheduling.WorkloadPodGroupTemplateReference{
-				WorkloadName:         "w",
-				PodGroupTemplateName: "t",
-			},
-		},
-		SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-			Gang: &scheduling.GangSchedulingPolicy{
-				MinCount: 5,
-			},
-		},
-		SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
-			Topology: []scheduling.TopologyConstraint{
-				{Key: "foo"},
-			},
-		},
-	},
+func podGroupWithSchedulingConstraints(keys ...string) *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
+		Topology: []scheduling.TopologyConstraint{},
+	}
+	for _, key := range keys {
+		constraint := scheduling.TopologyConstraint{Key: key}
+		pg.Spec.SchedulingConstraints.Topology = append(pg.Spec.SchedulingConstraints.Topology, constraint)
+	}
+	return pg
+}
+
+func podGroupWithDisruptionMode(mode scheduling.DisruptionMode) *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.DisruptionMode = &mode
+	return pg
 }
 
 var (
@@ -82,6 +73,11 @@ var (
 	minCountError          = "must be greater than or equal to 1"
 	oneOfError             = "must specify one of: `basic`, `gang`"
 	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
+	tooManyItemsError      = "must have at most 1 item"
+	maximumError           = "must be less than or equal to 1000000000"
+	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	forbiddenError         = "Forbidden"
+	supportedModesError    = `supported values: "Pod", "PodGroup"`
 )
 
 func TestStrategy(t *testing.T) {
@@ -106,13 +102,13 @@ func ctxWithRequestInfo() context.Context {
 func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
-	type testCase struct {
-		obj                   *scheduling.PodGroup
-		expectObj             *scheduling.PodGroup
-		expectValidationError string
-		tasEnabled            bool
-	}
-	testCases := map[string]testCase{
+	testCases := map[string]struct {
+		obj                           *scheduling.PodGroup
+		expectObj                     *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		enableWorkloadAwarePreemption bool
+		expectValidationError         string
+	}{
 		"simple": {
 			obj:       podGroup,
 			expectObj: podGroup,
@@ -157,51 +153,116 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectObj: podGroup,
 		},
-		"multiple topology constraints": {
-			obj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology = []scheduling.TopologyConstraint{
-					{Key: "foo"},
-					{Key: "bar"},
-				}
-				return newPodGroup
-			}(),
-			expectValidationError: "must have at most 1 item",
-			tasEnabled:            true,
+		"multiple topology constraints, topology aware scheduling enabled": {
+			obj:                           podGroupWithSchedulingConstraints("foo", "bar"),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         tooManyItemsError,
 		},
-		"invalid topology key": {
-			obj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology[0].Key = "foo-"
-				return newPodGroup
-			}(),
-			expectValidationError: "Invalid value: \"foo-\"",
-			tasEnabled:            true,
+		"multiple topology constraints, topology aware scheduling disabled": {
+			obj:       podGroupWithSchedulingConstraints("foo", "bar"),
+			expectObj: podGroup,
+		},
+		"invalid topology key, topology aware scheduling enabled": {
+			obj:                           podGroupWithSchedulingConstraints("foo-"),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         "Invalid value: \"foo-\"",
+		},
+		"invalid topology key, topology aware scheduling disabled": {
+			obj:       podGroupWithSchedulingConstraints("foo-"),
+			expectObj: podGroup,
 		},
 		"with TAS feature gate disabled, drop scheduling constraints on creation": {
-			obj:        podGroupWithSchedulingConstraints.DeepCopy(),
-			expectObj:  podGroup,
-			tasEnabled: false,
+			obj:       podGroupWithSchedulingConstraints("foo-"),
+			expectObj: podGroup,
+		},
+		"workload aware preemption disabled - drop disruption mode": {
+			obj:       podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			expectObj: podGroup,
+		},
+		"workload aware preemption enabled - preserve disruption mode (pod)": {
+			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - preserve disruption mode (pod group)": {
+			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - unknown disruption mode": {
+			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionMode("Invalid")),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         supportedModesError,
+		},
+		"workload aware preemption disabled - drop priorityClassName": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "high-priority"
+				return pg
+			}(),
+			expectObj: podGroup,
+		},
+		"workload aware preemption enabled - invalid priorityClassName": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "invalid/priority/class/name"
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         subdomainNameError,
+		},
+		"workload aware preemption enabled - preserve priorityClassName": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "high-priority"
+				return pg
+			}(),
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "high-priority"
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption disabled - drop priority": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(1000))
+				return pg
+			}(),
+			expectObj: podGroup,
+		},
+		"workload aware preemption enabled - preserve priority": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(1000))
+				return pg
+			}(),
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(1000))
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - too high priority": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         maximumError,
 		},
 	}
 
-	allTestCases := make(map[string]testCase)
 	for name, tc := range testCases {
-		allTestCases[name] = tc
-		if tc.tasEnabled {
-			newTc := testCase{
-				obj:       tc.obj,
-				expectObj: podGroup,
-			}
-			allTestCases[fmt.Sprintf("drops scheduling constraints, originally %s", name)] = newTc
-		}
-	}
-
-	for name, tc := range allTestCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 tc.tasEnabled,
-				features.TopologyAwareWorkloadScheduling: tc.tasEnabled,
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
+				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
 			podGroup := tc.obj.DeepCopy()
 
@@ -225,6 +286,7 @@ func TestStrategyCreate(t *testing.T) {
 			if warnings := strategy.WarningsOnCreate(ctx, podGroup); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
+			strategy.Canonicalize(podGroup)
 			if tc.expectObj != nil {
 				if diff := cmp.Diff(tc.expectObj, podGroup); diff != "" {
 					t.Errorf("got unexpected podGroup object (-want, +got): %s", diff)
@@ -237,10 +299,11 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                *scheduling.PodGroup
-		newObj                *scheduling.PodGroup
-		expectValidationError string
-		tasEnabled            bool
+		oldObj                        *scheduling.PodGroup
+		newObj                        *scheduling.PodGroup
+		enableTopologyAwareScheduling bool
+		enableWorkloadAwarePreemption bool
+		expectValidationError         string
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -290,69 +353,104 @@ func TestStrategyUpdate(t *testing.T) {
 			expectValidationError: fieldImmutableError,
 		},
 		"changing scheduling constraints not allowed": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{}
-				return newPodGroup
-			}(),
-			expectValidationError: fieldImmutableError,
-			tasEnabled:            true,
+			oldObj:                        podGroupWithSchedulingConstraints("foo"),
+			newObj:                        podGroupWithSchedulingConstraints(),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         fieldImmutableError,
 		},
 		"changing topology constraints not allowed": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology = []scheduling.TopologyConstraint{}
-				return newPodGroup
-			}(),
-			expectValidationError: fieldImmutableError,
-			tasEnabled:            true,
+			oldObj:                        podGroupWithSchedulingConstraints("foo"),
+			newObj:                        podGroupWithSchedulingConstraints(),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         fieldImmutableError,
 		},
 		"changing topology key not allowed": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology[0].Key = "foobar"
-				return newPodGroup
-			}(),
-			expectValidationError: fieldImmutableError,
-			tasEnabled:            true,
+			oldObj:                        podGroupWithSchedulingConstraints("foo"),
+			newObj:                        podGroupWithSchedulingConstraints("foobar"),
+			enableTopologyAwareScheduling: true,
+			expectValidationError:         fieldImmutableError,
 		},
 		"changing scheduling constraints not allowed with TAS disabled": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{}
-				return newPodGroup
-			}(),
-			expectValidationError: fieldImmutableError,
+			oldObj:                podGroupWithSchedulingConstraints("foo"),
+			newObj:                podGroupWithSchedulingConstraints(),
+			expectValidationError: forbiddenError,
 		},
 		"changing topology constraints not allowed with TAS disabled": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology = []scheduling.TopologyConstraint{}
-				return newPodGroup
-			}(),
-			expectValidationError: fieldImmutableError,
+			oldObj:                podGroupWithSchedulingConstraints("foo"),
+			newObj:                podGroupWithSchedulingConstraints(),
+			expectValidationError: forbiddenError,
 		},
 		"changing topology key not allowed with TAS disabled": {
-			oldObj: podGroupWithSchedulingConstraints,
-			newObj: func() *scheduling.PodGroup {
-				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
-				newPodGroup.Spec.SchedulingConstraints.Topology[0].Key = "foobar"
-				return newPodGroup
+			oldObj:                podGroupWithSchedulingConstraints("foo"),
+			newObj:                podGroupWithSchedulingConstraints("foobar"),
+			expectValidationError: forbiddenError,
+		},
+		"disruption mode update, workload aware preemption disabled": {
+			oldObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			newObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			expectValidationError: forbiddenError,
+		},
+		"disruption mode update, workload aware preemption enabled": {
+			oldObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			newObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
+		},
+		"priority class name update, workload aware preemption disabled": {
+			oldObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "low-priority"
+				return pg
 			}(),
-			expectValidationError: fieldImmutableError,
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "high-priority"
+				return pg
+			}(),
+			expectValidationError: forbiddenError,
+		},
+		"priority class name update, workload aware preemption enabled": {
+			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.PriorityClassName = "high-priority"
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
+		},
+		"priority update, workload aware preemption disabled": {
+			oldObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(1000))
+				return pg
+			}(),
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(2000))
+				return pg
+			}(),
+			expectValidationError: forbiddenError,
+		},
+		"priority update, workload aware preemption enabled": {
+			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			newObj: func() *scheduling.PodGroup {
+				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg.Spec.Priority = new(int32(2000))
+				return pg
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 tc.tasEnabled,
-				features.TopologyAwareWorkloadScheduling: tc.tasEnabled,
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
+				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
+				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
@@ -478,7 +576,272 @@ func TestStatusStrategyUpdate(t *testing.T) {
 
 			expectObj := tc.expectObj.DeepCopy()
 			expectObj.ResourceVersion = "4"
-			assert.Equal(t, expectObj, newObj)
+			if diff := cmp.Diff(expectObj, newObj); diff != "" {
+				t.Errorf("PodGroup mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
+}
+
+func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
+	var noPodGroup *scheduling.PodGroup
+	podGroupWithoutClaims := podGroup
+
+	t.Run("spec", func(t *testing.T) {
+		podGroupWithClaims := func() *scheduling.PodGroup {
+			w := podGroupWithoutClaims.DeepCopy()
+			w.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: new("resource-claim"),
+				},
+			}
+			return w
+		}()
+
+		tests := []struct {
+			description  string
+			enabled      bool
+			oldPodGroup  *scheduling.PodGroup
+			newPodGroup  *scheduling.PodGroup
+			wantPodGroup *scheduling.PodGroup
+		}{
+			{
+				description:  "old with claims / new with claims / disabled",
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "old without claims / new with claims / disabled",
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new with claims / disabled",
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+
+			{
+				description:  "old with claims / new without claims / disabled",
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "old without claims / new without claims / disabled",
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new without claims / disabled",
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+
+			{
+				description:  "old with claims / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "old without claims / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "no old PodGroup / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+
+			{
+				description:  "old with claims / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "old without claims / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.description, func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAWorkloadResourceClaims: tc.enabled,
+					features.GenericWorkload:           tc.enabled,
+				})
+
+				oldPodGroup := tc.oldPodGroup.DeepCopy()
+				newPodGroup := tc.newPodGroup.DeepCopy()
+				wantPodGroup := tc.wantPodGroup
+				dropDisabledPodGroupFields(newPodGroup, oldPodGroup)
+
+				// old PodGroup should never be changed
+				if diff := cmp.Diff(oldPodGroup, tc.oldPodGroup); diff != "" {
+					t.Errorf("old PodGroup changed: %s", diff)
+				}
+
+				if diff := cmp.Diff(wantPodGroup, newPodGroup); diff != "" {
+					t.Errorf("new PodGroup changed (- want, + got): %s", diff)
+				}
+			})
+		}
+	})
+
+	t.Run("status", func(t *testing.T) {
+		podGroupWithClaims := func() *scheduling.PodGroup {
+			w := podGroupWithoutClaims.DeepCopy()
+			w.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: new("resource-claim"),
+				},
+			}
+			w.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: new("generated-claim"),
+				},
+			}
+			return w
+		}()
+
+		tests := []struct {
+			description  string
+			enabled      bool
+			oldPodGroup  *scheduling.PodGroup
+			newPodGroup  *scheduling.PodGroup
+			wantPodGroup *scheduling.PodGroup
+		}{
+			{
+				description:  "old with claims / new with claims / disabled",
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "old without claims / new with claims / disabled",
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new with claims / disabled",
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+
+			{
+				description:  "old with claims / new without claims / disabled",
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "old without claims / new without claims / disabled",
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new without claims / disabled",
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+
+			{
+				description:  "old with claims / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "old without claims / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+			{
+				description:  "no old PodGroup / new with claims / enabled",
+				enabled:      true,
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithClaims,
+				wantPodGroup: podGroupWithClaims,
+			},
+
+			{
+				description:  "old with claims / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "old without claims / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  podGroupWithoutClaims,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+			{
+				description:  "no old PodGroup / new without claims / enabled",
+				enabled:      true,
+				oldPodGroup:  noPodGroup,
+				newPodGroup:  podGroupWithoutClaims,
+				wantPodGroup: podGroupWithoutClaims,
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.description, func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAWorkloadResourceClaims: tc.enabled,
+					features.GenericWorkload:           tc.enabled,
+				})
+
+				oldPodGroup := tc.oldPodGroup.DeepCopy()
+				newPodGroup := tc.newPodGroup.DeepCopy()
+				wantPodGroup := tc.wantPodGroup
+				dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup)
+
+				// old PodGroup should never be changed
+				if diff := cmp.Diff(oldPodGroup, tc.oldPodGroup); diff != "" {
+					t.Errorf("old PodGroup changed: %s", diff)
+				}
+
+				if diff := cmp.Diff(wantPodGroup.Status, newPodGroup.Status); diff != "" {
+					t.Errorf("new PodGroup changed (- want, + got): %s", diff)
+				}
+			})
+		}
+	})
 }

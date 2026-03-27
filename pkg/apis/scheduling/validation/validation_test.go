@@ -305,59 +305,6 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Namespace += "bar"
 			}),
 		},
-		"set controller ref": {
-			old: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-			update: mkWorkload(),
-		},
-		"unset controller ref": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-		},
-		"change pod group name": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[0].Name += "bar"
-			}),
-		},
-		"add pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates = append(w.Spec.PodGroupTemplates, scheduling.PodGroupTemplate{
-					Name: "group3",
-					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
-					},
-				})
-			}),
-		},
-		"delete pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates = w.Spec.PodGroupTemplates[:1]
-			}),
-		},
-		"change gang min count": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingPolicy.Gang.MinCount = 5
-			}),
-		},
-		"change controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef.Kind += "bar"
-			}),
-		},
-		"delete controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -542,44 +489,6 @@ func TestValidatePodGroupUpdate(t *testing.T) {
 				pg.Namespace += "bar"
 			}),
 		},
-		"change podGroup template ref name": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef.Workload.PodGroupTemplateName = "new-template"
-			}),
-		},
-		"change podGroup template ref workload name": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef.Workload.WorkloadName = "new-workload"
-			}),
-		},
-		"delete podGroup template ref": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef = nil
-			}),
-		},
-		"change gang min count": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy.Gang.MinCount = 10
-			}),
-		},
-		"change scheduling policy": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
-					Basic: &scheduling.BasicSchedulingPolicy{},
-				}
-			}),
-		},
-		"multiple scheduling policies": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy.Basic = &scheduling.BasicSchedulingPolicy{}
-			}),
-		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -611,6 +520,24 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 					Message:            "Test status condition message",
 					LastTransitionTime: now,
 				})
+			}),
+		},
+		"ok resource claim status": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+			}),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: new("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				}
 			}),
 		},
 	}
@@ -724,6 +651,14 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 					},
 				}
 				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"non-existent resource claim in status": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: new("my-claim")},
+				}
 			}),
 		},
 	}

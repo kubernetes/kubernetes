@@ -68,6 +68,9 @@ type Snapshot struct {
 	placementNodes *placementNodes
 	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
 	genericWorkloadEnabled bool
+	// hasBackup holds information whether backup was performed and
+	// restore was not performed yet.
+	hasBackup bool
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -128,6 +131,61 @@ func createPodGroupStates(pods []*v1.Pod) map[podGroupKey]*podGroupStateSnapshot
 		pgs.addPod(pod)
 	}
 	return podGroupStates
+}
+
+// RestoreSnapshot is a function that can be used to restore the snapshot to the state
+// before the backup was taken.
+type RestoreSnapshot func()
+
+// BackupSnapshot provides a way to temporarily backup the snapshot's state
+// and returns a restore function. This is primarily used in workload-aware
+// preemption to simulate pod group preemption by mutating deep copies of NodeInfos.
+// Backups cannot be stacked, i.e., only one backup can be made without restoring
+// the snapshot first.
+// Restoring backup when the placement is set is not supported and can lead to
+// undefined behavior.
+func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
+	if s.hasBackup {
+		return nil, fmt.Errorf("cannot stack backups")
+	}
+	origNodeInfoMap := s.nodeInfoMap
+	origNodeInfoList := s.nodeInfoList
+	origHavePodsWithAffinityNodeInfoList := s.havePodsWithAffinityNodeInfoList
+	origHavePodsWithRequiredAntiAffinityNodeInfoList := s.havePodsWithRequiredAntiAffinityNodeInfoList
+
+	clonedNodeInfoMap := make(map[string]*framework.NodeInfo, len(s.nodeInfoMap))
+	for k, v := range s.nodeInfoMap {
+		clonedNodeInfoMap[k] = v.Snapshot().(*framework.NodeInfo)
+	}
+
+	clonedNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	clonedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	clonedHavePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+
+	for _, v := range s.nodeInfoList {
+		clonedNode := clonedNodeInfoMap[v.Node().Name]
+		clonedNodeInfoList = append(clonedNodeInfoList, clonedNode)
+		if len(clonedNode.PodsWithAffinity) > 0 {
+			clonedHavePodsWithAffinityNodeInfoList = append(clonedHavePodsWithAffinityNodeInfoList, clonedNode)
+		}
+		if len(clonedNode.PodsWithRequiredAntiAffinity) > 0 {
+			clonedHavePodsWithRequiredAntiAffinityNodeInfoList = append(clonedHavePodsWithRequiredAntiAffinityNodeInfoList, clonedNode)
+		}
+	}
+
+	s.hasBackup = true
+	s.nodeInfoMap = clonedNodeInfoMap
+	s.nodeInfoList = clonedNodeInfoList
+	s.havePodsWithAffinityNodeInfoList = clonedHavePodsWithAffinityNodeInfoList
+	s.havePodsWithRequiredAntiAffinityNodeInfoList = clonedHavePodsWithRequiredAntiAffinityNodeInfoList
+
+	return func() {
+		s.hasBackup = false
+		s.nodeInfoMap = origNodeInfoMap
+		s.nodeInfoList = origNodeInfoList
+		s.havePodsWithAffinityNodeInfoList = origHavePodsWithAffinityNodeInfoList
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = origHavePodsWithRequiredAntiAffinityNodeInfoList
+	}, nil
 }
 
 // createNodeInfoMap obtains a list of pods and pivots that list into a map

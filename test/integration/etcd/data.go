@@ -539,7 +539,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			RemovedVersion:    "1.42",
 		},
 		gvr("scheduling.k8s.io", "v1alpha2", "podgroups"): {
-			Stub:              `{"metadata": {"name": "pg1"}, "spec": {"podGroupTemplateRef": {"workload": {"podGroupTemplateName": "t", "workloadName": "w"}}, "schedulingPolicy": {"basic": {}}}}`,
+			Stub:              `{"metadata": {"name": "pg1"}, "spec": {"schedulingPolicy": {"basic": {}}}}`,
 			ExpectedEtcdPath:  "/registry/podgroups/" + namespace + "/pg1",
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",
@@ -607,6 +607,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
+		},
+		gvr("resource.k8s.io", "v1alpha3", "resourcepoolstatusrequests"): {
+			Stub:              `{"metadata": {"name": "rpsr1name"}, "spec": {"driver": "test-driver.example.com"}}`,
+			ExpectedEtcdPath:  "/registry/resourcepoolstatusrequests/rpsr1name",
+			IntroducedVersion: "1.36",
+			RemovedVersion:    "1.42",
 		},
 		// --
 

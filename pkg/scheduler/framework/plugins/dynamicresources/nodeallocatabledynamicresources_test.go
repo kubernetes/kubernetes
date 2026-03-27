@@ -75,28 +75,16 @@ func (m *mockDRAManager) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClai
 
 func (m *mockDRAManager) AssumedClaimRestore(namespace, name string) {}
 
-func (m *mockDRAManager) ClaimHasPendingAllocation(uid types.UID) bool {
-	return false
+func (m *mockDRAManager) GetPendingAllocation(uid types.UID) *resourceapi.AllocationResult {
+	return nil
 }
 
 func (m *mockDRAManager) SignalClaimPendingAllocation(uid types.UID, claim *resourceapi.ResourceClaim) error {
 	return nil
 }
 
-func (m *mockDRAManager) GetPendingAllocation(claimUID types.UID) (*resourceapi.AllocationResult, bool) {
-	return nil, false
-}
-
-func (m *mockDRAManager) MaybeRemoveClaimPendingAllocation(claimUID types.UID, shareable bool) (deleted bool) {
+func (m *mockDRAManager) MaybeRemoveClaimPendingAllocation(_ types.UID, _ bool) (deleted bool) {
 	return false
-}
-
-func (m *mockDRAManager) AddSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
-	return nil
-}
-
-func (m *mockDRAManager) RemoveSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
-	return nil
 }
 
 func (m *mockDRAManager) List() ([]*resourceapi.ResourceClaim, error) {

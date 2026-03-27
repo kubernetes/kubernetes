@@ -71,17 +71,20 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, desiredCtrCPU, desiredCtrMem)
 			for i, c := range expectedContainers {
 				// If the pod has init containers, but we are not resizing them, keep the original resources.
-				if c.InitCtr && !resizeInitCtrs {
+				podLevelOnly := (desiredCtrCPU == "" && desiredPodCPU != originalCPU) || (desiredCtrMem == "" && desiredPodMem != originalMem)
+
+				if c.InitCtr && !resizeInitCtrs && !podLevelOnly {
 					c.Resources = originalContainers[i].Resources
 					expectedContainers[i] = c
 					continue
 				}
 				// For containers where the resize policy is "restart", we expect a restart.
 				expectRestart := int32(0)
-				if cpuPolicy == v1.RestartContainer && desiredCtrCPU != originalCtrCPU {
+
+				if cpuPolicy == v1.RestartContainer && (desiredCtrCPU != originalCtrCPU || (desiredCtrCPU == "" && desiredPodCPU != originalCPU)) {
 					expectRestart = 1
 				}
-				if memPolicy == v1.RestartContainer && desiredCtrMem != originalCtrMem {
+				if memPolicy == v1.RestartContainer && (desiredCtrMem != originalCtrMem || (desiredCtrMem == "" && desiredPodMem != originalMem)) {
 					expectRestart = 1
 				}
 				c.RestartCount = expectRestart

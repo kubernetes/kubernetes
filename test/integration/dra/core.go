@@ -44,6 +44,7 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -518,7 +519,8 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 				managedFieldsSize += f.Size()
 			}
 			specSize := createdSlice.Spec.Size()
-			tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+			tCtx.Logf("\n\nDevices: %d\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+				len(createdSlice.Spec.Devices),
 				resource.NewQuantity(int64(totalSize), resource.BinarySI),
 				resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
 				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
@@ -538,7 +540,11 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 	class, _ := createTestClass(tCtx, namespace)
 
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+	features := resourceclaim.Features{
+		AdminAccess:     true,
+		PrioritizedList: true,
+	}
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory, features)
 	informerFactory.Start(tCtx.Done())
 	cache.WaitForCacheSync(tCtx.Done(),
 		informerFactory.Core().V1().Pods().Informer().HasSynced,

@@ -40,9 +40,17 @@ spec:
     attributes:
       attributesKey:
         bool: true
+        bools:
+        - true
         int: 2
+        ints:
+        - 6
         string: stringValue
+        strings:
+        - stringsValue
         version: versionValue
+        versions:
+        - versionsValue
     bindingConditions:
     - bindingConditionsValue
     bindingFailureConditions:
