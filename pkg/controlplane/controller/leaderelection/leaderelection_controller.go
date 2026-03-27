@@ -211,13 +211,6 @@ func (c *Controller) electionNeeded(candidates []*v1beta1.LeaseCandidate, leaseN
 		return true, nil
 	}
 
-	// every 15min enforce an election to update all candidates. Every 30min we garbage collect.
-	for _, candidate := range candidates {
-		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(leaseCandidateValidDuration/2).Before(c.clock.Now()) {
-			return true, nil
-		}
-	}
-
 	prelimStrategy, err := pickBestStrategy(candidates)
 	if err != nil {
 		return false, err
