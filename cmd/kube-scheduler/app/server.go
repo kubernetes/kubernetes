@@ -238,7 +238,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 
 		// Start lease candidate controller for coordinated leader election
-		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
+		leaseCandidate, err := leaderelection.NewCandidate(
 			cc.Client,
 			metav1.NamespaceSystem,
 			cc.LeaderElection.Lock.Identity(),
@@ -250,7 +250,6 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		if err != nil {
 			return err
 		}
-		readyzChecks = append(readyzChecks, healthz.NewInformerSyncHealthz(waitForSync))
 		go leaseCandidate.Run(ctx)
 	}
 
