@@ -262,7 +262,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		if err != nil {
 			return defaultRequeueInterval, err
 		}
-		return c.requeueForHealthyLease(candidates, leaseNN), nil
+		return c.requeueForHealthyLease(leaseNN), nil
 	}
 	if err != nil {
 		return defaultRequeueInterval, err
@@ -438,26 +438,15 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 }
 
 // requeueForHealthyLease computes the requeue duration for a lease that does not
-// need election. It returns the minimum of time-until-lease-expiry and
-// time-until-earliest-candidate-needs-renewal-enforcement.
-func (c *Controller) requeueForHealthyLease(candidates []*v1beta1.LeaseCandidate, leaseNN types.NamespacedName) time.Duration {
-	now := c.clock.Now()
-	d := time.Duration(0)
-
+// need election. While the holder is alive, lease renewal informer events will
+// wake the controller. This timer is a safety net for when the holder dies and
+// stops generating events.
+func (c *Controller) requeueForHealthyLease(leaseNN types.NamespacedName) time.Duration {
 	lease, err := c.leaseInformer.Lister().Leases(leaseNN.Namespace).Get(leaseNN.Name)
-	if err == nil {
-		d = timeUntilLeaseExpiry(c.clock, lease)
+	if err != nil {
+		return defaultRequeueInterval
 	}
-
-	for _, candidate := range candidates {
-		if candidate.Spec.RenewTime != nil {
-			untilRenewal := candidate.Spec.RenewTime.Add(leaseCandidateValidDuration / 2).Sub(now)
-			if untilRenewal > 0 && (d <= 0 || untilRenewal < d) {
-				d = untilRenewal
-			}
-		}
-	}
-
+	d := timeUntilLeaseExpiry(c.clock, lease)
 	if d <= 0 {
 		return defaultRequeueInterval
 	}
