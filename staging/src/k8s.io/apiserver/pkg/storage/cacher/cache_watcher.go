@@ -210,8 +210,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 
 	// OK, block sending, but only until timer fires.
+	start := time.Now()
 	select {
 	case c.input <- event:
+		metrics.RecordCacheWatcherInputQueueBlock(c.groupResource, start)
 		return true
 	case <-timer.C:
 		closeFunc()

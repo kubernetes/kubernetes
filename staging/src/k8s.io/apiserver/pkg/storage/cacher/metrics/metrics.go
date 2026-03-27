@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -171,6 +172,26 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"group", "resource"})
 
+	cacherIncomingQueueBlockDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "incoming_queue_block_duration_seconds",
+			Help:           "Time spent waiting to write to the incoming channel in Cacher.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10},
+		}, []string{"group", "resource"})
+
+	cacheWatcherInputQueueBlockDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "cache_watcher_input_queue_block_duration_seconds",
+			Help:           "Time spent waiting to write to the input channel of a cache watcher.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10},
+		}, []string{"group", "resource"})
+
 	ConsistentReadTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -234,6 +255,8 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
+		legacyregistry.MustRegister(cacherIncomingQueueBlockDuration)
+		legacyregistry.MustRegister(cacheWatcherInputQueueBlockDuration)
 	})
 }
 
@@ -274,4 +297,21 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordCacherIncomingQueueBlock updates the incoming_queue_block_duration_seconds metric.
+func RecordCacherIncomingQueueBlock(groupResource schema.GroupResource, startTime time.Time) {
+	cacherIncomingQueueBlockDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordCacheWatcherInputQueueBlock updates the cache_watcher_input_queue_block_duration_seconds metric.
+func RecordCacheWatcherInputQueueBlock(groupResource schema.GroupResource, startTime time.Time) {
+	cacheWatcherInputQueueBlockDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+}
+
+// sinceInSeconds gets the time since the specified start in seconds.
+//
+// This is a variable to facilitate testing.
+var sinceInSeconds = func(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }

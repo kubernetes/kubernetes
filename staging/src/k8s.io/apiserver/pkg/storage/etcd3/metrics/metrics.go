@@ -183,6 +183,42 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	watcherQueueEventBlockDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_watcher_queue_event_block_duration_seconds",
+			Help:           "Time spent waiting to write to the incoming event channel in queueEvent.",
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10, 15, 30, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	watcherSendEventBlockDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_watcher_send_event_block_duration_seconds",
+			Help:           "Time spent waiting to write to the result channel in sendEvent.",
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10, 15, 30, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	watcherConcurrentProcessingBlockDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_watcher_concurrent_processing_block_duration_seconds",
+			Help:           "Time spent waiting to schedule concurrent event processing when the queue is full.",
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	watcherTransformDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_watcher_transform_duration_seconds",
+			Help:           "Time spent in transform (CPU bound decoding/deserialization) of events.",
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -208,6 +244,10 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(watcherQueueEventBlockDuration)
+		legacyregistry.MustRegister(watcherSendEventBlockDuration)
+		legacyregistry.MustRegister(watcherConcurrentProcessingBlockDuration)
+		legacyregistry.MustRegister(watcherTransformDuration)
 	})
 }
 
@@ -265,6 +305,26 @@ func RecordEtcdBookmark(groupResource schema.GroupResource) {
 // RecordDecodeError sets the storage_decode_errors metrics.
 func RecordDecodeError(groupResource schema.GroupResource) {
 	decodeErrorCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordWatcherQueueEventBlock updates the etcd_watcher_queue_event_block_duration_seconds metric.
+func RecordWatcherQueueEventBlock(groupResource schema.GroupResource, startTime time.Time) {
+	watcherQueueEventBlockDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordWatcherSendEventBlock updates the etcd_watcher_send_event_block_duration_seconds metric.
+func RecordWatcherSendEventBlock(groupResource schema.GroupResource, startTime time.Time) {
+	watcherSendEventBlockDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordWatcherConcurrentProcessingBlock updates the etcd_watcher_concurrent_processing_block_duration_seconds metric.
+func RecordWatcherConcurrentProcessingBlock(groupResource schema.GroupResource, startTime time.Time) {
+	watcherConcurrentProcessingBlockDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordWatcherTransform updates the etcd_watcher_transform_duration_seconds metric.
+func RecordWatcherTransform(groupResource schema.GroupResource, startTime time.Time) {
+	watcherTransformDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 // Reset resets the etcd_request_duration_seconds metric.

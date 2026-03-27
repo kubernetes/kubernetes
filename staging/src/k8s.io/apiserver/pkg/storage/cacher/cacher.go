@@ -880,7 +880,9 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 		// Monitor if this gets backed up, and how much.
 		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.groupResource.String(), curLen)
 	}
+	start := time.Now()
 	c.incoming <- *event
+	metrics.RecordCacherIncomingQueueBlock(c.groupResource, start)
 }
 
 func (c *Cacher) dispatchEvents() {

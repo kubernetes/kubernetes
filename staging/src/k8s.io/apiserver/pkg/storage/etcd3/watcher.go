@@ -512,10 +512,12 @@ func (p *concurrentOrderedEventProcessing) scheduleEventProcessing(ctx context.C
 		case e = <-p.wc.incomingEventChan:
 		}
 		processingResponse := make(chan *processingResult, 1)
+		start := time.Now()
 		select {
 		case <-ctx.Done():
 			return
 		case p.processingQueue <- processingResponse:
+			metrics.RecordWatcherConcurrentProcessingBlock(p.wc.watcher.groupResource, start)
 		}
 		wg.Add(1)
 		go func(e *event, response chan<- *processingResult) {
@@ -570,6 +572,11 @@ func (wc *watchChan) acceptAll() bool {
 
 // transform transforms an event into a result for user if not filtered.
 func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
+	start := time.Now()
+	defer func() {
+		metrics.RecordWatcherTransform(wc.watcher.groupResource, start)
+	}()
+
 	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
 		klog.Errorf("failed to prepare current and previous objects: %v", err)
@@ -680,8 +687,10 @@ func (wc *watchChan) sendEvent(event *watch.Event) bool {
 	// If user couldn't receive results fast enough, we also block incoming events from watcher.
 	// Because storing events in local will cause more memory usage.
 	// The worst case would be closing the fast watcher.
+	start := time.Now()
 	select {
 	case wc.resultChan <- *event:
+		metrics.RecordWatcherSendEventBlock(wc.watcher.groupResource, start)
 		return true
 	case <-wc.ctx.Done():
 		return false
@@ -692,8 +701,10 @@ func (wc *watchChan) queueEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
 		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
 	}
+	start := time.Now()
 	select {
 	case wc.incomingEventChan <- e:
+		metrics.RecordWatcherQueueEventBlock(wc.watcher.groupResource, start)
 	case <-wc.ctx.Done():
 	}
 }
