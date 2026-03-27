@@ -1191,6 +1191,163 @@ func TestFastPathLeaderElection(t *testing.T) {
 	}
 }
 
+func TestCoordinatedFastPathLeaderElection(t *testing.T) {
+	objectType := "leases"
+	identity := "baz"
+	var (
+		lockObj    runtime.Object
+		updates    int
+		lockOps    []string
+		cancelFunc func()
+	)
+	resetVars := func() {
+		lockObj = nil
+		updates = 0
+		lockOps = []string{}
+		cancelFunc = nil
+	}
+	lec := LeaderElectionConfig{
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+		Coordinated:   true,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		reactors        []Reactor
+		expectedLockOps []string
+	}{
+		{
+			name: "Exercise fast path after coordinated lock acquired",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						// Pre-existing lease held by this identity (coordinated leases are created externally)
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						// After acquiring (first update), subsequent renewals should be fast path (update only).
+						// Cancel after 3 updates: 1 acquire + 2 renewals.
+						if updates == 3 {
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			// acquire: get + update, then 2 fast-path renewals: update, update (no get)
+			expectedLockOps: []string{"get", "update", "update", "update"},
+		},
+		{
+			name: "Fallback to slow path after coordinated fast path conflict",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						switch updates {
+						case 2:
+							// First renewal fast path: return conflict to force slow path fallback
+							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "fake conflict", nil)
+						case 4:
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			// acquire: get + update, then renewal 1: update(conflict) + get + update (slow path),
+			// then renewal 2: update (fast path again)
+			expectedLockOps: []string{"get", "update", "update", "get", "update", "update"},
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			resetVars()
+
+			recorder := record.NewFakeRecorder(100)
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      identity,
+				EventRecorder: recorder,
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
+			}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
+			lock, err := rl.New("leases", "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			if err != nil {
+				t.Fatal("resourcelock.New() = ", err)
+			}
+
+			lec.Lock = lock
+			elector, err := NewLeaderElector(lec)
+			if err != nil {
+				t.Fatal("Failed to create leader elector: ", err)
+			}
+
+			ctx, cancel := context.WithCancel(ctx)
+			cancelFunc = cancel
+
+			elector.Run(ctx)
+			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+		})
+	}
+}
+
 func TestCheckMethodRace(t *testing.T) {
 	objectType := "leases"
 	objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
