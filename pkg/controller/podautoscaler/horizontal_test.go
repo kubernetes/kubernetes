@@ -727,15 +727,19 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 		}
 		return v >= 1, nil
 	}); err != nil {
-		t.Fatalf("reconciliation metric was not recorded for action=%s, error=%s", actionStr, errorStr)
+		t.Fatalf("reconciliations_total metric was not recorded for action=%s, error=%s", actionStr, errorStr)
 	}
 
 	if tc.verifyReconciliationDuration {
-		count, err := metricstestutil.GetHistogramMetricCount(monitor.ReconciliationsDuration.WithLabelValues(actionStr, errorStr))
-		if err != nil {
-			t.Fatalf("error getting reconciliation duration metric: %v", err)
+		if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+			count, err := metricstestutil.GetHistogramMetricCount(monitor.ReconciliationsDuration.WithLabelValues(actionStr, errorStr))
+			if err != nil {
+				return false, nil
+			}
+			return count >= 1, nil
+		}); err != nil {
+			t.Fatalf("reconciliation_duration_seconds metric was not recorded for action=%s, error=%s", actionStr, errorStr)
 		}
-		assert.Positive(t, count, "reconciliation duration should be recorded")
 	}
 
 	if tc.expectedReconciliationCount > 0 {
