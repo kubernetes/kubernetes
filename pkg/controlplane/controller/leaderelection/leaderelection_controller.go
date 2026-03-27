@@ -325,6 +325,14 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		}
 	}
 	if len(ackedCandidates) == 0 {
+		// If the lease has a stale PreferredHolder (target LeaseCandidate was
+		// deleted or expired), clear it so the current holder can re-acquire
+		// rather than staying stepped-down for a candidate that no longer exists.
+		if cleared, err := c.clearStalePreferredHolder(ctx, leaseNN, candidates); err != nil {
+			return defaultRequeueInterval, err
+		} else if cleared {
+			return defaultRequeueInterval, nil
+		}
 		return noRequeue, fmt.Errorf("no available candidates")
 	}
 
@@ -422,6 +430,45 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	}
 
 	return defaultRequeueInterval, nil
+}
+
+// clearStalePreferredHolder checks whether the lease's PreferredHolder refers
+// to a candidate that is no longer in the provided candidate list. If so it
+// clears PreferredHolder on the lease so that a subsequent reconciliation can
+// elect from the remaining candidates instead of stalling.
+// It returns true if PreferredHolder was cleared.
+func (c *Controller) clearStalePreferredHolder(ctx context.Context, leaseNN types.NamespacedName, candidates []*v1beta1.LeaseCandidate) (bool, error) {
+	lease, err := c.leaseInformer.Lister().Leases(leaseNN.Namespace).Get(leaseNN.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if lease.Spec.PreferredHolder == nil || *lease.Spec.PreferredHolder == "" {
+		return false, nil
+	}
+
+	preferred := *lease.Spec.PreferredHolder
+	for _, c := range candidates {
+		if c.Name == preferred {
+			return false, nil // preferred holder is still a valid candidate
+		}
+	}
+
+	// PreferredHolder is stale — clear it. We must fetch the live object for
+	// the update to avoid conflicts with a stale ResourceVersion from the cache.
+	klog.Infof("Clearing stale PreferredHolder %q on lease %s (candidate no longer exists)", preferred, leaseNN)
+	live, err := c.leaseClient.Leases(leaseNN.Namespace).Get(ctx, leaseNN.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	live.Spec.PreferredHolder = nil
+	_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, live, metav1.UpdateOptions{})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1beta1.LeaseCandidate, error) {

@@ -300,6 +300,125 @@ func TestReconcileElectionStep(t *testing.T) {
 			expectedError:          false,
 		},
 		{
+			name:    "stale PreferredHolder cleared when target deleted, other candidates acked",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1beta1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.19.0",
+						BinaryVersion:    "1.19.0",
+						PingTime:         ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:        ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						Strategy:         v1.OldestEmulationVersion,
+					},
+				},
+			},
+			existingLease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component-A",
+				},
+				Spec: v1.LeaseSpec{
+					HolderIdentity:       ptr.To("component-identity-old"),
+					PreferredHolder:      ptr.To("component-identity-deleted"),
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+				},
+			},
+			// The stale PreferredHolder is cleared; since the current holder is
+			// still active, the controller sets PreferredHolder to the best
+			// candidate rather than directly replacing HolderIdentity.
+			expectLease:             true,
+			expectedHolderIdentity:  ptr.To("component-identity-old"),
+			expectedPreferredHolder: ptr.To("component-identity-1"),
+			expectedStrategy:        ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
+			expectedRequeue:         true,
+			expectedError:           false,
+		},
+		{
+			name:    "stale PreferredHolder cleared and new leader elected when lease expired",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1beta1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.19.0",
+						BinaryVersion:    "1.19.0",
+						PingTime:         ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:        ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						Strategy:         v1.OldestEmulationVersion,
+					},
+				},
+			},
+			existingLease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component-A",
+				},
+				Spec: v1.LeaseSpec{
+					HolderIdentity:       ptr.To("component-identity-old"),
+					PreferredHolder:      ptr.To("component-identity-deleted"),
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
+				},
+			},
+			// Lease is expired and PreferredHolder is stale: clear PreferredHolder and
+			// directly elect the best candidate as the new holder.
+			expectLease:             true,
+			expectedHolderIdentity:  ptr.To("component-identity-1"),
+			expectedPreferredHolder: nil,
+			expectedStrategy:        ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
+			expectedRequeue:         true,
+			expectedError:           false,
+		},
+		{
+			name:    "stale PreferredHolder cleared when target deleted, no acked candidates requeues",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1beta1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.19.0",
+						BinaryVersion:    "1.19.0",
+						PingTime:         ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
+						RenewTime:        ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-2 * time.Minute))),
+						Strategy:         v1.OldestEmulationVersion,
+					},
+				},
+			},
+			existingLease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component-A",
+				},
+				Spec: v1.LeaseSpec{
+					HolderIdentity:       ptr.To("component-identity-old"),
+					PreferredHolder:      ptr.To("component-identity-deleted"),
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+				},
+			},
+			// No acked candidates but stale PreferredHolder is cleared, triggering requeue
+			expectLease:             true,
+			expectedHolderIdentity:  ptr.To("component-identity-old"),
+			expectedPreferredHolder: nil,
+			expectedRequeue:         true,
+			expectedError:           false,
+		},
+		{
 			name:    "candidates exist, lease exists, lease expired, 3rdparty strategy",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
 			candidates: []*v1beta1.LeaseCandidate{
