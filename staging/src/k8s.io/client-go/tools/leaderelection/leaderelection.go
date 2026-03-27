@@ -359,7 +359,24 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		AcquireTime:          now,
 	}
 
-	// 1. obtain the electionRecord
+	// 1. fast path for the leader to update optimistically assuming that the record observed
+	// last time is the current version.
+	if le.IsLeader() && le.isLeaseValid(now.Time) {
+		oldObservedRecord := le.getObservedRecord()
+		leaderElectionRecord.AcquireTime = oldObservedRecord.AcquireTime
+		leaderElectionRecord.LeaderTransitions = oldObservedRecord.LeaderTransitions
+		// For coordinated, also preserve Strategy
+		leaderElectionRecord.Strategy = oldObservedRecord.Strategy
+
+		err := le.config.Lock.Update(ctx, leaderElectionRecord)
+		if err == nil {
+			le.setObservedRecord(&leaderElectionRecord)
+			return true
+		}
+		logger.V(2).Info("Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe(), "err", err)
+	}
+
+	// 2. obtain the electionRecord
 	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -370,19 +387,14 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		return false
 	}
 
-	// 2. Record obtained, check the Identity & Time
+	// 3. Record obtained, check the Identity & Time
 	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
 		le.setObservedRecord(oldLeaderElectionRecord)
 
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 
-	le.observedRecordLock.RLock()
-	obsTime := le.observedTime
-	le.observedRecordLock.RUnlock()
-
-	hasExpired := obsTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).Before(now.Time)
-	if hasExpired {
+	if !le.isLeaseValid(now.Time) {
 		logger.Info("Lease has expired", "lock", le.config.Lock.Describe())
 		return false
 	}
@@ -392,8 +404,8 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		return false
 	}
 
-	// 2b. If the lease has been marked as "end of term", don't renew it
-	if le.IsLeader() && oldLeaderElectionRecord.PreferredHolder != "" {
+	// 3b. If the lease has been marked as "end of term", don't renew it
+	if oldLeaderElectionRecord.PreferredHolder != "" {
 		logger.V(4).Info("Lease is marked as 'end of term'", "lock", le.config.Lock.Describe())
 		// TODO: Instead of letting lease expire, the holder may deleted it directly
 		// This will not be compatible with all controllers, so it needs to be opt-in behavior.
@@ -405,16 +417,12 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		return false
 	}
 
-	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
+	// 4. We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
-	if le.IsLeader() {
-		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
-		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
-		leaderElectionRecord.Strategy = oldLeaderElectionRecord.Strategy
-		le.metrics.slowpathExercised(le.config.Name)
-	} else {
-		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
-	}
+	leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
+	leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
+	leaderElectionRecord.Strategy = oldLeaderElectionRecord.Strategy
+	le.metrics.slowpathExercised(le.config.Name)
 
 	// update the lock itself
 	if err = le.config.Lock.Update(ctx, leaderElectionRecord); err != nil {
