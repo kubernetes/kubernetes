@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +83,8 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj r
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	opts := validation.ValidationOptionsForPersistentVolumeClaim(pvc, nil)
-	return validation.ValidatePersistentVolumeClaim(pvc, opts)
+	allErrs := validation.ValidatePersistentVolumeClaim(pvc, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -123,7 +125,8 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, ol
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
-	return validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)
+	allErrs := validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

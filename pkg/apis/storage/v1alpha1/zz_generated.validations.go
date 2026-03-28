@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -32,6 +33,7 @@ import (
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -101,6 +103,36 @@ func Validate_VolumeAttachment(
 	return errs
 }
 
+// Validate_VolumeAttachmentSource validates an instance of VolumeAttachmentSource according
+// to declarative validation rules in the API schema.
+func Validate_VolumeAttachmentSource(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1alpha1.VolumeAttachmentSource) (errs field.ErrorList) {
+	// field storagev1alpha1.VolumeAttachmentSource.PersistentVolumeName has no validation
+
+	// field storagev1alpha1.VolumeAttachmentSource.InlineVolumeSpec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, v1.Validate_PersistentVolumeSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("inlineVolumeSpec"), obj.InlineVolumeSpec, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentSource) *corev1.PersistentVolumeSpec {
+			return oldObj.InlineVolumeSpec
+		}), oldObj != nil)...)
+
+	return errs
+}
+
 // Validate_VolumeAttachmentSpec validates an instance of VolumeAttachmentSpec according
 // to declarative validation rules in the API schema.
 func Validate_VolumeAttachmentSpec(
@@ -142,7 +174,20 @@ func Validate_VolumeAttachmentSpec(
 		errs = append(errs, fn(fldPath.Child("attacher"), &obj.Attacher, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1alpha1.VolumeAttachmentSpec.Source has no validation
+	// field storagev1alpha1.VolumeAttachmentSpec.Source
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1alpha1.VolumeAttachmentSource, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_VolumeAttachmentSource(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("source"), &obj.Source, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentSpec) *storagev1alpha1.VolumeAttachmentSource {
+			return &oldObj.Source
+		}), oldObj != nil)...)
+
 	// field storagev1alpha1.VolumeAttachmentSpec.NodeName has no validation
 	return errs
 }

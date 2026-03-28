@@ -280,6 +280,7 @@ type StatefulSetSpec struct {
 	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
 	// serviceName is the name of the service that governs this StatefulSet.

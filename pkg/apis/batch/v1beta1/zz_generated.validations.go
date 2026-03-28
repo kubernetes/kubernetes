@@ -134,27 +134,17 @@ func Validate_CronJobSpec(
 	// field batchv1beta1.CronJobSpec.ConcurrencyPolicy has no validation
 	// field batchv1beta1.CronJobSpec.Suspend has no validation
 
-	{ // field batchv1beta1.CronJobSpec.JobTemplate
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *batchv1beta1.JobTemplateSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field batchv1beta1.CronJobSpec.JobTemplate
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *batchv1beta1.JobTemplateSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_JobTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *batchv1beta1.CronJobSpec) *batchv1beta1.JobTemplateSpec {
-				return &oldObj.JobTemplate
-			})
-		errs = append(errs, fn(fldPath.Child("jobTemplate"), &obj.JobTemplate, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("jobTemplate"), &obj.JobTemplate, safe.Field(oldObj, func(oldObj *batchv1beta1.CronJobSpec) *batchv1beta1.JobTemplateSpec { return &oldObj.JobTemplate }), oldObj != nil)...)
 
 	// field batchv1beta1.CronJobSpec.SuccessfulJobsHistoryLimit has no validation
 	// field batchv1beta1.CronJobSpec.FailedJobsHistoryLimit has no validation
@@ -163,33 +153,20 @@ func Validate_CronJobSpec(
 
 // Validate_JobTemplateSpec validates an instance of JobTemplateSpec according
 // to declarative validation rules in the API schema.
-func Validate_JobTemplateSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *batchv1beta1.JobTemplateSpec) (errs field.ErrorList) {
-
+func Validate_JobTemplateSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *batchv1beta1.JobTemplateSpec) (errs field.ErrorList) {
 	// field batchv1beta1.JobTemplateSpec.ObjectMeta has no validation
 
-	{ // field batchv1beta1.JobTemplateSpec.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *batchv1.JobSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field batchv1beta1.JobTemplateSpec.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *batchv1.JobSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, v1.Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *batchv1beta1.JobTemplateSpec) *batchv1.JobSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *batchv1beta1.JobTemplateSpec) *batchv1.JobSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	return errs
 }
