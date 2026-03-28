@@ -82,6 +82,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default metric will be set to 80% average CPU utilization.
 	// +listType=atomic
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 
 	// behavior configures the scaling behavior of the target
@@ -94,9 +95,11 @@ type HorizontalPodAutoscalerSpec struct {
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
 	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 
 	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// apiVersion is the API version of the referent
@@ -114,6 +117,7 @@ type MetricSpec struct {
 	// object refers to a metric describing a single kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Object *ObjectMetricSource `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
 
 	// pods refers to a metric describing each pod in the current scale target
@@ -425,6 +429,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
 	// +listType=atomic
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
@@ -488,6 +493,7 @@ type MetricStatus struct {
 	// object refers to a metric describing a single kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Object *ObjectMetricStatus `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
 
 	// pods refers to a metric describing each pod in the current scale target
