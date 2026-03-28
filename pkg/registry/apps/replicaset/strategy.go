@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +113,8 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
-	return appsvalidation.ValidateReplicaSet(rs, opts)
+	allErrs := appsvalidation.ValidateReplicaSet(rs, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, rs, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -142,7 +144,8 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldReplicaSet := old.(*apps.ReplicaSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
-	return appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
+	allErrs := appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newReplicaSet, oldReplicaSet, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
