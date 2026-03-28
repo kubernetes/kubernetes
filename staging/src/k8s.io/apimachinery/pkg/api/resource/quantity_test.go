@@ -2024,3 +2024,39 @@ func TestMustParseNearMaxInt64(t *testing.T) {
 		})
 	}
 }
+
+func TestMustParseNearMaxInt64(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantErr     bool
+		wantAsInt64 bool
+	}{
+		{"9223372036854775807", false, true},  // math.MaxInt64 - should parse and fit in int64
+		{"9223372036854775806", false, true},  // MaxInt64 - 1 - should parse and fit in int64
+		{"9223372036854775808", false, false}, // MaxInt64 + 1 - valid quantity but won't fit in int64
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			q, err := ParseQuantity(tt.input)
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error for input %q but got none", tt.input)
+				return
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error for input %q: %v", tt.input, err)
+				return
+			}
+			val, ok := q.AsInt64()
+			if ok != tt.wantAsInt64 {
+				t.Errorf("AsInt64() returned ok=%v for input %q, want ok=%v", ok, tt.input, tt.wantAsInt64)
+				return
+			}
+			if ok {
+				t.Logf("parsed %q → %d", tt.input, val)
+			} else {
+				t.Logf("parsed %q → stored as decimal (too large for int64)", tt.input)
+			}
+		})
+	}
+}
