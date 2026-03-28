@@ -1057,6 +1057,10 @@ func TestFastPathLeaderElection(t *testing.T) {
 		coordinated     bool
 		reactors        []Reactor
 		expectedLockOps []string
+		// lockOpsPrefix, if set, is checked instead of expectedLockOps:
+		// the recorded ops must start with the prefix, and remaining ops must all equal lockOpsTail.
+		lockOpsPrefix []string
+		lockOpsTail   string
 	}{
 		{
 			name: "Exercise fast path after lock acquired",
@@ -1278,9 +1282,12 @@ func TestFastPathLeaderElection(t *testing.T) {
 			// renewal 1: update (fast path succeeds)
 			// renewal 2: update (fast path, rv conflict from server PreferredHolder write)
 			//   → slow path: get (sees PreferredHolder) → returns false
-			// renewal 3-4: fast path skipped (PreferredHolder in observed) → slow path:
+			// renewal 3+: fast path skipped (PreferredHolder in observed) → slow path:
 			//   get → PreferredHolder → returns false (retries until RenewDeadline expires)
-			expectedLockOps: []string{"get", "update", "update", "update", "get", "get", "get"},
+			// The exact number of trailing GETs depends on timing, so we assert the
+			// deterministic prefix and verify the tail is all "get" operations.
+			lockOpsPrefix: []string{"get", "update", "update", "update", "get"},
+			lockOpsTail:   "get",
 		},
 	}
 
@@ -1330,7 +1337,16 @@ func TestFastPathLeaderElection(t *testing.T) {
 			cancelFunc = cancel
 
 			elector.Run(ctx)
-			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			if test.lockOpsPrefix != nil {
+				if assert.GreaterOrEqual(t, len(lockOps), len(test.lockOpsPrefix)+1, "Expected at least %d ops (prefix + tail), got %d: %q", len(test.lockOpsPrefix)+1, len(lockOps), lockOps) {
+					assert.Equal(t, test.lockOpsPrefix, lockOps[:len(test.lockOpsPrefix)], "Lock ops prefix mismatch: got %q", lockOps)
+					for i := len(test.lockOpsPrefix); i < len(lockOps); i++ {
+						assert.Equal(t, test.lockOpsTail, lockOps[i], "Lock op [%d] expected %q, got %q (full: %q)", i, test.lockOpsTail, lockOps[i], lockOps)
+					}
+				}
+			} else {
+				assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			}
 		})
 	}
 }
