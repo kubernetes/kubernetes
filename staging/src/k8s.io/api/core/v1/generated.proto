@@ -1702,7 +1702,6 @@ message EphemeralVolumeSource {
   // to the PVC after it has been created.
   //
   // Required, must not be nil.
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional PersistentVolumeClaimTemplate volumeClaimTemplate = 1;
 }
 
@@ -3255,8 +3254,6 @@ message PersistentVolumeClaimSpec {
   // volumeMode defines what type of volume is required by the claim.
   // Value of Filesystem is implied when not included in claim spec.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string volumeMode = 6;
 
   // dataSource field can be used to specify either:
@@ -4430,7 +4427,6 @@ message PodSpec {
   // +patchStrategy=merge,retainKeys
   // +listType=map
   // +listMapKey=name
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -5447,7 +5443,6 @@ message ReplicationControllerSpec {
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional PodTemplateSpec template = 3;
 }
 
@@ -7244,7 +7239,6 @@ message VolumeSource {
   // persistent volumes at the same time.
   //
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional EphemeralVolumeSource ephemeral = 29;
 
   // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
