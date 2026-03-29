@@ -49,6 +49,8 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates["ContainerRestartRules"] = false
+			initialConfig.FeatureGates["RestartAllContainersOnContainerExits"] = false
 		})
 
 		f.Context("timing with CRI Proxy delays", feature.CriProxy, func() {

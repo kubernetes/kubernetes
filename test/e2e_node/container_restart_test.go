@@ -46,6 +46,13 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Container restart backs off", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = false
+			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = false
+		})
 
 		ginkgo.BeforeEach(func() {
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
@@ -70,6 +77,7 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 				initialConfig.FeatureGates = map[string]bool{}
 			}
 			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = true
+			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = false
 		})
 
 		ginkgo.BeforeEach(func() {
@@ -93,6 +101,7 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = false
 			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = true
 		})
 
@@ -118,8 +127,8 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = map[string]bool{}
 			}
-			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = true
 			initialConfig.FeatureGates["KubeletCrashLoopBackOffMax"] = true
+			initialConfig.FeatureGates["ReduceDefaultCrashLoopBackOffDecay"] = true
 		})
 
 		ginkgo.BeforeEach(func() {
@@ -183,6 +192,8 @@ func newFailAlwaysPod() *v1.Pod {
 					Name:            containerName,
 					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 					ImagePullPolicy: v1.PullIfNotPresent,
+					// Exit non-zero immediately so restart timing is deterministic.
+					Command: []string{"sh", "-c", "exit 1"},
 				},
 			},
 		},
