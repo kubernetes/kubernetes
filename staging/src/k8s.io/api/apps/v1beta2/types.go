@@ -421,6 +421,7 @@ type StatefulSetList struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
+// +k8s:supportsSubresource="/scale"
 
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
 // more information.
@@ -903,6 +904,7 @@ type DaemonSetList struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSet
+// +k8s:supportsSubresource="/scale"
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
 // more information.
