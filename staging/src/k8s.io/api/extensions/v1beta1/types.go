@@ -84,6 +84,7 @@ type Scale struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.8
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
+// +k8s:supportsSubresource="/scale"
 
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
@@ -915,6 +916,7 @@ type IngressBackend struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.8
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSet
+// +k8s:supportsSubresource="/scale"
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.

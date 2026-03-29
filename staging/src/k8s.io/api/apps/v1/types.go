@@ -368,6 +368,7 @@ type StatefulSetList struct {
 // +genclient:method=ApplyScale,verb=apply,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
+// +k8s:supportsSubresource="/scale"
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 // +k8s:supportsSubresource="/scale"
@@ -840,6 +841,7 @@ type DaemonSetList struct {
 // +genclient:method=ApplyScale,verb=apply,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
+// +k8s:supportsSubresource="/scale"
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 // +k8s:supportsSubresource="/scale"

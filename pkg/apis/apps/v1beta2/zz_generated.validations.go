@@ -43,7 +43,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	// type Deployment
 	scheme.AddValidationFunc((*appsv1beta2.Deployment)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
-		case "/":
+		case "/", "/scale":
 			return Validate_Deployment(ctx, op, nil /* fldPath */, obj.(*appsv1beta2.Deployment), safe.Cast[*appsv1beta2.Deployment](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
@@ -51,7 +51,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	// type ReplicaSet
 	scheme.AddValidationFunc((*appsv1beta2.ReplicaSet)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
-		case "/":
+		case "/", "/scale":
 			return Validate_ReplicaSet(ctx, op, nil /* fldPath */, obj.(*appsv1beta2.ReplicaSet), safe.Cast[*appsv1beta2.ReplicaSet](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}

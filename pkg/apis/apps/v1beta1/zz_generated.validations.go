@@ -43,7 +43,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	// type Deployment
 	scheme.AddValidationFunc((*appsv1beta1.Deployment)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
-		case "/":
+		case "/", "/scale":
 			return Validate_Deployment(ctx, op, nil /* fldPath */, obj.(*appsv1beta1.Deployment), safe.Cast[*appsv1beta1.Deployment](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
