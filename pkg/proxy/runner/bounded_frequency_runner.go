@@ -49,6 +49,9 @@ type BoundedFrequencyRunner struct {
 //     the *completion* of one execution and the *start* of the next. Calls to
 //     `Run()` during this cooldown period are coalesced and deferred until the
 //     interval expires. This prevents burst executions.
+//     Note: if `fn` takes longer than `minInterval` to complete, any `Run()`
+//     call made during that execution will trigger the next run immediately
+//     after completion, without an additional cooldown wait.
 //  2. Maximum Interval (`maxInterval`): The function `fn` is guaranteed to run
 //     at least once per `maxInterval`, ensuring periodic execution even without
 //     explicit `Run()` calls (e.g., for refreshing state).
