@@ -87,7 +87,7 @@ func newDialMetrics() *DialMetrics {
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "dial_failure_count",
+			Name:           "dial_failures_total",
 			Help:           "Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed",
 			StabilityLevel: metrics.BETA,
 		},

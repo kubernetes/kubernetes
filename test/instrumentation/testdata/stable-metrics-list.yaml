@@ -67,7 +67,7 @@
   - 0.5
   - 2.5
   - 12.5
-- name: dial_failure_count
+- name: dial_failures_total
   subsystem: egress_dialer
   namespace: apiserver
   help: Dial failure count, labeled by the protocol (http-connect or grpc), transport
