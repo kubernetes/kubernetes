@@ -366,11 +366,10 @@ func (c *Controller) queueEndpoints(obj interface{}) {
 // controller. This will be false if:
 // - the Endpoints resource is nil.
 // - the Endpoints resource has a skip-mirror label.
-// - the Endpoints resource has a leader election annotation.
 // This does not ensure that a corresponding Service exists with a nil selector.
 // That check should be performed separately.
 func (c *Controller) shouldMirror(endpoints *v1.Endpoints) bool {
-	if endpoints == nil || skipMirror(endpoints.Labels) || hasLeaderElection(endpoints.Annotations) {
+	if endpoints == nil || skipMirror(endpoints.Labels) {
 		return false
 	}
 

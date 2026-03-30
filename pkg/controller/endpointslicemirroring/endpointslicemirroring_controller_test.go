@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -307,17 +306,6 @@ func TestShouldMirror(t *testing.T) {
 			},
 		},
 		shouldMirror: true,
-	}, {
-		testName: "Endpoints with leader election annotation",
-		endpoints: &v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-endpoints",
-				Annotations: map[string]string{
-					resourcelock.LeaderElectionRecordAnnotationKey: "",
-				},
-			},
-		},
-		shouldMirror: false,
 	}}
 
 	for _, tc := range testCases {
