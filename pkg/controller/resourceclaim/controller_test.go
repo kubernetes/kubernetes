@@ -52,7 +52,6 @@ import (
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/ptr"
 )
 
 var (
@@ -715,7 +714,7 @@ func TestSyncHandler(t *testing.T) {
 				)
 				// Initially only claimA is in status
 				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
+					{Name: "claimA", ResourceClaimName: new("claimA-object")},
 				}
 				return []*v1.Pod{pod}
 			}(),
@@ -726,8 +725,8 @@ func TestSyncHandler(t *testing.T) {
 			key: podKeyPrefix + testNamespace + "/" + testPodName,
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodName: {
-					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
-					{Name: "claimB", ResourceClaimName: ptr.To("test-pod-claimB--1")},
+					{Name: "claimA", ResourceClaimName: new("claimA-object")},
+					{Name: "claimB", ResourceClaimName: new("test-pod-claimB--1")},
 				},
 			},
 			expectedClaims: []resourceapi.ResourceClaim{
@@ -1483,7 +1482,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 						Requests: []resourceapi.DeviceRequest{
 							{
 								Exactly: &resourceapi.ExactDeviceRequest{
-									AdminAccess: ptr.To(false),
+									AdminAccess: new(false),
 								},
 							},
 						},
@@ -1500,7 +1499,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 						Requests: []resourceapi.DeviceRequest{
 							{
 								Exactly: &resourceapi.ExactDeviceRequest{
-									AdminAccess: ptr.To(true),
+									AdminAccess: new(true),
 								},
 							},
 						},
@@ -1532,12 +1531,12 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 						Requests: []resourceapi.DeviceRequest{
 							{
 								Exactly: &resourceapi.ExactDeviceRequest{
-									AdminAccess: ptr.To(false),
+									AdminAccess: new(false),
 								},
 							},
 							{
 								Exactly: &resourceapi.ExactDeviceRequest{
-									AdminAccess: ptr.To(true),
+									AdminAccess: new(true),
 								},
 							},
 						},
@@ -1559,7 +1558,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 							},
 							{
 								Exactly: &resourceapi.ExactDeviceRequest{
-									AdminAccess: ptr.To(false),
+									AdminAccess: new(false),
 								},
 							},
 						},
