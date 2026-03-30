@@ -192,28 +192,28 @@ func NewController(
 	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, false)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			ec.enqueuePod(logger, updated, false)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, true)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim", "claimDump", updated)
 			ec.enqueueResourceClaim(logger, old, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
@@ -221,15 +221,15 @@ func NewController(
 		return nil, err
 	}
 	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim template", "claimTemplateDump", obj)
 			ec.enqueueResourceClaimTemplate(logger, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim template", "claimTemplateDump", updated)
 			ec.enqueueResourceClaimTemplate(logger, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim template", "claimTemplateDump", obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -250,15 +250,15 @@ func NewController(
 		ec.podGroupIndexer = podGroupInformer.Informer().GetIndexer()
 
 		if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				logger.V(6).Info("New PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, false)
 			},
-			UpdateFunc: func(old, updated interface{}) {
+			UpdateFunc: func(old, updated any) {
 				logger.V(6).Info("Updated PodGroup", "podGroupDump", updated)
 				ec.enqueuePodGroup(logger, updated, false)
 			},
-			DeleteFunc: func(obj interface{}) {
+			DeleteFunc: func(obj any) {
 				logger.V(6).Info("Deleted PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, true)
 			},
@@ -307,7 +307,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}) {
+func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj any) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -372,7 +372,7 @@ func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj inter
 	}
 }
 
-func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePod(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -537,7 +537,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -678,7 +678,7 @@ func (ec *Controller) podGroupNeedsWork(podGroup *schedulingapi.PodGroup) (bool,
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
+func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj any) {
 	deleted := newObj == nil
 	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
 		oldObj = d.Obj
@@ -1604,7 +1604,7 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 	return "", ""
 }
 
-func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1624,7 +1624,7 @@ func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
 // namespace/name) for ResourceClaim or ResourceClaimTemplates in a given pod.
-func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1645,7 +1645,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupMemberIndexFunc is an index function that returns PodGroup keys (=
 // namespace/name) for Pods in a given group.
-func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
+func podGroupMemberIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1659,7 +1659,7 @@ func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupResourceClaimTemplateIndexFunc is an index function that returns
 // ResourceClaimTemplate keys (= namespace/name) for a given PodGroup.
-func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1680,7 +1680,7 @@ func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 // podGroupResourceClaimIndexFunc is an index function that returns
 // ResourceClaim keys (= namespace/name) for ResourceClaim or
 // ResourceClaimTemplates in a given PodGroup.
-func podGroupResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1708,7 +1708,7 @@ func isPodDone(pod *v1.Pod) bool {
 
 // claimPodOwnerIndexFunc is an index function that returns the pod UIDs of
 // all pods which own the resource claim. Should only be one, though.
-func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
@@ -1727,7 +1727,7 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 
 // claimPodGroupOwnerIndexFunc is an index function that returns the PodGroup UIDs of
 // all PodGroups which own the resource claim. Should only be one, though.
-func claimPodGroupOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodGroupOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
