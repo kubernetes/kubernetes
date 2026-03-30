@@ -19,7 +19,7 @@ package kubelet
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate" // Import for the type conversion
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 )
 
 // FeatureGateAdapter adapts a component-base FeatureGate to the nodedeclaredfeatures FeatureGate interface.
@@ -38,15 +38,37 @@ func (a FeatureGateAdapter) Enabled(key string) bool {
 func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	adaptedFG := FeatureGateAdapter{FeatureGate: utilfeature.DefaultFeatureGate}
 
-	runtimeFeatures := nodedeclaredfeatures.RuntimeFeatures{}
+	runtimeFeatures := ndf.RuntimeFeatures{}
 	if features := kl.runtimeState.runtimeFeatures(); features != nil {
 		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
 	}
 
-	cfg := &nodedeclaredfeatures.NodeConfiguration{
+	cfg := &ndf.NodeConfiguration{
 		FeatureGates:    adaptedFG,
 		Version:         kl.version,
 		RuntimeFeatures: runtimeFeatures,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
+}
+
+func (kl *Kubelet) getNodeDeclaredFeatures() []string {
+	kl.nodeDeclaredFeaturesMux.RLock()
+	defer kl.nodeDeclaredFeaturesMux.RUnlock()
+	return kl.nodeDeclaredFeatures
+}
+
+func (kl *Kubelet) getNodeDeclaredFeaturesSet() ndf.FeatureSet {
+	kl.nodeDeclaredFeaturesMux.RLock()
+	defer kl.nodeDeclaredFeaturesMux.RUnlock()
+	return kl.nodeDeclaredFeaturesSet
+}
+
+func (kl *Kubelet) updateNodeDeclaredFeatures() {
+	features := kl.discoverNodeDeclaredFeatures()
+	featureSet := kl.nodeDeclaredFeaturesFramework.MustMapSorted(features)
+
+	kl.nodeDeclaredFeaturesMux.Lock()
+	defer kl.nodeDeclaredFeaturesMux.Unlock()
+	kl.nodeDeclaredFeatures = features
+	kl.nodeDeclaredFeaturesSet = featureSet
 }
