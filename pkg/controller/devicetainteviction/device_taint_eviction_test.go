@@ -1970,7 +1970,7 @@ func testController(tCtx ktesting.TContext) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
 					events := make([]any, numEvents)
-					for i := 0; i < numEvents; i++ {
+					for i := range numEvents {
 						events[i] = tc.events[permutation[i]]
 					}
 					tc := tc
@@ -1985,7 +1985,7 @@ func testController(tCtx ktesting.TContext) {
 					})
 					return
 				}
-				for i := 0; i < numEvents; i++ {
+				for i := range numEvents {
 					if slices.Index(permutation[0:depth], i) != -1 {
 						// Already taken.
 						continue
