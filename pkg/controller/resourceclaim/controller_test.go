@@ -19,11 +19,9 @@ package resourceclaim
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
@@ -36,20 +34,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -866,369 +860,58 @@ func TestSyncHandler(t *testing.T) {
 	}
 }
 
-func TestResourceClaimTemplateEventHandler(t *testing.T) {
-	tCtx := ktesting.Init(t)
-
-	fakeKubeClient := createTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
-	claimInformer := informerFactory.Resource().V1().ResourceClaims()
-	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
-	claimTemplateClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates(testNamespace)
-	claimTemplateTmpClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates("tmp")
-	podClient := fakeKubeClient.CoreV1().Pods(testNamespace)
-	podTmpClient := fakeKubeClient.CoreV1().Pods("tmp")
-
-	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
-	tCtx.ExpectNoError(err, "creating ephemeral controller")
-
-	informerFactory.Start(tCtx.Done())
-	stopInformers := func() {
-		tCtx.Cancel("stopping informers")
-		informerFactory.Shutdown()
-	}
-	defer stopInformers()
-
-	expectQueue := func(tCtx ktesting.TContext, expectedKeys []string, expectedIndexerKeys []string) {
-		g := gomega.NewWithT(tCtx)
-		tCtx.Helper()
-
-		lenDiffMessage := func() string {
-			actualKeys := []string{}
-			for ec.queue.Len() > 0 {
-				actual, _ := ec.queue.Get()
-				actualKeys = append(actualKeys, actual)
-				ec.queue.Forget(actual)
-				ec.queue.Done(actual)
-			}
-			return "Workqueue does not contain expected number of elements\n" +
-				"Diff of elements (- expected, + actual):\n" +
-				diff.Diff(expectedKeys, actualKeys)
-		}
-
-		g.Eventually(ec.queue.Len).
-			WithTimeout(5*time.Second).
-			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
-		g.Consistently(ec.queue.Len).
-			WithTimeout(1*time.Second).
-			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
-
-		g.Eventually(func() int { return len(ec.podIndexer.ListIndexFuncValues(podResourceClaimTemplateIndex)) }).
-			WithTimeout(5 * time.Second).
-			Should(gomega.Equal(len(expectedIndexerKeys)))
-		g.Consistently(func() int { return len(ec.podIndexer.ListIndexFuncValues(podResourceClaimTemplateIndex)) }).
-			WithTimeout(1 * time.Second).
-			Should(gomega.Equal(len(expectedIndexerKeys)))
-
-		for _, expected := range expectedKeys {
-			actual, shuttingDown := ec.queue.Get()
-			g.Expect(shuttingDown).To(gomega.BeFalseBecause("workqueue is unexpectedly shutting down"))
-			g.Expect(actual).To(gomega.Equal(expected))
-			ec.queue.Forget(actual)
-			ec.queue.Done(actual)
-		}
-
-		for _, src := range expectedIndexerKeys {
-			objects, err := ec.podIndexer.ByIndex(podResourceClaimTemplateIndex, src)
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "should not error when getting objects by index for key %s", src)
-			g.Expect(objects).NotTo(gomega.BeEmpty(), "should have at least one object indexed for key %s", src)
-
-			// Verify that the indexed objects are the expected pods
-			found := false
-			for _, obj := range objects {
-				pod, ok := obj.(*v1.Pod)
-				if !ok {
-					continue
-				}
-				// Check if this pod matches the expected template reference
-				for _, claim := range pod.Spec.ResourceClaims {
-					if claim.ResourceClaimTemplateName != nil {
-						// Build the expected index key for this pod
-						expectedKey := pod.Namespace + "/" + *claim.ResourceClaimTemplateName
-						if expectedKey == src {
-							found = true
-							break
-						}
-					}
-				}
-			}
-			g.Expect(found).To(gomega.BeTrueBecause("should find a pod with template %s in index for key %s", templateName, src))
-		}
-	}
-
-	tmpNamespace := "tmp"
-
-	expectQueue(tCtx, []string{}, []string{})
-
-	// Create two pods:
-	// - testPodWithResource in the my-namespace namespace
-	// - fake-1 in the tmp namespace
-	_, err = podClient.Create(tCtx, testPodWithResource, metav1.CreateOptions{})
-	_, err1 := podTmpClient.Create(tCtx, makePod("fake-1", tmpNamespace, "uidpod2", *makePodResourceClaim(podResourceClaimName, templateName)), metav1.CreateOptions{})
-	tCtx.Step("create pod", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		tCtx.ExpectNoError(err1)
-		expectQueue(tCtx, []string{testPodKey, podKeyPrefix + tmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
-	})
-
-	// The item  has been forgotten and marked as done in the workqueue,so queue is nil
-	tCtx.Step("expect queue is nil", func(tCtx ktesting.TContext) {
-		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
-	})
-
-	// After create claim template,queue should have test pod key
-	_, err = claimTemplateClient.Create(tCtx, template, metav1.CreateOptions{})
-	tCtx.Step("create claim template after pod backoff", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		expectQueue(tCtx, []string{testPodKey}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
-	})
-
-	// The item  has been forgotten and marked as done in the workqueue,so queue is nil
-	tCtx.Step("expect queue is nil", func(tCtx ktesting.TContext) {
-		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
-	})
-
-	// After create tmp namespace claim template,queue should have fake pod key
-	TmpNamespaceTemplate := makeTemplate(templateName, "tmp", nil)
-	_, err = claimTemplateTmpClient.Create(tCtx, TmpNamespaceTemplate, metav1.CreateOptions{})
-	tCtx.Step("create  claim template in tmp namespace after  pod backoff in test namespace", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		expectQueue(tCtx, []string{podKeyPrefix + tmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
-	})
-
-}
-
-func TestResourceClaimEventHandler(t *testing.T) {
-	tCtx := ktesting.Init(t)
-
-	fakeKubeClient := createTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
-	claimInformer := informerFactory.Resource().V1().ResourceClaims()
-	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
-	setupMetrics()
-	claimClient := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace)
-
-	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
-	tCtx.ExpectNoError(err, "creating ephemeral controller")
-
-	informerFactory.Start(tCtx.Done())
-	stopInformers := func() {
-		tCtx.Cancel("stopping informers")
-		informerFactory.Shutdown()
-	}
-	defer stopInformers()
-
-	em := newNumMetrics(claimInformer.Lister())
-
-	expectQueue := func(tCtx ktesting.TContext, expectedKeys []string) {
-		g := gomega.NewWithT(tCtx)
-		tCtx.Helper()
-
-		lenDiffMessage := func() string {
-			actualKeys := []string{}
-			for ec.queue.Len() > 0 {
-				actual, _ := ec.queue.Get()
-				actualKeys = append(actualKeys, actual)
-				ec.queue.Forget(actual)
-				ec.queue.Done(actual)
-			}
-			return "Workqueue does not contain expected number of elements\n" +
-				"Diff of elements (- expected, + actual):\n" +
-				diff.Diff(expectedKeys, actualKeys)
-		}
-
-		g.Eventually(ec.queue.Len).
-			WithTimeout(5*time.Second).
-			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
-		g.Consistently(ec.queue.Len).
-			WithTimeout(1*time.Second).
-			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
-
-		for _, expected := range expectedKeys {
-			actual, shuttingDown := ec.queue.Get()
-			g.Expect(shuttingDown).To(gomega.BeFalseBecause("workqueue is unexpectedly shutting down"))
-			g.Expect(actual).To(gomega.Equal(expected))
-			ec.queue.Forget(actual)
-			ec.queue.Done(actual)
-		}
-	}
-
-	expectQueue(tCtx, []string{})
-
-	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
-	tCtx.Step("create claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{testClaimKey})
-	})
-
-	modifiedClaim := testClaim.DeepCopy()
-	modifiedClaim.Labels = map[string]string{"foo": "bar"}
-	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Consistently(tCtx)
-		expectQueue(tCtx, []string{testClaimKey})
-	})
-
-	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
-	tCtx.Step("allocate claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{testClaimKey})
-	})
-
-	modifiedClaim = testClaimAllocated.DeepCopy()
-	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
-	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Consistently(tCtx)
-		expectQueue(tCtx, []string{testClaimKey})
-	})
-
-	otherClaimAllocated := testClaimAllocated.DeepCopy()
-	otherClaimAllocated.Name += "2"
-	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
-	tCtx.Step("create allocated claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{testClaimKey + "2"})
-	})
-
-	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
-	tCtx.Step("deallocate claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{testClaimKey})
-	})
-
-	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
-	tCtx.Step("delete deallocated claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{})
-	})
-
-	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
-	tCtx.Step("delete allocated claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-		expectQueue(tCtx, []string{})
-	})
-
-	_, err = claimClient.Create(tCtx, templatedTestClaimWithAdmin, metav1.CreateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	tCtx.Step("create claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	modifiedClaim = templatedTestClaimWithAdmin.DeepCopy()
-	modifiedClaim.Labels = map[string]string{"foo": "bar"}
-	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Consistently(tCtx)
-	})
-
-	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdminAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	tCtx.Step("allocate claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	modifiedClaim = templatedTestClaimWithAdminAllocated.DeepCopy()
-	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
-	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Consistently(tCtx)
-	})
-
-	otherClaimAllocated = templatedTestClaimWithAdminAllocated.DeepCopy()
-	otherClaimAllocated.Name += "2"
-	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	tCtx.Step("create allocated claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdmin, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	tCtx.Step("deallocate claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	err = claimClient.Delete(tCtx, templatedTestClaimWithAdmin.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	tCtx.Step("delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	tCtx.Step("delete allocated claim with admin access", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	_, err = claimClient.Create(tCtx, extendedTestClaim, metav1.CreateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
-	tCtx.Step("create extended resource claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	_, err = claimClient.Update(tCtx, extendedTestClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
-	tCtx.Step("allocate extended resource claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	_, err = claimClient.Update(tCtx, extendedTestClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
-	tCtx.Step("deallocate extended resource claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	err = claimClient.Delete(tCtx, extendedTestClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
-	tCtx.Step("delete extended resource claim", func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(err)
-		em.Eventually(tCtx)
-	})
-
-	em.Consistently(tCtx)
-}
-
 func TestEventHandlers(t *testing.T) { testEventHandlers(ktesting.Init(t)) }
 func testEventHandlers(tCtx ktesting.TContext) {
 	type object interface {
 		runtime.Object
 		metav1.Object
 	}
+
+	modifiedClaim := testClaim.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar"}
+
+	modifiedClaimAdminAccess := templatedTestClaimWithAdmin.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar"}
+
+	otherClaimAllocated := testClaimAllocated.DeepCopy()
+	otherClaimAllocated.Name += "2"
+	otherClaimKey := testClaimKey + "2"
+
+	otherClaimAllocatedAdminAccess := templatedTestClaimWithAdminAllocated.DeepCopy()
+	otherClaimAllocatedAdminAccess.Name += "2"
+
+	templatedTestClaimKey := testClaimKey + "--1"
+	templatedOtherClaimKey := templatedTestClaimKey + "2"
+	extendedResourceTemplatedClaimKey := claimKeyPrefix + testNamespace + "/" + testPodName + "-extended-resources--1"
+
+	otherNSTemplate := makeTemplate(templateName, otherNamespace, nil)
+
+	otherNSPod := makePod("fake-1", otherNamespace, "uidpod2", *makePodResourceClaim(podResourceClaimName, templateName))
+	otherNSPodKey := podKeyPrefix + otherNamespace + "/" + otherNSPod.Name
+
+	extendedResourceClaimName := "test-extended-claim"
+	podWithExtendedResourceClaim := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
+		Spec:       v1.PodSpec{},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: extendedResourceClaimName,
+			},
+		},
+	}
+
+	completedPodWithExtendedResourceClaim := podWithExtendedResourceClaim.DeepCopy()
+	completedPodWithExtendedResourceClaim.Status.Phase = v1.PodSucceeded
+
+	completedPodWithRegularAndExtendedResourceClaim := podWithExtendedResourceClaim.DeepCopy()
+	completedPodWithRegularAndExtendedResourceClaim.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: "regular-claim"}}
+	completedPodWithRegularAndExtendedResourceClaim.Status.Phase = v1.PodSucceeded
+
+	failedPodWithExtendedResourceClaim := podWithExtendedResourceClaim.DeepCopy()
+	failedPodWithExtendedResourceClaim.Status.Phase = v1.PodFailed
+
+	extendedResourceClaimKey := claimKeyPrefix + testNamespace + "/" + extendedResourceClaimName
 
 	tests := map[string]struct {
 		features        Features
@@ -1238,8 +921,198 @@ func testEventHandlers(tCtx ktesting.TContext) {
 		deleteObjects   []object
 		expectedKeys    []string
 		expectedMetrics map[controllermetrics.NumResourceClaimLabels]float64
+
+		expectedIndexedPodsByResourceClaimTemplate []string
 	}{
 		"nothing": {},
+		"new-claim": {
+			createObjects: []object{testClaim},
+			expectedKeys:  []string{testClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "false"}: 1,
+			},
+		},
+		"update-claim": {
+			initialObjects: []runtime.Object{testClaim},
+			updateObjects:  []object{modifiedClaim},
+			expectedKeys:   []string{testClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "false"}: 1,
+			},
+		},
+		"allocate-claim": {
+			initialObjects: []runtime.Object{testClaim},
+			updateObjects:  []object{testClaimAllocated},
+			expectedKeys:   []string{testClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "false"}: 1,
+			},
+		},
+		"allocate-another-claim": {
+			initialObjects: []runtime.Object{testClaimAllocated},
+			createObjects:  []object{otherClaimAllocated},
+			expectedKeys:   []string{otherClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "false"}: 2,
+			},
+		},
+		"deallocate-claim": {
+			initialObjects: []runtime.Object{testClaimAllocated, otherClaimAllocated},
+			updateObjects:  []object{testClaim},
+			expectedKeys:   []string{testClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "false"}:  1,
+				{Allocated: "false", AdminAccess: "false"}: 1,
+			},
+		},
+		"delete-deallocated-claim": {
+			initialObjects: []runtime.Object{testClaim, otherClaimAllocated},
+			deleteObjects:  []object{testClaim},
+			expectedKeys:   []string{},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "false"}: 1,
+			},
+		},
+		"delete-allocated-claim": {
+			initialObjects:  []runtime.Object{otherClaimAllocated},
+			deleteObjects:   []object{otherClaimAllocated},
+			expectedKeys:    []string{},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{},
+		},
+		"new-claim-admin-access": {
+			createObjects: []object{templatedTestClaimWithAdmin},
+			expectedKeys:  []string{templatedTestClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}: 1,
+			},
+		},
+		"update-claim-admin-access": {
+			initialObjects: []runtime.Object{templatedTestClaimWithAdmin},
+			updateObjects:  []object{modifiedClaimAdminAccess},
+			expectedKeys:   []string{templatedTestClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}: 1,
+			},
+		},
+		"allocate-claim-admin-access": {
+			initialObjects: []runtime.Object{modifiedClaimAdminAccess},
+			updateObjects:  []object{templatedTestClaimWithAdminAllocated},
+			expectedKeys:   []string{templatedTestClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}: 1,
+			},
+		},
+		"allocate-another-claim-admin-access": {
+			initialObjects: []runtime.Object{templatedTestClaimWithAdminAllocated},
+			createObjects:  []object{otherClaimAllocatedAdminAccess},
+			expectedKeys:   []string{templatedOtherClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}: 2,
+			},
+		},
+		"deallocate-claim-admin-access": {
+			initialObjects: []runtime.Object{templatedTestClaimWithAdminAllocated, otherClaimAllocatedAdminAccess},
+			updateObjects:  []object{templatedTestClaimWithAdmin},
+			expectedKeys:   []string{templatedTestClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}:  1,
+				{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}: 1,
+			},
+		},
+		"delete-deallocated-claim-admin-access": {
+			initialObjects: []runtime.Object{templatedTestClaimWithAdmin, otherClaimAllocatedAdminAccess},
+			deleteObjects:  []object{templatedTestClaimWithAdmin},
+			expectedKeys:   []string{},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}: 1,
+			},
+		},
+		"delete-allocated-claim-admin-access": {
+			initialObjects:  []runtime.Object{otherClaimAllocatedAdminAccess},
+			deleteObjects:   []object{otherClaimAllocatedAdminAccess},
+			expectedKeys:    []string{},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{},
+		},
+		"new-claim-extended-resources": {
+			createObjects: []object{extendedTestClaim},
+			expectedKeys:  []string{extendedResourceTemplatedClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}: 1,
+			},
+		},
+		"allocate-claim-extended-resources": {
+			initialObjects: []runtime.Object{extendedTestClaim},
+			updateObjects:  []object{extendedTestClaimAllocated},
+			expectedKeys:   []string{extendedResourceTemplatedClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}: 1,
+			},
+		},
+		"deallocate-claim-extended-resources": {
+			initialObjects: []runtime.Object{extendedTestClaimAllocated},
+			updateObjects:  []object{extendedTestClaim},
+			expectedKeys:   []string{extendedResourceTemplatedClaimKey},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
+				{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}: 1,
+			},
+		},
+		"delete-claim-extended-resources": {
+			initialObjects:  []runtime.Object{extendedTestClaimAllocated},
+			deleteObjects:   []object{extendedTestClaimAllocated},
+			expectedKeys:    []string{},
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{},
+		},
+		"new-pods": {
+			createObjects: []object{testPodWithResource, otherNSPod},
+			expectedKeys:  []string{testPodKey, otherNSPodKey},
+			expectedIndexedPodsByResourceClaimTemplate: []string{
+				testNamespace + "/" + templateName,
+				otherNamespace + "/" + templateName,
+			},
+		},
+		"new-template-for-pod": {
+			initialObjects: []runtime.Object{testPodWithResource, otherNSPod},
+			createObjects:  []object{template},
+			expectedKeys:   []string{testPodKey},
+			expectedIndexedPodsByResourceClaimTemplate: []string{
+				testNamespace + "/" + templateName,
+				otherNamespace + "/" + templateName,
+			},
+		},
+		"new-template-for-pod-other-namespace": {
+			initialObjects: []runtime.Object{testPodWithResource, otherNSPod, template},
+			createObjects:  []object{otherNSTemplate},
+			expectedKeys:   []string{otherNSPodKey},
+			expectedIndexedPodsByResourceClaimTemplate: []string{
+				testNamespace + "/" + templateName,
+				otherNamespace + "/" + templateName,
+			},
+		},
+		"pod-without-resource-claims": {
+			createObjects: []object{testPod},
+			expectedKeys:  []string{},
+		},
+		"running-pod-with-extended-resource-claim": {
+			createObjects: []object{podWithExtendedResourceClaim},
+			expectedKeys:  []string{},
+		},
+		"completed-pod-with-extended-resource-claim": {
+			createObjects: []object{completedPodWithExtendedResourceClaim},
+			expectedKeys:  []string{extendedResourceClaimKey},
+		},
+		"faled-pod-with-extended-resource-claim": {
+			createObjects: []object{failedPodWithExtendedResourceClaim},
+			expectedKeys:  []string{extendedResourceClaimKey},
+		},
+		"delete-pod-with-extended-resource-claim": {
+			initialObjects: []runtime.Object{podWithExtendedResourceClaim},
+			deleteObjects:  []object{podWithExtendedResourceClaim},
+			expectedKeys:   []string{extendedResourceClaimKey},
+		},
+		"completed-pod-with-regular-and-extended-resource-claim": {
+			createObjects: []object{completedPodWithRegularAndExtendedResourceClaim},
+			expectedKeys:  []string{extendedResourceClaimKey, testPodKey},
+		},
 		"new-podgroup-feature-disabled": {
 			features:      Features{WorkloadResourceClaims: false},
 			createObjects: []object{testPodGroupWithResourceInStatus},
@@ -1289,6 +1162,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 				testPodKey + "-1",
 				testPodKey + "-2",
 			},
+			expectedIndexedPodsByResourceClaimTemplate: []string{testNamespace + "/" + templateName},
 		},
 		"podgroup-claim-status-update-feature-disabled": {
 			features: Features{WorkloadResourceClaims: false},
@@ -1301,6 +1175,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			},
 			updateObjects: []object{testPodGroupWithResourceInStatus},
 			expectedKeys:  []string{},
+			expectedIndexedPodsByResourceClaimTemplate: []string{testNamespace + "/" + templateName},
 		},
 	}
 	for name, test := range tests {
@@ -1364,7 +1239,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 				tCtx.ExpectNoError(err)
 			}
 			for _, object := range test.deleteObjects {
-				err := fakeKubeClient.Tracker().Delete(gvr(object), object.GetName(), object.GetNamespace(), metav1.DeleteOptions{})
+				err := fakeKubeClient.Tracker().Delete(gvr(object), object.GetNamespace(), object.GetName(), metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err)
 			}
 
@@ -1376,6 +1251,9 @@ func testEventHandlers(tCtx ktesting.TContext) {
 				em = em.withUpdates(labels, val)
 			}
 			em.verify(tCtx)
+
+			actualIndexedPodsByResourceClaimTemplate := ec.podIndexer.ListIndexFuncValues(podResourceClaimTemplateIndex)
+			tCtx.Expect(actualIndexedPodsByResourceClaimTemplate).To(gomega.ConsistOf(test.expectedIndexedPodsByResourceClaimTemplate), "expected Pods were not indexed by ResourceClaimTemplate")
 		})
 	}
 }
@@ -1803,28 +1681,6 @@ func (em numMetrics) verify(tCtx ktesting.TContext) {
 	tCtx.Expect(result.metrics).To(gomega.Equal(em.metrics))
 }
 
-func (em numMetrics) Eventually(tCtx ktesting.TContext) {
-	g := gomega.NewWithT(tCtx)
-	tCtx.Helper()
-
-	g.Eventually(func() (numMetrics, error) {
-		result, err := getNumMetric(em.lister, tCtx.Logger())
-		result.lister = em.lister
-		return result, err
-	}).WithTimeout(5 * time.Second).Should(gomega.Equal(em))
-}
-
-func (em numMetrics) Consistently(tCtx ktesting.TContext) {
-	g := gomega.NewWithT(tCtx)
-	tCtx.Helper()
-
-	g.Consistently(func() (numMetrics, error) {
-		result, err := getNumMetric(em.lister, tCtx.Logger())
-		result.lister = em.lister
-		return result, err
-	}).WithTimeout(time.Second).Should(gomega.Equal(em))
-}
-
 type expectedMetrics struct {
 	numCreated          int
 	numCreatedWithAdmin int
@@ -1900,191 +1756,5 @@ func (em numMetrics) withUpdates(rcLabels controllermetrics.NumResourceClaimLabe
 	return numMetrics{
 		metrics: em.metrics,
 		lister:  em.lister,
-	}
-}
-
-func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
-	tests := []struct {
-		name                        string
-		pod                         *v1.Pod
-		featureGateEnabled          bool
-		deleted                     bool
-		expectEarlyReturn           bool
-		expectExtendedClaimEnqueued bool
-	}{
-		{
-			name: "pod with no resource claims",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status:     v1.PodStatus{},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           true,
-			expectExtendedClaimEnqueued: false,
-		},
-		{
-			name: "pod with regular resource claims only",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec: v1.PodSpec{
-					ResourceClaims: []v1.PodResourceClaim{{Name: "regular-claim"}},
-				},
-				Status: v1.PodStatus{Phase: v1.PodRunning},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: false,
-		},
-		{
-			name: "pod with extended resource claim, feature enabled, running pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status: v1.PodStatus{
-					Phase: v1.PodRunning,
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: false,
-		},
-		{
-			name: "pod with extended resource claim, feature enabled, completed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status: v1.PodStatus{
-					Phase: v1.PodSucceeded,
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: true,
-		},
-		{
-			name: "pod with extended resource claim, feature enabled, failed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status: v1.PodStatus{
-					Phase: v1.PodFailed, // Failed pod
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: true,
-		},
-		{
-			name: "pod with extended resource claim, feature disabled",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status: v1.PodStatus{
-					Phase: v1.PodSucceeded,
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          false,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: true,
-		},
-		{
-			name: "deleted pod with extended resource claim",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec:       v1.PodSpec{},
-				Status: v1.PodStatus{
-					Phase: v1.PodSucceeded,
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          true,
-			deleted:                     true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: true,
-		},
-		{
-			name: "pod with both regular and extended resource claims, completed",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
-				Spec: v1.PodSpec{
-					ResourceClaims: []v1.PodResourceClaim{{Name: "regular-claim"}},
-				},
-				Status: v1.PodStatus{
-					Phase: v1.PodSucceeded,
-					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
-						ResourceClaimName: "test-extended-claim",
-					},
-				},
-			},
-			featureGateEnabled:          true,
-			expectEarlyReturn:           false,
-			expectExtendedClaimEnqueued: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.featureGateEnabled)
-
-			tCtx := ktesting.Init(t)
-
-			fakeKubeClient := createTestClient()
-			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
-			claimInformer := informerFactory.Resource().V1().ResourceClaims()
-			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
-
-			setupMetrics()
-
-			ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
-			if err != nil {
-				t.Fatalf("error creating controller: %v", err)
-			}
-
-			ec.enqueuePod(tCtx.Logger(), test.pod, test.deleted)
-
-			var keys []string
-			for ec.queue.Len() > 0 {
-				k, _ := ec.queue.Get()
-				keys = append(keys, k)
-				ec.queue.Forget(k)
-				ec.queue.Done(k)
-			}
-
-			if test.expectEarlyReturn {
-				if len(keys) != 0 {
-					t.Errorf("expected no keys enqueued on early return, got: %v", keys)
-				}
-				return
-			}
-
-			var expectedClaimKey string
-			if test.pod.Status.ExtendedResourceClaimStatus != nil {
-				expectedClaimKey = claimKeyPrefix + test.pod.Namespace + "/" + test.pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
-			}
-			found := slices.Contains(keys, expectedClaimKey)
-			if test.expectExtendedClaimEnqueued && !found {
-				t.Errorf("expected extended claim key %q to be enqueued, got keys: %v", expectedClaimKey, keys)
-			}
-			if !test.expectExtendedClaimEnqueued && found {
-				t.Errorf("did not expect extended claim key %q to be enqueued, got keys: %v", expectedClaimKey, keys)
-			}
-		})
 	}
 }
