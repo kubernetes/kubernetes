@@ -5904,39 +5904,6 @@
     endpoint: /metrics
   - component: kubelet
     endpoint: /metrics
-- name: rest_client_request_duration_seconds
-  help: Request latency in seconds. Broken down by verb, and host.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - host
-  - verb
-  buckets:
-  - 0.005
-  - 0.025
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2
-  - 4
-  - 8
-  - 15
-  - 30
-  - 60
-  componentEndpoints:
-  - component: cloud-controller-manager
-    endpoint: /metrics
-  - component: kube-apiserver
-    endpoint: /metrics
-  - component: kube-controller-manager
-    endpoint: /metrics
-  - component: kube-proxy
-    endpoint: /metrics
-  - component: kube-scheduler
-    endpoint: /metrics
-  - component: kubelet
-    endpoint: /metrics
 - name: rest_client_request_retries_total
   help: Number of request retries, partitioned by status code, verb, and host.
   type: Counter
@@ -5977,27 +5944,6 @@
   - 1.048576e+06
   - 4.194304e+06
   - 1.6777216e+07
-  componentEndpoints:
-  - component: cloud-controller-manager
-    endpoint: /metrics
-  - component: kube-apiserver
-    endpoint: /metrics
-  - component: kube-controller-manager
-    endpoint: /metrics
-  - component: kube-proxy
-    endpoint: /metrics
-  - component: kube-scheduler
-    endpoint: /metrics
-  - component: kubelet
-    endpoint: /metrics
-- name: rest_client_requests_total
-  help: Number of HTTP requests, partitioned by status code, method, and host.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - code
-  - host
-  - method
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics
@@ -7643,6 +7589,60 @@
   labels:
   - deprecated_version
   - stability_level
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
+- name: rest_client_request_duration_seconds
+  help: Request latency in seconds. Broken down by verb, and host.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - host
+  - verb
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2
+  - 4
+  - 8
+  - 15
+  - 30
+  - 60
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
+- name: rest_client_requests_total
+  help: Number of HTTP requests, partitioned by status code, method, and host.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
+  - host
+  - method
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics

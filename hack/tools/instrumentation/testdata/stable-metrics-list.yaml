@@ -470,6 +470,34 @@
   labels:
   - deprecated_version
   - stability_level
+- name: rest_client_request_duration_seconds
+  help: Request latency in seconds. Broken down by verb, and host.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - host
+  - verb
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2
+  - 4
+  - 8
+  - 15
+  - 30
+  - 60
+- name: rest_client_requests_total
+  help: Number of HTTP requests, partitioned by status code, method, and host.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
+  - host
+  - method
 - name: running_managed_controllers
   help: Indicates where instances of a controller are currently running
   type: Gauge
