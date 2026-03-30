@@ -75,7 +75,7 @@ const (
 	podGroupResourceClaimTemplateIndex = "podGroupResourceClaimTemplate"
 
 	// claimPodOwnerIndex is used to find ResourceClaims which have
-	// a specific pod as owner. Values for this index are the pod UID.
+	// a specific pod as owner. Values for this index are the pod "namespace/UID".
 	claimPodOwnerIndex = "claimPodOwner"
 
 	// claimPodGroupOwnerIndex is used to find ResourceClaims which have a
@@ -1102,7 +1102,7 @@ func hasPrioritizedList(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 // the pod).
 func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceClaim) (*resourceapi.ResourceClaim, error) {
 	// Only claims owned by the pod will get returned here.
-	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, string(pod.UID))
+	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, pod.Namespace+"/"+string(pod.UID))
 	if err != nil {
 		return nil, err
 	}
@@ -1719,7 +1719,7 @@ func claimPodOwnerIndexFunc(obj any) ([]string, error) {
 			*owner.Controller &&
 			owner.APIVersion == "v1" &&
 			owner.Kind == "Pod" {
-			keys = append(keys, string(owner.UID))
+			keys = append(keys, claim.Namespace+"/"+string(owner.UID))
 		}
 	}
 	return keys, nil
