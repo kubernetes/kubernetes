@@ -35,7 +35,7 @@ var (
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_request_duration_seconds",
 			Help:           "Request latency in seconds. Broken down by verb, and host.",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.BETA,
 			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
 		[]string{"verb", "host"},
@@ -88,7 +88,7 @@ var (
 	requestResult = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Name:           "rest_client_requests_total",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.BETA,
 			Help:           "Number of HTTP requests, partitioned by status code, method, and host.",
 		},
 		[]string{"code", "method", "host"},
