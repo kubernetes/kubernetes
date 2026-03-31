@@ -1238,10 +1238,7 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 						// Tolerate forever -> ignore taint.
 						continue nextTaint
 					}
-					newTolerationSeconds := *toleration.TolerationSeconds
-					if newTolerationSeconds < 0 {
-						newTolerationSeconds = 0
-					}
+					newTolerationSeconds := max(*toleration.TolerationSeconds, 0)
 					if newTolerationSeconds < tolerationSeconds {
 						tolerationSeconds = newTolerationSeconds
 					}
