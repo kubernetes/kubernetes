@@ -613,7 +613,7 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj any, deleted bool)
 			runtime.HandleErrorWithLogger(logger, nil, "unexpected object in Pod indexer", "type", fmt.Sprintf("%T", object))
 			return
 		}
-		logger.V(4).Info(
+		logger.V(6).Info(
 			"Enqueuing Pod due to PodGroup change",
 			"podgroup", klog.KObj(podGroup),
 			"pod", klog.KObj(pod),
