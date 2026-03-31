@@ -115,7 +115,8 @@ var (
 	adminAccessFeatureOffError     = "admin access is requested, but the feature is disabled"
 )
 
-func TestSyncHandler(t *testing.T) {
+func TestSyncHandler(t *testing.T) { testSyncHandler(ktesting.Init(t)) }
+func testSyncHandler(tCtx ktesting.TContext) {
 	tests := []struct {
 		name                          string
 		key                           string
@@ -731,9 +732,7 @@ func TestSyncHandler(t *testing.T) {
 
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
-		t.Run(tc.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
 				objects = append(objects, pod)
@@ -776,7 +775,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 			ec, err := NewController(tCtx.Logger(), features, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
 			if err != nil {
-				t.Fatalf("error creating ephemeral controller : %v", err)
+				tCtx.Fatalf("error creating ephemeral controller : %v", err)
 			}
 
 			// Ensure informers are up-to-date.
@@ -798,34 +797,34 @@ func TestSyncHandler(t *testing.T) {
 			for _, pod := range tc.podsLater {
 				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
 				if err != nil {
-					t.Fatalf("unexpected error while creating pod: %v", err)
+					tCtx.Fatalf("unexpected error while creating pod: %v", err)
 				}
 			}
 
 			err = ec.syncHandler(tCtx, tc.key)
 			if err != nil {
-				assert.ErrorContains(t, err, tc.expectedError, "the error message should have contained the expected error message")
+				assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
 				return
 			}
 			if tc.expectedError != "" {
-				t.Fatalf("expected error, got none")
+				tCtx.Fatalf("expected error, got none")
 			}
 
 			if tc.name == "flapping-resourceclaim-statuses" {
-				assert.Len(t, appliedPatches, 1, "should have applied status once")
-				assert.Contains(t, appliedPatches[0], `"name":"claimA"`, "patch should contain claimA")
-				assert.Contains(t, appliedPatches[0], `"name":"claimB"`, "patch should contain claimB")
+				assert.Len(tCtx, appliedPatches, 1, "should have applied status once")
+				assert.Contains(tCtx, appliedPatches[0], `"name":"claimA"`, "patch should contain claimA")
+				assert.Contains(tCtx, appliedPatches[0], `"name":"claimB"`, "patch should contain claimB")
 			}
 
 			claims, err := fakeKubeClient.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
-				t.Fatalf("unexpected error while listing claims: %v", err)
+				tCtx.Fatalf("unexpected error while listing claims: %v", err)
 			}
-			assert.Equal(t, normalizeClaims(tc.expectedClaims), normalizeClaims(claims.Items))
+			assert.Equal(tCtx, normalizeClaims(tc.expectedClaims), normalizeClaims(claims.Items))
 
 			pods, err := fakeKubeClient.CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
-				t.Fatalf("unexpected error while listing pods: %v", err)
+				tCtx.Fatalf("unexpected error while listing pods: %v", err)
 			}
 			var actualStatuses map[string][]v1.PodResourceClaimStatus
 			for _, pod := range pods.Items {
@@ -837,11 +836,11 @@ func TestSyncHandler(t *testing.T) {
 				}
 				actualStatuses[pod.Name] = pod.Status.ResourceClaimStatuses
 			}
-			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
+			assert.Equal(tCtx, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
 			podGroups, err := fakeKubeClient.SchedulingV1alpha3().PodGroups("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
-				t.Fatalf("unexpected error while listing podgroups: %v", err)
+				tCtx.Fatalf("unexpected error while listing podgroups: %v", err)
 			}
 			var actualPodGroupStatuses map[string][]schedulingapi.PodGroupResourceClaimStatus
 			for _, podGroup := range podGroups.Items {
@@ -853,9 +852,9 @@ func TestSyncHandler(t *testing.T) {
 				}
 				actualPodGroupStatuses[podGroup.Name] = podGroup.Status.ResourceClaimStatuses
 			}
-			assert.Equal(t, tc.expectedPodGroupStatuses, actualPodGroupStatuses, "podgroup resource claim statuses")
+			assert.Equal(tCtx, tc.expectedPodGroupStatuses, actualPodGroupStatuses, "podgroup resource claim statuses")
 
-			expectMetrics(t, tc.expectedMetrics)
+			expectMetrics(tCtx, tc.expectedMetrics)
 		})
 	}
 }
@@ -1688,40 +1687,40 @@ type expectedMetrics struct {
 	numFailureWithAdmin int
 }
 
-func expectMetrics(t *testing.T, em expectedMetrics) {
-	t.Helper()
+func expectMetrics(tCtx ktesting.TContext, em expectedMetrics) {
+	tCtx.Helper()
 
 	// Check created claims
 	actualCreated, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "false"))
-	handleErr(t, err, "ResourceClaimCreateSuccesses")
+	handleErr(tCtx, err, "ResourceClaimCreateSuccesses")
 	if actualCreated != float64(em.numCreated) {
-		t.Errorf("Expected claims to be created %d, got %v", em.numCreated, actualCreated)
+		tCtx.Errorf("Expected claims to be created %d, got %v", em.numCreated, actualCreated)
 	}
 
 	// Check created claims with admin access
 	actualCreatedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "true"))
-	handleErr(t, err, "ResourceClaimCreateSuccessesWithAdminAccess")
+	handleErr(tCtx, err, "ResourceClaimCreateSuccessesWithAdminAccess")
 	if actualCreatedWithAdmin != float64(em.numCreatedWithAdmin) {
-		t.Errorf("Expected claims with admin access to be created %d, got %v", em.numCreatedWithAdmin, actualCreatedWithAdmin)
+		tCtx.Errorf("Expected claims with admin access to be created %d, got %v", em.numCreatedWithAdmin, actualCreatedWithAdmin)
 	}
 
 	// Check failed claims
 	actualFailed, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "false"))
-	handleErr(t, err, "ResourceClaimCreateFailures")
+	handleErr(tCtx, err, "ResourceClaimCreateFailures")
 	if actualFailed != float64(em.numFailures) {
-		t.Errorf("Expected claims to have failed %d, got %v", em.numFailures, actualFailed)
+		tCtx.Errorf("Expected claims to have failed %d, got %v", em.numFailures, actualFailed)
 	}
 
 	// Check failed claims with admin access
 	actualFailedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "true"))
-	handleErr(t, err, "ResourceClaimCreateFailuresWithAdminAccess")
+	handleErr(tCtx, err, "ResourceClaimCreateFailuresWithAdminAccess")
 	if actualFailedWithAdmin != float64(em.numFailureWithAdmin) {
-		t.Errorf("Expected claims with admin access to have failed %d, got %v", em.numFailureWithAdmin, actualFailedWithAdmin)
+		tCtx.Errorf("Expected claims with admin access to have failed %d, got %v", em.numFailureWithAdmin, actualFailedWithAdmin)
 	}
 }
-func handleErr(t *testing.T, err error, metricName string) {
+func handleErr(tCtx ktesting.TContext, err error, metricName string) {
 	if err != nil {
-		t.Errorf("Failed to get %s value, err: %v", metricName, err)
+		tCtx.Errorf("Failed to get %s value, err: %v", metricName, err)
 	}
 }
 func setupMetrics() {
