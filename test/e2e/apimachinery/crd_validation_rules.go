@@ -99,10 +99,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 	ginkgo.It("MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validations rules", func(ctx context.Context) {
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
@@ -129,10 +129,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 	ginkgo.It("MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validations rules", func(ctx context.Context) {
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
@@ -175,7 +175,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		   }
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithInvalidValidationRule, false)
-		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "creating CustomResourceDefinition with a validation rule that refers to a property that do not exist")
 		expectedErrMsg := "undefined field 'z'"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -197,7 +197,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 			}
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
-		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
 		expectedErrMsg := "Syntax error"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -230,7 +230,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		    }
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
-		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
 		expectedErrMsg := "exceeds budget"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -241,10 +241,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 	ginkgo.It("MUST fail create of a custom resource that exceeds the runtime cost limit for x-kubernetes-validations rule execution", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition including an expensive rule on a large amount of data")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
-		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition including an expensive rule on a large amount of data")
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 		ginkgo.By("Attempting to create a custom resource that will exceed the runtime cost limit")
@@ -287,10 +287,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 			  }
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithTransitionRule, false)
-		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition including an x-kubernetes-validations transition rule")
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 		ginkgo.By("Attempting to create a custom resource")

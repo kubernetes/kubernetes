@@ -158,12 +158,12 @@ func TestOpenAPIV2CRDMergeNoDuplicateTypes(t *testing.T) {
 		},
 	}
 
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(foo, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), foo, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(baz, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), baz, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -343,10 +343,10 @@ func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExten
 // the apiextension apiserver has installed the CRD. But it's not safe to watch
 // the created CR. Please call CreateCRDUsingRemovedAPI if you need to
 // watch the CR.
-func waitForCRDReadyWatchUnsafe(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+func waitForCRDReadyWatchUnsafe(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	// wait until all resources appears in discovery
 	for _, version := range servedV1Versions(crd) {
-		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			return existsInDiscoveryV1(crd, apiExtensionsClient, version)
 		})
 		if err != nil {
@@ -358,8 +358,8 @@ func waitForCRDReadyWatchUnsafe(crd *apiextensionsv1.CustomResourceDefinition, a
 }
 
 // waitForCRDReady creates the given CRD and makes sure its watch cache is primed on the server.
-func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	v1CRD, err := waitForCRDReadyWatchUnsafe(crd, apiExtensionsClient)
+func waitForCRDReady(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := waitForCRDReadyWatchUnsafe(ctx, crd, apiExtensionsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtension
 	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
-	err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
@@ -387,15 +387,15 @@ func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtension
 // the apiextension apiserver has installed the CRD. But it's not safe to watch
 // the created CR. Please call CreateNewV1CustomResourceDefinition if you need to
 // watch the CR.
-func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), v1CRD, metav1.CreateOptions{})
+func CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx context.Context, v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, v1CRD, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// wait until all resources appears in discovery
 	for _, version := range servedV1Versions(v1CRD) {
-		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			return existsInDiscoveryV1(v1CRD, apiExtensionsClient, version)
 		})
 		if err != nil {
@@ -407,8 +407,8 @@ func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.Custo
 }
 
 // CreateNewV1CustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.
-func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	v1CRD, err := CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD, apiExtensionsClient)
+func CreateNewV1CustomResourceDefinition(ctx context.Context, v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, v1CRD, apiExtensionsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +423,7 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
-	err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
@@ -512,12 +512,12 @@ func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicCl
 }
 
 // DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
-func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
+func DeleteV1CustomResourceDefinition(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
+	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd.Name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {
-		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			exists, err := existsInDiscoveryV1(crd, apiExtensionsClient, version)
 			return !exists, err
 		})
@@ -529,17 +529,17 @@ func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinit
 }
 
 // DeleteV1CustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
-func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
-	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
+func DeleteV1CustomResourceDefinitions(ctx context.Context, deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
+	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, deleteListOpts)
 	if err != nil {
 		return err
 	}
-	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, deleteListOpts); err != nil {
+	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(ctx, metav1.DeleteOptions{}, deleteListOpts); err != nil {
 		return err
 	}
 	for _, crd := range list.Items {
 		for _, version := range servedV1Versions(&crd) {
-			err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 				exists, err := existsInDiscoveryV1(&crd, apiExtensionsClient, version)
 				return !exists, err
 			})

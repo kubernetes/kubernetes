@@ -55,7 +55,7 @@ func TestApplyCRDNoSchema(t *testing.T) {
 
 	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
 
-	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(context.TODO(), server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

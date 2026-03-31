@@ -894,12 +894,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// use.
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(ctx, definition, apiExtensionClient)
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(ctx, definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
@@ -1029,12 +1029,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// use.
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(ctx, definition, apiExtensionClient)
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(ctx, definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}

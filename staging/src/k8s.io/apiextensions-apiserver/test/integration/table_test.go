@@ -120,7 +120,7 @@ func TestTableGet(t *testing.T) {
 	}
 
 	crd := newTableCRD()
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestColumnsPatch(t *testing.T) {
 
 	// CRD with no top-level and per-version columns should be created successfully
 	crd := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)[0]
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,7 +461,7 @@ func TestPatchCleanTopLevelColumns(t *testing.T) {
 	crd.Spec.Versions[0].AdditionalPrinterColumns = []apiextensionsv1.CustomResourceColumnDefinition{
 		{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
 	}
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

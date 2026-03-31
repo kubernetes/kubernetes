@@ -42,7 +42,7 @@ func TestFinalization(t *testing.T) {
 	defer tearDown()
 
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	ns := testNamespace
@@ -106,7 +106,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 
 	// Create a CRD.
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	// Create a CR with a finalizer.
@@ -134,7 +134,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	require.NotNil(t, gottenNoxuInstance.GetDeletionTimestamp())
 
 	// Delete the CRD.
-	fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient)
 
 	// Check is CR still there after the CRD deletion.
 	gottenNoxuInstance, err = noxuResourceClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -178,7 +178,7 @@ func TestApplyCRDuringCRDFinalization(t *testing.T) {
 	// Create a CRD with a finalizer which will stall deletion
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 	noxuDefinition.SetFinalizers([]string{testFinalizer})
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	// Delete the CRD. Since it has a finalizer it will be stuck in terminating state

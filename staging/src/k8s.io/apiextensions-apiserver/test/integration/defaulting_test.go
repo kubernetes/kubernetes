@@ -209,7 +209,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,7 +631,7 @@ func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(metaDefaultingFooV1beta1Schema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

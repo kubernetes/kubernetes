@@ -68,11 +68,11 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			randomDefinition := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 
 			// Create CRD and waits for the resource to be recognized and available.
-			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(randomDefinition, apiExtensionClient)
+			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, randomDefinition, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 
 			defer func() {
-				err = fixtures.DeleteV1CustomResourceDefinition(randomDefinition, apiExtensionClient)
+				err = fixtures.DeleteV1CustomResourceDefinition(ctx, randomDefinition, apiExtensionClient)
 				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 		})
@@ -100,17 +100,17 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			for i := range testListSize {
 				crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 				crd.Labels = map[string]string{"e2e-list-test-uuid": testUUID}
-				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 				framework.ExpectNoError(err, "creating CustomResourceDefinition")
 				crds[i] = crd
 			}
 
 			// Create a crd w/o the label to ensure the label selector matching works correctly
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
-				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+				err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 
@@ -133,7 +133,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			}
 
 			// Use delete collection to remove the CRDs
-			err = fixtures.DeleteV1CustomResourceDefinitions(selectorListOpts, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinitions(ctx, selectorListOpts, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinitions")
 			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "getting remaining CustomResourceDefinition")
@@ -157,10 +157,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 
 			// Create CRD and waits for the resource to be recognized and available.
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
-				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+				err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 
@@ -284,10 +284,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		}
 		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["a"] = v1.JSONSchemaProps{Type: "string"}
 		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["b"] = v1.JSONSchemaProps{Type: "string"}
-		crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 

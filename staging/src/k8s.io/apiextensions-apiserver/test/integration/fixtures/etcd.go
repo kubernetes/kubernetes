@@ -33,12 +33,12 @@ import (
 // CreateCRDUsingRemovedAPI creates a CRD directly using etcd.  This is must *ONLY* be used for checks of compatibility
 // with removed data.  Do not use this just because you don't want to update your test to use v1.  Only use this
 // when it actually matters.
-func CreateCRDUsingRemovedAPI(etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+func CreateCRDUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	crd, err := CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient, etcdStoragePrefix, betaCRD, apiExtensionsClient)
 	if err != nil {
 		return nil, err
 	}
-	return waitForCRDReady(crd, apiExtensionsClient, dynamicClientSet)
+	return waitForCRDReady(ctx, crd, apiExtensionsClient, dynamicClientSet)
 }
 
 // CreateCRDUsingRemovedAPIWatchUnsafe creates a CRD directly using etcd.  This is must *ONLY* be used for checks of compatibility

@@ -122,9 +122,9 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 			},
 		}
 		gv := schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name}
-		_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+		_, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, crd, apiExtensionClient, dynamicClient)
 		defer func() {
-			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			_ = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 		}()
 
 		framework.ExpectNoError(err)
@@ -150,7 +150,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 			framework.Failf("%s", diff)
 		}
 
-		err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+		err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 		framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		// Poll for the OpenAPI to be updated with the deleted CRD
 		err = wait.PollUntilContextTimeout(ctx, time.Second*1, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {

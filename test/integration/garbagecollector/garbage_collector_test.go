@@ -210,7 +210,7 @@ func createRandomCustomResourceDefinition(
 	// use.
 	definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
 
-	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(context.TODO(), definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
@@ -1258,7 +1258,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	t.Logf("Second pass CRD cascading deletion")
 	accessor := meta.NewAccessor()
 	accessor.SetResourceVersion(definition, "")
-	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(context.TODO(), definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
@@ -1289,7 +1289,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	time.Sleep(ctx.syncPeriod + 5*time.Second)
 
 	// Delete the definition, which should cascade to the owner and ultimately its dependents.
-	if err := apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient); err != nil {
+	if err := apiextensionstestserver.DeleteV1CustomResourceDefinition(context.TODO(), definition, apiExtensionClient); err != nil {
 		t.Fatalf("failed to delete %q: %v", definition.Name, err)
 	}
 

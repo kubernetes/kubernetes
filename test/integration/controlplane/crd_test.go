@@ -234,7 +234,7 @@ func TestCRDOpenAPI(t *testing.T) {
 			},
 		},
 	}
-	nonStructuralCRD, err := fixtures.CreateCRDUsingRemovedAPI(result.EtcdClient, result.EtcdStoragePrefix, nonStructuralBetaCRD, apiextensionsclient, dynamicClient)
+	nonStructuralCRD, err := fixtures.CreateCRDUsingRemovedAPI(context.TODO(), result.EtcdClient, result.EtcdStoragePrefix, nonStructuralBetaCRD, apiextensionsclient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

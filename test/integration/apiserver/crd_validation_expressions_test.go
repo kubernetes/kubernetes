@@ -57,7 +57,7 @@ func TestCustomResourceValidators(t *testing.T) {
 
 	t.Run("Structural schema", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithValidators)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,7 +215,7 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 	t.Run("CRD writes MUST fail for a non-structural schema containing x-kubernetes-validations", func(t *testing.T) {
 		// The only way for a non-structural schema to exist is for it to already be persisted in etcd as a non-structural CRD.
-		nonStructuralCRD, err := fixtures.CreateCRDUsingRemovedAPI(server.EtcdClient, server.EtcdStoragePrefix, nonStructuralCrdWithValidations(), apiExtensionClient, dynamicClient)
+		nonStructuralCRD, err := fixtures.CreateCRDUsingRemovedAPI(context.TODO(), server.EtcdClient, server.EtcdStoragePrefix, nonStructuralCrdWithValidations(), apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatalf("Unexpected error non-structural CRD by writing directly to etcd: %v", err)
 		}
@@ -247,7 +247,7 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 	t.Run("CRD creation MUST fail if a x-kubernetes-validations rule accesses a metadata field other than name", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "InvalidStructuralMetadata", structuralSchemaWithInvalidMetadataValidators)
-		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err == nil {
 			t.Error("Expected error creating custom resource but got none")
 		} else if !strings.Contains(err.Error(), "undefined field 'labels'") {
@@ -256,21 +256,21 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 	t.Run("CRD creation MUST pass if a x-kubernetes-validations rule accesses metadata.name", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "ValidStructuralMetadata", structuralSchemaWithValidMetadataValidators)
-		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Error("Unexpected error creating custom resource but metadata validation rule")
 		}
 	})
 	t.Run("CRD creation MUST pass for an CRD with empty field", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "WithEmptyObject", structuralSchemaWithEmptyObject)
-		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Errorf("unexpected error creating CRD with empty field: %v", err)
 		}
 	})
 	t.Run("CR creation MUST fail if a x-kubernetes-validations rule exceeds the runtime cost limit", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "RuntimeCostLimit", structuralSchemaWithCostLimit)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Errorf("Unexpected error creating custom resource definition: %v", err)
 		}
@@ -300,7 +300,7 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 	t.Run("Schema with valid transition rule", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "ValidTransitionRule", structuralSchemaWithValidTransitionRule)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -363,7 +363,7 @@ func TestCustomResourceValidators(t *testing.T) {
 
 	t.Run("CRD creation MUST fail if a x-kubernetes-validations rule contains invalid transition rule", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "InvalidTransitionRule", structuralSchemaWithInvalidTransitionRule)
-		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		_, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err == nil {
 			t.Error("Expected error creating custom resource but got none")
 		} else if !strings.Contains(err.Error(), "oldSelf cannot be used on the uncorrelatable portion of the schema") {
@@ -372,7 +372,7 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 	t.Run("Schema with default map key transition rule", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "DefaultMapKeyTransitionRule", structuralSchemaWithDefaultMapKeyTransitionRule)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -438,7 +438,7 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 
 	t.Run("Structural schema", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithBlockingErr)
-		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -670,7 +670,7 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 
 	// Create CRD with normal items+array schema
 	structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithItemsUnderArray)
-	crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+	crd, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +741,7 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 		t.Fatalf("expect error to contain \"Invalid value: \"array\": spec.backend in body must be of type object: \"array\"\" but get: %v", err)
 	}
 	// Delete the CRD
-	err = fixtures.DeleteV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient)
+	err = fixtures.DeleteV1CustomResourceDefinition(context.TODO(), structuralWithValidators, apiExtensionClient)
 	if err != nil {
 		t.Fatal(err)
 	}

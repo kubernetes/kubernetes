@@ -1061,7 +1061,7 @@ func getUnexpectedVersionCheckConverter(t *testing.T, version string) ObjectConv
 }
 
 func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interface, dynamicClient dynamic.Interface, etcdObjectReader *storage.EtcdObjectReader, v1CRD *apiextensionsv1.CustomResourceDefinition) (func(), *conversionTestContext) {
-	v1CRD, err := fixtures.CreateNewV1CustomResourceDefinition(v1CRD, apiExtensionsClient, dynamicClient)
+	v1CRD, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), v1CRD, apiExtensionsClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1071,7 +1071,7 @@ func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interf
 	}
 
 	tearDown := func() {
-		if err := fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionsClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), crd, apiExtensionsClient); err != nil {
 			t.Fatal(err)
 		}
 	}

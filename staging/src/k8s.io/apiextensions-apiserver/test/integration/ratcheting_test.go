@@ -426,7 +426,7 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 		},
 	}
 
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(myCRD, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), myCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

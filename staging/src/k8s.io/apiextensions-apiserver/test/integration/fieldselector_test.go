@@ -228,7 +228,7 @@ func TestSelectableFields(t *testing.T) {
 	}
 
 	// create the CRD
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -512,7 +512,7 @@ func TestFieldSelectorOpenAPI(t *testing.T) {
 	}
 
 	crd := selectableFieldFixture.DeepCopy()
-	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionsClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(context.TODO(), crd, apiExtensionsClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -698,7 +698,7 @@ func TestFieldSelectorDisablement(t *testing.T) {
 	// Write a field that uses the feature while the feature gate is enabled
 	t.Run("CustomResourceFieldSelectors", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
-		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+		crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -641,13 +641,13 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			noxuDefinition.Spec.Versions[i].Schema = &c
 		}
 
-		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			framework.Failf("cannot create crd %s", err)
 		}
 
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, noxuDefinition, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
@@ -903,13 +903,13 @@ spec:
 			crd.Spec.Versions[i].Schema = &c
 		}
 
-		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+		crd, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, crd, apiExtensionClient, dynamicClient)
 		if err != nil {
 			framework.Failf("cannot create crd %s", err)
 		}
 
 		defer func() {
-			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 

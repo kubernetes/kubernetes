@@ -48,7 +48,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 
 	ns := "not-the-default"
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestMultipleRegistration(t *testing.T) {
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestMultipleRegistration(t *testing.T) {
 	}
 
 	curletDefinition := fixtures.NewCurletV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	func() {
-		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,7 +237,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
 			t.Fatal(err)
 		}
-		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
@@ -255,7 +255,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
-		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -328,7 +328,7 @@ func TestEtcdStorage(t *testing.T) {
 
 	ns1 := "another-default-is-possible"
 	curletDefinition := fixtures.NewCurletV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +339,7 @@ func TestEtcdStorage(t *testing.T) {
 
 	ns2 := "the-cruel-default"
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

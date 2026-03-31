@@ -76,7 +76,7 @@ func TestCBORStorageEnablement(t *testing.T) {
 		}
 		defer tearDown()
 
-		if _, err := fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionsClientset, dynamicClient); err != nil {
+		if _, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionsClientset, dynamicClient); err != nil {
 			t.Fatal(err)
 		}
 
@@ -228,7 +228,7 @@ func TestCBORServingEnablement(t *testing.T) {
 					Scope: apiextensionsv1.ClusterScoped,
 				},
 			}
-			if _, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionsClientset, dynamicClient); err != nil {
+			if _, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionsClientset, dynamicClient); err != nil {
 				t.Fatal(err)
 			}
 			cr, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "mygroup.example.com", Version: "v1beta1", Resource: "foos"}).Create(

@@ -67,13 +67,13 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			}
 
 			noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
-				err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+				err = fixtures.DeleteV1CustomResourceDefinition(ctx, noxuDefinition, apiExtensionClient)
 				if err != nil {
 					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}

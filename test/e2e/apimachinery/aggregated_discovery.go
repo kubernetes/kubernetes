@@ -223,10 +223,10 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 			},
 		}
 		gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: resourceName + "s"}
-		_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+		_, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, crd, apiExtensionClient, dynamicClient)
 		framework.ExpectNoError(err)
 		defer func() {
-			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			_ = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 		}()
 
 		err = wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
@@ -332,10 +332,10 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 			},
 		}
 		gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: resourceName + "s"}
-		_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+		_, err = fixtures.CreateNewV1CustomResourceDefinition(ctx, crd, apiExtensionClient, dynamicClient)
 		framework.ExpectNoError(err)
 		defer func() {
-			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			_ = fixtures.DeleteV1CustomResourceDefinition(ctx, crd, apiExtensionClient)
 		}()
 
 		d := f.ClientSet.Discovery()

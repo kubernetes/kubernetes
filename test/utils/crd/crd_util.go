@@ -74,7 +74,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	var got *apiextensionsv1.CustomResourceDefinition
 	if err := wait.PollUntilContextTimeout(context.TODO(), f.Timeouts.Poll, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		// Create CRD and waits for the resource to be recognized and available.
-		got, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		got, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(ctx, crd, apiExtensionClient)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				// regenerate on conflict
@@ -102,7 +102,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	testcrd.Crd = got
 	testcrd.DynamicClients = resourceClients
 	testcrd.CleanUp = func(ctx context.Context) error {
-		err := fixtures.DeleteV1CustomResourceDefinition(got, apiExtensionClient)
+		err := fixtures.DeleteV1CustomResourceDefinition(ctx, got, apiExtensionClient)
 		if err != nil {
 			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", got.Name, err)
 		}
