@@ -683,7 +683,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		switch childType.Kind {
 		case types.Slice:
 			// Validate each value of a list field.
-			if elemNode := child.node.elem.node; elemNode == nil {
+			if elemNode := td.typeNodes[util.NonPointer(childType.Elem)]; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
@@ -715,7 +715,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			}
 		case types.Map:
 			// Validate each key of a map field.
-			if keyNode := child.node.key.node; keyNode == nil {
+			if keyNode := td.typeNodes[util.NonPointer(childType.Key)]; keyNode == nil {
 				if !child.fieldValidations.OpaqueKeyType {
 					return fmt.Errorf("%v: key type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
@@ -746,7 +746,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				}
 			}
 			// Validate each value of a map field.
-			if elemNode := child.node.elem.node; elemNode == nil {
+			if elemNode := td.typeNodes[util.NonPointer(childType.Elem)]; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
