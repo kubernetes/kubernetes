@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha3"
 	v1informers "k8s.io/client-go/informers/core/v1"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -97,7 +99,7 @@ const (
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
 	// features defines the feature gates that are enabled.
-	features Features
+	features controllerFeatures
 
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
@@ -154,8 +156,8 @@ const (
 	podGroupKeyPrefix = "podgroup:"
 )
 
-// Features defines which features should be enabled in the controller.
-type Features struct {
+// controllerFeatures defines which features should be enabled in the controller.
+type controllerFeatures struct {
 	AdminAccess            bool
 	PrioritizedList        bool
 	WorkloadResourceClaims bool
@@ -164,12 +166,34 @@ type Features struct {
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
-	features Features,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	podGroupInformer schedulinginformers.PodGroupInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
+	return newControllerWithFeatures(
+		logger,
+		kubeClient,
+		podInformer,
+		podGroupInformer,
+		claimInformer,
+		templateInformer,
+		controllerFeatures{
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		},
+	)
+}
+
+func newControllerWithFeatures(
+	logger klog.Logger,
+	kubeClient clientset.Interface,
+	podInformer v1informers.PodInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer,
+	claimInformer resourceinformers.ResourceClaimInformer,
+	templateInformer resourceinformers.ResourceClaimTemplateInformer,
+	features controllerFeatures) (*Controller, error) {
 
 	ec := &Controller{
 		features:        features,

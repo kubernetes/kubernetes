@@ -587,11 +587,6 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 	claimController.informerFactory = informers.NewSharedInformerFactory(client, 0 /* resync period */)
 	controller, err := resourceclaim.NewController(
 		klog.FromContext(claimControllerCtx),
-		resourceclaim.Features{
-			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		},
 		claimControllerCtx.Client(),
 		claimController.informerFactory.Core().V1().Pods(),
 		claimController.informerFactory.Scheduling().V1alpha3().PodGroups(),
