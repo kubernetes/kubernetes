@@ -850,13 +850,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	}
 	// When the pod container manager does not manage pod-level cgroups
 	// (e.g. cgroupsPerQOS=false), GetPodCgroupConfig returns nil.
-	// Track this so we skip pod-level cgroup updates in resizeContainers.
-	podCgroupsManaged := currentPodMemoryConfig != nil && currentPodCPUConfig != nil
+	// Default to the desired values so resizeContainers sees no pod-level
+	// diff and skips pod cgroup writes, while container updates still proceed.
 	if currentPodMemoryConfig == nil {
-		currentPodMemoryConfig = &cm.ResourceConfig{}
+		currentPodMemoryConfig = &cm.ResourceConfig{Memory: podResources.Memory}
 	}
 	if currentPodCPUConfig == nil {
-		currentPodCPUConfig = &cm.ResourceConfig{}
+		currentPodCPUConfig = &cm.ResourceConfig{CPUQuota: podResources.CPUQuota, CPUShares: podResources.CPUShares}
 	}
 
 	currentPodResources := podResources
@@ -970,13 +970,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
-		if podCgroupsManaged && newPodCgLimValue > currPodCgLimValue {
+		if newPodCgLimValue > currPodCgLimValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
-		if podCgroupsManaged && newPodCgReqValue > currPodCgReqValue {
+		if newPodCgReqValue > currPodCgReqValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
@@ -990,13 +990,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
-		if podCgroupsManaged && newPodCgReqValue < currPodCgReqValue {
+		if newPodCgReqValue < currPodCgReqValue {
 			// TODO: Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
-		if podCgroupsManaged && newPodCgLimValue < currPodCgLimValue {
+		if newPodCgLimValue < currPodCgLimValue {
 			// TODO(#127825): Pass logger from context once contextual logging migration is complete
 			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
