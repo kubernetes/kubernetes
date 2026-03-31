@@ -163,6 +163,21 @@ type controllerFeatures struct {
 	WorkloadResourceClaims bool
 }
 
+func (f controllerFeatures) String() string {
+	enabled := func(b bool) string {
+		if b {
+			return "enabled"
+		}
+		return "disabled"
+	}
+	return fmt.Sprintf(
+		"AdminAccess %s, PrioritizedList %s, WorkloadResourceClaims %s",
+		enabled(f.AdminAccess),
+		enabled(f.PrioritizedList),
+		enabled(f.WorkloadResourceClaims),
+	)
+}
+
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
