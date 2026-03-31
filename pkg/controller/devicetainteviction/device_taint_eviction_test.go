@@ -2391,11 +2391,9 @@ func testEviction(tCtx ktesting.TContext) {
 				tCtx.Cancel("time to stop")
 				wg.Wait()
 			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-			}()
+			})
 
 			// Eventually the controller should have synced it's informers.
 			tCtx.Wait()
@@ -2695,11 +2693,9 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// Eventually the pod gets scheduled for eviction.
 	tCtx.Wait()
@@ -2794,11 +2790,9 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// We don't want any events.
 	tCtx.Wait()
@@ -2863,11 +2857,9 @@ func synctestRetry(tCtx ktesting.TContext) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	expectLatencies := []time.Duration{5 * time.Millisecond /* default exponential retry */}
 
