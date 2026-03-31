@@ -62,7 +62,6 @@ var (
 	otherNamespace       = "not-my-namespace"
 	podResourceClaimName = "acme-resource"
 	templateName         = "my-template"
-	className            = "my-resource-class"
 	nodeName             = "worker"
 
 	testPod                     = makePod(testPodName, testNamespace, testPodUID)
@@ -80,8 +79,8 @@ var (
 		return podGroup
 	}()
 
-	testClaim              = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, makeOwnerReference(testPodWithResource, true))
-	testPodGroupClaim      = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, makeOwnerReference(testPodGroupWithResource, true))
+	testClaim              = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, makeOwnerReference(testPodWithResource, true))
+	testPodGroupClaim      = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, makeOwnerReference(testPodGroupWithResource, true))
 	testClaimAllocated     = allocateClaim(testClaim)
 	testClaimReserved      = reserveClaim(testClaimAllocated, testPodWithResource)
 	testClaimReservedTwice = reserveClaim(testClaimReserved, otherTestPod)
@@ -91,23 +90,23 @@ var (
 
 	testClaimReservedForPodGroup = reserveClaim(testClaimAllocated, testPodGroupWithResource)
 
-	templatedTestClaim                    = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
+	templatedTestClaim                    = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, 1, makeOwnerReference(testPodWithResource, true), nil)
 	templatedTestClaimAllocated           = allocateClaim(templatedTestClaim)
 	templatedTestClaimReserved            = reserveClaim(templatedTestClaimAllocated, testPodWithResource)
 	templatedTestClaimReservedForPodGroup = reserveClaim(templatedTestClaimAllocated, testPodGroupWithResource)
-	templatedTestPodGroupClaim            = makeTemplatedClaim(podResourceClaimName, testPodGroupName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodGroupWithResource, true), nil)
+	templatedTestPodGroupClaim            = makeTemplatedClaim(podResourceClaimName, testPodGroupName+"-"+podResourceClaimName+"-", testNamespace, 1, makeOwnerReference(testPodGroupWithResource, true), nil)
 
-	templatedTestClaimWithAdmin          = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), new(true))
+	templatedTestClaimWithAdmin          = makeTemplatedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, 1, makeOwnerReference(testPodWithResource, true), new(true))
 	templatedTestClaimWithAdminAllocated = allocateClaim(templatedTestClaimWithAdmin)
 
 	extendedTestClaim          = makeExtendedResourceClaim(testPodName, testNamespace, 1, makeOwnerReference(testPodWithResource, true))
 	extendedTestClaimAllocated = allocateClaim(extendedTestClaim)
 
-	conflictingClaim         = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, nil)
-	conflictingPodGroupClaim = makeClaim(testPodGroupName+"-"+podResourceClaimName, testNamespace, className, nil)
-	otherNamespaceClaim      = makeClaim(testPodName+"-"+podResourceClaimName, otherNamespace, className, nil)
-	template                 = makeTemplate(templateName, testNamespace, className, nil)
-	templateWithAdminAccess  = makeTemplate(templateName, testNamespace, className, new(true))
+	conflictingClaim         = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, nil)
+	conflictingPodGroupClaim = makeClaim(testPodGroupName+"-"+podResourceClaimName, testNamespace, nil)
+	otherNamespaceClaim      = makeClaim(testPodName+"-"+podResourceClaimName, otherNamespace, nil)
+	template                 = makeTemplate(templateName, testNamespace, nil)
+	templateWithAdminAccess  = makeTemplate(templateName, testNamespace, new(true))
 
 	testPodWithNodeName = func() *v1.Pod {
 		pod := testPodWithResource.DeepCopy()
@@ -719,7 +718,7 @@ func TestSyncHandler(t *testing.T) {
 			}(),
 			templates: []*resourceapi.ResourceClaimTemplate{template},
 			claims: []*resourceapi.ResourceClaim{
-				makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
+				makeClaim("claimA-object", testNamespace, makeOwnerReference(testPod, true)),
 			},
 			key: podKeyPrefix + testNamespace + "/" + testPodName,
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
@@ -729,8 +728,8 @@ func TestSyncHandler(t *testing.T) {
 				},
 			},
 			expectedClaims: []resourceapi.ResourceClaim{
-				*makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
-				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, className, 1, makeOwnerReference(testPod, true), nil),
+				*makeClaim("claimA-object", testNamespace, makeOwnerReference(testPod, true)),
+				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, 1, makeOwnerReference(testPod, true), nil),
 			},
 			expectedMetrics: expectedMetrics{1, 0, 0, 0},
 		},
@@ -991,7 +990,7 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	})
 
 	// After create tmp namespace claim template,queue should have fake pod key
-	TmpNamespaceTemplate := makeTemplate(templateName, "tmp", className, nil)
+	TmpNamespaceTemplate := makeTemplate(templateName, "tmp", nil)
 	_, err = claimTemplateTmpClient.Create(tCtx, TmpNamespaceTemplate, metav1.CreateOptions{})
 	tCtx.Step("create  claim template in tmp namespace after  pod backoff in test namespace", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
@@ -1508,7 +1507,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 	}
 }
 
-func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
+func makeClaim(name, namespace string, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
@@ -1519,7 +1518,7 @@ func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) 
 	return claim
 }
 
-func makeTemplatedClaim(podClaimName, generateName, namespace, classname string, createCounter int, owner *metav1.OwnerReference, adminAccess *bool) *resourceapi.ResourceClaim {
+func makeTemplatedClaim(podClaimName, generateName, namespace string, createCounter int, owner *metav1.OwnerReference, adminAccess *bool) *resourceapi.ResourceClaim {
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         fmt.Sprintf("%s-%d", generateName, createCounter),
@@ -1649,7 +1648,7 @@ func podInPodGroup(pod *v1.Pod, podName, podGroupName string) *v1.Pod {
 	return pod
 }
 
-func makeTemplate(name, namespace, classname string, adminAccess *bool) *resourceapi.ResourceClaimTemplate {
+func makeTemplate(name, namespace string, adminAccess *bool) *resourceapi.ResourceClaimTemplate {
 	template := &resourceapi.ResourceClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
