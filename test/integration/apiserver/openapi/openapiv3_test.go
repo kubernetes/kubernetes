@@ -119,7 +119,7 @@ func TestAddRemoveGroupVersion(t *testing.T) {
 
 	// Create a new CRD with group mygroup.example.com
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestAddRemoveGroupVersion(t *testing.T) {
 	}
 
 	// Delete the CRD and ensure that the group/version is also deleted in discovery
-	if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+	if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(4 * time.Second)

@@ -662,7 +662,7 @@ func TestUpdateStatusWithOldVersion(t *testing.T) {
 
 	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRDWithStatus(apiextensionsv1beta1.NamespaceScoped)
 
-	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(context.TODO(), server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(t.Context(), server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -74,7 +74,7 @@ func TestHandlerScope(t *testing.T) {
 					Scope: scope,
 				},
 			}
-			crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), crd, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}

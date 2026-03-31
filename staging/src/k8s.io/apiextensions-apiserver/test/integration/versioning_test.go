@@ -48,7 +48,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	assert.Equal(t, "v1beta2", noxuDefinition.Spec.Versions[1].Name)
 	assert.True(t, noxuDefinition.Spec.Versions[1].Storage)
 
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestVersionedNamespacedScopedCRD(t *testing.T) {
 	defer tearDown()
 
 	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 	defer tearDown()
 
 	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	defer tearDown()
 
 	noxuDefinition.Spec.Versions = versionsV1Beta1Storage
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = fixtures.DeleteV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient)
+	err = fixtures.DeleteV1CustomResourceDefinition(t.Context(), crd, apiExtensionClient)
 	if err != nil {
 		t.Fatal(err)
 	}

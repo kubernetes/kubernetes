@@ -210,7 +210,7 @@ func createRandomCustomResourceDefinition(
 	// use.
 	definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
 
-	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(context.TODO(), definition, apiExtensionClient, dynamicClient)
+	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(t.Context(), definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
@@ -1258,7 +1258,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	t.Logf("Second pass CRD cascading deletion")
 	accessor := meta.NewAccessor()
 	accessor.SetResourceVersion(definition, "")
-	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(context.TODO(), definition, apiExtensionClient, dynamicClient)
+	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(t.Context(), definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}

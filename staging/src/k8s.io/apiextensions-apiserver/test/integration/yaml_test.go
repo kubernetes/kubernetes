@@ -52,7 +52,7 @@ func TestYAML(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestYAMLSubresource(t *testing.T) {
 	}
 
 	noxuDefinition := NewNoxuSubresourcesCRDs(apiextensionsv1.ClusterScoped)[0]
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

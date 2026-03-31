@@ -95,7 +95,7 @@ func TestCustomResourceDeprecation(t *testing.T) {
 	}
 
 	crd := deprecationFixture.DeepCopy()
-	if _, err := fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionsClient, dynamicClient); err != nil {
+	if _, err := fixtures.CreateNewV1CustomResourceDefinition(t.Context(), crd, apiExtensionsClient, dynamicClient); err != nil {
 		t.Fatal(err)
 	}
 

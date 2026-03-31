@@ -51,7 +51,7 @@ func TestChangeCRD(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionsClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionsClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

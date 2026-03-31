@@ -3062,7 +3062,7 @@ func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless boo
 		crd.Spec.Versions[i].Schema = &c
 	}
 	// install the CRD
-	crd, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

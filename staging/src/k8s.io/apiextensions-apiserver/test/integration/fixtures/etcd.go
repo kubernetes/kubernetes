@@ -34,7 +34,7 @@ import (
 // with removed data.  Do not use this just because you don't want to update your test to use v1.  Only use this
 // when it actually matters.
 func CreateCRDUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	crd, err := CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient, etcdStoragePrefix, betaCRD, apiExtensionsClient)
+	crd, err := CreateCRDUsingRemovedAPIWatchUnsafe(ctx, etcdClient, etcdStoragePrefix, betaCRD, apiExtensionsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -44,18 +44,18 @@ func CreateCRDUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, 
 // CreateCRDUsingRemovedAPIWatchUnsafe creates a CRD directly using etcd.  This is must *ONLY* be used for checks of compatibility
 // with removed data.  Do not use this just because you don't want to update your test to use v1.  Only use this
 // when it actually matters.
-func CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+func CreateCRDUsingRemovedAPIWatchUnsafe(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	// attempt defaulting, best effort
 	apiextensionsv1beta1.SetDefaults_CustomResourceDefinition(betaCRD)
 	betaCRD.Kind = "CustomResourceDefinition"
 	betaCRD.APIVersion = apiextensionsv1beta1.SchemeGroupVersion.Group + "/" + apiextensionsv1beta1.SchemeGroupVersion.Version
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	reqCtx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	key := path.Join("/", etcdStoragePrefix, "apiextensions.k8s.io", "customresourcedefinitions", betaCRD.Name)
 	val, _ := json.Marshal(betaCRD)
-	if _, err := etcdClient.Put(ctx, key, string(val)); err != nil {
+	if _, err := etcdClient.Put(reqCtx, key, string(val)); err != nil {
 		return nil, err
 	}
 
-	return apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), betaCRD.Name, metav1.GetOptions{})
+	return apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, betaCRD.Name, metav1.GetOptions{})
 }

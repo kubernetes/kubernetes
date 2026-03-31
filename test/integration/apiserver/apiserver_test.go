@@ -973,7 +973,7 @@ func TestMetadataClient(t *testing.T) {
 			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1305,7 +1305,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1551,7 +1551,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 		},
 	}
 
-	fooWithSubresourceCRD, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
+	fooWithSubresourceCRD, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1944,7 +1944,7 @@ func TestTransform(t *testing.T) {
 			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

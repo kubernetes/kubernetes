@@ -35,7 +35,7 @@ func TestAPIApproval(t *testing.T) {
 	defer tearDown()
 
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestAPIApproval(t *testing.T) {
 	}
 	// the unit tests cover all variations. We just need to be sure that we see the code being called
 	approvedKubeAPI := newSigKubeAPIFn("approved", "https://github.com/kubernetes/kubernetes/pull/79724")
-	approvedKubeAPI, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), approvedKubeAPI, apiExtensionClient, dynamicClient)
+	approvedKubeAPI, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), approvedKubeAPI, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

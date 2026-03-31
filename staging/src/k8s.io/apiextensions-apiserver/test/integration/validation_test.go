@@ -47,7 +47,7 @@ func TestForProperValidationErrors(t *testing.T) {
 	defer tearDown()
 
 	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestCustomResourceValidation(t *testing.T) {
 
 	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,7 +237,7 @@ func TestCustomResourceValidation(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -259,7 +259,7 @@ func TestCustomResourceItemsValidation(t *testing.T) {
 
 	// create CRDs
 	t.Logf("Creating CRD %s", crd.Name)
-	if _, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, client); err != nil {
+	if _, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), crd, apiExtensionClient, client); err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
 
@@ -426,7 +426,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 
 	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -464,7 +464,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -574,7 +574,7 @@ spec:
 		t.Fatalf("failed decoding of: %v\n\n%s", err, crdManifest)
 	}
 	crd := crdObj.(*apiextensionsv1.CustomResourceDefinition)
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), crd, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +647,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 
 	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -724,7 +724,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				}
 			}
 		}
-		if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -750,7 +750,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			// set stricter schema
 			validationSchema.OpenAPIV3Schema.Required = []string{"alpha", "beta", "gamma"}
 
-			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -796,7 +796,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 				t.Fatal(err)
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
-			if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+			if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -822,7 +822,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 			existingProperties := validationSchema.OpenAPIV3Schema.Properties
 			validationSchema.OpenAPIV3Schema.Properties = nil
 			validationSchema.OpenAPIV3Schema.AdditionalProperties = &apiextensionsv1.JSONSchemaPropsOrBool{Allows: false}
-			_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
 			}
@@ -837,7 +837,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 					Allows: true,
 				},
 			}
-			_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 			}
@@ -851,18 +851,18 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 				},
 			}
 
-			_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatal("unexpected non-error: $ref cannot be non-empty string")
 			}
 
 			validationSchema.OpenAPIV3Schema.Ref = nil
 
-			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient, dynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := fixtures.DeleteV1CustomResourceDefinition(context.TODO(), noxuDefinition, apiExtensionClient); err != nil {
+			if err := fixtures.DeleteV1CustomResourceDefinition(t.Context(), noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -921,7 +921,7 @@ spec:
 
 	// create CRDs.  We cannot create these in v1, but they can exist in upgraded clusters
 	t.Logf("Creating CRD %s", betaCRD.Name)
-	if _, err := fixtures.CreateCRDUsingRemovedAPI(context.TODO(), etcdclient, etcdStoragePrefix, betaCRD, apiExtensionClient, dynamicClient); err != nil {
+	if _, err := fixtures.CreateCRDUsingRemovedAPI(t.Context(), etcdclient, etcdStoragePrefix, betaCRD, apiExtensionClient, dynamicClient); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1525,7 +1525,7 @@ properties:
 
 			// create CRDs.  We cannot create these in v1, but they can exist in upgraded clusters
 			t.Logf("Creating CRD %s", betaCRD.Name)
-			if _, err := fixtures.CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient, etcdPrefix, betaCRD, apiExtensionClient); err != nil {
+			if _, err := fixtures.CreateCRDUsingRemovedAPIWatchUnsafe(t.Context(), etcdClient, etcdPrefix, betaCRD, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 

@@ -161,12 +161,12 @@ func TestOpenAPIV3MultipleCRDsSameGV(t *testing.T) {
 		},
 	}
 
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = fixtures.CreateNewV1CustomResourceDefinition(context.TODO(), bazWithSubresourceCRD, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(t.Context(), bazWithSubresourceCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
