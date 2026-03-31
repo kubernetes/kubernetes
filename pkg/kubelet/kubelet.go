@@ -1079,6 +1079,11 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, evictionAdmitHandler)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		if status, err := klet.containerRuntime.Status(ctx); err == nil && status != nil {
+			klet.runtimeState.setRuntimeFeatures(status.Features)
+		} else if err != nil {
+			logger.V(4).Info("Unable to prefetch container runtime features for node declared features", "err", err)
+		}
 		v, err := versionutil.Parse(version.Get().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse version: %w", err)
@@ -2343,6 +2348,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 				ID:        pod.UID,
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
+				Timestamp: kl.clock.Now(),
 			}
 		} else {
 			return fmt.Errorf("unable to get pod prior to final pod termination: %w", err)

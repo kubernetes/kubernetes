@@ -1324,6 +1324,11 @@ func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types
 	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
 
+// ReservedForPodGroup sets that field of the inner object given information about one podgroup.
+func (wrapper *ResourceClaimWrapper) ReservedForPodGroup(podGroupName string, podGroupUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{APIGroup: schedulingapi.GroupName, Resource: "podgroups", Name: podGroupName, UID: podGroupUID})
+}
+
 type ResourceSliceWrapper struct {
 	resourceapi.ResourceSlice
 }
@@ -1588,6 +1593,12 @@ func (wrapper *PodGroupWrapper) Namespace(namespace string) *PodGroupWrapper {
 	return wrapper
 }
 
+// UID sets `uid` as the UID of the inner PodGroup.
+func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
+	wrapper.PodGroup.UID = uid
+	return wrapper
+}
+
 // Obj returns the inner PodGroup.
 func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
 	return &wrapper.PodGroup
@@ -1628,6 +1639,30 @@ func (wrapper *PodGroupWrapper) TopologyKey(topologyKey string) *PodGroupWrapper
 			},
 		},
 	}
+	return wrapper
+}
+
+// ResourceClaims adds resource claims to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaims(claims ...schedulingapi.PodGroupResourceClaim) *PodGroupWrapper {
+	wrapper.Spec.ResourceClaims = append(wrapper.Spec.ResourceClaims, claims...)
+	return wrapper
+}
+
+// ResourceClaimStatuses adds resource claim statuses to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaimStatuses(statuses ...schedulingapi.PodGroupResourceClaimStatus) *PodGroupWrapper {
+	wrapper.Status.ResourceClaimStatuses = append(wrapper.Status.ResourceClaimStatuses, statuses...)
+	return wrapper
+}
+
+// DisruptionMode sets the disruption mode of the inner PodGroup.
+func (wrapper *PodGroupWrapper) DisruptionMode(mode schedulingapi.DisruptionMode) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &mode
+	return wrapper
+}
+
+// Priority sets the priority of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.Priority = &priority
 	return wrapper
 }
 

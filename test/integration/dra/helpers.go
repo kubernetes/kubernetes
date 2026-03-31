@@ -238,7 +238,10 @@ func deleteAndWait[T any](tCtx ktesting.TContext, del func(context.Context, stri
 		options.GracePeriodSeconds = ptr.To(int64(0))
 	}
 
-	tCtx.ExpectNoError(del(tCtx, name, options), fmt.Sprintf("delete %T %s", t, name))
+	err := del(tCtx, name, options)
+	if !apierrors.IsNotFound(err) {
+		tCtx.ExpectNoError(err, fmt.Sprintf("delete %T %s", t, name))
+	}
 	waitForNotFound(tCtx, get, name)
 }
 

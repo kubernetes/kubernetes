@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -46,9 +47,10 @@ type remoteImageService struct {
 	conn        *grpc.ClientConn
 	// useStreaming indicates whether to use streaming RPCs for list operations
 	// when the CRIListStreaming feature gate is enabled. It falls back to false
-	// if a streaming RPC returns Unimplemented. The fallback is racy but kept
-	// simple since the worst case is a few extra fallback attempts.
-	useStreaming bool
+	// if a streaming RPC returns Unimplemented. Multiple goroutines may
+	// concurrently observe Unimplemented and store false, but that is harmless
+	// because the store is idempotent.
+	useStreaming atomic.Bool
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
@@ -97,17 +99,18 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 		grpc.WithConnectParams(connParams),
 	)
 
-	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
+	conn, err := grpc.NewClient(clientTargetForAddress(addr), dialOpts...)
 	if err != nil {
 		logger.Error(err, "Connect remote image service failed", "address", addr)
 		return nil, err
 	}
 
 	service := &remoteImageService{
-		timeout:      connectionTimeout,
-		conn:         conn,
-		useStreaming: useStreaming,
+		timeout: connectionTimeout,
+		conn:    conn,
 	}
+	service.useStreaming.Store(useStreaming)
+
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
 	}
@@ -143,7 +146,7 @@ func (r *remoteImageService) ListImages(ctx context.Context, filter *runtimeapi.
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	if r.useStreaming {
+	if r.useStreaming.Load() {
 		return r.streamImagesV1(ctx, filter)
 	}
 	return r.listImagesV1(ctx, filter)
@@ -184,7 +187,7 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 			// but when calling Recv() on the stream.
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamImages not implemented, falling back to ListImages", "filter", filter)
-				r.useStreaming = false
+				r.useStreaming.Store(false)
 				return r.listImagesV1(ctx, filter)
 			}
 			logger.Error(err, "StreamImages recv failed", "filter", filter, "itemsReceived", len(images))

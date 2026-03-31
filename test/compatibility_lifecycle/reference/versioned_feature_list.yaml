@@ -645,6 +645,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: DRAResourceClaimGranularStatusAuthorization
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: DRAResourcePoolStatus
   versionedSpecs:
   - default: false
@@ -657,6 +663,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: DRAWorkloadResourceClaims
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false
@@ -843,6 +855,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
@@ -1393,7 +1409,7 @@
     version: "1.36"
 - name: PLEGOnDemandRelist
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.36"

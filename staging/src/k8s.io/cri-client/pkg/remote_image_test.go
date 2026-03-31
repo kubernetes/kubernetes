@@ -19,6 +19,7 @@ package cri
 import (
 	"context"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,4 +97,29 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, exp.GetSpans())
+}
+
+func TestNewRemoteImageServiceUnixSocketEndpoint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket regression test is not applicable on windows")
+	}
+
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+		// clear endpoint file
+		if addr, _, err := util.GetAddressAndDialer(endpoint); err == nil {
+			if _, err := os.Stat(addr); err == nil {
+				if err := os.Remove(addr); err != nil {
+					t.Errorf("remove %q: %v", addr, err)
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
+	info, err := imgSvc.ImageFsInfo(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, info)
 }

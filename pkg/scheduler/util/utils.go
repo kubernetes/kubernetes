@@ -257,3 +257,15 @@ func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
 	}
 	return ports
 }
+
+// PodGroupPriority returns priority of a given pod group.
+func PodGroupPriority(pg *schedulingv1alpha2.PodGroup) int32 {
+	if pg.Spec.Priority != nil {
+		return *pg.Spec.Priority
+	}
+	// When priority of a pod group is nil, it means it was created at a time
+	// that there was no global default priority class and the priority class
+	// name of the pod group was empty (or when the WorkloadAwarePreemption
+	// feature gate was disabled). So, we resolve to the static default priority.
+	return 0
+}

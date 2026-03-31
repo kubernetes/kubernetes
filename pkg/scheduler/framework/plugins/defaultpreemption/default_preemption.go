@@ -24,9 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/listers/scheduling/v1alpha2"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -62,10 +64,14 @@ type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
-	fh        fwk.Handle
-	fts       feature.Features
-	args      config.DefaultPreemptionArgs
-	Evaluator *preemption.Evaluator
+	fh   fwk.Handle
+	fts  feature.Features
+	args config.DefaultPreemptionArgs
+
+	Executor          *preemption.Executor
+	Evaluator         *preemption.Evaluator
+	pgLister          v1alpha2.PodGroupLister
+	podGroupEvaluator *preemption.PodGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
@@ -103,7 +109,15 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		fts:  fts,
 		args: *args,
 	}
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+	pl.Executor = preemption.NewExecutor(fh, fts)
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
+
+	if pl.fts.EnableWorkloadAwarePreemption || pl.fts.EnableTopologyAwareWorkloadScheduling {
+		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha2().PodGroups().Lister()
+	}
+	if pl.fts.EnableWorkloadAwarePreemption {
+		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor)
+	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
@@ -123,6 +137,23 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
+	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableTopologyAwareWorkloadScheduling {
+		pg, err := pl.pgLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
+		if err != nil {
+			return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: pod group for pod not found")
+		}
+		if pg.Spec.SchedulingConstraints != nil {
+			// When TAS is enabled, the default preemption logic needs to be disabled to avoid performing preemption multiple times for each topology option.
+			// The TAS-compatible preemption logic will be implemented in Delayed Preemption KEP 4671 or Workload-aware preemption KEP 5710 features.
+			return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to placement-based pod group scheduling limitation")
+		}
+	}
+	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableWorkloadAwarePreemption {
+		// When WAP is enabled, the default preemption logic needs to be disabled for pod group scheduling to avoid performing preemption in pod by pod cycle
+		// of pod group scheduling. Instead the WAP will be called to perform preemption for the entire pod group.
+		return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled")
+	}
+
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
@@ -135,7 +166,20 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if pl.Evaluator.IsPodRunningPreemption(p.GetUID()) {
+	if p.Spec.SchedulingGroup != nil && pl.fts.EnableWorkloadAwarePreemption {
+		pg, err := pl.pgLister.PodGroups(p.Namespace).Get(*p.Spec.SchedulingGroup.PodGroupName)
+		// If the pg is not found do not block the pod. It's not a default preemption responsibility
+		// to block pods from pod group without pg from entering the queue.
+		if err != nil {
+			return nil
+		}
+		if pl.Executor.IsPodGroupRunningPreemption(pg.GetUID()) {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished")
+		}
+		return nil
+	}
+
+	if pl.Executor.IsPodRunningPreemption(p.GetUID()) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil
@@ -317,11 +361,6 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 //     Currently we check the node that is nominated for this pod, and as long as there are
 //     terminating pods on this node, we don't attempt to preempt more pods.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
-	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableTopologyAwareWorkloadScheduling {
-		// When TAS is enabled, the default preemption logic needs to be disabled to avoid performing preemption multiple times for each topology option.
-		// The TAS-compatible preemption logic will be implemented in Delayed Preemption KEP 4671 or Workload-aware preemption KEP 5710 features.
-		return false, "not eligible due to placement-based pod group scheduling limitation."
-	}
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
@@ -423,4 +462,9 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 		}
 	}
 	return violatingPodInfos, nonViolatingPodInfos
+}
+
+// PodGroupPostFilter runs a default preemption for the pod group.
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc func(ctx context.Context) *fwk.Status) *fwk.Status {
+	return pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
 }

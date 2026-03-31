@@ -38,7 +38,8 @@ const (
 	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
 	// PodResourceClaimAnnotation is the annotation set on template-generated
 	// ResourceClaims by the ResourceClaim controller. Its value is the
-	// pod.spec.resourceClaims[].name for which the claim was generated.
+	// spec.resourceClaims[].name of the Pod or PodGroup for which the claim was
+	// generated. The Pod and its PodGroup are guaranteed to use the same name.
 	PodResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 	// Resource device class prefix is for generating implicit extended resource
 	// name for a device class when its ExtendedResourceName field is not

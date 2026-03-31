@@ -52,8 +52,14 @@ func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.
 	workloadScheduling := obj.(*scheduling.Workload)
 	allErrs := validation.ValidateWorkload(workloadScheduling)
 	opts := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || anySchedulingConstraintsInUse(nil) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		opts = append(opts, string(features.DRAWorkloadResourceClaims))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
 }
@@ -75,8 +81,18 @@ func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
 	opts := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || anySchedulingConstraintsInUse(old.(*scheduling.Workload)) {
+	// Declarative validation will always allow fields to remain unchanged, so if any
+	// of the fields which are covered by these gates are set, we will not re-validate them
+	// (even if the gates are disabled) as long as they do not change values. If a gate
+	// is disabled, they will not be allowed to change values.
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		opts = append(opts, string(features.DRAWorkloadResourceClaims))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
 }
@@ -121,6 +137,10 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		}
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
+		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
+		dropDisabledDisruptionModeField(template, oldTemplate)
+		dropDisabledPriorityClassNameField(template, oldTemplate)
+		dropDisabledPriorityField(template, oldTemplate)
 	}
 }
 
@@ -130,23 +150,64 @@ func dropDisabledSchedulingConstraintsFields(template, oldTemplate *scheduling.P
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldTemplate) {
 		return
 	}
-
 	template.SchedulingConstraints = nil
 }
 
-func anySchedulingConstraintsInUse(workload *scheduling.Workload) bool {
-	if workload == nil {
-		return false
+// dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references from
+// podGroupTemplates unless they are already used by the old Workload spec.
+func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldTemplate) {
+		return
 	}
+	template.ResourceClaims = nil
+}
 
-	for i := range workload.Spec.PodGroupTemplates {
-		if schedulingConstraintsInUse(&workload.Spec.PodGroupTemplates[i]) {
-			return true
-		}
+// dropDisabledDisruptionModeField removes the DisruptionMode field from a template
+// unless it is already used in the old template.
+func dropDisabledDisruptionModeField(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || disruptionModeInUse(oldTemplate) {
+		// No need to drop anything.
+		return
 	}
-	return false
+	template.DisruptionMode = nil
+}
+
+// dropDisabledPriorityClassNameField removes the PriorityClassName field from a template
+// unless it is already used in the old template.
+func dropDisabledPriorityClassNameField(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityClassNameInUse(oldTemplate) {
+		// No need to drop anything.
+		return
+	}
+	template.PriorityClassName = ""
+}
+
+// dropDisabledPriorityField removes the Priority field from a template unless it is
+// already used in the old template.
+func dropDisabledPriorityField(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityInUse(oldTemplate) {
+		// No need to drop anything.
+		return
+	}
+	template.Priority = nil
 }
 
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
+}
+
+func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && len(pgt.ResourceClaims) > 0
+}
+
+func disruptionModeInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.DisruptionMode != nil
+}
+
+func priorityClassNameInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.PriorityClassName != ""
+}
+
+func priorityInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.Priority != nil
 }

@@ -36,6 +36,7 @@ type Features struct {
 	EnableDRAPartitionableDevices                 bool
 	EnableDRAResourceClaimDeviceStatus            bool
 	EnableDRASchedulerFilterTimeout               bool
+	EnableDRAWorkloadResourceClaims               bool
 	EnableDynamicResourceAllocation               bool
 	EnableVolumeAttributesClass                   bool
 	EnableVolumeLimitScaling                      bool
@@ -53,6 +54,7 @@ type Features struct {
 	EnableTaintTolerationComparisonOperators      bool
 	EnableInPlacePodLevelResourcesVerticalScaling bool
 	EnableTopologyAwareWorkloadScheduling         bool
+	EnableWorkloadAwarePreemption                 bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -67,6 +69,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRASchedulerFilterTimeout:               featureGate.Enabled(features.DRASchedulerFilterTimeout),
 		EnableDRAResourceClaimDeviceStatus:            featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
 		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
+		EnableDRAWorkloadResourceClaims:               featureGate.Enabled(features.DRAWorkloadResourceClaims),
 		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),
 		EnableVolumeLimitScaling:                      featureGate.Enabled(features.VolumeLimitScaling),
@@ -86,5 +89,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
 		EnableDRANodeAllocatableResources:             featureGate.Enabled(features.DRANodeAllocatableResources),
+		EnableWorkloadAwarePreemption:                 featureGate.Enabled(features.WorkloadAwarePreemption),
 	}
 }

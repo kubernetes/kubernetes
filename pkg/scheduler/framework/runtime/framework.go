@@ -44,6 +44,7 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -55,25 +56,26 @@ const (
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry             Registry
-	snapshotSharedLister fwk.SharedLister
-	waitingPods          *waitingPodsMap
-	podsInPreBind        *podsInPreBindMap
-	scorePluginWeight    map[string]int
-	preEnqueuePlugins    []fwk.PreEnqueuePlugin
-	enqueueExtensions    []fwk.EnqueueExtensions
-	queueSortPlugins     []fwk.QueueSortPlugin
-	preFilterPlugins     []fwk.PreFilterPlugin
-	filterPlugins        []fwk.FilterPlugin
-	postFilterPlugins    []fwk.PostFilterPlugin
-	preScorePlugins      []fwk.PreScorePlugin
-	scorePlugins         []fwk.ScorePlugin
-	reservePlugins       []fwk.ReservePlugin
-	preBindPlugins       []fwk.PreBindPlugin
-	bindPlugins          []fwk.BindPlugin
-	postBindPlugins      []fwk.PostBindPlugin
-	permitPlugins        []fwk.PermitPlugin
-	batchablePlugins     []fwk.SignPlugin
+	registry                  Registry
+	snapshotSharedLister      fwk.SharedLister
+	waitingPods               *waitingPodsMap
+	podsInPreBind             *podsInPreBindMap
+	scorePluginWeight         map[string]int
+	preEnqueuePlugins         []fwk.PreEnqueuePlugin
+	enqueueExtensions         []fwk.EnqueueExtensions
+	queueSortPlugins          []fwk.QueueSortPlugin
+	preFilterPlugins          []fwk.PreFilterPlugin
+	filterPlugins             []fwk.FilterPlugin
+	postFilterPlugins         []fwk.PostFilterPlugin
+	preScorePlugins           []fwk.PreScorePlugin
+	scorePlugins              []fwk.ScorePlugin
+	reservePlugins            []fwk.ReservePlugin
+	preBindPlugins            []fwk.PreBindPlugin
+	bindPlugins               []fwk.BindPlugin
+	postBindPlugins           []fwk.PostBindPlugin
+	permitPlugins             []fwk.PermitPlugin
+	batchablePlugins          []fwk.SignPlugin
+	podGroupPostFilterPlugins []framework.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementScorePlugins      []fwk.PlacementScorePlugin
@@ -470,6 +472,19 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 		f.computeBatchablePlugins()
+	}
+
+	// Put default preemption as the only PodGroupPostFilterPlugin
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		if dp, ok := f.pluginsMap[names.DefaultPreemption]; ok {
+			if _, ok := dp.(framework.PodGroupPostFilterPlugin); ok {
+				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, dp.(framework.PodGroupPostFilterPlugin))
+			} else {
+				logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin does not fulfill PodGroupPostFilterPlugin interface. Workload Aware Preemption will not be used.")
+			}
+		} else {
+			logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin is not set. Workload Aware Preemption will not be used.")
+		}
 	}
 
 	if options.captureProfile != nil {
@@ -1127,6 +1142,10 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state fwk.Cycl
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+
+	if state.ShouldSkipAllPostFilterPlugins() {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "All PostFilter plugins are skipped")
+	}
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -2118,6 +2137,11 @@ func (f *frameworkImpl) HasPostFilterPlugins() bool {
 // HasScorePlugins returns true if at least one score plugin is defined.
 func (f *frameworkImpl) HasScorePlugins() bool {
 	return len(f.scorePlugins) > 0
+}
+
+// PodGroupPostFilterPlugins returns registered PodGroup PostFilter plugins.
+func (f *frameworkImpl) PodGroupPostFilterPlugins() []framework.PodGroupPostFilterPlugin {
+	return f.podGroupPostFilterPlugins
 }
 
 // ListPlugins returns a map of extension point name to plugin names configured at each extension

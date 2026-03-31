@@ -44,6 +44,7 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -539,7 +540,11 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 	class, _ := createTestClass(tCtx, namespace)
 
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+	features := resourceclaim.Features{
+		AdminAccess:     true,
+		PrioritizedList: true,
+	}
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory, features)
 	informerFactory.Start(tCtx.Done())
 	cache.WaitForCacheSync(tCtx.Done(),
 		informerFactory.Core().V1().Pods().Informer().HasSynced,

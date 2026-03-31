@@ -28,19 +28,24 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
@@ -63,6 +68,7 @@ const (
 	bindPlugin                        = "bind-plugin"
 	testCloseErrorPlugin              = "test-close-error-plugin"
 	placementGeneratePlugin           = "placement-generate-plugin"
+	defaultPreemptionPlugin           = names.DefaultPreemption
 
 	testProfileName              = "test-profile"
 	testPercentageOfNodesToScore = 35
@@ -276,6 +282,10 @@ func (pl *TestPlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 	return nil
 }
 
+func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha2.PodGroup, pods []*v1.Pod, pgSchedulingFunc func(ctx context.Context) *fwk.Status) *fwk.Status {
+	return nil
+}
+
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 	return &TestCloseErrorPlugin{name: testCloseErrorPlugin}, nil
 }
@@ -461,6 +471,7 @@ var registry = func() Registry {
 	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	r.Register(placementGeneratePlugin, newTestPlacementGeneratePlugin)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
+	r.Register(defaultPreemptionPlugin, newTestPlugin)
 	return r
 }()
 
@@ -649,6 +660,127 @@ func TestNewFrameworkErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPodGroupPostFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name                   string
+		plugins                *config.Plugins
+		featureGate            bool
+		wantPodGroupPostFilter bool
+	}{
+		{
+			name: "should fill pod group post filter with feature gate and default preemption",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: defaultPreemptionPlugin},
+					},
+				},
+			},
+			featureGate:            true,
+			wantPodGroupPostFilter: true,
+		},
+		{
+			name: "should not fill pod group post filter when feature gate is disabled",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: defaultPreemptionPlugin},
+					},
+				},
+			},
+			featureGate:            false,
+			wantPodGroupPostFilter: false,
+		},
+		{
+			name: "should not fill pod group post filter when post filter plugin is not default preemption",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+					},
+				},
+			},
+			featureGate:            false,
+			wantPodGroupPostFilter: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.featureGate {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:         true,
+					features.GangScheduling:          true,
+					features.WorkloadAwarePreemption: true,
+				})
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			profile := &config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: queueSortPlugin},
+						},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: bindPlugin},
+						},
+					},
+					PostFilter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: defaultPreemptionPlugin},
+						},
+					},
+				},
+			}
+			f, _ := NewFramework(ctx, registry, profile)
+
+			if tc.wantPodGroupPostFilter && len(f.PodGroupPostFilterPlugins()) != 1 {
+				t.Errorf("Expected 1 pod group post filter plugin, got %d", len(f.PodGroupPostFilterPlugins()))
+			}
+			if !tc.wantPodGroupPostFilter && len(f.PodGroupPostFilterPlugins()) != 0 {
+				t.Errorf("Expected 0 pod group post filter plugin, got %d", len(f.PodGroupPostFilterPlugins()))
+			}
+		})
+	}
+
 }
 
 func TestNewFrameworkMultiPointExpansion(t *testing.T) {
@@ -2271,9 +2403,10 @@ func TestFilterPlugins(t *testing.T) {
 
 func TestPostFilterPlugins(t *testing.T) {
 	tests := []struct {
-		name       string
-		plugins    []*TestPlugin
-		wantStatus *fwk.Status
+		name        string
+		skipPlugins bool
+		plugins     []*TestPlugin
+		wantStatus  *fwk.Status
 	}{
 		{
 			name: "a single plugin makes a Pod schedulable",
@@ -2284,6 +2417,21 @@ func TestPostFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: fwk.NewStatus(fwk.Success, injectReason),
+		},
+		{
+			name:        "skips all post filters if state has SkipPostFilterPlugins",
+			skipPlugins: true,
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PostFilterStatus: int(fwk.Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PostFilterStatus: int(fwk.Success)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "All PostFilter plugins are skipped"),
 		},
 		{
 			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod schedulable",
@@ -2387,6 +2535,8 @@ func TestPostFilterPlugins(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
+			state := framework.NewCycleState()
+			state.SetSkipAllPostFilterPlugins(tt.skipPlugins)
 			_, gotStatus := f.RunPostFilterPlugins(ctx, state, pod, nil)
 
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {

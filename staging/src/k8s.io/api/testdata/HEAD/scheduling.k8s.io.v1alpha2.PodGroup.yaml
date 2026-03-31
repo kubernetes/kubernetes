@@ -33,10 +33,17 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  disruptionMode: disruptionModeValue
   podGroupTemplateRef:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue
       workloadName: workloadNameValue
+  priority: 7
+  priorityClassName: priorityClassNameValue
+  resourceClaims:
+  - name: nameValue
+    resourceClaimName: resourceClaimNameValue
+    resourceClaimTemplateName: resourceClaimTemplateNameValue
   schedulingConstraints:
     topology:
     - key: keyValue
@@ -52,3 +59,6 @@ status:
     reason: reasonValue
     status: statusValue
     type: typeValue
+  resourceClaimStatuses:
+  - name: nameValue
+    resourceClaimName: resourceClaimNameValue

@@ -2288,6 +2288,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								TerminationSeconds: containerTerminationSeconds,
 								ExitCode:           0,
 							}),
+							Lifecycle: &v1.Lifecycle{
+								PostStart: startedPostStartGate(),
+							},
 							RestartPolicy: &containerRestartPolicyAlways,
 						},
 						{
@@ -2306,6 +2309,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								TerminationSeconds: 1,
 								ExitCode:           0,
 							}),
+							Lifecycle: &v1.Lifecycle{
+								PostStart: startedPostStartGate(),
+							},
 							RestartPolicy: &containerRestartPolicyAlways,
 						},
 					},
@@ -4566,6 +4572,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit2,
@@ -4576,6 +4585,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit3,
@@ -4586,6 +4598,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 						},
 						Containers: []v1.Container{
@@ -4776,17 +4791,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				restartableInit3 := "restartable-init-3"
 				regular1 := "regular-1"
 
-				makePrestop := func(containerName string) *v1.Lifecycle {
-					return &v1.Lifecycle{
-						PreStop: &v1.LifecycleHandler{
-							Exec: &v1.ExecAction{
-								Command: ExecCommand(prefixedName(PreStopPrefix, containerName), execCommand{
-									ExitCode:      0,
-									ContainerName: containerName,
-									LoopForever:   true,
-									LoopPeriod:    0.2,
-								}),
-							},
+				makePrestop := func(containerName string) *v1.LifecycleHandler {
+					return &v1.LifecycleHandler{
+						Exec: &v1.ExecAction{
+							Command: ExecCommand(prefixedName(PreStopPrefix, containerName), execCommand{
+								ExitCode:      0,
+								ContainerName: containerName,
+								LoopForever:   true,
+								LoopPeriod:    0.2,
+							}),
 						},
 					}
 				}
@@ -4807,7 +4820,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit1),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit1),
+								},
 							},
 							{
 								Name:          restartableInit2,
@@ -4818,7 +4834,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit2),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit2),
+								},
 							},
 							{
 								Name:          restartableInit3,
@@ -4829,7 +4848,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit3),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit3),
+								},
 							},
 						},
 						Containers: []v1.Container{
@@ -4915,17 +4937,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				restartableInit3 := "restartable-init-3"
 				regular1 := "regular-1"
 
-				makePrestop := func(containerName string) *v1.Lifecycle {
-					return &v1.Lifecycle{
-						PreStop: &v1.LifecycleHandler{
-							Exec: &v1.ExecAction{
-								Command: ExecCommand(prefixedName(PreStopPrefix, containerName), execCommand{
-									Delay:         1,
-									ExitCode:      0,
-									ContainerName: containerName,
-									LoopPeriod:    0.2,
-								}),
-							},
+				makePrestop := func(containerName string) *v1.LifecycleHandler {
+					return &v1.LifecycleHandler{
+						Exec: &v1.ExecAction{
+							Command: ExecCommand(prefixedName(PreStopPrefix, containerName), execCommand{
+								Delay:         1,
+								ExitCode:      0,
+								ContainerName: containerName,
+								LoopPeriod:    0.2,
+							}),
 						},
 					}
 				}
@@ -4946,7 +4966,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit1),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit1),
+								},
 							},
 							{
 								Name:          restartableInit2,
@@ -4957,7 +4980,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit2),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit2),
+								},
 							},
 							{
 								Name:          restartableInit3,
@@ -4968,7 +4994,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 5,
 									ExitCode:           0,
 								}),
-								Lifecycle: makePrestop(restartableInit3),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+									PreStop:   makePrestop(restartableInit3),
+								},
 							},
 						},
 						Containers: []v1.Container{
@@ -5605,6 +5634,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 1,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit2,
@@ -5615,6 +5647,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 20,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit3,
@@ -5625,6 +5660,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 1,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 						},
 						Containers: []v1.Container{
@@ -5706,6 +5744,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 1,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit2,
@@ -5716,6 +5757,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 20,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 							{
 								Name:          restartableInit3,
@@ -5726,6 +5770,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 									TerminationSeconds: 1,
 									ExitCode:           0,
 								}),
+								Lifecycle: &v1.Lifecycle{
+									PostStart: startedPostStartGate(),
+								},
 							},
 						},
 						Containers: []v1.Container{

@@ -75,8 +75,14 @@ func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	podGroup := obj.(*scheduling.PodGroup)
 	allErrs := validation.ValidatePodGroup(podGroup)
 	opts := []string{}
-	if schedulingConstraintsInUse(nil) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		opts = append(opts, string(features.DRAWorkloadResourceClaims))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
 }
@@ -103,8 +109,18 @@ func (*podGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPodGroup := old.(*scheduling.PodGroup)
 	allErrs := validation.ValidatePodGroupUpdate(newPodGroup, oldPodGroup)
 	opts := []string{}
-	if schedulingConstraintsInUse(oldPodGroup) {
+	// Declarative validation will always allow fields to remain unchanged, so if any
+	// of the fields which are covered by these gates are set, we will not re-validate them
+	// (even if the gates are disabled) as long as they do not change values. If a gate
+	// is disabled, they will not be allowed to change values.
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		opts = append(opts, string(features.DRAWorkloadResourceClaims))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPodGroup, oldPodGroup, allErrs, operation.Update, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
 }
@@ -144,6 +160,7 @@ func (*podGroupStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 	oldPodGroup := old.(*scheduling.PodGroup)
 	newPodGroup.Spec = oldPodGroup.Spec
 	metav1.ResetObjectMetaForStatus(&newPodGroup.ObjectMeta, &oldPodGroup.ObjectMeta)
+	dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup)
 }
 
 func (r *podGroupStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -159,21 +176,104 @@ func (*podGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old ru
 }
 
 // dropDisabledPodGroupFields removes fields which are covered by a feature gate.
-func dropDisabledPodGroupFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
-	dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup)
+func dropDisabledPodGroupFields(podGroup, oldPodGroup *scheduling.PodGroup) {
+	var podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec
+	if podGroup != nil {
+		podGroupSpec = &podGroup.Spec
+	}
+	if oldPodGroup != nil {
+		oldPodGroupSpec = &oldPodGroup.Spec
+	}
+	dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec)
+}
+
+func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledDisruptionModeField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPriorityClassNameField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec)
+}
+
+func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
+	var oldPodGroupSpec *scheduling.PodGroupSpec
+	if oldPodGroup != nil {
+		oldPodGroupSpec = &oldPodGroup.Spec
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	newPodGroup.Status.ResourceClaimStatuses = nil
 }
 
 // dropDisabledSchedulingConstraintsFields drops the SchedulingConstraints field
 // from the new PodGroup if the TopologyAwareWorkloadScheduling feature gate is disabled
 // and it was not used in the old PodGroup.
-func dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
-	if schedulingConstraintsInUse(oldPodGroup) {
+func dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
-	newPodGroup.Spec.SchedulingConstraints = nil
+	podGroupSpec.SchedulingConstraints = nil
 }
 
-func schedulingConstraintsInUse(pg *scheduling.PodGroup) bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || (pg != nil && pg.Spec.SchedulingConstraints != nil)
+// dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references
+// unless they are already used by the old PodGroup spec.
+func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.ResourceClaims = nil
+}
+
+// dropDisabledDisruptionModeField removes the DisruptionMode field unless it is
+// already used in the old PodGroup spec.
+func dropDisabledDisruptionModeField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || disruptionModeInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.DisruptionMode = nil
+}
+
+// dropDisabledPriorityClassNameField removes the PriorityClassName field unless
+// it is already used in the old PodGroup spec.
+func dropDisabledPriorityClassNameField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityClassNameInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.PriorityClassName = ""
+}
+
+// dropDisabledPriorityField removes the Priority field unless it is already used
+// in the old PodGroup spec.
+func dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.Priority = nil
+}
+
+func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.SchedulingConstraints != nil
+}
+
+func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
+}
+
+func disruptionModeInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.DisruptionMode != nil
+}
+
+func priorityClassNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.PriorityClassName != ""
+}
+
+func priorityInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.Priority != nil
 }

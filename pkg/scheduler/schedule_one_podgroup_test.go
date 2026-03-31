@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -50,6 +51,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -58,17 +60,21 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// fakePodGroupPlugin simulates Filter, PostFilter and Permit behaviors for PodGroup scheduling testing.
+// fakePodGroupPlugin simulates Filter, PostFilter, Permit and PodGroupPostFilter behaviors for PodGroup scheduling testing.
 type fakePodGroupPlugin struct {
-	filterStatus     map[string]*fwk.Status
-	postFilterResult map[string]*fwk.PostFilterResult
-	postFilterStatus map[string]*fwk.Status
-	permitStatus     map[string]*fwk.Status
+	filterStatus             map[string]*fwk.Status
+	postFilterResult         map[string]*fwk.PostFilterResult
+	postFilterStatus         map[string]*fwk.Status
+	postFilterCalled         bool
+	permitStatus             map[string]*fwk.Status
+	podGroupPostFilterStatus *fwk.Status
+	podGroupPostFilterCalled bool
 }
 
 var _ fwk.FilterPlugin = &fakePodGroupPlugin{}
 var _ fwk.PostFilterPlugin = &fakePodGroupPlugin{}
 var _ fwk.PermitPlugin = &fakePodGroupPlugin{}
+var _ framework.PodGroupPostFilterPlugin = &fakePodGroupPlugin{}
 
 func (mp *fakePodGroupPlugin) Name() string { return "FakePodGroupPlugin" }
 
@@ -80,6 +86,7 @@ func (mp *fakePodGroupPlugin) Filter(ctx context.Context, state fwk.CycleState, 
 }
 
 func (mp *fakePodGroupPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	mp.postFilterCalled = true
 	if status, ok := mp.postFilterStatus[pod.Name]; ok {
 		return mp.postFilterResult[pod.Name], status
 	}
@@ -91,6 +98,14 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 		return status, 0
 	}
 	return fwk.NewStatus(fwk.Unschedulable, "default fake permit failure"), 0
+}
+
+func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, pg *schedulingv1alpha2.PodGroup, pods []*v1.Pod, pgSchedulingFunc func(ctx context.Context) *fwk.Status) *fwk.Status {
+	mp.podGroupPostFilterCalled = true
+	if mp.podGroupPostFilterStatus != nil {
+		return mp.podGroupPostFilterStatus
+	}
+	return fwk.NewStatus(fwk.Unschedulable, "default fake podgroup postfilter failure")
 }
 
 func TestPodGroupInfoForPod(t *testing.T) {
@@ -402,10 +417,154 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 		},
 	}
 
-	sched.podGroupCycle(ctx, schedFwk, podGroupInfo)
+	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
 
 	if !failureHandlerCalled {
 		t.Errorf("Expected FailureHandler to be called after UpdateSnapshot failed")
+	}
+}
+
+func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
+	tests := []struct {
+		name                             string
+		wapFeatureGateEnabled            bool
+		postFilterPlugin                 string
+		expectedPodGroupPostFilterCalled bool
+	}{
+		{
+			name:                             "runs pod group post filter when WAP is enabled and DefaultPreemption is registered",
+			wapFeatureGateEnabled:            true,
+			postFilterPlugin:                 "DefaultPreemption",
+			expectedPodGroupPostFilterCalled: true,
+		},
+		{
+			name:                             "disables pod group post filter when WAP feature gate is disabled",
+			wapFeatureGateEnabled:            false,
+			postFilterPlugin:                 "DefaultPreemption",
+			expectedPodGroupPostFilterCalled: false,
+		},
+		{
+			name:                             "disables pod group post filter when DefaultPreemption is not registered",
+			wapFeatureGateEnabled:            true,
+			postFilterPlugin:                 "FakePodGroupPlugin",
+			expectedPodGroupPostFilterCalled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Enable feature gates
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.WorkloadAwarePreemption: tt.wapFeatureGateEnabled,
+				features.GangScheduling:          true,
+			})
+
+			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+			testNode := st.MakeNode().Name("node1").UID("node1").Obj()
+
+			qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
+			qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
+
+			podGroupInfo := &framework.QueuedPodGroupInfo{
+				QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
+				PodGroupInfo: &framework.PodGroupInfo{
+					Name:            "pg",
+					Namespace:       "default",
+					UnscheduledPods: []*v1.Pod{p1, p2},
+				},
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			fakePlugin := &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+					"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+				},
+				podGroupPostFilterStatus: nil,
+			}
+
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+				"FakePodGroupPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return fakePlugin, nil
+				},
+			}
+
+			if tt.postFilterPlugin == "DefaultPreemption" {
+				// Register the same plugin as DefaultPreemption to fulfill runWorkloadAwarePreemption requirements.
+				registry["DefaultPreemption"] = func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return &fakeDefaultPreemption{fakePodGroupPlugin: fakePlugin}, nil
+				}
+			}
+
+			profileCfg := config.KubeSchedulerProfile{
+				SchedulerName: "test-scheduler",
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{{Name: queuesort.Name}},
+					},
+					Filter: config.PluginSet{
+						Enabled: []config.Plugin{{Name: "FakePodGroupPlugin"}},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+					},
+					PostFilter: config.PluginSet{
+						Enabled: []config.Plugin{{Name: tt.postFilterPlugin}},
+					},
+				},
+			}
+
+			client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podGroupLister := informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+			snapshot := internalcache.NewEmptySnapshot()
+
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			cache := internalcache.New(ctx, nil, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			cache.AddNode(logger, testNode)
+
+			sched := &Scheduler{
+				Profiles:                       profile.Map{"test-scheduler": schedFwk},
+				SchedulingQueue:                internalqueue.NewTestQueue(ctx, nil),
+				Cache:                          cache,
+				client:                         client,
+				podGroupLister:                 podGroupLister,
+				nodeInfoSnapshot:               internalcache.NewEmptySnapshot(),
+				workloadAwarePreemptionEnabled: tt.wapFeatureGateEnabled,
+				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+				},
+			}
+
+			sched.SchedulePod = sched.schedulePod
+			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+
+			if fakePlugin.podGroupPostFilterCalled != tt.expectedPodGroupPostFilterCalled {
+				t.Errorf("Expected workload aware preemption (PodGroupPostFilter) to be %v, but got %v", tt.expectedPodGroupPostFilterCalled, fakePlugin.podGroupPostFilterCalled)
+			}
+		})
 	}
 }
 
@@ -435,6 +594,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 		expectedGroupWaitingOnPreemption bool
 		expectedPodStatus                map[string]*fwk.Status
 		expectedPreemption               map[string]bool
+		postFilterMode                   podGroupPostFilterMode
 		skipForTAS                       bool
 	}{
 		{
@@ -860,7 +1020,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 
-				result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupInfo)
+				result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, runAllPostFilters)
 
 				if result.status.Code() != tt.expectedGroupStatusCode {
 					t.Errorf("Expected group status code: %v, got: %v", tt.expectedGroupStatusCode, result.status.Code())
@@ -1476,13 +1636,15 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				},
 			}
 
+			podGroupCycleState := framework.NewCycleState()
+
 			for i := range tt.algorithmResult.podResults {
 				pod := podGroupInfo.QueuedPodInfos[i].Pod
-				podCtx := initPodSchedulingContext(ctx, pod)
+				podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, runAllPostFilters)
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 
-			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupInfo, tt.algorithmResult, time.Now())
+			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, tt.algorithmResult, time.Now())
 
 			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				lock.Lock()
@@ -2180,7 +2342,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 				},
 			}
 
-			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, pgInfo)
+			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo, runAllPostFilters)
 
 			opts := cmp.Options{
 				cmp.AllowUnexported(
@@ -2342,12 +2504,207 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				},
 			}
 
-			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, pgInfo)
+			result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo, runAllPostFilters)
 
 			expectedHost := placements[tt.expectedPlacement][0]
 			actualHost := result.podResults[0].scheduleResult.SuggestedHost
 			if expectedHost != actualHost {
 				t.Fatalf("Unexpected algorithm result, expected placement %s with node %s, got node %s", tt.expectedPlacement, expectedHost, actualHost)
+			}
+		})
+	}
+}
+
+type fakeDefaultPreemption struct {
+	*fakePodGroupPlugin
+}
+
+func (f *fakeDefaultPreemption) Name() string {
+	return names.DefaultPreemption
+}
+
+func TestRunWorkloadAwarePreemption(t *testing.T) {
+	tests := []struct {
+		name               string
+		podGroupInfo       *framework.QueuedPodGroupInfo
+		existingPodGroups  []*schedulingv1alpha2.PodGroup
+		pluginsRegistered  bool
+		pluginReturnStatus *fwk.Status
+		expectedStatus     *fwk.Status
+	}{
+		{
+			name: "error when no PodGroupPostFilter plugin is registered",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			pluginsRegistered: false,
+			expectedStatus:    fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled"),
+		},
+		{
+			name: "error when pod group is not found in informer",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "missing-pg"},
+				QueuedPodInfos: []*framework.QueuedPodInfo{
+					{PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("default").Obj()}},
+				},
+			},
+			pluginsRegistered: true,
+			expectedStatus:    fwk.AsStatus(fmt.Errorf("failed to get pod group object: podgroup.scheduling.k8s.io \"missing-pg\" not found")),
+		},
+		{
+			name: "error when pod group has scheduling constraints",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg-with-constraints"},
+				QueuedPodInfos: []*framework.QueuedPodInfo{
+					{PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("default").Obj()}},
+				},
+			},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg-with-constraints"},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						SchedulingConstraints: &schedulingv1alpha2.PodGroupSchedulingConstraints{
+							Topology: []schedulingv1alpha2.TopologyConstraint{{}}, // non-empty
+						},
+					},
+				},
+			},
+			pluginsRegistered: true,
+			expectedStatus:    fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints"),
+		},
+		{
+			name: "success when plugin returns success status",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg-success"},
+				QueuedPodInfos: []*framework.QueuedPodInfo{
+					{PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("default").Obj()}},
+				},
+			},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg-success"},
+				},
+			},
+			pluginsRegistered:  true,
+			pluginReturnStatus: fwk.NewStatus(fwk.Success),
+			expectedStatus:     fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "failure when plugin returns unschedulable status",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg-unschedulable"},
+				QueuedPodInfos: []*framework.QueuedPodInfo{
+					{PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("default").Obj()}},
+				},
+			},
+			existingPodGroups: []*schedulingv1alpha2.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg-unschedulable"},
+				},
+			},
+			pluginsRegistered:  true,
+			pluginReturnStatus: fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
+			expectedStatus:     fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
+		},
+		{
+			name: "error when pod group does not exist",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg-unschedulable"},
+				QueuedPodInfos: []*framework.QueuedPodInfo{
+					{PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("default").Obj()}},
+				},
+			},
+			existingPodGroups:  []*schedulingv1alpha2.PodGroup{},
+			pluginsRegistered:  true,
+			pluginReturnStatus: fwk.NewStatus(fwk.Success),
+			expectedStatus:     fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", errors.New("podgroup.scheduling.k8s.io \"pg-unschedulable\" not found"))),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Enable feature gate before framework initialization
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.WorkloadAwarePreemption: tt.pluginsRegistered,
+				features.GangScheduling:          true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+			}
+
+			if tt.pluginsRegistered {
+				registry["DefaultPreemption"] = func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return &fakeDefaultPreemption{
+						fakePodGroupPlugin: &fakePodGroupPlugin{
+							podGroupPostFilterStatus: tt.pluginReturnStatus,
+						},
+					}, nil
+				}
+			}
+
+			profileCfg := config.KubeSchedulerProfile{
+				SchedulerName: "test-scheduler",
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{{Name: queuesort.Name}},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+					},
+					PostFilter: config.PluginSet{
+						Enabled: []config.Plugin{},
+					},
+				},
+			}
+			if tt.pluginsRegistered {
+				profileCfg.Plugins.PostFilter.Enabled = append(profileCfg.Plugins.PostFilter.Enabled, config.Plugin{Name: "DefaultPreemption"})
+			}
+
+			objs := []runtime.Object{}
+			for _, pg := range tt.existingPodGroups {
+				objs = append(objs, pg)
+			}
+			client := clientsetfake.NewSimpleClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithClientSet(client),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			podGroupLister := informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+
+			if tt.pluginsRegistered {
+				informerFactory.Start(ctx.Done())
+				informerFactory.WaitForCacheSync(ctx.Done())
+			}
+
+			cache := internalcache.New(ctx, nil, true)
+			sched := &Scheduler{
+				Cache:            cache,
+				nodeInfoSnapshot: internalcache.NewEmptySnapshot(), // Need empty snapshot to avoid nil pointer issues
+				podGroupLister:   podGroupLister,
+			}
+
+			// Just inject logger explicitly in context to avoid panic
+			ctx = klog.NewContext(ctx, logger)
+
+			status := sched.runWorkloadAwarePreemption(ctx, schedFwk, framework.NewCycleState(), tt.podGroupInfo)
+
+			if tt.expectedStatus.Code() != status.Code() || tt.expectedStatus.Message() != status.Message() {
+				t.Errorf("Unexpected status, want code %v message %q, got code %v message %q",
+					tt.expectedStatus.Code(), tt.expectedStatus.Message(),
+					status.Code(), status.Message())
 			}
 		})
 	}

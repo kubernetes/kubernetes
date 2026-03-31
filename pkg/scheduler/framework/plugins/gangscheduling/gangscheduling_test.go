@@ -317,7 +317,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 			fakeActivator.activatedPods = nil
 
 			cycleState := schedulerframework.NewCycleState()
-			cycleState.SetPodGroupSchedulingCycle(tt.isDuringPodGroupSchedulingCycle)
+			if tt.isDuringPodGroupSchedulingCycle {
+				cycleState.SetPodGroupSchedulingCycle(cycleState)
+			}
 
 			pod := tt.pod.DeepCopy()
 			pod.Spec.NodeName = "some-node"

@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,12 +27,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -374,6 +378,9 @@ var fieldImmutableError = "field is immutable"
 var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 var deviceRequestError = "exactly one of `exactly` or `firstAvailable` is required"
 var constraintError = "matchAttribute: Required value"
+var bindingUpdateError = `User "test-user" cannot update resource "resourceclaims/binding" in API group "resource.k8s.io" at the cluster scope: denied`
+var deviceAssociatedNodeUpdateError = `User "system:serviceaccount:kube-system:dra-driver" cannot associated-node:update resource "resourceclaims/driver" in API group "resource.k8s.io" in the namespace "default": denied`
+var deviceArbitraryNodeUpdateError = `User "test-user" cannot arbitrary-node:update resource "resourceclaims/driver" in API group "resource.k8s.io" in the namespace "default": denied`
 
 const (
 	req0        = "req-0"
@@ -384,6 +391,7 @@ const (
 	testDriver  = "test-driver"
 	testPool    = "test-pool"
 	testDevice  = "test-device"
+	testUser    = "test-user"
 )
 
 var (
@@ -397,7 +405,7 @@ var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
 func TestStrategy(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	strategy := NewStrategy(mockNSClient)
+	strategy := NewStrategy(mockNSClient, nil)
 	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaim must be namespace scoped")
 	}
@@ -629,7 +637,7 @@ func TestStrategyCreate(t *testing.T) {
 				features.DRAPrioritizedList:    tc.prioritizedList,
 				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
-			strategy := NewStrategy(mockNSClient)
+			strategy := NewStrategy(mockNSClient, nil)
 
 			obj := tc.obj.DeepCopy()
 			strategy.PrepareForCreate(ctx, obj)
@@ -964,7 +972,7 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
 
-			strategy := NewStrategy(mockNSClient)
+			strategy := NewStrategy(mockNSClient, nil)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -996,15 +1004,30 @@ func TestStrategyUpdate(t *testing.T) {
 
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{
+		Name:   testUser,
+		Groups: []string{"system:authenticated"},
+	})
+	ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "update",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        "v1",
+		Resource:          "resourceclaims",
+		Subresource:       "status",
+		Namespace:         metav1.NamespaceDefault,
+	})
 	testcases := map[string]struct {
 		oldObj                        *resource.ResourceClaim
 		newObj                        *resource.ResourceClaim
+		authz                         authorizer.Authorizer
+		ctxOverride                   func(context.Context) context.Context // if set, transforms the default ctx
 		adminAccess                   bool
 		deviceStatusFeatureGate       bool
 		consumableCapacityFeatureGate bool
 		prioritizedListFeatureGate    bool
 		bindingConditions             bool
-		expectValidationError         string
+		expectValidationErrors        []string
 		expectObj                     *resource.ResourceClaim
 		verify                        func(*testing.T, []testclient.Action)
 	}{
@@ -1025,7 +1048,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				obj.Name += "-2"
 				return obj
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1082,10 +1105,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access-NonAdminNamespace": {
-			oldObj:                objInNonAdminNamespace,
-			newObj:                objWithAdminAccessStatusInNonAdminNamespace,
-			adminAccess:           true,
-			expectValidationError: adminAccessError,
+			oldObj:                 objInNonAdminNamespace,
+			newObj:                 objWithAdminAccessStatusInNonAdminNamespace,
+			adminAccess:            true,
+			expectValidationErrors: []string{adminAccessError},
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
 					t.Errorf("expected one action but got %d", len(as))
@@ -1234,6 +1257,123 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-update-fields-devices-status-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			adminAccess:             true, // Keep emulation version at 1.36 so DRAResourceClaimGranularStatusAuthorization is active
+			deviceStatusFeatureGate: true,
+			expectValidationErrors:  []string{deviceArbitraryNodeUpdateError},
+			expectObj: func() *resource.ResourceClaim { // Status is not updated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				return obj
+			}(),
+			authz: &fakeAuthorizer{false},
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-update-fields-devices-status-associated-node-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			ctxOverride: func(ctx context.Context) context.Context {
+				return genericapirequest.WithUser(ctx, &user.DefaultInfo{
+					Name:   "system:serviceaccount:kube-system:dra-driver",
+					Groups: []string{"system:authenticated"},
+					Extra:  map[string][]string{"authentication.kubernetes.io/node-name": {"test-node"}},
+				})
+			},
+			adminAccess:             true,
+			deviceStatusFeatureGate: true,
+			authz:                   &fakeAuthorizer{false},
+			expectValidationErrors:  []string{deviceAssociatedNodeUpdateError},
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-drop-status-deallocated-device-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // device is deallocated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			adminAccess:             true, // Keep emulation version at 1.36 so DRAResourceClaimGranularStatusAuthorization is active
+			authz:                   &fakeAuthorizer{false},
+			deviceStatusFeatureGate: true,
+			expectValidationErrors:  []string{bindingUpdateError},
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1562,7 +1702,11 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			strategy := NewStrategy(mockNSClient)
+			authz := tc.authz
+			if tc.authz == nil {
+				authz = &fakeAuthorizer{true}
+			}
+			strategy := NewStrategy(mockNSClient, authz)
 
 			if !tc.adminAccess {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
@@ -1580,20 +1724,27 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			})
 			statusStrategy := NewStatusStrategy(strategy)
 
+			ctx := ctx
+			if tc.ctxOverride != nil {
+				ctx = tc.ctxOverride(ctx)
+			}
+
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
 
 			statusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := statusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				assert.Len(t, errs, 1, "exactly one error expected")
-				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				assert.Len(t, errs, len(tc.expectValidationErrors), "wrong number of validation errors")
+				for i, expectValidationError := range tc.expectValidationErrors {
+					assert.ErrorContains(t, errs[i], expectValidationError, "the error message should have contained the expected error message")
+				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 			if warnings := statusStrategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
@@ -1660,4 +1811,15 @@ func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool
 		Device:  device,
 		ShareID: (*string)(shareID),
 	})
+}
+
+type fakeAuthorizer struct {
+	verdict bool
+}
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	if !f.verdict {
+		return authorizer.DecisionDeny, "denied", nil
+	}
+	return authorizer.DecisionAllow, "default accept", nil
 }

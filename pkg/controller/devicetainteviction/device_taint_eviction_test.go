@@ -38,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcebeta "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,8 +66,10 @@ func init() {
 	// We must not use Default*Mutable*FeatureGate directly here,
 	// otherwise hack/verify-test-featuregates.sh complains.
 	if err := utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate).SetFromMap(map[string]bool{
-		string(features.DRADeviceTaints):     true,
-		string(features.DRADeviceTaintRules): true,
+		string(features.DRADeviceTaints):           true,
+		string(features.DRADeviceTaintRules):       true,
+		string(features.DRAWorkloadResourceClaims): true,
+		string(features.GenericWorkload):           true, // Dependency of DRAWorkloadResourceClaims
 	}); err != nil {
 		panic(err)
 	}
@@ -109,7 +112,7 @@ func l[T any](items ...T) []T {
 }
 
 // setup creates a controller which is ready to have its handle* methods called.
-func setup(tCtx ktesting.TContext) *testContext {
+func setup(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) *testContext {
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
@@ -119,6 +122,7 @@ func setup(tCtx ktesting.TContext) *testContext {
 		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
+		workloadResourceClaimsEnabled,
 	)
 	tContext := &testContext{
 		TContext:        tCtx,
@@ -132,6 +136,8 @@ func setup(tCtx ktesting.TContext) *testContext {
 	// Always log, not matter what the -v value is.
 	controller.eventLogger = &tContext.logger
 	tContext.Controller.recorder = tContext.recorder
+
+	tCtx.ExpectNoError(controller.addIndexers())
 
 	return tContext
 }
@@ -227,6 +233,8 @@ func assertEqual[T any](t interface {
 }
 
 type testCase struct {
+	workloadResourceClaimsEnabled bool
+
 	initialState state
 
 	// events contains pairs of old and new objects which will
@@ -265,11 +273,14 @@ func update[T any](oldObj, newObj *T) [2]*T {
 
 var (
 	podKind      = v1.SchemeGroupVersion.WithKind("Pod")
+	podGroupKind = schedulingapi.SchemeGroupVersion.WithKind("PodGroup")
 	nodeName     = "worker"
 	nodeName2    = "worker-2"
 	driver       = "some-driver"
 	podName      = "my-pod"
 	podUID       = "1234"
+	podGroupName = "my-podgroup"
+	podGroupUID  = "5678"
 	className    = "my-resource-class"
 	resourceName = "my-resource"
 	claimName    = podName + "-" + resourceName
@@ -502,6 +513,11 @@ var (
 			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
 			Obj()
+	inUseClaimByPodGroup = st.FromResourceClaim(claim).
+				OwnerReference(podGroupName, podGroupUID, podGroupKind).
+				Allocation(allocationResult).
+				ReservedForPodGroup(podGroupName, types.UID(podGroupUID)).
+				Obj()
 	inUseClaimOtherNamespace = st.FromResourceClaim(claim).
 					Namespace(namespace+"-other").
 					OwnerReference(podName, podUID+"-2", podKind). // podWithClaimNameOtherNamespace below.
@@ -545,6 +561,17 @@ var (
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Node(nodeName).
+				Obj()
+	podWithPodGroup = st.MakePod().Name(podName).Namespace(namespace).
+			UID(podUID).
+			Node(nodeName).
+			PodGroupName(podGroupName).
+			Obj()
+	podWithPodGroupClaim = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				Node(nodeName).
+				PodGroupName(podGroupName).
 				Obj()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
@@ -864,6 +891,35 @@ func testController(tCtx ktesting.TContext) {
 			},
 			wantEvents: l(deletePodEvent),
 		},
+		"evict-pod-resourceclaim-podgroup": {
+			workloadResourceClaimsEnabled: true,
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaimByPodGroup),
+				add(podWithPodGroupClaim),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimByPodGroup, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithPodGroupClaim): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithPodGroupClaim)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"no-evict-pod-in-podgroup-without-claim": {
+			workloadResourceClaimsEnabled: true,
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaimByPodGroup),
+				add(podWithPodGroup),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimByPodGroup, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+			},
+		},
 		"evict-pod-rule": {
 			events: []any{
 				add(inUseClaim),
@@ -1052,6 +1108,26 @@ func testController(tCtx ktesting.TContext) {
 				{
 					pods:  l(podWithClaimName, podWithClaimNameOtherName),
 					rules: l(inProgress(ruleNone, false, "NoEffect", "0 published devices selected. 3 allocated devices selected. 2 pods would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", taintTime)),
+				},
+			},
+		},
+		"none-podgroup-rule": {
+			workloadResourceClaimsEnabled: true,
+			events: []any{
+				add(slice),
+				add(inUseClaimByPodGroup),
+				add(podWithPodGroupClaim),
+				add(ruleNone),
+			},
+			finalState: state{
+				slices:          l(slice),
+				allocatedClaims: l(ac(inUseClaimByPodGroup)),
+				queued:          MockState[workItem]{Ready: newWorkItems(ruleNone)},
+			},
+			process: []step{
+				{
+					pods:  l(podWithPodGroupClaim),
+					rules: l(inProgress(ruleNone, false, "NoEffect", "3 published devices selected. 1 allocated device selected. 1 pod would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", taintTime)),
 				},
 			},
 		},
@@ -1883,7 +1959,7 @@ func testController(tCtx ktesting.TContext) {
 			if numEvents <= 1 {
 				// No permutations.
 				tCtx.SyncTest("", func(tCtx ktesting.TContext) {
-					tContext := setup(tCtx)
+					tContext := setup(tCtx, tc.workloadResourceClaimsEnabled)
 					testHandlers(tContext, tc)
 				})
 				return
@@ -1904,7 +1980,7 @@ func testController(tCtx ktesting.TContext) {
 					tCtx.Run(name, func(tCtx ktesting.TContext) {
 						tCtx.Parallel()
 						tCtx.SyncTest("", func(tCtx ktesting.TContext) {
-							tContext := setup(tCtx)
+							tContext := setup(tCtx, tc.workloadResourceClaimsEnabled)
 							testHandlers(tContext, tc)
 						})
 					})
@@ -2127,6 +2203,7 @@ func newTestController(tCtx ktesting.TContext) *Controller {
 		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
+		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	controller.metrics = metrics.New()
 	// Always log, not matter what the -v value is.
@@ -2816,7 +2893,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 // consumer, and then undoing that when the DeviceTaintRule is removed.
 func BenchmarkTaintUntaint(b *testing.B) {
 	tCtx := ktesting.Init(b)
-	tContext := setup(tCtx)
+	tContext := setup(tCtx, false) // Disable DRAWorkloadResourceClaims because it's alpha
 	podStore := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 	// No output, comment out if output is desired.
 	tContext.Controller.eventLogger = nil

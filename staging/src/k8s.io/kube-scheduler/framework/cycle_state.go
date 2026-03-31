@@ -73,6 +73,10 @@ type CycleState interface {
 	// in the PreBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetParallelPreBindPlugins(plugins sets.Set[string])
+	// ShouldSkipAllPostFilterPlugins returns whether all plugins should be skipped in the PostFilter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldSkipAllPostFilterPlugins() bool
+
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//
@@ -94,9 +98,12 @@ type CycleState interface {
 	// or doesn't belong to any pod group.
 	// This field can only be set to true when GenericWorkload feature flag is enabled.
 	IsPodGroupSchedulingCycle() bool
-	// SetPodGroupSchedulingCycle sets whether this cycle is a pod group scheduling cycle or not.
+	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for a Pod.
 	// This should be only used when GenericWorkload feature flag is enabled.
-	SetPodGroupSchedulingCycle(bool)
+	GetPodGroupSchedulingCycle() PodGroupCycleState
+	// SetPodGroupSchedulingCycle sets the cycle state of the PodGroup for a Pod.
+	// This should be only used when GenericWorkload feature flag is enabled.
+	SetPodGroupSchedulingCycle(PodGroupCycleState)
 }
 
 // PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.

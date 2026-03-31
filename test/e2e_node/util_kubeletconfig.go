@@ -84,6 +84,7 @@ func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework,
 		if opts.deleteStateFiles {
 			deleteStateFile(cpuManagerStateFile)
 			deleteStateFile(memoryManagerStateFile)
+			deleteStateFile(usernsStateFiles)
 		}
 
 		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))

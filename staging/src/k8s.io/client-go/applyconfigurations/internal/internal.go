@@ -14769,6 +14769,29 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupStatus
       default: {}
+- name: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceClaimName
+      type:
+        scalar: string
+    - name: resourceClaimTemplateName
+      type:
+        scalar: string
+- name: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaimStatus
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceClaimName
+      type:
+        scalar: string
 - name: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingConstraints
   map:
     fields:
@@ -14796,9 +14819,27 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1alpha2.PodGroupSpec
   map:
     fields:
+    - name: disruptionMode
+      type:
+        scalar: string
+      default: Pod
     - name: podGroupTemplateRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupTemplateReference
+    - name: priority
+      type:
+        scalar: numeric
+    - name: priorityClassName
+      type:
+        scalar: string
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: schedulingConstraints
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingConstraints
@@ -14817,13 +14858,38 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+    - name: resourceClaimStatuses
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaimStatus
+          elementRelationship: associative
+          keys:
+          - name
 - name: io.k8s.api.scheduling.v1alpha2.PodGroupTemplate
   map:
     fields:
+    - name: disruptionMode
+      type:
+        scalar: string
     - name: name
       type:
         scalar: string
       default: ""
+    - name: priority
+      type:
+        scalar: numeric
+    - name: priorityClassName
+      type:
+        scalar: string
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: schedulingConstraints
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingConstraints

@@ -87,6 +87,7 @@ const (
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
+	usernsStateFiles       = "/var/lib/kubelet/pods/*/userns"
 )
 
 var (

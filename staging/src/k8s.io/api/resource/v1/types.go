@@ -37,7 +37,8 @@ const (
 	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
 	// PodResourceClaimAnnotation is the annotation set on template-generated
 	// ResourceClaims by the ResourceClaim controller. Its value is the
-	// pod.spec.resourceClaims[].name for which the claim was generated.
+	// spec.resourceClaims[].name of the Pod or PodGroup for which the claim was
+	// generated. The Pod and its PodGroup are guaranteed to use the same name.
 	PodResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 	// Resource device class prefix is for generating implicit extended resource
 	// name for a device class when its ExtendedResourceName field is not
@@ -46,6 +47,23 @@ const (
 	// in pod.Spec.Resources.Requests, in that case, a valid name has to be specified
 	// explicitly in device class.
 	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
+
+	// The constants below are all related to synthetic authorization checks for resourceclaims.status writes.
+
+	// SubresourceBinding is the synthetic subresource used for authorization
+	// of updates to status.allocation and status.reservedFor.
+	SubresourceBinding = "binding"
+	// SubresourceDriver is the synthetic subresource used for per-driver
+	// authorization of updates to status.devices.
+	SubresourceDriver = "driver"
+	// VerbPrefixAssociatedNode is the verb prefix for requests from a service account
+	// on the same node as the claim's allocation. The full verb is
+	// "associated-node:<request-verb>", e.g. "associated-node:update".
+	VerbPrefixAssociatedNode = "associated-node:"
+	// VerbPrefixArbitraryNode is the verb prefix for requests not associated
+	// with a specific node (controllers, etc.). The full verb is
+	// "arbitrary-node:<request-verb>", e.g. "arbitrary-node:update".
+	VerbPrefixArbitraryNode = "arbitrary-node:"
 )
 
 // +genclient

@@ -46,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -53,6 +54,11 @@ func TestRemoveContainer(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -71,7 +77,7 @@ func TestRemoveContainer(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
@@ -108,6 +114,11 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -126,7 +137,7 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
@@ -683,7 +694,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
 		tCtx := ktesting.Init(t)
 		// Fake all the things you need before trying to create a container
-		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
+		fakeSandBox, _ := makeAndSetFakePod(tCtx, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(tCtx, testPod, 0)
 		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
@@ -1088,7 +1099,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	runtimePod, err := m.GetPod(tCtx, pod.UID)

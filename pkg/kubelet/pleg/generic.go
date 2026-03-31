@@ -425,9 +425,9 @@ func (g *GenericPLEG) relistPod(podUID types.UID) {
 
 	g.logger.V(5).Info("GenericPLEG: Relisting Pod", "podUID", podUID)
 
-	timestamp := g.clock.Now()
+	startTime := g.clock.Now()
 	defer func() {
-		metrics.PLEGPodRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
+		metrics.PLEGPodRelistDuration.Observe(metrics.SinceInSeconds(startTime))
 	}()
 	pod, err := g.runtime.GetPod(ctx, podUID)
 	if err != nil {
@@ -448,7 +448,7 @@ func (g *GenericPLEG) relistPod(podUID types.UID) {
 
 	// Since we're not setting the global timestamp, we need to mark this pod as observed in case it
 	// wasn't modified.
-	g.cache.SetObservedTime(podUID, timestamp)
+	g.cache.SetObservedTime(podUID, pod.Timestamp)
 }
 
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
@@ -525,8 +525,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		return nil, true, nil
 	}
 
-	timestamp := g.clock.Now()
-
+	timestamp := pod.Timestamp
 	status, err := g.runtime.GetPodStatus(ctx, pod)
 	if err != nil {
 		// nolint:logcheck // Not using the result of klog.V inside the

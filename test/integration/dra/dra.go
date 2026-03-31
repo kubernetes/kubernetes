@@ -164,6 +164,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 				runSubTest(tCtx, "ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
+				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
 			},
 		},
 		// This scenario verifies that features which have graduated to GA can
@@ -220,14 +221,15 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaintRules:          true,
+				features.DRAListTypeAttributes:        true,
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
 				features.DRANodeAllocatableResources:  true,
+				features.DRAWorkloadResourceClaims:    true,
 				features.GangScheduling:               true,
-				features.GenericWorkload:              true,
-				features.DRAListTypeAttributes:        true,
+				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims, GangScheduling
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!
@@ -256,6 +258,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, true) })
 				runSubTest(tCtx, "PodGroup", testPodGroup)
+				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true, true) })
 			},
 		},
 	} {
@@ -585,11 +588,13 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 	controller, err := resourceclaim.NewController(
 		klog.FromContext(claimControllerCtx),
 		resourceclaim.Features{
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 		},
 		claimControllerCtx.Client(),
 		claimController.informerFactory.Core().V1().Pods(),
+		claimController.informerFactory.Scheduling().V1alpha2().PodGroups(),
 		claimController.informerFactory.Resource().V1().ResourceClaims(),
 		claimController.informerFactory.Resource().V1().ResourceClaimTemplates(),
 	)

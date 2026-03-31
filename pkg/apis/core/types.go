@@ -3953,6 +3953,14 @@ type PodSpec struct {
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
+//
+// When the DRAWorkloadResourceClaims feature gate is enabled and this Pod
+// belongs to a PodGroup, a PodResourceClaim is matched to a
+// PodGroupResourceClaim if all of their fields are equal (Name,
+// ResourceClaimName, and ResourceClaimTemplateName). A matched claim references
+// a single ResourceClaim shared across all Pods in the PodGroup, reserved for
+// the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
+// Pods.
 type PodResourceClaim struct {
 	// Name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
@@ -3974,6 +3982,16 @@ type PodResourceClaim struct {
 	// generated component, will be used to form a unique name for the
 	// ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
 	//
+	// When the DRAWorkloadResourceClaims feature gate is enabled and the pod
+	// belongs to a PodGroup that defines a PodGroupResourceClaim with the same
+	// Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the
+	// ResourceClaim generated for the PodGroup. All pods in the group that
+	// define an equivalent PodResourceClaim matching the
+	// PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same
+	// generated ResourceClaim. ResourceClaims generated for a PodGroup are
+	// owned by the PodGroup and their lifecycles are tied to the PodGroup
+	// instead of any individual pod.
+	//
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
@@ -3993,9 +4011,16 @@ type PodResourceClaimStatus struct {
 	Name string
 
 	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod. If this is
-	// unset, then generating a ResourceClaim was not necessary. The
-	// pod.spec.resourceClaims entry can be ignored in this case.
+	// generated for the Pod in the namespace of the Pod.
+	//
+	// When the DRAWorkloadResourceClaims feature is enabled and the
+	// corresponding PodResourceClaim matches a PodGroupResourceClaim
+	// made by the Pod's PodGroup, then this is the name of the
+	// ResourceClaim generated and reserved for the PodGroup.
+	//
+	// If this is unset, then generating a ResourceClaim was not
+	// necessary. The pod.spec.resourceClaims entry can be ignored in
+	// this case.
 	ResourceClaimName *string
 }
 

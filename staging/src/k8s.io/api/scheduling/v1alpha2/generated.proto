@@ -78,6 +78,81 @@ message PodGroupList {
   repeated PodGroup items = 2;
 }
 
+// PodGroupResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the PodGroup.
+//
+// It adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup.
+// Pods that need access to the ResourceClaim define a matching reference in its
+// own Spec.ResourceClaims. The Pod's claim must match all fields of the
+// PodGroup's claim exactly.
+message PodGroupResourceClaim {
+  // Name uniquely identifies this resource claim inside the PodGroup.
+  // This must be a DNS_LABEL.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
+  optional string name = 1;
+
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace as this PodGroup. The ResourceClaim will be reserved for the
+  // PodGroup instead of its individual pods.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimName = 2;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace as this PodGroup.
+  //
+  // The template will be used to create a new ResourceClaim, which will
+  // be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim
+  // will also be deleted. The PodGroup name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.
+  //
+  // This field is immutable and no changes will be made to the
+  // corresponding ResourceClaim by the control plane after creating the
+  // ResourceClaim.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimTemplateName = 3;
+}
+
+// PodGroupResourceClaimStatus is stored in the PodGroupStatus for each
+// PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
+// generated name for the corresponding ResourceClaim.
+message PodGroupResourceClaimStatus {
+  // Name uniquely identifies this resource claim inside the PodGroup. This
+  // must match the name of an entry in podgroup.spec.resourceClaims, which
+  // implies that the string must be a DNS_LABEL.
+  //
+  // +required
+  optional string name = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was generated for
+  // the PodGroup in the namespace of the PodGroup. If this is unset, then
+  // generating a ResourceClaim was not necessary. The
+  // podgroup.spec.resourceClaims entry can be ignored in this case.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimName = 2;
+}
+
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 message PodGroupSchedulingConstraints {
   // Topology defines the topology constraints for the pod group.
@@ -119,7 +194,7 @@ message PodGroupSpec {
   //
   // +optional
   // +k8s:optional
-  // +k8s:alpha(since:"1.36")=+k8s:immutable
+  // +k8s:immutable
   optional PodGroupTemplateReference podGroupTemplateRef = 1;
 
   // SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
@@ -127,7 +202,7 @@ message PodGroupSpec {
   // This field is immutable.
   //
   // +required
-  // +k8s:alpha(since:"1.36")=+k8s:immutable
+  // +k8s:immutable
   optional PodGroupSchedulingPolicy schedulingPolicy = 2;
 
   // SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
@@ -141,6 +216,80 @@ message PodGroupSpec {
   // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:optional
   // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:immutable
   optional PodGroupSchedulingConstraints schedulingConstraints = 3;
+
+  // ResourceClaims defines which ResourceClaims may be shared among Pods in
+  // the group. Pods consume the devices allocated to a PodGroup's claim by
+  // defining a claim in its own Spec.ResourceClaims that matches the
+  // PodGroup's claim exactly. The claim must have the same name and refer to
+  // the same ResourceClaim or ResourceClaimTemplate.
+  //
+  // This is an alpha-level field and requires that the
+  // DRAWorkloadResourceClaims feature gate is enabled.
+  //
+  // This field is immutable.
+  //
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=4
+  // +k8s:immutable
+  // +featureGate=DRAWorkloadResourceClaims
+  repeated PodGroupResourceClaim resourceClaims = 4;
+
+  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
+  // One of Pod, PodGroup. Defaults to Pod if unset.
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +default="Pod"
+  optional string disruptionMode = 5;
+
+  // PriorityClassName defines the priority that should be considered when scheduling this pod group.
+  // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
+  // Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
+  // (i.e. if no priority class is specified, admission control can set this to the global default
+  // priority class if it exists. Otherwise, the pod group's priority will be zero).
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  optional string priorityClassName = 6;
+
+  // Priority is the value of priority of this pod group. Various system components
+  // use this field to find the priority of the pod group. When Priority Admission
+  // Controller is enabled, it prevents users from setting this field. The admission
+  // controller populates this field from PriorityClassName.
+  // The higher the value, the higher the priority.
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
+  optional int32 priority = 7;
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -168,6 +317,19 @@ message PodGroupStatus {
   // +listType=map
   // +listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+
+  // Status of resource claims.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=4
+  // +featureGate=DRAWorkloadResourceClaims
+  repeated PodGroupResourceClaimStatus resourceClaimStatuses = 2;
 }
 
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
@@ -193,6 +355,71 @@ message PodGroupTemplate {
   // +k8s:ifDisabled(TopologyAwareWorkloadScheduling)=+k8s:forbidden
   // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:optional
   optional PodGroupSchedulingConstraints schedulingConstraints = 3;
+
+  // ResourceClaims defines which ResourceClaims may be shared among Pods in
+  // the group. Pods consume the devices allocated to a PodGroup's claim by
+  // defining a claim in its own Spec.ResourceClaims that matches the
+  // PodGroup's claim exactly. The claim must have the same name and refer to
+  // the same ResourceClaim or ResourceClaimTemplate.
+  //
+  // This is an alpha-level field and requires that the
+  // DRAWorkloadResourceClaims feature gate is enabled.
+  //
+  // This field is immutable.
+  //
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=4
+  // +k8s:immutable
+  // +featureGate=DRAWorkloadResourceClaims
+  repeated PodGroupResourceClaim resourceClaims = 4;
+
+  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // One of Pod, PodGroup.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  optional string disruptionMode = 5;
+
+  // PriorityClassName indicates the priority that should be considered when scheduling
+  // a pod group created from this template. If no priority class is specified, admission
+  // control can set this to the global default priority class if it exists. Otherwise,
+  // pod groups created from this template will have the priority set to zero.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
+  optional string priorityClassName = 6;
+
+  // Priority is the value of priority of pod groups created from this template. Various
+  // system components use this field to find the priority of the pod group. When
+  // Priority Admission Controller is enabled, it prevents users from setting this field.
+  // The admission controller populates this field from PriorityClassName.
+  // The higher the value, the higher the priority.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
+  optional int32 priority = 7;
 }
 
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
@@ -304,7 +531,7 @@ message WorkloadSpec {
   //
   // +optional
   // +k8s:optional
-  // +k8s:alpha(since:"1.36")=+k8s:immutable
+  // +k8s:immutable
   optional TypedLocalObjectReference controllerRef = 1;
 
   // PodGroupTemplates is the list of templates that make up the Workload.
@@ -317,7 +544,7 @@ message WorkloadSpec {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=8
-  // +k8s:alpha(since:"1.36")=+k8s:immutable
+  // +k8s:immutable
   repeated PodGroupTemplate podGroupTemplates = 2;
 }
 

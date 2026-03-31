@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -794,5 +795,150 @@ func TestSnapshot_Placement(t *testing.T) {
 				Nodes: placementNodes,
 			})
 		})
+	}
+}
+
+func TestSnapshot_BackupRestore(t *testing.T) {
+	podWithAffinity := st.MakePod().Name("p-aff").Namespace("ns").UID("p-aff").PodAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAffinityWithRequiredReq).Node("node-1").Obj()
+	podWithAntiAffinity := st.MakePod().Name("p-anti").Namespace("ns").UID("p-anti").PodAntiAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()
+
+	tests := []struct {
+		name           string
+		initialPods    []*v1.Pod
+		initialNodes   []*v1.Node
+		modifySnapshot func(klog.Logger, *Snapshot)
+	}{
+		{
+			name: "Modify NodeInfo (Add Pod)",
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+			},
+			modifySnapshot: func(_ klog.Logger, s *Snapshot) {
+				node := s.nodeInfoMap["node-1"]
+				pod := st.MakePod().Name("p1").Node("node-1").Obj()
+				node.AddPod(pod)
+			},
+		},
+		{
+			name: "Modify havePodsWithAffinityNodeInfoList (Add)",
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{"key": "value"}}},
+			},
+			modifySnapshot: func(_ klog.Logger, s *Snapshot) {
+				node := s.nodeInfoMap["node-1"]
+				node.AddPod(podWithAffinity)
+				s.havePodsWithAffinityNodeInfoList = append(s.havePodsWithAffinityNodeInfoList, node)
+			},
+		},
+		{
+			name: "Modify havePodsWithRequiredAntiAffinityNodeInfoList (Remove)",
+			initialPods: []*v1.Pod{
+				podWithAntiAffinity,
+			},
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{"key": "value"}}},
+			},
+			modifySnapshot: func(logger klog.Logger, s *Snapshot) {
+				node := s.nodeInfoMap["node-1"]
+				if err := node.RemovePod(logger, podWithAntiAffinity); err != nil {
+					t.Fatalf("Failed to remove pod: %v", err)
+				}
+				s.havePodsWithRequiredAntiAffinityNodeInfoList = []fwk.NodeInfo{}
+			},
+		},
+		{
+			name: "Modify nodeInfoList directly",
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-2"}},
+			},
+			modifySnapshot: func(_ klog.Logger, s *Snapshot) {
+				// Reverse the list
+				s.nodeInfoList[0], s.nodeInfoList[1] = s.nodeInfoList[1], s.nodeInfoList[0]
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			s := NewSnapshot(tt.initialPods, tt.initialNodes)
+
+			// Store original state for deep verification
+			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList := simplifySnapshot(s)
+
+			restore, err := s.BackupSnapshot()
+			if err != nil {
+				t.Fatalf("failed to prepare a backup")
+			}
+			tt.modifySnapshot(logger, s)
+			restore()
+
+			// Get state after for verification
+			postRestoreNodeInfoMap, postRestoreNodeInfoList, postRestoreAffinityList, postRestoreAntiAffinityList := simplifySnapshot(s)
+
+			if cmp.Diff(origNodeInfoMap, postRestoreNodeInfoMap) != "" {
+				t.Errorf("nodeInfoMap mismatch: want %v, got %v", origNodeInfoMap, postRestoreNodeInfoMap)
+			}
+			if cmp.Diff(origNodeInfoList, postRestoreNodeInfoList) != "" {
+				t.Errorf("nodeInfoList mismatch: want %v, got %v", origNodeInfoList, postRestoreNodeInfoList)
+			}
+			if cmp.Diff(origAffinityList, postRestoreAffinityList) != "" {
+				t.Errorf("havePodsWithAffinityNodeInfoList mismatch: want %v, got %v", origAffinityList, postRestoreAffinityList)
+			}
+			if cmp.Diff(origAntiAffinityList, postRestoreAntiAffinityList) != "" {
+				t.Errorf("havePodsWithRequiredAntiAffinityNodeInfoList mismatch: want %v, got %v", origAntiAffinityList, postRestoreAntiAffinityList)
+			}
+		})
+	}
+}
+
+// simplifySnapshot for comparison in unit tests
+func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []string) {
+	nodeInfoMap := make(map[string][]string)
+	var nodeInfoList []string
+	var affinityList []string
+	var antiAffinityList []string
+	for _, nodeInfo := range s.nodeInfoMap {
+		for _, p := range nodeInfo.GetPods() {
+			nodeInfoMap[nodeInfo.Node().Name] = append(nodeInfoMap[nodeInfo.Node().Name], p.GetPod().Name)
+		}
+	}
+	for _, nodeInfo := range s.nodeInfoList {
+		nodeInfoList = append(nodeInfoList, nodeInfo.Node().Name)
+	}
+	for _, nodeInfo := range s.havePodsWithAffinityNodeInfoList {
+		affinityList = append(affinityList, nodeInfo.Node().Name)
+	}
+	for _, nodeInfo := range s.havePodsWithRequiredAntiAffinityNodeInfoList {
+		antiAffinityList = append(antiAffinityList, nodeInfo.Node().Name)
+	}
+	return nodeInfoMap, nodeInfoList, affinityList, antiAffinityList
+}
+
+func TestSnapshot_MultipleBackups(t *testing.T) {
+	s := NewSnapshot(nil, nil)
+
+	restore, err := s.BackupSnapshot()
+	if err != nil {
+		t.Fatalf("failed to prepare a backup: %v", err)
+	}
+
+	_, err = s.BackupSnapshot()
+	if err == nil {
+		t.Fatalf("expected error when stacking backups, got nil")
+	}
+
+	expectedErr := "cannot stack backups"
+	if err.Error() != expectedErr {
+		t.Errorf("expected error %q, got %q", expectedErr, err.Error())
+	}
+
+	// Restore the previous backup, and now it should work again
+	restore()
+
+	_, err = s.BackupSnapshot()
+	if err != nil {
+		t.Fatalf("failed to prepare a backup after restoring: %v", err)
 	}
 }
