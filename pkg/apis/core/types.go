@@ -453,7 +453,7 @@ type PersistentVolumeStatus struct {
 	// +optional
 	Reason string
 	// LastPhaseTransitionTime is the time the phase transitioned from one to another
-	// and automatically resets to current time everytime a volume phase transitions.
+	// and automatically resets to current time every time a volume phase transitions.
 	// +optional
 	LastPhaseTransitionTime *metav1.Time
 }

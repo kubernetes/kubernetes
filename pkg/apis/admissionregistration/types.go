@@ -334,7 +334,7 @@ type Validation struct {
 	// If unset, the message is "failed rule: {Rule}".
 	// e.g. "must be a URL with the host matching spec.host"
 	// If ExpressMessage is specified, Message will be ignored
-	// If the Expression contains line breaks. Eith Message or ExpressMessage is required.
+	// If the Expression contains line breaks. Either Message or ExpressMessage is required.
 	// The message must not contain line breaks.
 	// If unset, the message is "failed Expression: {Expression}".
 	// +optional
@@ -413,7 +413,7 @@ type AuditAnnotation struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
+// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with parameterized resources.
 // ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
 //
 // For a given admission request, each binding will cause its policy to be

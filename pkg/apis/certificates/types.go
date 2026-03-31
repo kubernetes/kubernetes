@@ -279,7 +279,7 @@ type ClusterTrustBundleList struct {
 	Items []ClusterTrustBundle
 }
 
-// MaxTrustBundleSize is the maximimum size of a single trust bundle field.
+// MaxTrustBundleSize is the maximum size of a single trust bundle field.
 const MaxTrustBundleSize = 1 * 1024 * 1024
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

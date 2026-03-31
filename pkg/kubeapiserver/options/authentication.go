@@ -82,7 +82,7 @@ const (
 // Exported as a variable so that it can be overridden in integration tests.
 var UpdateAuthenticationConfigTimeout = time.Minute
 
-// BuiltInAuthenticationOptions contains all build-in authentication options for API Server
+// BuiltInAuthenticationOptions contains all built-in authentication options for API Server
 type BuiltInAuthenticationOptions struct {
 	APIAudiences    []string
 	Anonymous       *AnonymousAuthenticationOptions
@@ -170,7 +170,7 @@ func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 	}
 }
 
-// WithAll set default value for every build-in authentication option
+// WithAll set default value for every built-in authentication option
 func (o *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 	return o.
 		WithAnonymous().

@@ -46,7 +46,7 @@ const (
 	authorizationConfigFlag                 = "authorization-config"
 )
 
-// BuiltInAuthorizationOptions contains all build-in authorization options for API Server
+// BuiltInAuthorizationOptions contains all built-in authorization options for API Server
 type BuiltInAuthorizationOptions struct {
 	Modes                       []string
 	PolicyFile                  string

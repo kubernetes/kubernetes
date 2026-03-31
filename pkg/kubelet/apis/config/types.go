@@ -595,7 +595,7 @@ type KubeletWebhookAuthorization struct {
 	CacheUnauthorizedTTL metav1.Duration
 }
 
-// KubeletAuthentication holds the Kubetlet Authentication setttings.
+// KubeletAuthentication holds the Kubelet Authentication settings.
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication
@@ -857,7 +857,7 @@ const (
 	// a list of images that were pulled outside the kubelet process
 	NeverVerifyAllowlistedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyAllowlistedImages"
 	// AlwaysVerify requires credential verification for accessing any image on the
-	// node irregardless how it was pulled
+	// node regardless of how it was pulled
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
 )
 
