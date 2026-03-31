@@ -79,6 +79,13 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			// remain toggleable. DRAExtendedResource is toggleable in 1.36.
 			emulatedVersion: "1.36",
 		},
+		"workload-resourceclaims": {
+			test:                workloadResourceClaimsGateCycle,
+			driverResourcesFunc: workloadResourceClaimsDriverResources,
+			enabledGates:        []string{"GenericWorkload"},
+			toggledGates:        []string{"DRAWorkloadResourceClaims"},
+			extraRuntimeConfig:  "scheduling.k8s.io/v1alpha3",
+		},
 	}
 
 	for name, def := range subTests {

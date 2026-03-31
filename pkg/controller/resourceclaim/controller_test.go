@@ -64,6 +64,7 @@ var (
 
 	otherTestPod = makePod(testPodName+"-II", testNamespace, testPodUID+"-II")
 
+	testPodGroup                     = makePodGroup(testPodGroupName, testNamespace, testPodGroupUID)
 	testPodGroupWithResource         = makePodGroup(testPodGroupName, testNamespace, testPodGroupUID, *makePodGroupResourceClaim(podResourceClaimName, templateName))
 	testPodGroupWithResourceInStatus = func() *schedulingapi.PodGroup {
 		podGroup := testPodGroupWithResource.DeepCopy()
@@ -114,39 +115,74 @@ var (
 	testPodWithPodGroupAndNodeName = podInPodGroup(testPodWithNodeName, testPodName, testPodGroupName)
 	adminAccessFeatureOffError     = "admin access is requested, but the feature is disabled"
 
+	// WorkloadResourceClaims depends on GenericWorkload
 	allPossibleFeatures = []controllerFeatures{
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: false},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: true},
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
 	}
 	adminAccessDisabled = []controllerFeatures{
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: false},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
 	}
 	adminAccessEnabled = []controllerFeatures{
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
+	}
+	genericWorkloadDisabled = []controllerFeatures{
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+	}
+	genericWorkloadEnabled = []controllerFeatures{
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
 	}
 	workloadResourceClaimsDisabled = []controllerFeatures{
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: false},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: false, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
 	}
 	workloadResourceClaimsEnabled = []controllerFeatures{
-		{AdminAccess: false, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: false, PrioritizedList: true, WorkloadResourceClaims: true},
-		{AdminAccess: true, PrioritizedList: false, WorkloadResourceClaims: true},
-		{AdminAccess: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: true},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: true},
+	}
+	workloadResourceClaimsDisabledGenericWorkloadEnabled = []controllerFeatures{
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: false, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: false, WorkloadResourceClaims: false},
+		{AdminAccess: true, GenericWorkload: true, PrioritizedList: true, WorkloadResourceClaims: false},
 	}
 )
 
@@ -204,6 +240,29 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 1, 0, 0},
 		},
 		{
+			name:                "create for Pod in PodGroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			pods:                []*v1.Pod{podInPodGroup(testPodWithResource, testPodName, testPodGroupName)},
+			podGroups:           []*schedulingapi.PodGroup{testPodGroup},
+			templates:           []*resourceapi.ResourceClaimTemplate{template},
+			key:                 podKey(testPodWithResource),
+			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+		},
+		{
+			name:                "skip-create-for-pod-podgroup-does-not-exist",
+			featureCombinations: genericWorkloadEnabled,
+			pods:                []*v1.Pod{podInPodGroup(testPodWithResource, testPodName, testPodGroupName)},
+			templates:           []*resourceapi.ResourceClaimTemplate{template},
+			key:                 podKey(testPodWithResource),
+			expectedError:       `podgroup.scheduling.k8s.io "test-podgroup" not found`,
+		},
+		{
 			name:                "create for PodGroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -254,17 +313,34 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name:                "create ResourceClaim for Pod with PodGroup claim when feature is disabled",
-			featureCombinations: workloadResourceClaimsDisabled,
+			name:                "skip create ResourceClaim for Pod with PodGroup claim when GenericWorkload feature is disabled",
+			featureCombinations: genericWorkloadDisabled,
 			pods:                []*v1.Pod{testPodWithPodGroupResource},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
-			claims:              []*resourceapi.ResourceClaim{templatedTestPodGroupClaim},
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podKey(testPodWithPodGroupResource),
-			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestPodGroupClaim, *templatedTestClaim},
+			expectedError:       "GenericWorkload feature is disabled",
+		},
+		{
+			name:                "skip create ResourceClaim for Pod with PodGroup claim when DRAWorkloadResourceClaims feature is disabled",
+			featureCombinations: workloadResourceClaimsDisabledGenericWorkloadEnabled,
+			pods:                []*v1.Pod{testPodWithPodGroupResource},
+			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
+			templates:           []*resourceapi.ResourceClaimTemplate{template},
+			key:                 podKey(testPodWithPodGroupResource),
+			expectedError:       "DRAWorkloadResourceClaims feature is disabled",
+		},
+		{
+			name:                "create ResourceClaim for grouped Pod with claim when DRAWorkloadResourceClaims feature is disabled",
+			featureCombinations: workloadResourceClaimsDisabledGenericWorkloadEnabled,
+			pods:                []*v1.Pod{podInPodGroup(testPodWithResource, testPodName, testPodGroupName)},
+			podGroups:           []*schedulingapi.PodGroup{testPodGroup},
+			templates:           []*resourceapi.ResourceClaimTemplate{template},
+			key:                 podKey(testPodWithResource),
+			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithPodGroupResource.Name: {
-					{Name: testPodWithPodGroupResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				testPodName: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{1, 0, 0, 0},
@@ -502,7 +578,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			pods:            []*v1.Pod{testPodWithResource},
 			templates:       []*resourceapi.ResourceClaimTemplate{template},
 			key:             podKey(testPodWithResource),
-			expectedMetrics: expectedMetrics{1, 0, 1, 0},
+			expectedMetrics: expectedMetrics{0, 0, 1, 0},
 			expectedError:   "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
@@ -511,7 +587,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podGroupKey(testPodGroupWithResource),
-			expectedMetrics:     expectedMetrics{1, 0, 1, 0},
+			expectedMetrics:     expectedMetrics{0, 0, 1, 0},
 			expectedError:       "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
@@ -685,14 +761,31 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name:                "add-reserved-podgroup-feature-disabled",
-			featureCombinations: workloadResourceClaimsDisabled,
+			name:                "skip-add-reserved-podgroup-genericworkload-disabled",
+			featureCombinations: genericWorkloadDisabled,
 			pods:                []*v1.Pod{testPodWithPodGroupAndNodeName},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
 			key:                 podKey(testPodWithPodGroupAndNodeName),
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			claims:              []*resourceapi.ResourceClaim{templatedTestClaimAllocated},
-			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestClaimReserved},
+			expectedError:       "GenericWorkload feature is disabled",
+			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestClaimAllocated},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithPodGroupAndNodeName.Name: {
+					{Name: testPodWithPodGroupAndNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
+			name:                "skip-add-reserved-podgroup-workloadresourceclaims-disabled",
+			featureCombinations: workloadResourceClaimsDisabledGenericWorkloadEnabled,
+			pods:                []*v1.Pod{testPodWithPodGroupAndNodeName},
+			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
+			key:                 podKey(testPodWithPodGroupAndNodeName),
+			templates:           []*resourceapi.ResourceClaimTemplate{template},
+			claims:              []*resourceapi.ResourceClaim{templatedTestClaimAllocated},
+			expectedClaims:      []resourceapi.ResourceClaim{*templatedTestClaimAllocated},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithPodGroupAndNodeName.Name: {
 					{Name: testPodWithPodGroupAndNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
@@ -831,13 +924,12 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 
 			err = ec.syncHandler(tCtx, tc.key)
-			if err != nil {
-				assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
-				return
-			}
 			if tc.expectedError != "" {
-				tCtx.Fatalf("expected error, got none")
+				assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
+			} else if err != nil {
+				tCtx.Errorf("unexpected sync handler error: %v", err)
 			}
+			// keep going to check other side effects
 
 			if tc.name == "flapping-resourceclaim-statuses" {
 				assert.Len(tCtx, appliedPatches, 1, "should have applied status once")
