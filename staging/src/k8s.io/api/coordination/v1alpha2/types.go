@@ -24,6 +24,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
 
 // LeaseCandidate defines a candidate for a Lease object.
 // Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
@@ -80,6 +81,7 @@ type LeaseCandidateSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
 
 // LeaseCandidateList is a list of Lease objects.
 type LeaseCandidateList struct {
