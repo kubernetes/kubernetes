@@ -113,7 +113,7 @@ func l[T any](items ...T) []T {
 func setup(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) *testContext {
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := New(fakeClientset,
+	controller := newWithFeatures(fakeClientset,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
@@ -2201,7 +2201,6 @@ func newTestController(tCtx ktesting.TContext) *Controller {
 		informerFactory.Resource().V1().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	controller.metrics = metrics.New()
 	// Always log, not matter what the -v value is.

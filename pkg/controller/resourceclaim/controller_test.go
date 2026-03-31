@@ -768,12 +768,12 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
 
-			features := Features{
+			features := controllerFeatures{
 				AdminAccess:            tc.adminAccessEnabled,
 				PrioritizedList:        tc.prioritizedListEnabled,
 				WorkloadResourceClaims: tc.workloadResourceClaimsEnabled,
 			}
-			ec, err := NewController(tCtx.Logger(), features, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
+			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer, features)
 			if err != nil {
 				tCtx.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -878,7 +878,7 @@ func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 
-	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
+	ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer, controllerFeatures{})
 	tCtx.ExpectNoError(err, "creating controller")
 	tCtx.Cleanup(ec.queue.ShutDown)
 
@@ -983,11 +983,12 @@ func testEventHandlers(tCtx ktesting.TContext) {
 	extendedResourceClaimKey := claimKeyPrefix + testNamespace + "/" + extendedResourceClaimName
 
 	tests := map[string]struct {
-		features        Features
-		initialObjects  []runtime.Object
-		createObjects   []object
-		updateObjects   []object
-		deleteObjects   []object
+		features       controllerFeatures
+		initialObjects []runtime.Object
+		createObjects  []object
+		updateObjects  []object
+		deleteObjects  []object
+
 		expectedKeys    []string
 		expectedMetrics map[controllermetrics.NumResourceClaimLabels]float64
 
@@ -1183,17 +1184,17 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			expectedKeys:  []string{extendedResourceClaimKey, testPodKey},
 		},
 		"new-podgroup-feature-disabled": {
-			features:      Features{WorkloadResourceClaims: false},
+			features:      controllerFeatures{WorkloadResourceClaims: false},
 			createObjects: []object{testPodGroupWithResourceInStatus},
 			expectedKeys:  []string{},
 		},
 		"new-podgroup": {
-			features:      Features{WorkloadResourceClaims: true},
+			features:      controllerFeatures{WorkloadResourceClaims: true},
 			createObjects: []object{testPodGroupWithResourceInStatus},
 			expectedKeys:  []string{testPodGroupKey},
 		},
 		"new-podgroup-templated-claim-already-exists": {
-			features:       Features{WorkloadResourceClaims: true},
+			features:       controllerFeatures{WorkloadResourceClaims: true},
 			initialObjects: []runtime.Object{testPodGroupClaim},
 			createObjects:  []object{testPodGroupWithResourceInStatus},
 			expectedKeys:   []string{},
@@ -1202,7 +1203,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			},
 		},
 		"new-templated-claim-for-podgroup": {
-			features:       Features{WorkloadResourceClaims: true},
+			features:       controllerFeatures{WorkloadResourceClaims: true},
 			initialObjects: []runtime.Object{testPodGroupWithResourceInStatus},
 			createObjects:  []object{testPodGroupClaim},
 			expectedKeys:   []string{testClaimKey},
@@ -1211,13 +1212,13 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			},
 		},
 		"new-template-for-podgroup": {
-			features:       Features{WorkloadResourceClaims: true},
+			features:       controllerFeatures{WorkloadResourceClaims: true},
 			initialObjects: []runtime.Object{testPodGroupWithResource},
 			createObjects:  []object{template},
 			expectedKeys:   []string{testPodGroupKey},
 		},
 		"podgroup-claim-status-update": {
-			features: Features{WorkloadResourceClaims: true},
+			features: controllerFeatures{WorkloadResourceClaims: true},
 			initialObjects: []runtime.Object{
 				testPodGroupWithResource,
 				podInPodGroup(testPodWithPodGroupResource, testPodName+"-1", testPodGroupName),
@@ -1234,7 +1235,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			expectedIndexedPodsByResourceClaimTemplate: []string{testNamespace + "/" + templateName},
 		},
 		"podgroup-claim-status-update-feature-disabled": {
-			features: Features{WorkloadResourceClaims: false},
+			features: controllerFeatures{WorkloadResourceClaims: false},
 			initialObjects: []runtime.Object{
 				testPodGroupWithResource,
 				podInPodGroup(testPodWithPodGroupResource, testPodName+"-1", testPodGroupName),
@@ -1257,7 +1258,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
 
-			ec, err := NewController(tCtx.Logger(), test.features, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
+			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer, test.features)
 			tCtx.ExpectNoError(err, "creating ephemeral controller")
 			tCtx.Cleanup(ec.queue.ShutDown)
 
