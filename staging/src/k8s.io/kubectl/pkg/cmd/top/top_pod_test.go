@@ -385,6 +385,106 @@ func TestTopPodWithSwap(t *testing.T) {
 	})
 }
 
+func TestTopPodWithNodeInfo(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	const testName = "TestTopPodWithNodeInfo"
+	testNS := "testns"
+	t.Run(testName, func(t *testing.T) {
+		metricsList := testV1beta1PodMetricsData()
+		// Set the namespace on metrics to match the test namespace.
+		for i := range metricsList {
+			metricsList[i].Namespace = testNS
+		}
+		fakemetricsClientset := &metricsfake.Clientset{}
+
+		fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			res := &metricsv1beta1api.PodMetricsList{
+				Items: metricsList,
+			}
+			return true, res, nil
+		})
+
+		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+		defer tf.Cleanup()
+
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		ns := scheme.Codecs.WithoutConversion()
+
+		podList := &v1.PodList{
+			Items: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: testNS},
+					Spec:       v1.PodSpec{NodeName: "node-a"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: testNS},
+					Spec:       v1.PodSpec{NodeName: "node-b"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: testNS},
+					Spec:       v1.PodSpec{NodeName: "node-c"},
+				},
+			},
+		}
+
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch req.URL.Path {
+				case "/api":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				case "/apis":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				case "/api/v1/namespaces/" + testNS + "/pods":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
+				default:
+					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
+						testName, req, req.URL)
+					return nil, nil
+				}
+			}),
+		}
+		tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+		streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+		cmd := NewCmdTopPod(tf, nil, streams)
+		cmdOptions := &TopPodOptions{
+			ShowNodeName: true,
+		}
+		cmdOptions.IOStreams = streams
+
+		if err := cmdOptions.Complete(tf, cmd, nil); err != nil {
+			t.Fatal(err)
+		}
+		cmdOptions.MetricsClient = fakemetricsClientset
+		cmdOptions.ShowNodeName = true
+		if err := cmdOptions.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if err := cmdOptions.RunTopPod(); err != nil {
+			t.Fatal(err)
+		}
+
+		result := buf.String()
+
+		if !strings.Contains(result, "NODE") {
+			t.Errorf("missing NODE header: \n%s", result)
+		}
+
+		expectedNodeNames := map[string]string{
+			"pod1": "node-a",
+			"pod2": "node-b",
+			"pod3": "node-c",
+		}
+		for podName, nodeName := range expectedNodeNames {
+			if !strings.Contains(result, nodeName) {
+				t.Errorf("missing node %s for pod %s: \n%s", nodeName, podName, result)
+			}
+		}
+	})
+}
+
 func getResultColumnValues(result string, columnIndex int) []string {
 	resultLines := strings.Split(result, "\n")
 	values := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line

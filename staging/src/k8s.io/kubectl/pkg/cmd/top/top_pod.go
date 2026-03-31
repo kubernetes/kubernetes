@@ -48,12 +48,14 @@ type TopPodOptions struct {
 	LabelSelector      string
 	FieldSelector      string
 	SortBy             string
+	OutputFormat       string
 	AllNamespaces      bool
 	PrintContainers    bool
 	NoHeaders          bool
 	UseProtocolBuffers bool
 	Sum                bool
 	ShowSwap           bool
+	ShowNodeName       bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -85,7 +87,10 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel
+
+		# Show metrics for the pods with node information
+		kubectl top pod -o wide`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.IOStreams) *cobra.Command {
@@ -119,6 +124,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
 	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print pod resources related to swap memory.")
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", o.OutputFormat, "Output format. One of: wide.")
 	return cmd
 }
 
@@ -154,6 +160,7 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	o.PodClient = clientset.CoreV1()
 
+	o.ShowNodeName = o.OutputFormat == "wide"
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.ShowSwap)
 	return nil
 }
@@ -166,6 +173,9 @@ func (o *TopPodOptions) Validate() error {
 	}
 	if len(o.ResourceName) > 0 && (len(o.LabelSelector) > 0 || len(o.FieldSelector) > 0) {
 		return errors.New("only one of NAME or selector can be provided")
+	}
+	if len(o.OutputFormat) > 0 && o.OutputFormat != "wide" {
+		return errors.New("--output accepts only wide")
 	}
 	return nil
 }
@@ -219,7 +229,42 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+	var podNodeMap map[string]string
+	if o.ShowNodeName {
+		podNodeMap, err = o.buildPodNodeMap(labelSelector, fieldSelector)
+		if err != nil {
+			return err
+		}
+	}
+
+	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum, podNodeMap)
+}
+
+func (o TopPodOptions) buildPodNodeMap(labelSelector labels.Selector, fieldSelector fields.Selector) (map[string]string, error) {
+	podNodeMap := make(map[string]string)
+	ns := o.Namespace
+	if o.AllNamespaces {
+		ns = metav1.NamespaceAll
+	}
+	if o.ResourceName != "" {
+		pod, err := o.PodClient.Pods(ns).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		podNodeMap[pod.Namespace+"/"+pod.Name] = pod.Spec.NodeName
+	} else {
+		pods, err := o.PodClient.Pods(ns).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector.String(),
+			FieldSelector: fieldSelector.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, pod := range pods.Items {
+			podNodeMap[pod.Namespace+"/"+pod.Name] = pod.Spec.NodeName
+		}
+	}
+	return podNodeMap, nil
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {

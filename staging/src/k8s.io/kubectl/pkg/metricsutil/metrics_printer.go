@@ -31,6 +31,7 @@ import (
 var (
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
+	NodeColumn      = "NODE"
 )
 
 const ResourceSwap = "swap"
@@ -102,7 +103,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool, podNodeMap map[string]string) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -110,6 +111,9 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	defer w.Flush()
 
 	columnWidth := len(printer.podColumns)
+	if podNodeMap != nil {
+		columnWidth++
+	}
 	if !noHeaders {
 		if withNamespace {
 			printValue(w, NamespaceColumn)
@@ -119,7 +123,22 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 			printValue(w, PodColumn)
 			columnWidth++
 		}
-		printColumnNames(w, printer.podColumns)
+		// Print NAME first, then NODE (if requested), then remaining metric columns.
+		printValue(w, printer.podColumns[0])
+		if podNodeMap != nil {
+			printValue(w, NodeColumn)
+		}
+		for _, name := range printer.podColumns[1:] {
+			printValue(w, name)
+		}
+		fmt.Fprint(w, "\n")
+	} else {
+		if withNamespace {
+			columnWidth++
+		}
+		if printContainers {
+			columnWidth++
+		}
 	}
 
 	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy, printer.measuredResources))
@@ -127,9 +146,9 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	for _, m := range metrics {
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printer.printSinglePodContainerMetrics(w, &m, withNamespace, printer.measuredResources)
+			printer.printSinglePodContainerMetrics(w, &m, withNamespace, podNodeMap, printer.measuredResources)
 		} else {
-			printer.printSinglePodMetrics(w, &m, withNamespace, printer.measuredResources)
+			printer.printSinglePodMetrics(w, &m, withNamespace, podNodeMap, printer.measuredResources)
 		}
 
 	}
@@ -159,29 +178,37 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func (printer *TopCmdPrinter) printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, measuredResources []v1.ResourceName) {
+func (printer *TopCmdPrinter) printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, podNodeMap map[string]string, measuredResources []v1.ResourceName) {
 	podMetrics := getPodMetrics(m, measuredResources)
 	if withNamespace {
 		printValue(out, m.Namespace)
 	}
-	printer.printMetricsLine(out, &ResourceMetricsInfo{
+	var nodeName string
+	if podNodeMap != nil {
+		nodeName = podNodeMap[m.Namespace+"/"+m.Name]
+	}
+	printer.printMetricsLineWithNode(out, &ResourceMetricsInfo{
 		Name:      m.Name,
 		Metrics:   podMetrics,
 		Available: v1.ResourceList{},
-	}, measuredResources)
+	}, podNodeMap != nil, nodeName, measuredResources)
 }
 
-func (printer *TopCmdPrinter) printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, measuredResources []v1.ResourceName) {
+func (printer *TopCmdPrinter) printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, podNodeMap map[string]string, measuredResources []v1.ResourceName) {
 	for _, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
 		}
 		printValue(out, m.Name)
-		printer.printMetricsLine(out, &ResourceMetricsInfo{
+		var nodeName string
+		if podNodeMap != nil {
+			nodeName = podNodeMap[m.Namespace+"/"+m.Name]
+		}
+		printer.printMetricsLineWithNode(out, &ResourceMetricsInfo{
 			Name:      c.Name,
 			Metrics:   c.Usage,
 			Available: v1.ResourceList{},
-		}, measuredResources)
+		}, podNodeMap != nil, nodeName, measuredResources)
 	}
 }
 
@@ -203,6 +230,15 @@ func getPodMetrics(m *metricsapi.PodMetrics, measuredResources []v1.ResourceName
 
 func (printer *TopCmdPrinter) printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo, measuredResources []v1.ResourceName) {
 	printValue(out, metrics.Name)
+	printer.printAllResourceUsages(out, metrics, measuredResources)
+	fmt.Fprint(out, "\n")
+}
+
+func (printer *TopCmdPrinter) printMetricsLineWithNode(out io.Writer, metrics *ResourceMetricsInfo, showNode bool, nodeName string, measuredResources []v1.ResourceName) {
+	printValue(out, metrics.Name)
+	if showNode {
+		printValue(out, nodeName)
+	}
 	printer.printAllResourceUsages(out, metrics, measuredResources)
 	fmt.Fprint(out, "\n")
 }

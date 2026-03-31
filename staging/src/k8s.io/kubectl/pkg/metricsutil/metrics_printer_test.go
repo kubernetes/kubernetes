@@ -148,6 +148,7 @@ func TestPrintPodMetrics(t *testing.T) {
 		noHeader        bool
 		sortBy          string
 		sum             bool
+		podNodeMap      map[string]string
 		expectedErr     error
 		expectedOutput  string
 	}{
@@ -308,6 +309,30 @@ test     400m         2048Mi
 `,
 		},
 		{
+			name: "Single Pod with Node Info (-o wide)",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			podNodeMap: map[string]string{"default/test": "node1"},
+			expectedOutput: "NAME   NODE    CPU(cores)   MEMORY(bytes)   \ntest   node1   200m         1024Mi          \n",
+		},
+		{
 			name: "Multiple Pods with Multiple Containers - Calculate Total Resource Usage",
 			podMetric: []metricsapi.PodMetrics{
 				{
@@ -376,7 +401,7 @@ test-1   400m         5120Mi
 
 			top := NewTopCmdPrinter(out, false)
 			err := top.PrintPodMetrics(test.podMetric, test.printContainers,
-				test.withNamespace, test.noHeader, test.sortBy, test.sum)
+				test.withNamespace, test.noHeader, test.sortBy, test.sum, test.podNodeMap)
 			assert.Equal(t, test.expectedErr, err)
 			assert.Equal(t, test.expectedOutput, out.String())
 		})
