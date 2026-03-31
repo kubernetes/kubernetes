@@ -159,6 +159,7 @@ const (
 // controllerFeatures defines which features should be enabled in the controller.
 type controllerFeatures struct {
 	AdminAccess            bool
+	GenericWorkload        bool
 	PrioritizedList        bool
 	WorkloadResourceClaims bool
 }
@@ -171,8 +172,9 @@ func (f controllerFeatures) String() string {
 		return "disabled"
 	}
 	return fmt.Sprintf(
-		"AdminAccess %s, PrioritizedList %s, WorkloadResourceClaims %s",
+		"AdminAccess %s, GenericWorkload %s, PrioritizedList %s, WorkloadResourceClaims %s",
 		enabled(f.AdminAccess),
+		enabled(f.GenericWorkload),
 		enabled(f.PrioritizedList),
 		enabled(f.WorkloadResourceClaims),
 	)
@@ -195,6 +197,7 @@ func NewController(
 		templateInformer,
 		controllerFeatures{
 			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			GenericWorkload:        utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 		},
@@ -282,9 +285,11 @@ func newControllerWithFeatures(
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
+	if features.GenericWorkload {
+		ec.podGroupLister = podGroupInformer.Lister()
+	}
 	ec.podGroupSynced = func() bool { return true }
 	if features.WorkloadResourceClaims {
-		ec.podGroupLister = podGroupInformer.Lister()
 		ec.podGroupSynced = podGroupInformer.Informer().HasSynced
 		ec.podGroupIndexer = podGroupInformer.Informer().GetIndexer()
 
@@ -963,6 +968,15 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 			if err != nil {
 				return err
 			}
+			if isPodGroupClaim(bindTo) && !ec.features.WorkloadResourceClaims {
+				// It's not expected for ResourceClaims to remain allocated but
+				// unreserved for too long. This message is logged at a lower
+				// verbosity threshold so cluster admins can more easily
+				// identify when that happens because of this feature gate in
+				// normal production clusters.
+				logger.V(3).Info("Not reserving PodGroup ResourceClaim because feature is disabled", "feature", features.DRAWorkloadResourceClaims, "resourceClaim", klog.KObj(claim))
+				continue
+			}
 			logger.V(5).Info("Reserve claim", "resourceClaim", klog.KObj(claim), "reservedForResource", bindTo.Resource)
 			if err := ec.reserveFor(ctx, bindTo, claim); err != nil {
 				return err
@@ -1025,9 +1039,11 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 	if err != nil {
 		return err
 	}
-	isPodGroupClaim := bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 	var claim *resourceapi.ResourceClaim
-	if isPodGroupClaim {
+	if isPodGroupClaim(bindTo) {
+		if !ec.features.WorkloadResourceClaims {
+			return fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)
+		}
 		claim, err = ec.findPodGroupResourceClaim(podGroup, schedulingapi.PodGroupResourceClaim{
 			Name: podClaim.Name,
 		})
@@ -1624,10 +1640,13 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 }
 
 func (ec *Controller) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
-	if !ec.features.WorkloadResourceClaims ||
-		pod.Spec.SchedulingGroup == nil ||
+	if pod.Spec.SchedulingGroup == nil ||
 		pod.Spec.SchedulingGroup.PodGroupName == nil {
+		// Pod is not a member of a PodGroup.
 		return nil, nil
+	}
+	if !ec.features.GenericWorkload {
+		return nil, fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)
 	}
 	return ec.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 }
@@ -1789,6 +1808,10 @@ func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
 		}
 	}
 	return "false"
+}
+
+func isPodGroupClaim(bindTo resourceapi.ResourceClaimConsumerReference) bool {
+	return bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 }
 
 func newCustomCollector(rcLister resourcelisters.ResourceClaimLister, adminAccessFunc func(*resourceapi.ResourceClaim) string, logger klog.Logger) metrics.StableCollector {
