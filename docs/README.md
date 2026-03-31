@@ -5,6 +5,7 @@ This folder adds a code-oriented learning layer for `kubernetes/kubernetes`. It 
 ## Available language editions
 
 - English: [`docs/en/README.md`](en/README.md)
+- Chinese: [`docs/zh/README.md`](zh/README.md)
 
 ## What this series explains
 
@@ -33,3 +34,11 @@ The documents in this folder are anchored in the repository itself, especially t
 3. [`docs/en/control-plane.md`](en/control-plane.md)
 4. [`docs/en/math-theory.md`](en/math-theory.md)
 5. [`docs/en/controller-kubelet.md`](en/controller-kubelet.md)
+
+## 中文阅读顺序
+
+1. [`docs/zh/quick-start.md`](zh/quick-start.md)
+2. [`docs/zh/architecture.md`](zh/architecture.md)
+3. [`docs/zh/control-plane.md`](zh/control-plane.md)
+4. [`docs/zh/math-theory.md`](zh/math-theory.md)
+5. [`docs/zh/controller-kubelet.md`](zh/controller-kubelet.md)
