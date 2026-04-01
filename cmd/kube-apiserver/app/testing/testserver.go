@@ -485,7 +485,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
 				req.Param("exclude", storageVersionCheck)
 			}
-			result := req.Do(context.TODO())
+			result := req.Do(tCtx)
 			status := 0
 			result.StatusCode(&status)
 			if status == 200 {
@@ -506,7 +506,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		default:
 		}
 
-		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(tCtx, "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}
