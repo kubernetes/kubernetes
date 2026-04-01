@@ -149,8 +149,8 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
-	allErrs := append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
+	errorList = append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
