@@ -469,7 +469,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		t.Logf("Waiting for /healthz to be ok...")
 
 		// wait until healthz endpoint returns ok
-		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
 			select {
 			case err := <-errCh:
 				return false, err
@@ -485,7 +485,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
 				req.Param("exclude", storageVersionCheck)
 			}
-			result := req.Do(tCtx)
+			result := req.Do(ctx)
 			status := 0
 			result.StatusCode(&status)
 			if status == 200 {
@@ -499,14 +499,14 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 
 	// wait until default namespace is created
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
 		default:
 		}
 
-		if _, err := client.CoreV1().Namespaces().Get(tCtx, "default", metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}
