@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -572,9 +573,23 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handlerRegistration = resourceClaimCache.AddEventHandler(
-					buildEvtResHandler(at, fwk.ResourceClaim),
-				)
+				if sched.claimQueue == nil {
+					sched.claimQueue = workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*claimQueueItem]())
+				}
+				funcs := cache.ResourceEventHandlerFuncs{}
+				if at&fwk.Add != 0 {
+					evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add}
+					funcs.AddFunc = func(obj interface{}) {
+						sched.claimQueue.Add(&claimQueueItem{evt: evt, newObj: obj})
+					}
+				}
+				if at&fwk.Update != 0 {
+					evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}
+					funcs.UpdateFunc = func(old, obj interface{}) {
+						sched.claimQueue.Add(&claimQueueItem{evt: evt, oldObj: old, newObj: obj})
+					}
+				}
+				handlerRegistration = resourceClaimCache.AddEventHandler(funcs)
 				handlers = append(handlers, handlerRegistration)
 			}
 		case fwk.ResourceSlice:
@@ -709,4 +724,17 @@ type AdmissionResult struct {
 	Name                 string
 	Reason               string
 	InsufficientResource *noderesources.InsufficientResource
+}
+
+func (sched *Scheduler) claimQueueWorker(logger klog.Logger) {
+	for {
+		item, quit := sched.claimQueue.Get()
+		if quit {
+			return
+		}
+		start := time.Now()
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, item.evt, item.oldObj, item.newObj, nil)
+		metrics.EventHandlingLatency.WithLabelValues(item.evt.Label()).Observe(metrics.SinceInSeconds(start))
+		sched.claimQueue.Done(item)
+	}
 }

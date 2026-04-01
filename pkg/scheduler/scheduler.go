@@ -34,6 +34,7 @@ import (
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -65,6 +66,13 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
+// claimQueueItem holds data to process a ResourceClaim event asynchronously.
+type claimQueueItem struct {
+	evt    fwk.ClusterEvent
+	oldObj interface{}
+	newObj interface{}
+}
+
 type Scheduler struct {
 	// It is expected that changes made via Cache will be observed
 	// by NodeLister and Algorithm.
@@ -118,6 +126,9 @@ type Scheduler struct {
 
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
+
+	// claimQueue decouples ResourceClaim event handling from the informer thread.
+	claimQueue workqueue.TypedRateLimitingInterface[*claimQueueItem]
 
 	nominatedNodeNameForExpectationEnabled bool
 	genericWorkloadEnabled                 bool
@@ -526,6 +537,10 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	sched.SchedulingQueue.Run(logger)
 
+	if sched.claimQueue != nil {
+		go wait.UntilWithContext(ctx, func(ctx context.Context) { sched.claimQueueWorker(logger) }, time.Second)
+	}
+
 	if sched.APIDispatcher != nil {
 		sched.APIDispatcher.Run(logger)
 	}
@@ -541,6 +556,9 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	<-ctx.Done()
 	if sched.APIDispatcher != nil {
 		sched.APIDispatcher.Close()
+	}
+	if sched.claimQueue != nil {
+		sched.claimQueue.ShutDown()
 	}
 	sched.SchedulingQueue.Close()
 
