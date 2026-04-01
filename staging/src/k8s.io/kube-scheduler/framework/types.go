@@ -190,6 +190,9 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
+	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate.
+	// If set and returns non-nil, only pods with matching keys are checked.
+	PreQueueingHintFn PreQueueingHintFn
 }
 
 // QueueingHintFn returns a hint that signals whether the event can make a Pod,
@@ -203,6 +206,11 @@ type ClusterEventWithHint struct {
 //   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
 //   - `oldObj` is nil if the event is add event.
 //   - `newObj` is nil if the event is delete event.
+// PreQueueingHintFn is called once per event before iterating pods.
+// It returns a set of pod keys that should be evaluated by QueueingHintFn.
+// If nil is returned, all pods are evaluated (default behavior).
+type PreQueueingHintFn func(logger klog.Logger, oldObj, newObj interface{}) sets.Set[string]
+
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
 
 type QueueingHint int

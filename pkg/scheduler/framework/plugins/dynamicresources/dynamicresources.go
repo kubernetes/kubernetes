@@ -252,7 +252,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: claimPreQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -276,6 +276,25 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 		return statusUnschedulable(klog.FromContext(ctx), err.Error())
 	}
 	return nil
+}
+
+// claimPreQueueingHint returns the set of pod keys affected by a ResourceClaim event.
+// For per-pod claims (with a Pod OwnerReference), only that pod needs evaluation.
+func claimPreQueueingHint(logger klog.Logger, oldObj, newObj interface{}) sets.Set[string] {
+	obj := newObj
+	if obj == nil {
+		obj = oldObj
+	}
+	claim, ok := obj.(*resourceapi.ResourceClaim)
+	if !ok {
+		return nil
+	}
+	for _, ref := range claim.OwnerReferences {
+		if ref.Kind == "Pod" && ref.APIVersion == "v1" {
+			return sets.New(ref.Name + "_" + claim.Namespace)
+		}
+	}
+	return nil // shared claim — evaluate all pods
 }
 
 // isSchedulableAfterClaimChange is invoked for add and update claim events reported by

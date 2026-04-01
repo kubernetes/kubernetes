@@ -218,8 +218,9 @@ type PriorityQueue struct {
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
 type QueueingHintFunction struct {
-	PluginName     string
-	QueueingHintFn fwk.QueueingHintFn
+	PluginName        string
+	QueueingHintFn    fwk.QueueingHintFn
+	PreQueueingHintFn fwk.PreQueueingHintFn
 }
 
 // clusterEvent has the event and involved objects.
@@ -1406,15 +1407,53 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		return
 	}
 
-	unschedulableEntities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
-	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-			if preCheck == nil || preCheck(pInfo.Pod) {
-				unschedulableEntities = append(unschedulableEntities, entity)
-				return false
+	// Run PreQueueingHintFns to narrow the pod set.
+	var podKeys sets.Set[string]
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch, hintfns := range hintMap {
+			if !framework.MatchClusterEvents(eventToMatch, event) {
+				continue
 			}
-			return true
-		})
+			for _, hintfn := range hintfns {
+				if hintfn.PreQueueingHintFn != nil {
+					if keys := hintfn.PreQueueingHintFn(logger, oldObj, newObj); keys != nil {
+						if podKeys == nil {
+							podKeys = keys
+						} else {
+							podKeys = podKeys.Union(keys)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	var unschedulableEntities []framework.QueuedEntityInfo
+	if podKeys != nil {
+		// Only check entities for pods identified by PreQueueingHint.
+		unschedulableEntities = make([]framework.QueuedEntityInfo, 0, podKeys.Len())
+		for _, entity := range p.unschedulableEntities.entityInfoMap {
+			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				key := pInfo.Pod.Name + "_" + pInfo.Pod.Namespace
+				if podKeys.Has(key) && (preCheck == nil || preCheck(pInfo.Pod)) {
+					unschedulableEntities = append(unschedulableEntities, entity)
+					return false
+				}
+				return true
+			})
+		}
+	} else {
+		unschedulableEntities = make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
+		for _, entity := range p.unschedulableEntities.entityInfoMap {
+			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				if preCheck == nil || preCheck(pInfo.Pod) {
+					unschedulableEntities = append(unschedulableEntities, entity)
+					return false
+				}
+				return true
+			})
+		}
+	}
 	}
 	p.moveEntitiesToActiveOrBackoffQueue(logger, unschedulableEntities, event, oldObj, newObj)
 }
