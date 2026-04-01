@@ -609,7 +609,12 @@ func needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
 	// but CAN NOT change primary/secondary clusterIP || ipFamily UNLESS they are changing from/to/ON ExternalName
 	// so not care about order, only need check the length.
 	if len(oldService.Spec.IPFamilies) != len(newService.Spec.IPFamilies) {
-		klog.V(2).Infof("Service %s IPFamilies' count changed from %d to %d", klog.KObj(newService), len(oldService.Spec.IPFamilies), len(newService.Spec.IPFamilies))
+		klog.V(2).Infof("Service %s IPFamilies' count changed from %d to %d", klog.KObj(newService), len(oldService.Spec.IPFamilies), len(oldService.Spec.IPFamilies))
+		return true
+	}
+
+	if !servicehelper.LoadBalancerStatusEqual(&oldService.Status.LoadBalancer, &newService.Status.LoadBalancer) {
+		klog.V(2).Infof("Service %s LoadBalancer status changed", klog.KObj(newService))
 		return true
 	}
 

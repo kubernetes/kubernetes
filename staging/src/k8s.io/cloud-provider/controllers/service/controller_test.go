@@ -1502,6 +1502,16 @@ func TestNeedsUpdate(t *testing.T) {
 			return
 		},
 		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status is cleared",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "8.8.8.8"}}
+			newSvc = oldSvc.DeepCopy()
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: true,
 	}}
 
 	for _, tc := range testCases {
