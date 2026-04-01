@@ -216,8 +216,9 @@ type PriorityQueue struct {
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
 type QueueingHintFunction struct {
-	PluginName     string
-	QueueingHintFn fwk.QueueingHintFn
+	PluginName        string
+	QueueingHintFn    fwk.QueueingHintFn
+	PreQueueingHintFn fwk.PreQueueingHintFn
 }
 
 // clusterEvent has the event and involved objects.
@@ -1143,10 +1144,44 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		return
 	}
 
-	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if preCheck == nil || preCheck(pInfo.Pod) {
-			unschedulablePods = append(unschedulablePods, pInfo)
+	// Run PreQueueingHintFns to narrow the pod set.
+	var podKeys sets.Set[string]
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch, hintfns := range hintMap {
+			if !framework.MatchClusterEvents(eventToMatch, event) {
+				continue
+			}
+			for _, hintfn := range hintfns {
+				if hintfn.PreQueueingHintFn != nil {
+					if keys := hintfn.PreQueueingHintFn(logger, oldObj, newObj); keys != nil {
+						if podKeys == nil {
+							podKeys = keys
+						} else {
+							podKeys = podKeys.Union(keys)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	var unschedulablePods []*framework.QueuedPodInfo
+	if podKeys != nil {
+		// Only check the pods identified by PreQueueingHint.
+		unschedulablePods = make([]*framework.QueuedPodInfo, 0, podKeys.Len())
+		for key := range podKeys {
+			if pInfo, exists := p.unschedulablePods.podInfoMap[key]; exists {
+				if preCheck == nil || preCheck(pInfo.Pod) {
+					unschedulablePods = append(unschedulablePods, pInfo)
+				}
+			}
+		}
+	} else {
+		unschedulablePods = make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
+		for _, pInfo := range p.unschedulablePods.podInfoMap {
+			if preCheck == nil || preCheck(pInfo.Pod) {
+				unschedulablePods = append(unschedulablePods, pInfo)
+			}
 		}
 	}
 	p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
