@@ -579,7 +579,7 @@ func getRestartPolicy(restart string, interactive bool) (corev1.RestartPolicy, e
 	case corev1.RestartPolicyAlways, corev1.RestartPolicyNever, corev1.RestartPolicyOnFailure:
 		return restartPolicy, nil
 	default:
-		return "", fmt.Errorf("invalid restart policy: %s", restart)
+		return "", fmt.Errorf("invalid restart policy: %s, valid values are: %s, %s, %s", restart, corev1.RestartPolicyAlways, corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever)
 	}
 }
 
@@ -591,7 +591,7 @@ func getImagePullPolicy(pullPolicy string) (corev1.PullPolicy, error) {
 	case "":
 		return "", nil
 	default:
-		return "", fmt.Errorf("invalid image pull policy: %s", pullPolicy)
+		return "", fmt.Errorf("invalid image pull policy: %s, valid values are: %s, %s, %s", pullPolicy, corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever)
 	}
 }
 
