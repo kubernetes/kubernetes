@@ -2461,7 +2461,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "preempt-with-permit-plugin", nil)
 
 	ns := testContext.NS.Name
-	lowPriority, highPriority := int32(100), int32(300)
+	lowPriority, midPriority, highPriority := int32(100), int32(150), int32(300)
 	resReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "200m",
 		v1.ResourceMemory: "200",
@@ -2489,7 +2489,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			name:                   "waiting pod is not physically deleted upon preemption",
 			maxNumWaitingPodCalled: 2,
 			runningPod:             st.MakePod().Name("running-pod").Namespace(ns).Priority(lowPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
-			waitingPod:             st.MakePod().Name("waiting-pod").Namespace(ns).Priority(lowPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
+			waitingPod:             st.MakePod().Name("waiting-pod").Namespace(ns).Priority(midPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
 			preemptor:              st.MakePod().Name("preemptor-pod").Namespace(ns).Priority(highPriority).Req(preemptorReq).ZeroTerminationGracePeriod().Obj(),
 		},
 		{
