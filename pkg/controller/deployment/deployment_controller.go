@@ -401,11 +401,18 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 		if err != nil {
 			return
 		}
-		numPods := 0
+		activePods := 0
 		for _, podList := range podMap {
-			numPods += len(podList)
+			for _, pod := range podList {
+				switch pod.Status.Phase {
+				case v1.PodFailed, v1.PodSucceeded:
+					continue
+				default:
+					activePods++
+				}
+			}
 		}
-		if numPods == 0 {
+		if activePods == 0 {
 			dc.enqueueDeployment(d)
 		}
 	}

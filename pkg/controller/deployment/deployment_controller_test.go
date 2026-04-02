@@ -449,6 +449,47 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 	}
 }
 
+// TestPodDeletionWithTerminalPodsEnqueuesRecreateDeployment ensures that the deletion of a pod
+// will requeue a Recreate deployment even if there are terminal pods returned from the
+// client.
+func TestPodDeletionWithTerminalPodsEnqueuesRecreateDeployment(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	f := newFixture(t)
+
+	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+	rs1 := newReplicaSet(foo, "foo-1", 1)
+	rs2 := newReplicaSet(foo, "foo-2", 1)
+	pod1 := generatePodFromRS(rs1) // pod to delete
+	pod2 := generatePodFromRS(rs2) // terminal failed pod
+	pod2.Status.Phase = v1.PodFailed
+	pod3 := generatePodFromRS(rs2) // terminal succeeded pod
+	pod3.Status.Phase = v1.PodSucceeded
+
+	f.dLister = append(f.dLister, foo)
+	f.podLister = append(f.podLister, pod2, pod3)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, foo, rs1, rs2)
+
+	c, _, err := f.newController(ctx)
+	if err != nil {
+		t.Fatalf("error creating Deployment controller: %v", err)
+	}
+	enqueued := false
+	c.enqueueDeployment = func(d *apps.Deployment) {
+		if d.Name == "foo" {
+			enqueued = true
+		}
+	}
+
+	c.deletePod(logger, pod1)
+
+	if !enqueued {
+		t.Errorf("expected deployment %q to be queued after pod deletion, since remaining pods are terminal", foo.Name)
+	}
+}
+
 // TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment ensures that
 // the deletion of a pod will requeue a Recreate deployment iff there is no other
 // pod returned from the client in the case where a deployment has multiple replica
