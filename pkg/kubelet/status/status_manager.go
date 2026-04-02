@@ -61,6 +61,9 @@ type versionedPodStatus struct {
 	// True if the status is generated at the end of SyncTerminatedPod, or after it is completed.
 	podIsFinished bool
 
+	// True if the pod was rejected during admission.
+	podIsRejected bool
+
 	status v1.PodStatus
 }
 
@@ -155,6 +158,7 @@ type Manager interface {
 	AddPodUpdateNotifier(notifier PodUpdateNotifier)
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
+	// This function must be used only for admitted pods.
 	SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
@@ -204,6 +208,13 @@ type Manager interface {
 	// BackfillPodResizeConditions backfills the status manager's resize conditions by reading them from the
 	// provided pods' statuses.
 	BackfillPodResizeConditions(pods []*v1.Pod)
+
+	// SetPodRejected caches the status for a pod and also marks it as rejected.
+	// This function is exclusive for rejected pod status update.
+	SetPodRejected(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool)
+
+	// IsPodRejected returns true if the pod was rejected during admission.
+	IsPodRejected(uid types.UID) bool
 }
 
 const syncPeriod = 10 * time.Second
@@ -471,7 +482,31 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
+	return m.setPodStatusLocked(logger, pod, status, false, &notification)
+}
 
+func (m *manager) SetPodRejected(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool) {
+	var notification *podStatusNotification
+	defer func() {
+		if notification != nil {
+			m.sendNotification(notification)
+		}
+	}()
+
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	return m.setPodStatusLocked(logger, pod, status, true, &notification)
+}
+
+func (m *manager) IsPodRejected(uid types.UID) bool {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	status, ok := m.podStatuses[types.UID(m.podManager.TranslatePodUID(uid))]
+	return ok && status.podIsRejected
+}
+
+// setPodStatusLocked updates the pod status cache. The caller must hold podStatusesLock.
+func (m *manager) setPodStatusLocked(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, podIsRejected bool, notification **podStatusNotification) (v1.PodStatus, bool) {
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 
@@ -481,8 +516,8 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
-	changed, notif := m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil, false)
-	notification = notif
+	changed, notif := m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil, false, podIsRejected)
+	*notification = notif
 
 	return m.podStatuses[pod.UID].status, changed
 }
@@ -554,7 +589,7 @@ func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, co
 	allContainerStatuses := append(status.InitContainerStatuses, status.ContainerStatuses...)
 	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(pod, &oldStatus.status, status.Conditions, allContainerStatuses, status.Phase))
 	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(pod, &oldStatus.status, allContainerStatuses, status.Phase))
-	_, notification = m.updateStatusInternal(logger, pod, status, false, false)
+	_, notification = m.updateStatusInternal(logger, pod, status, false, false, false)
 }
 
 func (m *manager) SetContainerStartup(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
@@ -603,7 +638,7 @@ func (m *manager) SetContainerStartup(logger klog.Logger, podUID types.UID, cont
 	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
 	containerStatus.Started = &started
 
-	_, notification = m.updateStatusInternal(logger, pod, status, false, false)
+	_, notification = m.updateStatusInternal(logger, pod, status, false, false, false)
 }
 
 func findContainerStatus(status *v1.PodStatus, containerID string) (containerStatus *v1.ContainerStatus, init bool, ok bool) {
@@ -704,7 +739,7 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 	}
 
 	logger.V(5).Info("TerminatePod calling updateStatusInternal", "pod", klog.KObj(pod), "podUID", pod.UID)
-	_, notification = m.updateStatusInternal(logger, pod, status, true, true)
+	_, notification = m.updateStatusInternal(logger, pod, status, true, true, false)
 }
 
 // hasPodInitialized returns true if the pod has no evidence of ever starting a regular container, which
@@ -846,7 +881,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, forceUpdate, podIsFinished bool) (bool, *podStatusNotification) {
+func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, forceUpdate, podIsFinished, podIsRejected bool) (bool, *podStatusNotification) {
 	var oldStatus v1.PodStatus
 	cachedStatus, isCached := m.podStatuses[pod.UID]
 	if isCached {
@@ -856,6 +891,10 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 			if cachedStatus.podIsFinished && !podIsFinished {
 				logger.Info("Got unexpected podIsFinished=false, while podIsFinished=true in status cache, programmer error", "pod", klog.KObj(pod))
 				podIsFinished = true
+			}
+			if cachedStatus.podIsRejected && !podIsRejected {
+				logger.Info("Got unexpected podIsRejected=false, while podIsRejected=true in status cache, programmer error", "pod", klog.KObj(pod))
+				podIsRejected = true
 			}
 		}
 	} else if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
@@ -979,6 +1018,7 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		podName:       pod.Name,
 		podNamespace:  pod.Namespace,
 		podIsFinished: podIsFinished,
+		podIsRejected: podIsRejected,
 	}
 
 	// Multiple status updates can be generated before we update the API server,
