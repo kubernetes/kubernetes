@@ -178,13 +178,22 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				Should(HaveAllocatableDevices())
 		})
 
-		framework.It("should deploy pod consuming devices first but fail with admission error after kubelet restart in case device plugin hasn't re-registered", framework.WithFlaky(), func(ctx context.Context) {
+		framework.It("should defer container start after kubelet restart in case device plugin hasn't re-registered", framework.WithFlaky(), func(ctx context.Context) {
 			var err error
 			podCMD := "while true; do sleep 1000; done;"
 
 			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, e2enode.SampleDeviceResourceName))
 
 			pod := makeBusyboxDeviceRequiringPod(e2enode.SampleDeviceResourceName, podCMD)
+			// The CRI sandbox removal below is seen by kubelet as the container
+			// being killed (ContainerStatusUnknown, exit 137). With RestartPolicy=Never
+			// that sends the pod straight to Phase=Failed before we ever reach the
+			// device-plugin defer. Use Always so kubelet attempts a restart and hits
+			// GetDeviceRunContainerOptions.
+			// TODO: add another test to cover the RestartPolicy=Never variant, the
+			// Phase=Failed outcome there is computePodPhase behavior, not a
+			// device-manager decision, but we should still assert it explicitly.
+			pod.Spec.RestartPolicy = v1.RestartPolicyAlways
 			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			ginkgo.By("making sure all the pods are ready")
@@ -243,16 +252,17 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				WithTimeout(5 * time.Minute).
 				Should(HaveAllocatableDevices())
 
-			ginkgo.By("Checking that pod requesting devices failed to start because of admission error")
+			ginkgo.By("Checking that the pod is deferred waiting for the device plugin to report")
 
 			// NOTE: The device plugin won't re-register again and this is intentional.
-			// Because of this, the testpod (requesting a device) should fail with an admission error.
+			// Admission passes on the checkpoint's allocation, but container start is
+			// deferred at GetDeviceRunContainerOptions until the plugin reports.
 
-			gomega.Eventually(ctx, getPod).
+			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, testPod.Name).
 				WithTimeout(time.Minute).
-				Should(HaveFailedWithAdmissionError(),
-					"the pod succeeded to start, when it should fail with the admission error")
+				Should(BeDeferredWaitingForDevicePlugin(),
+					"the pod should be stuck in ContainerCreating with the device-plugin defer message")
 
 			ginkgo.By("removing application pods")
 			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
@@ -396,48 +406,51 @@ func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framewo
 	return true, nil
 }
 
-// HaveFailedWithAdmissionError verifies that a pod fails at admission.
-func HaveFailedWithAdmissionError() types.GomegaMatcher {
-	return gomega.And(
-		gcustom.MakeMatcher(func(hasFailed bool) (bool, error) {
-			if !hasFailed {
-				return false, fmt.Errorf("expected pod to have failed=%t", hasFailed)
+// BeDeferredWaitingForDevicePlugin verifies that a pod has a container in Waiting
+// state with CreateContainerConfigError and the device-plugin defer message. This is
+// the post-checkpoint-trust-bypass behavior: admission passes on the checkpoint's
+// word, but GetDeviceRunContainerOptions blocks container start until the plugin
+// reports. Phase is intentionally not checked — after node reboot it may transition
+// through Running→Pending depending on sync timing; the Waiting reason is the
+// load-bearing signal.
+//
+// TODO: the Message substring match is fragile. KEP-4680's
+// allocatedResourcesStatus[].resources[].health would be the right signal
+// (Unknown = "plugin unregistered and hasn't re-registered"), but
+// UpdateAllocatedResourcesStatus currently defaults to Healthy when allDevices
+// is empty instead of emitting Unknown. Once that's fixed, swap this matcher
+// to check health==Unknown.
+func BeDeferredWaitingForDevicePlugin() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+			return false, fmt.Errorf("expected pod to be non-terminal, got phase %q", pod.Status.Phase)
+		}
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.State.Waiting == nil {
+				continue
 			}
-			return true, nil
-		}),
-		hasFailed(true),
-	)
+			if cs.State.Waiting.Reason == "CreateContainerConfigError" &&
+				strings.Contains(cs.State.Waiting.Message, "has not yet reported devices") {
+				return true, nil
+			}
+		}
+		return false, fmt.Errorf("expected a container waiting with CreateContainerConfigError and device-plugin defer message, got statuses: %+v", pod.Status.ContainerStatuses)
+	}).WithTemplate("expected Pod {{.To}} be deferred waiting for device plugin\nGot instead:\n{{.FormattedActual}}")
 }
 
-// hasFailed matches if pod has failed.
-func hasFailed(hasFailed bool) types.GomegaMatcher {
-	return gcustom.MakeMatcher(func(hasPodFailed bool) (bool, error) {
-		return hasPodFailed == hasFailed, nil
-	}).WithTemplate("expected Pod failed {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasFailed)
+// HaveFailedWithAdmissionError verifies that a pod is in Phase=Failed with
+// Reason=UnexpectedAdmissionError. This is the device-manager admission-reject
+// path: devicesToAllocate fell through to the health checks (no healthy devices
+// / unregistered) before the plugin reported.
+func HaveFailedWithAdmissionError() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase != v1.PodFailed {
+			return false, nil
+		}
+		return pod.Status.Reason == "UnexpectedAdmissionError", nil
+	}).WithTemplate("expected Pod {{.To}} have failed with UnexpectedAdmissionError\nGot instead:\n{{.FormattedActual}}")
 }
 
 func getPodByName(ctx context.Context, f *framework.Framework, podName string) (*v1.Pod, error) {
 	return e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-}
-
-func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
-	pod, err := getPodByName(ctx, f, podName)
-	if err != nil {
-		return false, err
-	}
-
-	expectedStatusReason := "UnexpectedAdmissionError"
-	expectedStatusMessage := "Allocate failed due to no healthy devices present; cannot allocate unhealthy devices"
-
-	// This additional matcher checks for the final error condition.
-	if pod.Status.Phase != v1.PodFailed {
-		return false, fmt.Errorf("expected pod to reach phase %q, got final phase %q instead.", v1.PodFailed, pod.Status.Phase)
-	}
-	if pod.Status.Reason != expectedStatusReason {
-		return false, fmt.Errorf("expected pod status reason to be %q, got %q instead.", expectedStatusReason, pod.Status.Reason)
-	}
-	if !strings.Contains(pod.Status.Message, expectedStatusMessage) {
-		return false, fmt.Errorf("expected pod status reason to contain %q, got %q instead.", expectedStatusMessage, pod.Status.Message)
-	}
-	return true, nil
 }
