@@ -1403,7 +1403,7 @@ func TestSetReflectionOptionsBeforeStart(t *testing.T) {
 		BackoffResetDuration: 1 * time.Minute,
 	}
 
-	if err := informer.SetReflectionOptions(cfg); err != nil {
+	if err := informer.(ReflectionOptionsSetter).SetReflectionOptions(cfg); err != nil {
 		t.Fatalf("expected no error setting reflector config before start, got: %v", err)
 	}
 
@@ -1432,7 +1432,7 @@ func TestSetReflectionOptionsAfterStartReturnsError(t *testing.T) {
 	si.started = true
 	si.startedLock.Unlock()
 
-	if err := informer.SetReflectionOptions(ReflectionOptions{}); err == nil {
+	if err := informer.(ReflectionOptionsSetter).SetReflectionOptions(ReflectionOptions{}); err == nil {
 		t.Error("expected error when setting reflector config after start, got nil")
 	}
 }

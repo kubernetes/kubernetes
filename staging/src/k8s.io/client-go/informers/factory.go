@@ -20,6 +20,7 @@ package informers
 
 import (
 	context "context"
+	"fmt"
 	reflect "reflect"
 	sync "sync"
 	time "time"
@@ -57,15 +58,15 @@ import (
 type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
 
 type sharedInformerFactory struct {
-	client           kubernetes.Interface
-	namespace        string
-	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	lock             sync.Mutex
-	defaultResync    time.Duration
-	customResync     map[reflect.Type]time.Duration
-	transform        cache.TransformFunc
-	informerName     *cache.InformerName
-	reflectionOptions  cache.ReflectionOptions
+	client            kubernetes.Interface
+	namespace         string
+	tweakListOptions  internalinterfaces.TweakListOptionsFunc
+	lock              sync.Mutex
+	defaultResync     time.Duration
+	customResync      map[reflect.Type]time.Duration
+	transform         cache.TransformFunc
+	informerName      *cache.InformerName
+	reflectionOptions cache.ReflectionOptions
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -135,7 +136,6 @@ func WithReflectionOptions(config cache.ReflectionOptions) SharedInformerOption 
 		return factory
 	}
 }
-
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client kubernetes.Interface, defaultResync time.Duration) SharedInformerFactory {
@@ -270,7 +270,11 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	if f.transform != nil {
 		informer.SetTransform(f.transform)
 	}
-	informer.SetReflectionOptions(f.reflectionOptions)
+	if setter, ok := informer.(cache.ReflectionOptionsSetter); ok {
+		if err := setter.SetReflectionOptions(f.reflectionOptions); err != nil {
+			panic(fmt.Sprintf("SetReflectionOptions called on already-started informer: %v", err))
+		}
+	}
 	f.informers[informerType] = informer
 
 	return informer

@@ -243,15 +243,18 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
-	// SetReflectionOptions configures backoff and watch timeout behavior for the
-	// underlying reflector. Must be called before the informer is started.
-	// Calling after start returns an error.
-	SetReflectionOptions(config ReflectionOptions) error
-
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
 	IsStopped() bool
+}
+
+// ReflectionOptionsSetter is an optional interface for SharedInformer implementations if they also should set Reflection Options
+type ReflectionOptionsSetter interface {
+	// SetReflectionOptions configures backoff and watch timeout behavior for the
+	// underlying reflector. Must be called before the informer is started.
+	// Calling after start returns an error.
+	SetReflectionOptions(config ReflectionOptions) error
 }
 
 // ReflectionOptions holds optional configuration for a SharedInformer's underlying Reflector.
