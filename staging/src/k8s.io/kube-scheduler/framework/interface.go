@@ -496,6 +496,11 @@ type EnqueueExtensions interface {
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
 // callbacks to make incremental updates to its supposedly pre-calculated
 // state.
+// Note: In some contexts (e.g., preemption), the passed NodeInfo might be a shared, non-snapshotted
+// instance (especially for remote nodes affected by cross-node victims). Implementations
+// must treat the nodeInfo parameter as read-only and must NOT mutate it (e.g., by calling
+// RemovePod or AddPodInfo). Additionally, plugins that read NodeInfo directly during Filter
+// (rather than CycleState) will observe stale state for those remote nodes.
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
