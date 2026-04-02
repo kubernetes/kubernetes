@@ -159,7 +159,7 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 		}
 		rc, ok = tombstone.Obj.(*v1.ReplicationController)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %#v", tombstone.Obj))
 			return
 		}
 		rs, err := convertRCtoRS(rc, nil)

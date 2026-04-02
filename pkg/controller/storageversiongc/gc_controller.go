@@ -272,7 +272,7 @@ func (c *Controller) onDeleteLease(logger klog.Logger, obj interface{}) {
 		}
 		castObj, ok = tombstone.Obj.(*coordinationv1.Lease)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Lease %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Lease %#v", tombstone.Obj))
 			return
 		}
 	}

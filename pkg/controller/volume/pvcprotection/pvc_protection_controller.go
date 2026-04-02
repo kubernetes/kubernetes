@@ -559,7 +559,7 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", tombstone.Obj))
 			return nil
 		}
 	}

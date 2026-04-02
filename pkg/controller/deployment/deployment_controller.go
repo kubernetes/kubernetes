@@ -221,7 +221,7 @@ func (dc *DeploymentController) deleteDeployment(logger klog.Logger, obj interfa
 		}
 		d, ok = tombstone.Obj.(*apps.Deployment)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", tombstone.Obj))
 			return
 		}
 	}
@@ -348,7 +348,7 @@ func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interfa
 		}
 		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", tombstone.Obj))
 			return
 		}
 	}
@@ -382,7 +382,7 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", tombstone.Obj))
 			return
 		}
 	}

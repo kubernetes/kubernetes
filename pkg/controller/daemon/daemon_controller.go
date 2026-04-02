@@ -327,7 +327,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", tombstone.Obj))
 			return
 		}
 	}
@@ -701,7 +701,7 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", tombstone.Obj))
 			return
 		}
 	}

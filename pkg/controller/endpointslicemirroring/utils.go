@@ -164,7 +164,7 @@ func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
 	}
 	service, ok := tombstone.Obj.(*corev1.Service)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", tombstone.Obj))
 		return nil
 	}
 	return service
@@ -185,7 +185,7 @@ func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
 	}
 	endpoints, ok := tombstone.Obj.(*corev1.Endpoints)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", tombstone.Obj))
 		return nil
 	}
 	return endpoints
@@ -205,7 +205,7 @@ func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice 
 	}
 	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", tombstone.Obj))
 		return nil
 	}
 	return endpointSlice

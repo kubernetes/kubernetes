@@ -530,12 +530,12 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", tombstone.Obj))
 			return
 		}
 	}
@@ -634,12 +634,12 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		jobObj, ok = tombstone.Obj.(*batch.Job)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %#v", tombstone.Obj))
 			return
 		}
 	}
