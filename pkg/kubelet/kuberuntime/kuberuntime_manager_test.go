@@ -25,6 +25,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -6059,4 +6060,351 @@ func TestOnPodSandboxReadyTiming(t *testing.T) {
 	// verify the final state of pod
 	assert.Len(t, fakeRuntime.Sandboxes, 1, "final sandbox count")
 	assert.Len(t, fakeRuntime.Containers, 1, "final container count")
+}
+
+// seedFakeContainersForKill populates the fake runtime with one
+// CONTAINER_RUNNING entry per ContainerStatus in podStatus so StopContainer
+// can succeed against IDs the test crafted by hand.
+func seedFakeContainersForKill(fakeRuntime *apitest.FakeRuntimeService, podStatus *kubecontainer.PodStatus) {
+	var fakes []*apitest.FakeContainer
+	for _, cs := range podStatus.ContainerStatuses {
+		fakes = append(fakes, &apitest.FakeContainer{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:       cs.ID.ID,
+				Metadata: &runtimeapi.ContainerMetadata{Name: cs.Name},
+				State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
+				Image:    &runtimeapi.ImageSpec{Image: "busybox"},
+				ImageRef: "busybox",
+			},
+		})
+	}
+	fakeRuntime.SetFakeContainers(fakes)
+}
+
+// slowStopRuntimeService wraps a FakeRuntimeService and lets a test block
+// StopContainer calls on a per-container barrier and inject per-container
+// errors. It records the wall-clock duration of every StopContainer call so
+// tests can assert that kills overlap in time rather than running serially.
+type slowStopRuntimeService struct {
+	*apitest.FakeRuntimeService
+
+	mu           sync.Mutex
+	blockers     map[string]chan struct{}
+	stopErrors   map[string]error
+	startedAt    map[string]time.Time
+	completedAt  map[string]time.Time
+	stopCallsWg  *sync.WaitGroup
+	stopDelay    time.Duration
+	maxOverlap   int
+	curOverlap   int
+	startCounter int
+}
+
+func newSlowStopRuntimeService(fake *apitest.FakeRuntimeService) *slowStopRuntimeService {
+	return &slowStopRuntimeService{
+		FakeRuntimeService: fake,
+		blockers:           map[string]chan struct{}{},
+		stopErrors:         map[string]error{},
+		startedAt:          map[string]time.Time{},
+		completedAt:        map[string]time.Time{},
+	}
+}
+
+func (s *slowStopRuntimeService) blockOn(containerID string) chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ch := make(chan struct{})
+	s.blockers[containerID] = ch
+	return ch
+}
+
+func (s *slowStopRuntimeService) failOn(containerID string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopErrors[containerID] = err
+}
+
+func (s *slowStopRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+	s.mu.Lock()
+	ch, blocked := s.blockers[containerID]
+	injectErr := s.stopErrors[containerID]
+	delay := s.stopDelay
+	s.startedAt[containerID] = time.Now()
+	s.startCounter++
+	s.curOverlap++
+	if s.curOverlap > s.maxOverlap {
+		s.maxOverlap = s.curOverlap
+	}
+	s.mu.Unlock()
+
+	if blocked {
+		<-ch
+	}
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+
+	s.mu.Lock()
+	s.curOverlap--
+	s.completedAt[containerID] = time.Now()
+	s.mu.Unlock()
+
+	if injectErr != nil {
+		return injectErr
+	}
+	return s.FakeRuntimeService.StopContainer(ctx, containerID, timeout)
+}
+
+// TestSyncPodKillsContainersInParallel verifies the Step 3 kill loop in
+// SyncPod kills multiple containers concurrently rather than serially. The
+// previous sequential implementation made the first-killed container wait
+// for every subsequent kill (and its preStop hook) before its replacement
+// could start; see https://github.com/kubernetes/kubernetes/issues/138146.
+//
+// The test marks three liveness-failed running containers, then blocks the
+// runtime's StopContainer call for all three until every kill is in flight.
+// If kills ran serially the second StopContainer would never start, the
+// barrier would never release, and the test would deadlock and time out.
+func TestSyncPodKillsContainersInParallel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	slow := newSlowStopRuntimeService(fakeRuntime)
+	m.runtimeService = slow
+
+	pod, podStatus := makeBasePodAndStatus()
+	pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+	seedFakeContainersForKill(fakeRuntime, podStatus)
+
+	// Mark all three containers as having failed their liveness probe so
+	// computePodActions populates ContainersToKill with all of them.
+	for _, cs := range podStatus.ContainerStatuses {
+		m.livenessManager.Set(cs.ID, proberesults.Failure, pod)
+	}
+
+	// Block every StopContainer call until released.
+	const totalContainers = 3
+	releaseChans := make([]chan struct{}, totalContainers)
+	for i, cs := range podStatus.ContainerStatuses {
+		releaseChans[i] = slow.blockOn(cs.ID.ID)
+	}
+
+	// Run SyncPod on a goroutine so we can inspect in-flight state.
+	syncDone := make(chan kubecontainer.PodSyncResult, 1)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	go func() {
+		syncDone <- m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	}()
+
+	// Wait until all three StopContainer calls are in flight at once.
+	require.Eventuallyf(t, func() bool {
+		slow.mu.Lock()
+		defer slow.mu.Unlock()
+		return slow.curOverlap == totalContainers
+	}, 10*time.Second, 10*time.Millisecond,
+		"expected %d concurrent in-flight StopContainer calls; the kill loop is serializing them",
+		totalContainers)
+
+	// Release all three.
+	for _, ch := range releaseChans {
+		close(ch)
+	}
+
+	select {
+	case result := <-syncDone:
+		// The kills themselves should not have produced an error.
+		for _, sr := range result.SyncResults {
+			if sr.Action == kubecontainer.KillContainer {
+				assert.NoError(t, sr.Error,
+					"unexpected kill failure for %v: %s", sr.Target, sr.Message)
+			}
+		}
+		// Every container should have a KillContainer SyncResult appended,
+		// regardless of which kill completed first. The previous sequential
+		// implementation returned after the first kill's AddSyncResult call;
+		// the parallel implementation must record all of them so callers
+		// see the full picture.
+		killed := map[string]bool{}
+		for _, sr := range result.SyncResults {
+			if sr.Action == kubecontainer.KillContainer {
+				name, _ := sr.Target.(string)
+				killed[name] = true
+			}
+		}
+		for _, c := range pod.Spec.Containers {
+			assert.Truef(t, killed[c.Name],
+				"missing KillContainer SyncResult for %q; result=%+v", c.Name, result.SyncResults)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("SyncPod did not return after the kill barrier was released")
+	}
+
+	slow.mu.Lock()
+	defer slow.mu.Unlock()
+	assert.Equalf(t, totalContainers, slow.maxOverlap,
+		"expected %d StopContainer calls to overlap; max observed overlap was %d",
+		totalContainers, slow.maxOverlap)
+}
+
+// TestSyncPodKillsRecordsAllResultsWhenOneFails verifies that when one of
+// the parallel Step 3 kills fails, SyncPod still records a SyncResult for
+// every container it attempted to kill. The sequential implementation would
+// return after the first AddSyncResult on the failed kill and drop the
+// remaining containers' results; the parallel implementation must wait for
+// every kill to complete and add all results before returning.
+func TestSyncPodKillsRecordsAllResultsWhenOneFails(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	slow := newSlowStopRuntimeService(fakeRuntime)
+	m.runtimeService = slow
+
+	pod, podStatus := makeBasePodAndStatus()
+	pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+	seedFakeContainersForKill(fakeRuntime, podStatus)
+	for _, cs := range podStatus.ContainerStatuses {
+		m.livenessManager.Set(cs.ID, proberesults.Failure, pod)
+	}
+
+	// Fail the kill for the first container. The other two should still be
+	// stopped and have their KillContainer SyncResult recorded.
+	failingID := podStatus.ContainerStatuses[0].ID.ID
+	slow.failOn(failingID, errors.New("simulated runtime failure"))
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+
+	killResults := map[string]*kubecontainer.SyncResult{}
+	for _, sr := range result.SyncResults {
+		if sr.Action == kubecontainer.KillContainer {
+			name, _ := sr.Target.(string)
+			killResults[name] = sr
+		}
+	}
+
+	// All three containers must have a recorded kill result, regardless of
+	// the order goroutines finished in.
+	for _, c := range pod.Spec.Containers {
+		require.Containsf(t, killResults, c.Name,
+			"missing KillContainer SyncResult for %q (only got %v); the parallel kill loop must record every result before returning",
+			c.Name, killResults)
+	}
+
+	// The failing container's result must carry the kill error.
+	failingResult := killResults[podStatus.ContainerStatuses[0].Name]
+	require.NotNil(t, failingResult)
+	assert.ErrorIs(t, failingResult.Error, kubecontainer.ErrKillContainer)
+	assert.Contains(t, failingResult.Message, "simulated runtime failure")
+}
+
+// TestSyncPodKillScenarioFromIssue138146 reproduces the reporter's scenario
+// from https://github.com/kubernetes/kubernetes/issues/138146 in miniature.
+// Four containers fail liveness simultaneously and each kill takes a fixed
+// simulated grace period. With sequential kills the total time is N*delay;
+// with parallel kills it is ~delay. The test demands the wall-clock to be
+// well under the sequential bound so a regression to serial behavior would
+// fail loudly.
+func TestSyncPodKillScenarioFromIssue138146(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	const (
+		numContainers       = 4
+		perContainerKillDur = 100 * time.Millisecond
+	)
+
+	slow := newSlowStopRuntimeService(fakeRuntime)
+	slow.mu.Lock()
+	slow.stopDelay = perContainerKillDur
+	slow.mu.Unlock()
+	m.runtimeService = slow
+
+	pod, podStatus := make4ContainerLivenessFailedPod()
+	seedFakeContainersForKill(fakeRuntime, podStatus)
+	for _, cs := range podStatus.ContainerStatuses {
+		m.livenessManager.Set(cs.ID, proberesults.Failure, pod)
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	start := time.Now()
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	elapsed := time.Since(start)
+
+	// Every container's kill must have happened and recorded a result.
+	killCount := 0
+	for _, sr := range result.SyncResults {
+		if sr.Action == kubecontainer.KillContainer {
+			killCount++
+			assert.NoError(t, sr.Error, "unexpected kill error for %v", sr.Target)
+		}
+	}
+	assert.Equal(t, numContainers, killCount,
+		"expected %d KillContainer results, got %d (results=%+v)",
+		numContainers, killCount, result.SyncResults)
+
+	slow.mu.Lock()
+	maxOverlap := slow.maxOverlap
+	startCalls := slow.startCounter
+	slow.mu.Unlock()
+	assert.Equal(t, numContainers, startCalls,
+		"all %d containers must reach StopContainer", numContainers)
+	assert.Equal(t, numContainers, maxOverlap,
+		"all %d kills must overlap in time", numContainers)
+
+	// Parallel must finish well under the sequential lower bound. The
+	// sequential implementation would take numContainers*perContainerKillDur;
+	// parallel should take roughly perContainerKillDur. Demand at least a
+	// 2x speedup so flaky scheduling under load doesn't false-fail while
+	// still catching a regression to fully-serial behavior.
+	sequentialBound := numContainers * perContainerKillDur
+	assert.Lessf(t, elapsed, sequentialBound/2,
+		"Step 3 kills took %s; sequential lower bound is %s. Behavior has regressed to serial.",
+		elapsed, sequentialBound)
+	t.Logf("issue #138146 scenario: %d containers, %s per kill -> elapsed %s (sequential bound %s)",
+		numContainers, perContainerKillDur, elapsed, sequentialBound)
+}
+
+// make4ContainerLivenessFailedPod returns a pod and matching PodStatus with
+// four running containers, mirroring the issue #138146 reproduction.
+func make4ContainerLivenessFailedPod() (*v1.Pod, *kubecontainer.PodStatus) {
+	names := []string{"app-a", "app-b", "app-c", "app-d"}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "issue-138146",
+			Name:      "sequential-kill-repro",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+	}
+	statuses := make([]*kubecontainer.Status, 0, len(names))
+	for _, n := range names {
+		c := v1.Container{Name: n, Image: "busybox"}
+		pod.Spec.Containers = append(pod.Spec.Containers, c)
+		statuses = append(statuses, &kubecontainer.Status{
+			ID:    kubecontainer.ContainerID{ID: "id-" + n},
+			Name:  n,
+			State: kubecontainer.ContainerStateRunning,
+			Hash:  kubecontainer.HashContainer(&c),
+		})
+	}
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Id:       "sandbox-id",
+				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+				Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID), Attempt: 0},
+				Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.0.0.1"},
+			},
+		},
+		ContainerStatuses: statuses,
+	}
+	return pod, podStatus
 }
