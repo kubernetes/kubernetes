@@ -28,6 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,14 +163,25 @@ func TestPreemption(t *testing.T) {
 	}
 
 	maxTokens := 1000
+
+	// makePGVictim returns a pause pod with Spec.SchedulingGroup pointing to pgName.
+	makePGVictim := func(conf *testutils.PausePodConfig, pgName string) *v1.Pod {
+		p := initPausePod(conf)
+		p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: &pgName}
+		return p
+	}
+
 	tests := []struct {
-		name                string
-		existingPods        []*v1.Pod
-		pod                 *v1.Pod
-		initTokens          int
-		enablePreFilter     bool
-		unresolvable        bool
-		preemptedPodIndexes map[int]struct{}
+		name                    string
+		existingPods            []*v1.Pod
+		pod                     *v1.Pod
+		initTokens              int
+		enablePreFilter         bool
+		unresolvable            bool
+		preemptedPodIndexes     map[int]struct{}
+		extraNodes              []*v1.Node
+		podGroups               []*schedulingapi.PodGroup
+		podGroupAsVictimEnabled bool
 	}{
 		{
 			name:       "basic pod preemption",
@@ -395,6 +407,100 @@ func TestPreemption(t *testing.T) {
 			}),
 			preemptedPodIndexes: map[int]struct{}{},
 		},
+		{
+			// Gates off: pods are individual victims, only the one on the preemptor's
+			// target node (node1) is evicted; the pod on node2 is left untouched.
+			name:                    "pod group victim across multiple nodes, pod-group-as-victim disabled",
+			initTokens:              maxTokens,
+			podGroupAsVictimEnabled: false,
+			extraNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+					v1.ResourcePods:   "32",
+					v1.ResourceCPU:    "500m",
+					v1.ResourceMemory: "500",
+				}).Label("node", "node2").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "victim-node1",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node1"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					}},
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "victim-node2",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node2"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					}},
+				}),
+			},
+			// Preemptor is pinned to node1; only victim-node1 (index 0) is evicted.
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:         "preemptor-pod",
+				Priority:     &highPriority,
+				NodeSelector: map[string]string{"node": "node1"},
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+				}},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		{
+			// Gates on: the PodGroup is treated as a single atomic victim, so both pods
+			// are evicted as a unit even though pod-group-victim-2 lives on node2.
+			name:                    "pod group victim across multiple nodes, pod-group-as-victim enabled",
+			initTokens:              maxTokens,
+			podGroupAsVictimEnabled: true,
+			extraNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+					v1.ResourcePods:   "32",
+					v1.ResourceCPU:    "500m",
+					v1.ResourceMemory: "500",
+				}).Label("node", "node2").Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Priority(lowPriority).BasicPolicy().
+					DisruptionModeAll().Obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePGVictim(&testutils.PausePodConfig{
+					Name:         "pod-group-victim-1",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node1"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					}},
+				}, "pg1"),
+				makePGVictim(&testutils.PausePodConfig{
+					Name:         "pod-group-victim-2",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node2"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					}},
+				}, "pg1"),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:         "preemptor-pod",
+				Priority:     &highPriority,
+				NodeSelector: map[string]string{"node": "node1"},
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+				}},
+			}),
+			// The entire pod group is evicted as a unit: both index 0 and index 1.
+			preemptedPodIndexes: map[int]struct{}{0: {}, 1: {}},
+		},
 	}
 
 	// Create a node with some resources and a label.
@@ -414,6 +520,7 @@ func TestPreemption(t *testing.T) {
 							features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
 							features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
 							features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+							features.GenericWorkload:                       test.podGroupAsVictimEnabled,
 						})
 
 						testCtx := testutils.InitTestSchedulerWithOptions(t,
@@ -427,8 +534,21 @@ func TestPreemption(t *testing.T) {
 						if _, err := createNode(testCtx.ClientSet, nodeObject); err != nil {
 							t.Fatalf("Error creating node: %v", err)
 						}
+						for _, n := range test.extraNodes {
+							if _, err := createNode(testCtx.ClientSet, n); err != nil {
+								t.Fatalf("Error creating extra node %s: %v", n.Name, err)
+							}
+						}
 
 						cs := testCtx.ClientSet
+						ns := testCtx.NS.Name
+
+						for _, pg := range test.podGroups {
+							pg.Namespace = ns
+							if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+								t.Fatalf("Error creating PodGroup %s: %v", pg.Name, err)
+							}
+						}
 
 						filter.Tokens = test.initTokens
 						filter.EnablePreFilter = test.enablePreFilter
@@ -436,14 +556,14 @@ func TestPreemption(t *testing.T) {
 						pods := make([]*v1.Pod, len(test.existingPods))
 						// Create and run existingPods.
 						for i, p := range test.existingPods {
-							p.Namespace = testCtx.NS.Name
+							p.Namespace = ns
 							pods[i], err = runPausePod(cs, p)
 							if err != nil {
 								t.Fatalf("Error running pause pod: %v", err)
 							}
 						}
 						// Create the "pod".
-						test.pod.Namespace = testCtx.NS.Name
+						test.pod.Namespace = ns
 						preemptor, err := createPausePod(cs, test.pod)
 						if err != nil {
 							t.Errorf("Error while creating high priority pod: %v", err)
@@ -463,8 +583,15 @@ func TestPreemption(t *testing.T) {
 								if cond == nil {
 									t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 								}
-							} else if p.DeletionTimestamp != nil {
-								t.Errorf("Didn't expect pod %v to get preempted.", p.Name)
+							} else {
+								// Re-fetch to get current state; the pod object from runPausePod
+								// always has DeletionTimestamp=nil and cannot detect unexpected eviction.
+								current, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+								if err != nil {
+									t.Errorf("Error getting pod %v: %v", p.Name, err)
+								} else if current.DeletionTimestamp != nil {
+									t.Errorf("Pod %v was unexpectedly preempted", p.Name)
+								}
 							}
 						}
 						// Also check that the preemptor pod gets the NominatedNodeName field set.
