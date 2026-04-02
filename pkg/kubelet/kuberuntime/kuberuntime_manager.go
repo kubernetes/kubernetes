@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -1484,15 +1485,38 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
+		// Kill containers in parallel so that a container whose kill completes
+		// quickly is not blocked from restarting by slow-to-terminate siblings.
+		// All kills run to completion before this step returns so every
+		// container's SyncResult is recorded, matching the pattern used by
+		// killContainersWithSyncResult for the whole-pod teardown path.
+		containerResults := make(chan *kubecontainer.SyncResult, len(podContainerChanges.ContainersToKill))
+		wg := sync.WaitGroup{}
+		wg.Add(len(podContainerChanges.ContainersToKill))
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-				return
+			go func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) {
+				defer utilruntime.HandleCrashWithContext(ctx)
+				defer wg.Done()
+				logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+				if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+					logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				}
+				containerResults <- killContainerResult
+			}(containerID, containerInfo)
+		}
+		wg.Wait()
+		close(containerResults)
+		var killErr error
+		for containerResult := range containerResults {
+			result.AddSyncResult(containerResult)
+			if containerResult.Error != nil && killErr == nil {
+				killErr = containerResult.Error
 			}
+		}
+		if killErr != nil {
+			return
 		}
 
 		// Removes the containers if they are marked for removal (for in-place restart)
