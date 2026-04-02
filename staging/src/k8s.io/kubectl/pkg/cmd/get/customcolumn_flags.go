@@ -39,7 +39,6 @@ var columnsFormats = map[string]bool{
 type CustomColumnsPrintFlags struct {
 	NoHeaders        bool
 	TemplateArgument string
-	LabelColumns     []string
 }
 
 func (f *CustomColumnsPrintFlags) AllowedFormats() []string {
@@ -86,10 +85,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (printers.Res
 	// UniversalDecoder call must specify parameter versions; otherwise it will decode to internal versions.
 	decoder := scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	var (
-		err     error
-		printer *CustomColumnsPrinter
-	)
+	var printer *CustomColumnsPrinter
 	if templateFormat == "custom-columns-file" {
 		file, err := os.Open(templateValue)
 		if err != nil {
@@ -97,17 +93,10 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (printers.Res
 		}
 		defer file.Close()
 		printer, err = NewCustomColumnsPrinterFromTemplate(file, decoder)
-	} else {
-		printer, err = NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
+		return printer, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
-	if err := appendLabelColumnsToCustomColumns(printer, f.LabelColumns); err != nil {
-		return nil, err
-	}
-	return printer, nil
+	return NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
 }
 
 // AddFlags receives a *cobra.Command reference and binds
@@ -121,34 +110,5 @@ func NewCustomColumnsPrintFlags() *CustomColumnsPrintFlags {
 	return &CustomColumnsPrintFlags{
 		NoHeaders:        false,
 		TemplateArgument: "",
-		LabelColumns:     nil,
 	}
-}
-
-func appendLabelColumnsToCustomColumns(printer *CustomColumnsPrinter, labelColumns []string) error {
-	if printer == nil || len(labelColumns) == 0 {
-		return nil
-	}
-	for _, label := range labelColumns {
-		spec, err := RelaxedJSONPathExpression(fmt.Sprintf(".metadata.labels.%s", escapeJSONPathLabelKey(label)))
-		if err != nil {
-			return err
-		}
-		printer.Columns = append(printer.Columns, Column{
-			Header:    formatLabelHeader(label),
-			FieldSpec: spec,
-		})
-	}
-	return nil
-}
-
-func formatLabelHeader(label string) string {
-	parts := strings.Split(label, "/")
-	return strings.ToUpper(parts[len(parts)-1])
-}
-
-func escapeJSONPathLabelKey(label string) string {
-	label = strings.ReplaceAll(label, "\\", "\\\\")
-	label = strings.ReplaceAll(label, ".", "\\.")
-	return label
 }

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -135,47 +134,5 @@ func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 				t.Errorf("unexpected output: expecting %q, got %q", tc.expectedOutput, out.String())
 			}
 		})
-	}
-}
-
-func TestCustomColumnsPrinterAppendsLabelColumns(t *testing.T) {
-	testObject := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				"kubernetes.io/metadata.name": "label-foo",
-				"app":                         "demo",
-			},
-		},
-	}
-
-	printFlags := CustomColumnsPrintFlags{
-		TemplateArgument: "NAME:.metadata.name",
-		LabelColumns:     []string{"kubernetes.io/metadata.name", "app"},
-	}
-
-	p, err := printFlags.ToPrinter("custom-columns")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	out := bytes.NewBuffer([]byte{})
-	if err := p.PrintObj(testObject, out); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) < 2 {
-		t.Fatalf("expected headers and one data row, got %q", out.String())
-	}
-
-	headers := strings.Fields(lines[0])
-	if !reflect.DeepEqual(headers, []string{"NAME", "METADATA.NAME", "APP"}) {
-		t.Fatalf("unexpected headers: %v", headers)
-	}
-
-	values := strings.Fields(lines[1])
-	if !reflect.DeepEqual(values, []string{"foo", "label-foo", "demo"}) {
-		t.Fatalf("unexpected values: %v", values)
 	}
 }
