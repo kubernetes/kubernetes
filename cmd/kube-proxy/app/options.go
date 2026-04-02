@@ -363,7 +363,6 @@ func (o *Options) Validate() error {
 
 // Run runs the specified ProxyServer.
 func (o *Options) Run(ctx context.Context) error {
-	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
@@ -394,15 +393,21 @@ func (o *Options) runLoop(ctx context.Context) error {
 		o.watcher.Run(ctx)
 	}
 
+	proxyErrCh := make(chan error, 1)
 	// run the proxy in goroutine
 	go func() {
-		err := o.proxyServer.Run(ctx)
-		o.errCh <- err
+		proxyErrCh <- o.proxyServer.Run(ctx)
 	}()
 
 	for {
-		err := <-o.errCh
-		if err != nil {
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-o.errCh:
+			if err != nil {
+				return err
+			}
+		case err := <-proxyErrCh:
 			return err
 		}
 	}
