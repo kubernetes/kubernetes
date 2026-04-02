@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -102,14 +101,23 @@ type ManagerImpl struct {
 	// init containers.
 	devicesToReuse PodReusableDevices
 
-	// containerMap provides a mapping from (pod, container) -> containerID
-	// for all containers in a pod. Used to detect pods running across a restart
-	containerMap containermap.ContainerMap
+	// pluginReportedSet tracks which resource names have received at least one ListAndWatch
+	// response from their device plugin since this kubelet started. Used to distinguish
+	// "plugin has not reconnected yet after kubelet restart" (trust the checkpoint) from
+	// "plugin has reported and healthyDevices is authoritative" (apply health checks).
+	// readCheckpoint initializes healthyDevices to an empty set — indistinguishable from
+	// a live plugin reporting all-unhealthy without this signal.
+	pluginReportedSet sets.Set[string]
 
-	// containerRunningSet identifies which container among those present in `containerMap`
-	// was reported running by the container runtime when `containerMap` was computed.
-	// Used to detect pods running across a restart
-	containerRunningSet sets.Set[string]
+	// currentBootID is the kernel boot_id observed at kubelet startup. It is
+	// persisted in the checkpoint so a future kubelet can distinguish a
+	// kubelet-only restart (boot_id unchanged) from a node reboot.
+	currentBootID string
+
+	// nodeRebooted is true when Start() determines the node rebooted since the
+	// checkpoint was written. When true, devicesToAllocate falls through to the
+	// existing health checks instead of trusting the checkpoint.
+	nodeRebooted bool
 
 	// update channel for device health updates
 	update chan resourceupdates.Update
@@ -129,7 +137,7 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store, bootID string) (*ManagerImpl, error) {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
@@ -137,10 +145,10 @@ func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologym
 	if runtime.GOOS == "windows" {
 		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
 	}
-	return newManagerImpl(logger, socketPath, topology, topologyAffinityStore)
+	return newManagerImpl(logger, socketPath, topology, topologyAffinityStore, bootID)
 }
 
-func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store, bootID string) (*ManagerImpl, error) {
 	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
 
 	var numaNodes []int
@@ -155,11 +163,17 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		healthyDevices:        make(map[string]sets.Set[string]),
 		unhealthyDevices:      make(map[string]sets.Set[string]),
 		allocatedDevices:      make(map[string]sets.Set[string]),
+		pluginReportedSet:     sets.New[string](),
 		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
+		currentBootID:         bootID,
 		devicesToReuse:        make(PodReusableDevices),
 		update:                make(chan resourceupdates.Update, 100),
+	}
+
+	if bootID == "" {
+		logger.Info("Device manager: cadvisor returned empty boot_id; reboot detection will fall back to the CRI startup snapshot on every restart")
 	}
 
 	server, err := plugin.NewServer(logger, socketPath, manager, manager)
@@ -264,9 +278,16 @@ func (m *ManagerImpl) PluginListAndWatchReceiver(logger klog.Logger, resourceNam
 	m.genericDeviceUpdateCallback(logger, resourceName, resp.Devices)
 }
 
+func (m *ManagerImpl) hasPluginReported(resource string) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.pluginReportedSet.Has(resource)
+}
+
 func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {
 	healthyCount := 0
 	m.mutex.Lock()
+	m.pluginReportedSet.Insert(resourceName)
 	m.healthyDevices[resourceName] = sets.New[string]()
 	m.unhealthyDevices[resourceName] = sets.New[string]()
 	oldDevices := m.allDevices[resourceName]
@@ -337,21 +358,38 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainerRunningSet sets.Set[string]) error {
 	logger.V(2).Info("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
-	m.containerMap = initialContainers
-	m.containerRunningSet = initialContainerRunningSet
 
 	// Loads in allocatedDevices information from disk.
-	err := m.readCheckpoint(logger)
+	checkpointBootID, err := m.readCheckpoint(logger)
 	if err != nil {
 		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
+	// nodeRebooted gates the checkpoint-trust bypass in devicesToAllocate; see detectNodeReboot.
+	nodeRebooted := detectNodeReboot(checkpointBootID, m.currentBootID, initialContainerRunningSet.Len())
+	m.mutex.Lock()
+	m.nodeRebooted = nodeRebooted
+	m.mutex.Unlock()
+	logger.V(2).Info("Device manager reboot detection", "nodeRebooted", nodeRebooted, "checkpointBootID", checkpointBootID, "currentBootID", m.currentBootID, "runningContainersAtStartup", initialContainerRunningSet.Len())
+
 	return m.server.Start(logger)
+}
+
+// detectNodeReboot decides whether the node rebooted since the on-disk
+// checkpoint was written. A boot_id mismatch is authoritative. When the
+// checkpoint has no boot_id (written by an older kubelet, or no checkpoint),
+// fall back to the CRI startup snapshot: any running container implies the
+// runtime survived, i.e. a kubelet-only restart.
+func detectNodeReboot(checkpointBootID, currentBootID string, runningContainersAtStartup int) bool {
+	if checkpointBootID == "" {
+		return runningContainersAtStartup == 0
+	}
+	return checkpointBootID != currentBootID
 }
 
 // Stop is the function that can stop the plugin server.
@@ -483,6 +521,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		delete(m.endpoints, resourceName)
 		delete(m.healthyDevices, resourceName)
 		delete(m.unhealthyDevices, resourceName)
+		m.pluginReportedSet.Delete(resourceName)
 	}
 
 	m.mutex.Unlock()
@@ -503,7 +542,7 @@ func (m *ManagerImpl) writeCheckpoint(logger klog.Logger) error {
 		registeredDevs[resource] = devices.UnsortedList()
 	}
 	data := checkpoint.New(m.podDevices.toCheckpointData(logger),
-		registeredDevs)
+		registeredDevs, m.currentBootID)
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
@@ -516,16 +555,17 @@ func (m *ManagerImpl) writeCheckpoint(logger klog.Logger) error {
 }
 
 // Reads device to container allocation information from disk, and populates
-// m.allocatedDevices accordingly.
-func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
+// m.allocatedDevices accordingly. Returns the boot_id stored in the
+// checkpoint (or "" if absent / no checkpoint).
+func (m *ManagerImpl) readCheckpoint(logger klog.Logger) (string, error) {
 	cp, err := m.getCheckpoint()
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
 			// no point in trying anything else
 			logger.Error(err, "Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
-			return nil
+			return "", nil
 		}
-		return err
+		return "", err
 	}
 
 	m.mutex.Lock()
@@ -542,13 +582,13 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 	}
 
 	logger.V(4).Info("Read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
-	return nil
+	return cp.GetBootID(), nil
 }
 
 func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error) {
 	registeredDevs := make(map[string][]string)
 	devEntries := make([]checkpoint.PodDevicesEntry, 0)
-	cp := checkpoint.New(devEntries, registeredDevs)
+	cp := checkpoint.New(devEntries, registeredDevs, "")
 	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
 	return cp, err
 }
@@ -603,16 +643,22 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	// 3. node reboot. In this scenario device plugins may not be running yet when we try to allocate devices.
 	//    note: if we get this far the runtime is surely running. This is usually enforced at OS level by startup system services dependencies.
 
-	// First we take care of the exceptional flow (scenarios 2 and 3). In both flows, kubelet is reinitializing, and while kubelet is initializing, sources are NOT all ready.
-	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
-	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
-	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(logger, podUID, contName) {
-		logger.V(3).Info("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+	// First we take care of the exceptional flow. On a kubelet-only restart (scenario 2), if the device plugin for this resource has not
+	// yet sent a ListAndWatch response since this kubelet started and the checkpoint has a prior allocation, trust the checkpoint: the
+	// container is still running with its devices, and GetDeviceRunContainerOptions defers any new container start until the plugin
+	// reports (preserving the #109595 invariant). This deliberately does not consult per-container CRI runtime state — the startup
+	// snapshot is fragile (transient errors, container-restart ID races; see #118559).
+	//
+	// On a node reboot (scenario 3), nodeRebooted is true and we fall through to the health checks below, matching the pre-existing
+	// behaviour: admission fails until the plugin reports, and the controller recreates the pod with a fresh allocation.
+	// m.mutex is held; safe to read m.pluginReportedSet directly.
+	checkpointTrusted := devices != nil && !m.nodeRebooted && !m.pluginReportedSet.Has(resource)
+	if checkpointTrusted {
+		logger.V(3).Info("Device plugin has not yet reported and checkpoint has allocation; trusting checkpoint", "resourceName", resource, "podUID", podUID, "containerName", contName)
 		return nil, nil
 	}
 
-	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
+	// From here on, healthyDevices is authoritative: the plugin has reported, or the checkpoint had no allocation for this pod/container.
 	logger.V(3).Info("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 	healthyDevices, hasRegistered := m.healthyDevices[resource]
 
@@ -965,6 +1011,11 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 		if !m.isDevicePluginResource(resource) || v.Value() == 0 {
 			continue
 		}
+		// Defer container start until the plugin reports so we never serve stale checkpoint mounts.
+		// Surfaces as waiting reason CreateContainerConfigError; kubelet retries on the next syncPod.
+		if !m.hasPluginReported(resource) {
+			return nil, fmt.Errorf("device plugin for resource %s has not yet reported devices; deferring container start (will retry)", resource)
+		}
 		err := m.callPreStartContainerIfNeeded(ctx, podUID, contName, resource)
 		if err != nil {
 			return nil, err
@@ -1206,39 +1257,4 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 		return false
 	}
 	return len(checkpoints) == 0
-}
-
-func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntName string) bool {
-	// Check if ANY container for this pod/container name is running.
-	// This handles the case where a container restarted before kubelet restart,
-	// so the containerMap might have multiple entries (old exited + new running).
-	// We need to check all of them to see if any are running.
-	//
-	// Note: if container runtime is down when kubelet restarts, containerRunningSet will be empty,
-	// so containers will fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559.
-	// This scenario should however be rare enough.
-	foundAnyContainer := false
-	foundRunningContainer := false
-
-	m.containerMap.Visit(func(visitPodUID, visitContainerName, visitContainerID string) {
-		if visitPodUID == podUID && visitContainerName == cntName {
-			foundAnyContainer = true
-			if m.containerRunningSet.Has(visitContainerID) {
-				foundRunningContainer = true
-				logger.V(4).Info("Container found in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", visitContainerID)
-			}
-		}
-	})
-
-	if !foundAnyContainer {
-		logger.V(4).Info("Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
-		return false
-	}
-
-	if !foundRunningContainer {
-		logger.V(4).Info("Container found in map but not in running set", "podUID", podUID, "containerName", cntName)
-		return false
-	}
-
-	return true
 }

@@ -28,6 +28,7 @@ import (
 type DeviceManagerCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetData() ([]PodDevicesEntry, map[string][]string)
+	GetBootID() string
 }
 
 // DevicesPerNUMA represents device ids obtained from device plugin per NUMA node id
@@ -54,6 +55,11 @@ type checkpointData struct {
 type Data struct {
 	Data     checkpointData
 	Checksum checksum.Checksum
+	// BootID is the kernel boot_id at the time this checkpoint was written.
+	// Stored outside checkpointData so that adding it does not invalidate the
+	// checksum of checkpoints written by older kubelets (which unmarshal with
+	// BootID == "").
+	BootID string `json:",omitempty"`
 }
 
 // NewDevicesPerNUMA is a function that creates DevicesPerNUMA map
@@ -73,16 +79,17 @@ func (dev DevicesPerNUMA) Devices() sets.Set[string] {
 }
 
 // New returns an instance of Checkpoint - must be an alias for the most recent version
-func New(devEntries []PodDevicesEntry, devices map[string][]string) DeviceManagerCheckpoint {
-	return newV2(devEntries, devices)
+func New(devEntries []PodDevicesEntry, devices map[string][]string, bootID string) DeviceManagerCheckpoint {
+	return newV2(devEntries, devices, bootID)
 }
 
-func newV2(devEntries []PodDevicesEntry, devices map[string][]string) DeviceManagerCheckpoint {
+func newV2(devEntries []PodDevicesEntry, devices map[string][]string, bootID string) DeviceManagerCheckpoint {
 	return &Data{
 		Data: checkpointData{
 			PodDeviceEntries:  devEntries,
 			RegisteredDevices: devices,
 		},
+		BootID: bootID,
 	}
 }
 
@@ -106,4 +113,10 @@ func (cp *Data) VerifyChecksum() error {
 // checkpoint format, *not* in the original format stored on disk.
 func (cp *Data) GetData() ([]PodDevicesEntry, map[string][]string) {
 	return cp.Data.PodDeviceEntries, cp.Data.RegisteredDevices
+}
+
+// GetBootID returns the kernel boot_id recorded when the checkpoint was written.
+// Returns "" for checkpoints written by kubelets that predate this field.
+func (cp *Data) GetBootID() string {
+	return cp.BootID
 }
