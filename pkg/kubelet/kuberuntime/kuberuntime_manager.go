@@ -848,17 +848,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup cpu config for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
-	// When the pod container manager does not manage pod-level cgroups
-	// (e.g. cgroupsPerQOS=false), GetPodCgroupConfig returns nil.
-	// Default to the desired values so resizeContainers sees no pod-level
-	// diff and skips pod cgroup writes, while container updates still proceed.
-	if currentPodMemoryConfig == nil {
-		currentPodMemoryConfig = &cm.ResourceConfig{Memory: podResources.Memory}
-	}
-	if currentPodCPUConfig == nil {
-		currentPodCPUConfig = &cm.ResourceConfig{CPUQuota: podResources.CPUQuota, CPUShares: podResources.CPUShares}
-	}
-
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
@@ -1015,7 +1004,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// partially actuated.
 	defer m.runtimeHelper.RequestPodReinspect(pod.UID)
 
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	if (len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources) && currentPodMemoryConfig != nil {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
 			// TODO(#128675): This does not support removing limits.
@@ -1032,8 +1021,16 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
 		}
+	} else if currentPodMemoryConfig == nil && len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 {
+		// Pod-level cgroup not managed (e.g. cgroupsPerQOS=false). Skip pod
+		// cgroup updates but still resize containers directly.
+		if err := m.updatePodContainerResources(ctx, pod, v1.ResourceMemory, podContainerChanges.ContainersToUpdate[v1.ResourceMemory]); err != nil {
+			logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceMemory)
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+			return resizeResult
+		}
 	}
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	if (len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources) && currentPodCPUConfig != nil {
 		if podResources.CPUShares == nil {
 			// This shouldn't happen: ResourceConfigForPod always returns a non-nil value for CPUShares.
 			logger.Error(nil, "podResources.CPUShares is nil", "pod", pod.Name)
@@ -1061,6 +1058,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		if errResize := resizeContainers(v1.ResourceCPU, currentCPUQuota, desiredCPUQuota,
 			currentCPUShares, int64(*podResources.CPUShares)); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
+			return resizeResult
+		}
+	} else if currentPodCPUConfig == nil && len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 {
+		// Pod-level cgroup not managed (e.g. cgroupsPerQOS=false). Skip pod
+		// cgroup updates but still resize containers directly.
+		if err := m.updatePodContainerResources(ctx, pod, v1.ResourceCPU, podContainerChanges.ContainersToUpdate[v1.ResourceCPU]); err != nil {
+			logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", v1.ResourceCPU)
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
 			return resizeResult
 		}
 	}
