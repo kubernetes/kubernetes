@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -98,6 +99,8 @@ type Manager interface {
 type manager struct {
 	//Topology Manager Scope
 	scope Scope
+	// NUMA nodes available to topology-aware hint providers.
+	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -128,6 +131,7 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
 	Name() string
+	GetNUMANodeIDs() []int
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
@@ -180,7 +184,12 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 
 	logger.Info("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
 
-	numaInfo, err := NewNUMAInfo(topology, opts)
+	effectiveTopology := topology
+	if opts.RestrictToCPUNUMANodes {
+		effectiveTopology = filterTopologyToCPUNUMANodes(topology)
+	}
+
+	numaInfo, err := NewNUMAInfo(effectiveTopology, opts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
@@ -219,12 +228,36 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	}
 
 	manager := &manager{
-		scope: scope,
+		scope:     scope,
+		numaNodes: extractNUMANodes(effectiveTopology),
 	}
 
 	manager.initializeMetrics()
 
 	return manager, nil
+}
+
+func filterTopologyToCPUNUMANodes(topology []cadvisorapi.Node) []cadvisorapi.Node {
+	filtered := make([]cadvisorapi.Node, 0, len(topology))
+	for _, node := range topology {
+		if len(node.Cores) == 0 {
+			continue
+		}
+		filtered = append(filtered, node)
+	}
+	if len(filtered) == 0 {
+		return topology
+	}
+	return filtered
+}
+
+func extractNUMANodes(topology []cadvisorapi.Node) []int {
+	numaNodes := make([]int, 0, len(topology))
+	for _, node := range topology {
+		numaNodes = append(numaNodes, node.Id)
+	}
+	sort.Ints(numaNodes)
+	return numaNodes
 }
 
 func (m *manager) initializeMetrics() {
@@ -245,6 +278,10 @@ func (m *manager) GetPolicy() Policy {
 
 func (m *manager) Name() string {
 	return m.scope.Name()
+}
+
+func (m *manager) GetNUMANodeIDs() []int {
+	return append([]int{}, m.numaNodes...)
 }
 
 func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {

@@ -75,6 +75,18 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 		},
 		{
+			description:       "return TopologyManagerOptions with RestrictToCPUNUMANodes set to true",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  8,
+				RestrictToCPUNUMANodes: true,
+			},
+			policyOptions: map[string]string{
+				RestrictToCPUNUMANodes: "true",
+			},
+		},
+		{
 			description:       "fail to parse options with error PreferClosestNUMANodes",
 			featureGateEnable: true,
 			policyOptions: map[string]string{
@@ -179,6 +191,10 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 			option:            MaxAllowableNUMANodes,
 			expectedAvailable: true,
 		},
+		{
+			option:            RestrictToCPUNUMANodes,
+			expectedAvailable: false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -234,6 +250,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: true,
 			expectedAvailable: true,
+		},
+		{
+			option:            RestrictToCPUNUMANodes,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            RestrictToCPUNUMANodes,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
 		},
 		{
 			option:            fancyAlphaOption,
