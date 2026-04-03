@@ -174,6 +174,38 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	getStorageCount = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_get_total",
+			Help:           "Number of GET requests served from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	getStorageNumFetched = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_get_fetched_objects_total",
+			Help:           "Number of objects read from storage in the course of serving a GET request",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	getStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_get_evaluated_objects_total",
+			Help:           "Number of objects tested in the course of serving a GET request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	getStorageNumReturned = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_get_returned_objects_total",
+			Help:           "Number of objects returned for a GET request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 	decodeErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      "apiserver",
@@ -207,6 +239,10 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
+		legacyregistry.MustRegister(getStorageCount)
+		legacyregistry.MustRegister(getStorageNumFetched)
+		legacyregistry.MustRegister(getStorageNumSelectorEvals)
+		legacyregistry.MustRegister(getStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
 	})
 }
@@ -303,6 +339,14 @@ func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, nu
 	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+}
+
+// RecordStorageGetMetrics notes various metrics of the cost to serve a GET request
+func RecordStorageGetMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
+	getStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+	getStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
+	getStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
+	getStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
 }
 
 type Monitor interface {

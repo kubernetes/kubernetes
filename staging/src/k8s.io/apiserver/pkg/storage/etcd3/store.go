@@ -243,6 +243,12 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+
+	numFetched, numReturned := 0, 0
+	defer func() {
+		metrics.RecordStorageGetMetrics(s.groupResource, numFetched, 0, numReturned)
+	}()
+
 	if err != nil {
 		return err
 	}
@@ -257,6 +263,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return storage.NewKeyNotFoundError(preparedKey, 0)
 	}
 
+	numFetched = 1
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
 		return storage.NewInternalError(err)
@@ -267,6 +274,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		recordDecodeError(s.groupResource, preparedKey)
 		return err
 	}
+	numReturned = 1
 	return nil
 }
 
@@ -771,11 +779,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var getResp kubernetes.ListResponse
 	var numFetched int
 	var numEvald int
-	// Because these metrics are for understanding the costs of handling LIST requests,
+	// Because these metrics are for understanding the costs of handling requests,
 	// get them recorded even in error cases.
+	// Non-recursive lists are essentially GET point queries, so we record them as GET operations.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
+		if opts.Recursive {
+			metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
+		} else {
+			metrics.RecordStorageGetMetrics(s.groupResource, numFetched, numEvald, numReturn)
+		}
 	}()
 
 	aggregator := s.listErrAggrFactory()
