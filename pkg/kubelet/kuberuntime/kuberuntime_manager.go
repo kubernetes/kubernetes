@@ -486,8 +486,8 @@ func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOption
 	if err != nil {
 		return nil, err
 	}
-	// Sort sandboxes by creation time, newest first.
-	sort.Sort(podSandboxByCreatedThenID(sandboxes))
+	// Sort sandboxes by attempt then creation time then Id.
+	sort.Sort(podSandboxSort(sandboxes))
 	for i := range sandboxes {
 		s := sandboxes[i]
 		if s.Metadata == nil {
@@ -523,7 +523,7 @@ func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOption
 	// To avoid unexpected behavior on container name based search (for example
 	// by calling *Kubelet.findContainer() without specifying a pod ID), we
 	// return the list of pods ordered by their creation time.
-	sort.Sort(containerByCreatedThenID(containers))
+	sort.Sort(containerSort(containers))
 	for i := range containers {
 		c := containers[i]
 		if c.Metadata == nil {
@@ -1981,7 +1981,7 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(ctx, podUID, status))
 	}
 
-	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
+	sort.Sort(containerStatusSort(kubeContainerStatuses))
 
 	return &kubecontainer.PodStatus{
 		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
