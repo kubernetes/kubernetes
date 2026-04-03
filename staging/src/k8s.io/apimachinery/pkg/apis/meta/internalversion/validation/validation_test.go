@@ -71,6 +71,13 @@ func TestValidateListOptions(t *testing.T) {
 			Watch: true,
 		},
 	}, {
+		name: "watch-with-limit-forbidden",
+		opts: internalversion.ListOptions{
+			Watch: true,
+			Limit: 100,
+		},
+		expectErrors: []string{"limit: Forbidden: limit is forbidden for watch"},
+	}, {
 		name: "valid-watch-sendInitialEvents-on",
 		opts: internalversion.ListOptions{
 			Watch:                true,
