@@ -8,7 +8,7 @@ spec:
     operator: Exists
     effect: NoSchedule
   containers:
-  - image: registry.k8s.io/pause:3.10.1
+  - image: registry.k8s.io/pause:3.10.2
     name: pause
     resources:
       requests:
