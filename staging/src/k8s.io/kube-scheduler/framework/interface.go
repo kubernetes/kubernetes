@@ -906,6 +906,9 @@ type PodActivator interface {
 	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
+	// Requeue moves the given pods from unschedulablePods to either activeQ or backoffQ
+	// depending on their backoff status.
+	Requeue(logger klog.Logger, pods []*v1.Pod)
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.

@@ -104,6 +104,9 @@ type SchedulingQueue interface {
 	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
+	// Requeue moves the given pods from unschedulablePods to either activeQ or backoffQ
+	// depending on their backoff status.
+	Requeue(logger klog.Logger, pods []*v1.Pod)
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
 	// returned by calling SchedulingCycle().
@@ -761,6 +764,43 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	if activated {
 		p.activeQ.broadcast()
 	}
+}
+
+// Requeue moves the given pods from unschedulablePods to either activeQ or backoffQ
+// depending on their backoff status. If any pod was successfully moved, it broadcasts
+// to activeQ to wake up waiting goroutines.
+func (p *PriorityQueue) Requeue(logger klog.Logger, pods []*v1.Pod) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	activated := false
+	for _, pod := range pods {
+		if p.requeue(logger, pod) {
+			activated = true
+		}
+	}
+
+	if activated {
+		p.activeQ.broadcast()
+	}
+}
+
+// requeue attempts to move a pod from unschedulablePods to either backoffQ or activeQ
+// depending on its backoff status. It returns true if the pod was successfully moved
+// to activeQ, and false otherwise.
+func (p *PriorityQueue) requeue(logger klog.Logger, pod *v1.Pod) bool {
+	pInfo := p.unschedulablePods.get(pod)
+	if pInfo == nil {
+		return false
+	}
+
+	// If the pod is backing off, move it to backoffQ.
+	if p.backoffQ.isPodBackingoff(pInfo) {
+		addedToBackoffQ := p.moveToBackoffQ(logger, pInfo, framework.ForceRequeue)
+		return addedToBackoffQ && p.isPopFromBackoffQEnabled
+	}
+
+	return p.moveToActiveQ(logger, pInfo, framework.ForceRequeue, false)
 }
 
 func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {

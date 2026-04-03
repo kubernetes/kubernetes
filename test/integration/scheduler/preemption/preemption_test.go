@@ -533,6 +533,12 @@ func TestAsyncPreemption(t *testing.T) {
 		// verifyPodInUnschedulable waits for some time and confirms that the given pod is in the unschedulable pool.
 		// The value is the name of the checked pod.
 		verifyPodInUnschedulable string
+		// verifyPodInActiveQ waits for some time and confirms that the given pod is in the active queue.
+		// The value is the name of the checked pod.
+		verifyPodInActiveQ string
+		// verifyPodNominated checks if the given Pod has NominatedNodeName set.
+		// The value is the name of the checked pod.
+		verifyPodNominated string
 	}
 
 	tests := []struct {
@@ -1208,6 +1214,61 @@ func TestAsyncPreemption(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "preemptor nomination cleared by another preemption triggers re-queue",
+			scenarios: []scenario{
+				{
+					name: "create victim Pod blocked in binding",
+					createPod: &createPod{
+						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					name: "schedule victim Pod",
+					schedulePod: &schedulePod{
+						podName: podBlockedInBindingName,
+					},
+				},
+				{
+					name: "create a mid-priority Pod A",
+					createPod: &createPod{
+						pod: st.MakePod().Name("pod-a").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").Priority(50).Obj(),
+					},
+				},
+				{
+					name: "schedule Pod A (expect unschedulable and nominated to node)",
+					schedulePod: &schedulePod{
+						podName:             "pod-a",
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name:            "check Pod A is in the queue and gated (nominated)",
+					podGatedInQueue: "pod-a",
+				},
+				{
+					name:               "verify Pod A has NominatedNodeName set",
+					verifyPodNominated: "pod-a",
+				},
+				{
+					name: "create a high-priority Pod B",
+					createPod: &createPod{
+						pod: st.MakePod().Name("pod-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule Pod B (expect unschedulable, triggers preemption on node)",
+					schedulePod: &schedulePod{
+						podName:             "pod-b",
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name:               "verify Pod A is in the active queue (re-queued by nomination clearance)",
+					verifyPodInActiveQ: "pod-a",
+				},
+			},
+		},
 	}
 
 	// All test cases have the same node.
@@ -1466,6 +1527,30 @@ func TestAsyncPreemption(t *testing.T) {
 							// If timeout was reached or context was cancelled without finding that vanished from unschedulable, it means the state is as expected.
 							// If a different error occurred, it means that the pod got unexpectedly activated, or something else went wrong.
 							t.Fatalf("Error in scenario verifyPodInUnschedulable: %v", err)
+						}
+					case scenario.verifyPodInActiveQ != "":
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							for _, pod := range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
+								if pod.Name == scenario.verifyPodInActiveQ {
+									return true, nil
+								}
+							}
+							return false, nil
+						}); err != nil {
+							t.Fatalf("Expected the pod %s to be in the active queue", scenario.verifyPodInActiveQ)
+						}
+					case scenario.verifyPodNominated != "":
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, scenario.verifyPodNominated, metav1.GetOptions{})
+							if err != nil {
+								return false, err
+							}
+							if pod.Status.NominatedNodeName == "" {
+								return false, nil
+							}
+							return true, nil
+						}); err != nil {
+							t.Fatalf("Expected the pod %s to have NominatedNodeName set", scenario.verifyPodNominated)
 						}
 					}
 				}
