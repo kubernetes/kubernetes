@@ -1082,7 +1082,7 @@ func errToString(err error) string {
 
 func makeDisruptedPods(n int) map[string]metav1.Time {
 	pods := make(map[string]metav1.Time, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		pods[fmt.Sprintf("pod-%d", i)] = metav1.Now()
 	}
 	return pods
