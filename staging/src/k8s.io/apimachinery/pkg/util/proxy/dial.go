@@ -64,13 +64,13 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 				return nil, err
 			}
 			if tlsConfig == nil {
-				// tls.Client requires non-nil config
-				klog.FromContext(ctx).Info("Warning: using custom dialer with no TLSClientConfig, defaulting to InsecureSkipVerify")
-				// tls.Handshake() requires ServerName or InsecureSkipVerify
-				tlsConfig = &tls.Config{
-					InsecureSkipVerify: true,
-				}
-			} else if len(tlsConfig.ServerName) == 0 && !tlsConfig.InsecureSkipVerify {
+				// tls.Client requires a non-nil config. An *http.Transport with
+				// TLSClientConfig: nil verifies against the system CA pool by
+				// default; preserve that behavior here rather than silently
+				// disabling verification. ServerName is inferred below.
+				tlsConfig = &tls.Config{}
+			}
+			if len(tlsConfig.ServerName) == 0 && !tlsConfig.InsecureSkipVerify {
 				// tls.HandshakeContext() requires ServerName or InsecureSkipVerify
 				// infer the ServerName from the hostname we're connecting to.
 				inferredHost := dialAddr
