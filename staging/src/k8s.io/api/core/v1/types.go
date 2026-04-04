@@ -7157,8 +7157,7 @@ type Binding struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The target object that you want to bind to the standard object.
-	// +k8s:alpha(since: "1.36")=+k8s:rule="self.target.name != ''",message="name: Required value"
-	// +k8s:alpha(since: "1.36")=+k8s:rule="self.target.kind == 'Node' || self.target.kind == ''",message="supported values: \"Node\", \"<empty>\""
+	// +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:required
 	Target ObjectReference `json:"target" protobuf:"bytes,2,opt,name=target"`
 }
 

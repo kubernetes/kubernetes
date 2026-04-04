@@ -6548,7 +6548,7 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 	}
 	if len(binding.Target.Name) == 0 {
 		// TODO: When validation becomes versioned, this gets more complicated.
-		allErrs = append(allErrs, field.Required(field.NewPath("target", "name"), "").MarkAlpha())
+		allErrs = append(allErrs, field.Required(field.NewPath("target", "name"), "").MarkCoveredByDeclarative())
 	}
 
 	return allErrs

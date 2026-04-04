@@ -56,12 +56,21 @@ func TestBinding_DeclarativeValidate_Create(t *testing.T) {
 				},
 			)
 
+			// These test cases exercise declarative validation parity.
+			// All 4 sub-modes (Beta enabled/disabled, hand-written, All Rules Enforced)
+			// must agree on the expected errors.
 			tests := map[string]struct {
 				obj          api.Binding
 				expectedErrs field.ErrorList
 			}{
 				"valid binding": {
 					obj:          mkBinding(),
+					expectedErrs: field.ErrorList{},
+				},
+				"valid binding with empty kind": {
+					obj: mkBinding(func(b *api.Binding) {
+						b.Target.Kind = ""
+					}),
 					expectedErrs: field.ErrorList{},
 				},
 				"missing target name": {
@@ -72,14 +81,6 @@ func TestBinding_DeclarativeValidate_Create(t *testing.T) {
 						field.Required(field.NewPath("target", "name"), "").MarkAlpha(),
 					},
 				},
-				"invalid target kind": {
-					obj: mkBinding(func(b *api.Binding) {
-						b.Target.Kind = "Pod"
-					}),
-					expectedErrs: field.ErrorList{
-						field.NotSupported(field.NewPath("target", "kind"), "Pod", []string{"Node"}).MarkAlpha(),
-					},
-				},
 			}
 
 			for name, tc := range tests {
@@ -87,6 +88,21 @@ func TestBinding_DeclarativeValidate_Create(t *testing.T) {
 					apitesting.VerifyValidationEquivalence(t, ctx, &tc.obj, BindingStrategy.Validate, tc.expectedErrs)
 				})
 			}
+
+			// The kind constraint is not yet covered by declarative validation (no suitable tag exists
+			// for constraining plain string fields to a set of allowed values). It is validated by
+			// hand-written code in ValidatePodBinding with MarkAlpha(). Test it separately.
+			t.Run("invalid target kind", func(t *testing.T) {
+				obj := mkBinding(func(b *api.Binding) {
+					b.Target.Kind = "Pod"
+				})
+				errs := BindingStrategy.Validate(ctx, &obj)
+				expectedErrs := field.ErrorList{
+					field.NotSupported(field.NewPath("target", "kind"), "Pod", []string{"Node", "<empty>"}).MarkAlpha(),
+				}
+				matcher := field.ErrorMatcher{}.ByType().ByOrigin().ByField()
+				matcher.Test(t, expectedErrs, errs)
+			})
 		})
 	}
 }
