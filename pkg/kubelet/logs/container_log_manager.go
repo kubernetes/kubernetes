@@ -277,7 +277,7 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 	return
 }
 
-func (c *containerLogManager) rmRedundantLogs(ctx context.Context, id, log string) error {
+func (c *containerLogManager) rmRedundantLogs(_ context.Context, id, log string) error {
 	klog.V(4).InfoS("Removing redundant logs for container", "containerID", id, "log", log)
 	// get the log dir and name of log file
 	logDir := filepath.Dir(log)
@@ -287,35 +287,36 @@ func (c *containerLogManager) rmRedundantLogs(ctx context.Context, id, log strin
 		return fmt.Errorf("failed to get current logs by dir %q: %w", logDir, err)
 	}
 
-	// c.policy.MaxFiles is the number which the one container should keep before rotation by default, we just make this redundant log truncate work
-	// when there are more than c.policy.MaxFiles logs in the log dir.
+	// Only run redundant log cleanup when there are more than MaxFiles logs in the log dir.
 	if len(currentLogsByDir) <= c.policy.MaxFiles {
 		klog.V(4).InfoS("No more than redundant logs found in log dir, skipping redundant log truncation", "MaxFiles", c.policy.MaxFiles, "logDir", logDir)
 		return nil
 	}
 
 	logFile := filepath.Base(log)
-	logFileNum := 0
 	parts := strings.Split(logFile, ".")
-	if len(parts) >= 2 {
-		// if log file has an extension, e.g. 5.log.*, we only keep the
-		// first part as the log file prefix
-		logFileNum, err = strconv.Atoi(parts[0])
-		if err != nil {
-			klog.ErrorS(err, "Log file name has unexpected format, cannot extract log file number", "log", log)
-			return err
-		}
+	if len(parts) < 2 {
+		klog.V(4).InfoS("Log file name does not match expected format, skipping redundant log cleanup", "log", log)
+		return nil
 	}
 
-	logs, err := getLogsLessThanN(logDir, logFileNum-1)
+	logFileNum, err := strconv.Atoi(parts[0])
 	if err != nil {
-		klog.ErrorS(err, "Failed to get logs less than N", "logDir", logDir, "N", logFileNum-1)
+		klog.ErrorS(err, "Log file name has unexpected format, cannot extract log file number", "log", log)
 		return err
 	}
 
-	for i := 0; i < len(logs); i++ {
-		if err := c.osInterface.Remove(logs[i]); err != nil {
-			klog.ErrorS(err, "Failed to remove old log", "log", logs[i])
+	// Keep the latest MaxFiles revisions, remove everything older.
+	removeBelow := logFileNum - c.policy.MaxFiles + 1
+	logs, err := getLogsLessThanN(logDir, removeBelow)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get logs less than N", "logDir", logDir, "N", removeBelow)
+		return err
+	}
+
+	for _, l := range logs {
+		if err := c.osInterface.Remove(l); err != nil {
+			klog.ErrorS(err, "Failed to remove old log", "log", l)
 		}
 	}
 
