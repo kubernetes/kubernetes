@@ -552,7 +552,7 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			image:                 "docker.io/testing/different:latest",
 			imageRef:              "testimageref",
 			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:                  true,
+			want:                  false,
 			wantPodCredsRequested: false,
 		},
 		{
@@ -714,7 +714,7 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			image:                 "docker.io/testing/different:latest",
 			imageRef:              "testimageref-sa",
 			pulledFiles:           []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
-			want:                  true,
+			want:                  false,
 			wantPodCredsRequested: false,
 		},
 		{
@@ -810,6 +810,71 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPreloadedImageNotPoisonedByPullFromDifferentRepo(t *testing.T) {
+	encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
+	require.NoError(t, err)
+	_, tCtx := ktesting.NewTestContext(t)
+
+	testDir := t.TempDir()
+	pullingDir := filepath.Join(testDir, "pulling")
+	pulledDir := filepath.Join(testDir, "pulled")
+	require.NoError(t, os.MkdirAll(pullingDir, fs.ModePerm))
+	require.NoError(t, os.MkdirAll(pulledDir, fs.ModePerm))
+
+	fsRecordAccessor := &fsPullRecordsAccessor{
+		pullingDir: pullingDir,
+		pulledDir:  pulledDir,
+		encoder:    encoder,
+		decoder:    decoder,
+	}
+
+	f := &PullManager{
+		recordsAccessor:     fsRecordAccessor,
+		imagePolicyEnforcer: NeverVerifyPreloadedPullPolicy(),
+		intentAccessors:     NewStripedLockSet(10),
+		intentCounters:      &sync.Map{},
+		pulledAccessors:     NewStripedLockSet(10),
+	}
+
+	sharedImageRef := "sha256:6446253dd96b1a1ec4a6d69fe9859961929c3a6c79a17f119f4f5021693d998b"
+	publicImage := "quay.io/mowsiany/qa-multi-arch:foo"
+	privateImage := "quay.io/mowsiany/qa-multi-arch-priv:foo"
+
+	noPodCreds := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
+		return nil, nil, nil
+	}
+
+	mustPull, err := f.MustAttemptImagePull(tCtx, publicImage, sharedImageRef, noPodCreds)
+	require.NoError(t, err)
+	if mustPull {
+		t.Fatal("Step 1: preloaded image from repo X should NOT require a pull, but MustAttemptImagePull returned true")
+	}
+
+	f.RecordImagePulled(tCtx, privateImage, sharedImageRef, &kubeletconfiginternal.ImagePullCredentials{
+		KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+			{
+				UID:            "3d2a7cfc-3554-49b5-9fdb-7da367b705e3",
+				Namespace:      "t",
+				Name:           "mowsiany-robot1-pull-secret",
+				CredentialHash: "8d80430d4f9c305461e11e35e4faa310611ca4d577265b2d18859ce5679eb9c0",
+			},
+		},
+	})
+
+	record, exists, err := fsRecordAccessor.GetImagePulledRecord(sharedImageRef)
+	require.NoError(t, err)
+	require.True(t, exists, "pulled record should exist after RecordImagePulled")
+	require.Contains(t, record.CredentialMapping, "quay.io/mowsiany/qa-multi-arch-priv",
+		"pulled record should have credential mapping for repo Y")
+
+	mustPull, err = f.MustAttemptImagePull(tCtx, publicImage, sharedImageRef, noPodCreds)
+	require.NoError(t, err)
+	if mustPull {
+		t.Fatal("Step 3 (issue #138175): preloaded image from repo X should NOT require a pull after " +
+			"a different repo Y with the same digest was pulled with secrets, but MustAttemptImagePull returned true")
 	}
 }
 
