@@ -36,10 +36,11 @@ import (
 
 const (
 	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
-	DefaultIPTablesMasqueradeBit = 14
-	DefaultIPTablesDropBit       = 15
-	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
-	DefaultPodLogsDir            = "/var/log/pods"
+	DefaultIPTablesMasqueradeBit     = 14
+	DefaultIPTablesDropBit           = 15
+	DefaultVolumePluginDir           = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	DefaultPodLogsDir                = "/var/log/pods"
+	DefaultDRAManagerReconcilePeriod = 60 * time.Second
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor  = 0.9
 	DefaultMemoryReservationPolicy = kubeletconfigv1beta1.NoneMemoryReservationPolicy
@@ -176,6 +177,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CPUManagerReconcilePeriod == zeroDuration {
 		// Keep the same as default NodeStatusUpdateFrequency
 		obj.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
+	if obj.DRAManagerReconcilePeriod == zeroDuration {
+		obj.DRAManagerReconcilePeriod = metav1.Duration{Duration: DefaultDRAManagerReconcilePeriod}
 	}
 	if obj.MemoryManagerPolicy == "" {
 		obj.MemoryManagerPolicy = kubeletconfigv1beta1.NoneMemoryManagerPolicy

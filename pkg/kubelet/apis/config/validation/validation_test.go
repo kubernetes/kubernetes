@@ -49,6 +49,7 @@ var (
 		ImageGCHighThresholdPercent:            85,
 		ImageGCLowThresholdPercent:             80,
 		ImageMinimumGCAge:                      metav1.Duration{Duration: 2 * time.Minute},
+		DRAManagerReconcilePeriod:              metav1.Duration{Duration: 60 * time.Second},
 		ImagePullCredentialsVerificationPolicy: "NeverVerifyPreloadedImages",
 		IPTablesDropBit:                        15,
 		IPTablesMasqueradeBit:                  14,
@@ -790,6 +791,20 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: imageMinimumGCAge -1ns must not be negative",
+		}, {
+			name: "invalid configuration: zero DRAManagerReconcilePeriod",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.DRAManagerReconcilePeriod = metav1.Duration{Duration: 0}
+				return conf
+			},
+			errMsg: "invalid configuration: draManagerReconcilePeriod 0s must be greater than zero",
+		}, {
+			name: "invalid configuration: negative DRAManagerReconcilePeriod",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.DRAManagerReconcilePeriod = metav1.Duration{Duration: -1}
+				return conf
+			},
+			errMsg: "invalid configuration: draManagerReconcilePeriod -1ns must be greater than zero",
 		}, {
 			name: "valid ImageMinimumGCAge set to default 1ns",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
