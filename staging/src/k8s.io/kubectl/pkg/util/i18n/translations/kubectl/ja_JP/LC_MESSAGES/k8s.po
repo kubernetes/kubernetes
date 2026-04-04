@@ -108,8 +108,7 @@ msgstr ""
 "\t\t# 指定されたポッドと、それに属するコンテナのメトリクスを表示する\n"
 "\t\tkubectl top pod POD_NAME --containers\n"
 "\n"
-"\t\t# name=myLabel というラベルによって定義されるポッドのメトリクスを表示す"
-"る\n"
+"\t\t# name=myLabelというラベルによって定義されるポッドのメトリクスを表示する\n"
 "\t\tkubectl top pod -l name=myLabel"
 
 #: pkg/kubectl/cmd/convert/convert.go:40
@@ -129,16 +128,14 @@ msgid ""
 "\t\tto change to output destination."
 msgstr ""
 "\n"
-"\t\t異なる API バージョン間で設定ファイルを変換する。\n"
-"\t\tYAML と JSON の両方のフォーマットを受け付ける。\n"
+"\t\t異なるAPIバージョン間で設定ファイルを変換します。\n"
+"\t\tYAML形式とJSON形式の両方を受け付けます。\n"
 "\n"
-"\t\tこのコマンドは、ファイル名、ディレクトリ、または URL を入力として受け付"
-"け、それを --output-version フラグで指定されたバージョンに変換する。\n"
-"\t\tもしバージョンが未指定またはサポート外であった場合、最新のバージョンに変換"
-"する。\n"
+"\t\tこのコマンドは、ファイル名、ディレクトリ、またはURLを入力として受け付け、"
+"それを--output-versionフラグで指定されたバージョンに変換します。\n"
+"\t\tバージョンが未指定またはサポート外であった場合、最新のバージョンに変換します。\n"
 "\n"
-"\t\t既定の出力は、YAML 形式で標準出力へ為される。-o オプションを使用すること"
-"で、出力先を変更できる。"
+"\t\t既定の出力はYAML形式で標準出力に表示されます。-oオプションを使用することで、出力先を変更できます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:39
@@ -195,12 +192,9 @@ msgid ""
 "\t\twithout updating any other parts of the object."
 msgstr ""
 "\n"
-"\t\t最新の last-applied-configuration アノテーションを、ファイルの内容と適合す"
-"るように設定する。\n"
-"\t\tこれによって、last-applied-configuration が、オブジェクトの他の部分を変更"
-"することなく、\n"
-"\t\tまるで 'kubectl apply -f <ファイル名>' を実行することによって更新されたも"
-"のであるかのように更新される。"
+"\t\t最新のlast-applied-configurationアノテーションを、ファイルの内容に一致するよう設定します。\n"
+"\t\tこれにより、オブジェクトの他の部分を変更することなく、last-applied-configurationが、"
+"まるで'kubectl apply -f <ファイル名>'を実行したかのように更新されます。"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:42
 msgid ""
@@ -209,7 +203,7 @@ msgid ""
 "\t  kubectl create namespace my-namespace"
 msgstr ""
 "\n"
-"\t  # my-namespace という名前の新しいネームスペースを作成する\n"
+"\t  # my-namespaceという名前の新しいネームスペースを作成する\n"
 "\t  kubectl create namespace my-namespace"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:43
@@ -219,7 +213,7 @@ msgid ""
 "\t  kubectl create serviceaccount my-service-account"
 msgstr ""
 "\n"
-"\t  # my-service-account という名前の新しいサービスアカウントを作成する\n"
+"\t  # my-service-accountという名前の新しいサービスアカウントを作成する\n"
 "\t  kubectl create serviceaccount my-service-account"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:344
@@ -232,13 +226,11 @@ msgid ""
 "\tthat exist off platform, on other clusters, or locally."
 msgstr ""
 "\n"
-"\t ExternalName サービスを指定された名前で作成する。\n"
+"\tExternalNameサービスを指定された名前で作成します。\n"
 "\n"
-"\tExternalName サービスは、ポッドだけでなく外部の DNS アドレスを参照することが"
-"できる。\n"
-"\tこれによって、アプリケーションの開発者は、プラットフォーム外、他のクラス"
-"ター、\n"
-"\tまたはローカルに存在するサービスを参照できるようになる。"
+"\tExternalNameサービスは、ポッドだけでなく外部DNSアドレスを参照できます。\n"
+"\tこれにより、アプリケーションの開発者は、プラットフォーム外、他のクラスター、"
+"またはローカルに存在するサービスを参照できるようになります。"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/help/help.go:28
 msgid ""
@@ -247,9 +239,8 @@ msgid ""
 "\tSimply type kubectl help [path to command] for full details."
 msgstr ""
 "\n"
-"\thelp は、アプリケーションにおけるコマンドのヘルプを提供する。\n"
-"\t単に kubectl help [コマンドへのパス] を実行することで、完全な詳細情報を取得"
-"できる。"
+"\thelpは、アプリケーションにおけるすべてのコマンドについてのヘルプを提供します。\n"
+"\t単にkubectl help [コマンドへのパス]を実行することで、完全な詳細情報を取得できます。"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:311
 msgid ""
@@ -258,7 +249,7 @@ msgid ""
 "    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
 msgstr ""
 "\n"
-"    # my-lbs という名前の新しい LoadBalancer サービスを作成する\n"
+"    # my-lbsという名前の新しいLoadBalancerサービスを作成する\n"
 "    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:102
@@ -281,13 +272,13 @@ msgstr ""
 "    # 標準出力に現在のクラスターの状態をダンプする\n"
 "    kubectl cluster-info dump\n"
 "\n"
-"    # /path/to/cluster-state に現在のクラスターの状態をダンプする\n"
+"    # /path/to/cluster-stateに現在のクラスターの状態をダンプする\n"
 "    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n"
 "\n"
 "    # すべてのネームスペースを標準出力にダンプする\n"
 "    kubectl cluster-info dump --all-namespaces\n"
 "\n"
-"    # /path/to/cluster-state に複数のネームスペースをダンプする\n"
+"    # /path/to/cluster-stateに複数のネームスペースをダンプする\n"
 "    kubectl cluster-info dump --namespaces default,kube-system --output-"
 "directory=/path/to/cluster-state"
 
@@ -298,7 +289,7 @@ msgid ""
 "    Create a LoadBalancer service with the specified name."
 msgstr ""
 "\n"
-"    指定された名前で LoadBalancer サービスを作成する。"
+"    指定された名前でLoadBalancerサービスを作成する。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:107
@@ -307,13 +298,13 @@ msgid ""
 "by the quota."
 msgstr ""
 "クォータによって監視される各オブジェクトとすべて一致していなければならない、"
-"クォータ スコープの一覧 (コンマ区切り)"
+"クォータスコープの一覧 (コンマ区切り)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L60
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:106
 msgid ""
 "A comma-delimited set of resource=quantity pairs that define a hard limit."
-msgstr "ハード リミットを定義する、resource=quantity の組の一覧 (コンマ区切り)"
+msgstr "ハードリミットを定義するresource=quantityの組の一覧 (コンマ区切り)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L63
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:113
@@ -321,8 +312,7 @@ msgid ""
 "A label selector to use for this budget. Only equality-based selector "
 "requirements are supported."
 msgstr ""
-"この budget に使用するラベル セレクター。等価ベースのセレクターのみがサポート"
-"される。"
+"このbudgetに使用するラベルセレクター。等価ベースのセレクターのみがサポートされます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L106
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:152
@@ -332,8 +322,8 @@ msgid ""
 "the replication controller or replica set.)"
 msgstr ""
 "このサービスで使用するラベル セレクター。等価ベースのセレクターのみがサポート"
-"される。空欄 (既定) であった場合、レプリケーション コントローラーまたはレプリ"
-"カ セットからセレクターを推測する。)"
+"されます。空欄 (既定) であった場合、レプリケーション コントローラーまたはレプリ"
+"カ セットからセレクターを推測します。)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:157
@@ -342,10 +332,9 @@ msgid ""
 "service. If this IP is routed to a node, the service can be accessed by this "
 "IP in addition to its generated service IP."
 msgstr ""
-"サービスに受け入れる、(Kubernetes によって管理されていない) 追加の外部 IP アド"
-"レス。この IP アドレスがノードに対してルーティングされる場合、生成されるサービ"
-"スの IP アドレスに加えて、この IP アドレスでもサービスにアクセスすることができ"
-"る。"
+"サービスに受け入れる、(Kubernetesによって管理されていない)追加の外部IPアドレス。"
+"このIPアドレスがノードに対してルーティングされる場合、生成されるサービスのIPアドレスに加えて、"
+"このIPアドレスでもサービスにアクセスできます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L119
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:158
@@ -355,9 +344,9 @@ msgid ""
 "used to override the generated object. Requires that the object supply a "
 "valid apiVersion field."
 msgstr ""
-"生成されたオブジェクトに対する、インライン JSON 形式のオーバーライド。指定され"
-"た場合、生成されたオブジェクトをオーバーライドするために使用される。オブジェク"
-"トは有効な apiVersion フィールドを持っていなければならない。"
+"生成されたオブジェクトに対する、インラインJSON形式のオーバーライド。"
+"指定された場合、生成されたオブジェクトをオーバーライドするために使用されます。"
+"オブジェクトは有効なapiVersionフィールドを持っていなければなりません。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
 #: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:125
@@ -370,8 +359,7 @@ msgid ""
 "Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
 "loadbalancing)."
 msgstr ""
-"独自の ClusterIP を割り当てるか、もしくは 'None' を指定することで「ヘッドレ"
-"ス」サービスとする (ロードバランシングしない)。"
+"独自のClusterIPを割り当てるか、もしくは'None'を指定することで「ヘッドレス」サービスとします(ロードバランシングしません)。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
 #: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:105
@@ -384,23 +372,22 @@ msgid ""
 "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set "
 "to 'None' to create a headless service."
 msgstr ""
-"サービスに割り当てられる ClusterIP。空欄にすると自動割り当てされ、'None' とす"
-"るとヘッドレス サービスを作成します。"
+"サービスに割り当てられるClusterIP。空欄にすると自動割り当てされ、'None'とするとヘッドレスサービスを作成します。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:101
 msgid "ClusterRole this ClusterRoleBinding should reference"
-msgstr "この ClusterRoleBinding が参照すべき ClusterRole"
+msgstr "このClusterRoleBindingが参照すべきClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L55
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:104
 msgid "ClusterRole this RoleBinding should reference"
-msgstr "この RoleBinding が参照すべき ClusterRole"
+msgstr "このRoleBindingが参照すべきClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
 #: pkg/kubectl/cmd/convert/convert.go:95
 msgid "Convert config files between different API versions"
-msgstr "異なる API バージョン間で config ファイルを変換する"
+msgstr "異なるAPIバージョン間でconfigファイルを変換する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
 #: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:106
@@ -410,7 +397,7 @@ msgstr "ファイルやディレクトリをコンテナから、またはコン
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:94
 msgid "Create a TLS secret"
-msgstr "TLS シークレットを作成する"
+msgstr "TLSシークレットを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:83
@@ -420,7 +407,7 @@ msgstr "指定された名前でネームスペースを作成する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:134
 msgid "Create a secret for use with a Docker registry"
-msgstr "Docker レジストリで使うためのシークレットを作成する"
+msgstr "Dockerレジストリで使用するシークレットを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:49
@@ -435,12 +422,12 @@ msgstr "指定された名前でサービスアカウントを作成する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
 msgid "Delete the specified cluster from the kubeconfig"
-msgstr "指定したクラスターを kubeconfig から削除する"
+msgstr "指定したクラスターをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42
 msgid "Delete the specified context from the kubeconfig"
-msgstr "指定したコンテキストを kubeconfig から削除する"
+msgstr "指定したコンテキストをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L121
 #: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:174
@@ -455,12 +442,12 @@ msgstr "1つまたは複数のコンテキストを記述する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/get_clusters.go:41
 msgid "Display clusters defined in the kubeconfig"
-msgstr "kubeconfig で定義されたクラスターを表示する"
+msgstr "kubeconfigで定義されたクラスターを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/view.go:81
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
-msgstr "マージされた kubeconfig の設定または指定された kubeconfig を表示する"
+msgstr "マージされたkubeconfigの設定または指定されたkubeconfigファイルを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/get.go#L107
 #: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:165
@@ -470,7 +457,7 @@ msgstr "1つまたは複数のリソースを表示する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:184
 msgid "Drain node in preparation for maintenance"
-msgstr "メンテナンスを準備するため、ノードを drain する"
+msgstr "メンテナンスを準備するため、ノードをdrainする"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
 #: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:77
@@ -480,7 +467,7 @@ msgstr "サーバー上のリソースを編集する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:152
 msgid "Email for Docker registry"
-msgstr "Docker レジストリのメールアドレス"
+msgstr "Dockerレジストリのメールアドレス"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
 #: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:89
@@ -503,7 +490,7 @@ msgid ""
 "If non-empty, set the session affinity for the service to this; legal values: "
 "'None', 'ClientIP'"
 msgstr ""
-"指定された場合、サービスのセッション アフィニティを設定する; 有効な値: "
+"指定された場合、サービスのセッション アフィニティを設定します; 有効な値: "
 "'None', 'ClientIP'"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L135
@@ -513,7 +500,7 @@ msgid ""
 "resource-version for the object. Only valid when specifying a single resource."
 msgstr ""
 "指定された場合、これがオブジェクトの現在のリソース バージョンである場合にの"
-"み、アノテーションの更新が成功する。単一のリソースを指定したときのみ有効。"
+"み、アノテーションの更新が成功します。単一のリソースを指定したときのみ有効です。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L132
 #: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:154
@@ -522,7 +509,7 @@ msgid ""
 "resource-version for the object. Only valid when specifying a single resource."
 msgstr ""
 "指定された場合、これがオブジェクトの現在のリソース バージョンである場合にの"
-"み、ラベルの更新が成功する。単一のリソースを指定したときのみ有効。"
+"み、ラベルの更新が成功します。単一のリソースを指定したときのみ有効です。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:98
@@ -548,7 +535,7 @@ msgstr "証明書のリソースを変更する。"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:42
 msgid "Modify kubeconfig files"
-msgstr "kubeconfig を変更する"
+msgstr "kubeconfigを変更する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:156
@@ -565,23 +552,23 @@ msgid ""
 "Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
 "one of since-time / since may be used."
 msgstr ""
-"特定の日付以降のログのみを返す (RFC3339)。既定ではすべてのログを返す。since-"
-"time / since オプションは1つのみ使用できる。"
+"特定の日付以降のログのみを返します(RFC3339)。既定ではすべてのログを返します。"
+"since-time/sinceオプションは1つのみ使用できます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
 #: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:112
 msgid "Output shell completion code for the specified shell (bash or zsh)"
-msgstr "指定されたシェルのためのシェル補完コードを表示する (bash または zsh)"
+msgstr "指定されたシェルのためのシェル補完コードを表示する(bashまたはzsh)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:151
 msgid "Password for Docker registry authentication"
-msgstr "Docker レジストリの認証のためのパスワード"
+msgstr "Dockerレジストリの認証のためのパスワード"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:110
 msgid "Path to PEM encoded public key certificate."
-msgstr "PEM でエンコードされた公開鍵証明書へのパス。"
+msgstr "PEMでエンコードされた公開鍵証明書へのパス。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:111
@@ -621,7 +608,7 @@ msgstr "一時停止したリソースを再開する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L56
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:105
 msgid "Role this RoleBinding should reference"
-msgstr "この RoleBinding が参照すべき Role"
+msgstr "このRoleBindingが参照すべきRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L94
 #: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:152
@@ -631,12 +618,12 @@ msgstr "クラスタ上で特定のイメージを起動する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/proxy.go#L68
 #: staging/src/k8s.io/kubectl/pkg/cmd/proxy/proxy.go:119
 msgid "Run a proxy to the Kubernetes API server"
-msgstr "Kubernetes API サーバーに対してプロキシを起動する"
+msgstr "Kubernetes APIサーバーに対してプロキシを起動する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:153
 msgid "Server location for Docker registry"
-msgstr "Docker レジストリのサーバーの場所"
+msgstr "Dockerレジストリのサーバーの場所"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set.go#L37
 #: staging/src/k8s.io/kubectl/pkg/cmd/set/set.go:39
@@ -661,7 +648,7 @@ msgstr "ロールアウトの状況を表示する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:154
 msgid "Synonym for --target-port"
-msgstr "--target-port の別名"
+msgstr "--target-portの別名"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
 #: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:174
@@ -674,13 +661,13 @@ msgid ""
 "The image pull policy for the container. If left empty, this value will not "
 "be specified by the client and defaulted by the server"
 msgstr ""
-"コンテナ向けにイメージを pull するときのポリシー。空欄である場合、この値はクラ"
-"イアントによっては指定されず、サーバーによって既定の値が使われる"
+"コンテナ向けにイメージをpullするときのポリシーです。"
+"空欄である場合、この値はクライアントによって指定されず、サーバーによって既定の値が使われます"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:111
 msgid "The minimum number or percentage of available pods this budget requires."
-msgstr "この budget が必要とする利用可能なポッドの最小の数、または割合。"
+msgstr "このbudgetが必要とする利用可能なポッドの最小の数、または割合。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:159
@@ -703,16 +690,15 @@ msgid ""
 "and 'service/v2'. The only difference between them is that service port in v1 "
 "is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
 msgstr ""
-"使用する API ジェネレーターの名前。ジェネレーターには、'service/v1' と "
-"'service/v2' の2つがある。これらのジェネレータの違いは、サービスのポートが、"
-"v1 においては 'default' と名付けられ、v2 では未指定となっている点である。既定"
-"では 'service/v2' が使われる。"
+"使用するAPIジェネレーターの名前です。ジェネレーターには、'service/v1'と'service/v2'の2つがあります。"
+"これらのジェネレーターの違いは、v1ではサービスのポート名が'default'で、v2では未指定になる点です。"
+"既定では'service/v2'が使われます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:148
 msgid "The network protocol for the service to be created. Default is 'TCP'."
 msgstr ""
-"作成されるサービスのネットワーク プロトコル。既定では 'TCP' が使われる。"
+"作成されるサービスのネットワークプロトコルです。既定では'TCP'が使われます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:149
@@ -730,9 +716,8 @@ msgid ""
 "'cpu=200m,memory=512Mi'.  Note that server side components may assign limits "
 "depending on the server configuration, such as limit ranges."
 msgstr ""
-"このコンテナのためのリソース要件の制限。例えば、'cpu=200m,memory=512Mi' と指定"
-"できる。サーバー側のコンポーネントは、制限の範囲などといったサーバー構成にした"
-"がって制限を割り当てるかもしれないことに注意してください。"
+"このコンテナのためのリソース要件の制限。例えば、'cpu=200m,memory=512Mi'と指定できます。"
+"サーバー側のコンポーネントは、制限の範囲などのサーバー構成にしたがって制限を割り当てることがあるため、注意してください。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
 #: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:192
@@ -741,9 +726,8 @@ msgid ""
 "'cpu=100m,memory=256Mi'.  Note that server side components may assign "
 "requests depending on the server configuration, such as limit ranges."
 msgstr ""
-"このコンテナのためのリソース要件の要求。例えば、'cpu=100m,memory=256Mi' と指定"
-"できる。サーバー側のコンポーネントは、制限の範囲などといったサーバー構成にした"
-"がって要求を割り当てるかもしれないことに注意してください。"
+"このコンテナのためのリソース要件の要求。例えば、'cpu=100m,memory=256Mi'と指定できます。"
+"サーバー側のコンポーネントは、制限の範囲などのサーバー構成にしたがって要求を割り当てることがあるため、注意してください。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:155
@@ -774,12 +758,12 @@ msgstr "リソースのラベルを更新する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
 #: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:109
 msgid "Update the taints on one or more nodes"
-msgstr "1つまたは複数のノードの taints を更新する"
+msgstr "1つまたは複数のノードのtaintを更新する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:150
 msgid "Username for Docker registry authentication"
-msgstr "Docker レジストリの認証のためのユーザー名"
+msgstr "Dockerレジストリの認証のためのユーザー名"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_history.go#L51
 #: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_history.go:83
@@ -792,8 +776,8 @@ msgid ""
 "Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
 "directory hierarchy in that directory"
 msgstr ""
-"ファイルの出力先。未指定もしくは '-' であった場合、標準出力へ出力する。そうで"
-"ない場合は、指定されたディレクトリ内にディレクトリの階層を作成する"
+"ファイルの出力先です。未指定もしくは'-'であった場合、標準出力へ出力します。"
+"そうでない場合は、指定されたディレクトリ内にディレクトリ階層を作成します"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/run/run_test.go:88
 msgid "dummy restart flag)"
@@ -802,7 +786,7 @@ msgstr "ダミーの再起動フラグ)"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
 #: staging/src/k8s.io/kubectl/pkg/cmd/cmd.go:227
 msgid "kubectl controls the Kubernetes cluster manager"
-msgstr "kubectl は Kubernetes クラスター マネージャーを制御します"
+msgstr "kubectlはKubernetesクラスターマネージャーを制御します"
 
 #~ msgid ""
 #~ "\n"
