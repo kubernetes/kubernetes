@@ -448,3 +448,88 @@ func TestRotateLatestLog(t *testing.T) {
 		assert.NoError(t, f.AssertCalls([]string{"ReopenContainerLog"}))
 	}
 }
+func TestRmRedundantLogs(t *testing.T) {
+	for desc, test := range map[string]struct {
+		files       []string
+		currentLog  string
+		maxFiles    int
+		expectFiles []string
+		expectError bool
+	}{
+		"no cleanup when files within MaxFiles limit": {
+			files:       []string{"0.log", "1.log"},
+			currentLog:  "1.log",
+			maxFiles:    3,
+			expectFiles: []string{"0.log", "1.log"},
+		},
+		"remove oldest revisions keeping MaxFiles=2": {
+			files:       []string{"0.log", "0.log.20060102.gz", "1.log", "2.log", "3.log"},
+			currentLog:  "3.log",
+			maxFiles:    2,
+			expectFiles: []string{"2.log", "3.log"},
+		},
+		"remove oldest revisions keeping MaxFiles=3": {
+			files:       []string{"0.log", "1.log", "2.log", "3.log", "4.log"},
+			currentLog:  "4.log",
+			maxFiles:    3,
+			expectFiles: []string{"2.log", "3.log", "4.log"},
+		},
+		"nothing to remove when current revision is low": {
+			files:       []string{"0.log", "0.log.20060102.gz", "0.log.20060103.gz", "1.log"},
+			currentLog:  "1.log",
+			maxFiles:    2,
+			expectFiles: []string{"0.log", "0.log.20060102.gz", "0.log.20060103.gz", "1.log"},
+		},
+		"skip cleanup for invalid log file name": {
+			files:       []string{"abc.log", "0.log", "1.log", "2.log"},
+			currentLog:  "abc.log",
+			maxFiles:    2,
+			expectError: true,
+			expectFiles: []string{"abc.log", "0.log", "1.log", "2.log"},
+		},
+		"skip cleanup for log without extension": {
+			files:       []string{"testlog", "0.log", "1.log", "2.log"},
+			currentLog:  "testlog",
+			maxFiles:    2,
+			expectFiles: []string{"testlog", "0.log", "1.log", "2.log"},
+		},
+		"remove rotated files of old revisions": {
+			files:       []string{"0.log", "0.log.20060102.gz", "1.log", "1.log.20060102.gz", "2.log", "3.log"},
+			currentLog:  "3.log",
+			maxFiles:    2,
+			expectFiles: []string{"2.log", "3.log"},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			dir, err := os.MkdirTemp("", "test-rm-redundant-logs")
+			require.NoError(t, err)
+			defer os.RemoveAll(dir)
+
+			for _, name := range test.files {
+				f, err := os.Create(filepath.Join(dir, name))
+				require.NoError(t, err)
+				f.Close()
+			}
+
+			c := &containerLogManager{
+				policy:      LogRotatePolicy{MaxFiles: test.maxFiles},
+				osInterface: container.RealOS{},
+			}
+
+			err = c.rmRedundantLogs(context.Background(), "test-container", filepath.Join(dir, test.currentLog))
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			remaining, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			var remainingNames []string
+			for _, entry := range remaining {
+				remainingNames = append(remainingNames, entry.Name())
+			}
+			assert.ElementsMatch(t, test.expectFiles, remainingNames)
+		})
+	}
+}
