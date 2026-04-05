@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1105,5 +1106,198 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+func TestGetRequestCaching(t *testing.T) {
+
+	t.Run("test get request caching", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		manager := newTestManager()
+		container := pod.Spec.Containers[0]
+		trueReference := true
+
+		container.ReadinessProbe = &v1.Probe{
+			InitialDelaySeconds: 0,
+			TimeoutSeconds:      1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+		}
+
+		manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:        container.Name,
+					ContainerID: "docker://fake-id",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Now(),
+						},
+					},
+					Ready:   true,
+					Started: &trueReference,
+				},
+			},
+		})
+
+		fakePodIp := "some-pod"
+
+		worker := newWorker(manager, readiness, pod, container)
+
+		worker.initHttpProbeHolder()
+		req, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v.", err)
+		}
+
+		req2, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v.", err)
+		}
+
+		if req != req2 {
+			t.Errorf("expected the same request pointer for subsequent calls, but got %p != %p", req, req2)
+		}
+
+		worker.httpProbeRequest.reset()
+
+		req3, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+
+		if req2 == req3 {
+			t.Errorf("Cache not invalidated.")
+		}
+
+	})
+}
+
+func TestGetRequest(t *testing.T) {
+	cases := []struct {
+		name  string
+		error bool
+		podIp string
+	}{
+		{
+			name:  "valid pod ip",
+			error: false,
+			podIp: "podip.docker",
+		},
+		{
+			name:  "invalid pod ip",
+			error: true,
+			podIp: "http://123123",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			manager := newTestManager()
+			container := pod.Spec.Containers[0]
+			trueReference := true
+
+			container.ReadinessProbe = &v1.Probe{
+				InitialDelaySeconds: 0,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10,
+				SuccessThreshold:    1,
+				FailureThreshold:    3,
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/",
+						Port: intstr.FromInt(8080),
+					},
+				},
+			}
+
+			manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        container.Name,
+						ContainerID: "docker://fake-id",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.Now(),
+							},
+						},
+						Ready:   true,
+						Started: &trueReference,
+					},
+				},
+			})
+
+			worker := newWorker(manager, readiness, pod, container)
+
+			worker.initHttpProbeHolder()
+			req, err := worker.httpProbeRequest.getRequest(&worker.container, c.podIp)
+
+			if err != nil && !c.error {
+				t.Errorf("Not expected error: %v", err)
+			} else if err == nil && c.error {
+				t.Errorf("No expected error.")
+			}
+
+			if req == nil && err == nil {
+				t.Errorf("Request does not returning without error.")
+			}
+		})
+	}
+}
+
+func BenchmarkHTTPProbe(b *testing.B) {
+	logger, ctx := ktesting.NewTestContext(b)
+	pod := getTestPod()
+	manager := newTestManager()
+	t := true
+
+	container := pod.Spec.Containers[0]
+	container.ReadinessProbe = &v1.Probe{
+		InitialDelaySeconds: 0,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/",
+				Port: intstr.FromInt(8080),
+			},
+		},
+	}
+
+	manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name:        container.Name,
+				ContainerID: "docker://fake-id",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{
+						StartedAt: metav1.Now(),
+					},
+				},
+				Ready:   true,
+				Started: &t,
+			},
+		},
+	})
+
+	worker := newWorker(manager, readiness, pod, container)
+
+	b.ResetTimer()
+	for b.Loop() {
+		worker.doProbe(ctx)
 	}
 }
