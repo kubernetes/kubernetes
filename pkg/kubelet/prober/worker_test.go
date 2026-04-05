@@ -1172,7 +1172,7 @@ func TestGetRequestCaching(t *testing.T) {
 
 		worker.httpProbeRequest.reset()
 
-		req3, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+		req3, _ := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
 
 		if req2 == req3 {
 			t.Errorf("Cache not invalidated.")
