@@ -29,10 +29,10 @@ msgid ""
 "\t\t  kubectl top node NODE_NAME"
 msgstr ""
 "\n"
-"\t\t  # すべてのノードのメトリクスを表示する\n"
+"\t\t  # すべてのNodeのメトリクスを表示する\n"
 "\t\t  kubectl top node\n"
 "\n"
-"\t\t  # 特定のノードのメトリクスを表示する\n"
+"\t\t  # 特定のNodeのメトリクスを表示する\n"
 "\t\t  kubectl top node NODE_NAME"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:46
@@ -99,16 +99,16 @@ msgid ""
 "\t\tkubectl top pod -l name=myLabel"
 msgstr ""
 "\n"
-"\t\t# 既定のネームスペースに属する、すべてのポッドのメトリクスを表示する\n"
+"\t\t# 既定のNamespaceに属する、すべてのPodのメトリクスを表示する\n"
 "\t\tkubectl top pod\n"
 "\n"
-"\t\t# 指定されたネームスペースに属する、すべてのポッドのメトリクスを表示する\n"
+"\t\t# 指定されたNamespaceに属する、すべてのPodのメトリクスを表示する\n"
 "\t\tkubectl top pod --namespace=NAMESPACE\n"
 "\n"
-"\t\t# 指定されたポッドと、それに属するコンテナのメトリクスを表示する\n"
+"\t\t# 指定されたPodと、それに属するコンテナのメトリクスを表示する\n"
 "\t\tkubectl top pod POD_NAME --containers\n"
 "\n"
-"\t\t# name=myLabelというラベルによって定義されるポッドのメトリクスを表示する\n"
+"\t\t# name=myLabelというラベルによって定義されるPodのメトリクスを表示する\n"
 "\t\tkubectl top pod -l name=myLabel"
 
 #: pkg/kubectl/cmd/convert/convert.go:40
@@ -144,7 +144,7 @@ msgid ""
 "\t\tCreate a namespace with the specified name."
 msgstr ""
 "\n"
-"\t\t指定された名前でネームスペースを作成する。"
+"\t\t指定された名前でNamespaceを作成する。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_role.go:43
@@ -153,7 +153,7 @@ msgid ""
 "\t\tCreate a role with single rule."
 msgstr ""
 "\n"
-"\t\t単一のルールを持つロールを作成する。"
+"\t\t単一のルールを持つRoleを作成する。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:40
@@ -162,7 +162,7 @@ msgid ""
 "\t\tCreate a service account with the specified name."
 msgstr ""
 "\n"
-"\t\t指定された名前でサービスアカウントを作成する。"
+"\t\t指定された名前でServiceAccountを作成する。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:84
@@ -171,7 +171,7 @@ msgid ""
 "\t\tMark node as schedulable."
 msgstr ""
 "\n"
-"\t\tノードをスケジュール可能な状態としてマークする。"
+"\t\tNodeをスケジュール可能な状態としてマークする。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:55
@@ -180,7 +180,7 @@ msgid ""
 "\t\tMark node as unschedulable."
 msgstr ""
 "\n"
-"\t\tノードをスケジュール不可能な状態としてマークする。"
+"\t\tNodeをスケジュール不可能な状態としてマークする。"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:70
 msgid ""
@@ -203,7 +203,7 @@ msgid ""
 "\t  kubectl create namespace my-namespace"
 msgstr ""
 "\n"
-"\t  # my-namespaceという名前の新しいネームスペースを作成する\n"
+"\t  # my-namespaceという名前の新しいNamespaceを作成する\n"
 "\t  kubectl create namespace my-namespace"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:43
@@ -213,7 +213,7 @@ msgid ""
 "\t  kubectl create serviceaccount my-service-account"
 msgstr ""
 "\n"
-"\t  # my-service-accountという名前の新しいサービスアカウントを作成する\n"
+"\t  # my-service-accountという名前の新しいServiceAccountを作成する\n"
 "\t  kubectl create serviceaccount my-service-account"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:344
@@ -226,11 +226,11 @@ msgid ""
 "\tthat exist off platform, on other clusters, or locally."
 msgstr ""
 "\n"
-"\tExternalNameサービスを指定された名前で作成します。\n"
+"\tExternalName Serviceを指定された名前で作成します。\n"
 "\n"
-"\tExternalNameサービスは、ポッドだけでなく外部DNSアドレスを参照できます。\n"
+"\tExternalName Serviceは、Podだけでなく外部DNSアドレスを参照できます。\n"
 "\tこれにより、アプリケーションの開発者は、プラットフォーム外、他のクラスター、"
-"またはローカルに存在するサービスを参照できるようになります。"
+"またはローカルに存在するServiceを参照できるようになります。"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/help/help.go:28
 msgid ""
@@ -249,7 +249,7 @@ msgid ""
 "    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
 msgstr ""
 "\n"
-"    # my-lbsという名前の新しいLoadBalancerサービスを作成する\n"
+"    # my-lbsという名前の新しいLoadBalancer Serviceを作成する\n"
 "    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:102
@@ -275,10 +275,10 @@ msgstr ""
 "    # /path/to/cluster-stateに現在のクラスターの状態をダンプする\n"
 "    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n"
 "\n"
-"    # すべてのネームスペースを標準出力にダンプする\n"
+"    # すべてのNamespaceを標準出力にダンプする\n"
 "    kubectl cluster-info dump --all-namespaces\n"
 "\n"
-"    # /path/to/cluster-stateに複数のネームスペースをダンプする\n"
+"    # /path/to/cluster-stateに複数のNamespaceをダンプする\n"
 "    kubectl cluster-info dump --namespaces default,kube-system --output-"
 "directory=/path/to/cluster-state"
 
@@ -289,7 +289,7 @@ msgid ""
 "    Create a LoadBalancer service with the specified name."
 msgstr ""
 "\n"
-"    指定された名前でLoadBalancerサービスを作成する。"
+"    指定された名前でLoadBalancer Serviceを作成する。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:107
@@ -321,9 +321,9 @@ msgid ""
 "requirements are supported. If empty (the default) infer the selector from "
 "the replication controller or replica set.)"
 msgstr ""
-"このサービスで使用するラベル セレクター。等価ベースのセレクターのみがサポート"
-"されます。空欄 (既定) であった場合、レプリケーション コントローラーまたはレプリ"
-"カ セットからセレクターを推測します。)"
+"このServiceで使用するラベル セレクター。等価ベースのセレクターのみがサポート"
+"されます。空欄 (既定) であった場合、ReplicationControllerまたはReplicaSet"
+"からセレクターを推測します。)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:157
@@ -332,9 +332,9 @@ msgid ""
 "service. If this IP is routed to a node, the service can be accessed by this "
 "IP in addition to its generated service IP."
 msgstr ""
-"サービスに受け入れる、(Kubernetesによって管理されていない)追加の外部IPアドレス。"
-"このIPアドレスがノードに対してルーティングされる場合、生成されるサービスのIPアドレスに加えて、"
-"このIPアドレスでもサービスにアクセスできます。"
+"Serviceに受け入れる、(Kubernetesによって管理されていない)追加の外部IPアドレス。"
+"このIPアドレスがNodeに対してルーティングされる場合、生成されるServiceのIPアドレスに加えて、"
+"このIPアドレスでもServiceにアクセスできます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L119
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:158
@@ -359,7 +359,7 @@ msgid ""
 "Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
 "loadbalancing)."
 msgstr ""
-"独自のClusterIPを割り当てるか、もしくは'None'を指定することで「ヘッドレス」サービスとします(ロードバランシングしません)。"
+"独自のClusterIPを割り当てるか、もしくは'None'を指定することで「ヘッドレス」Serviceとします(ロードバランシングしません)。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
 #: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:105
@@ -372,7 +372,7 @@ msgid ""
 "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set "
 "to 'None' to create a headless service."
 msgstr ""
-"サービスに割り当てられるClusterIP。空欄にすると自動割り当てされ、'None'とするとヘッドレスサービスを作成します。"
+"Serviceに割り当てられるClusterIP。空欄にすると自動割り当てされ、'None'とするとヘッドレスServiceを作成します。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:101
@@ -397,27 +397,27 @@ msgstr "ファイルやディレクトリをコンテナから、またはコン
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:94
 msgid "Create a TLS secret"
-msgstr "TLSシークレットを作成する"
+msgstr "TLS Secretを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:83
 msgid "Create a namespace with the specified name"
-msgstr "指定された名前でネームスペースを作成する"
+msgstr "指定された名前でNamespaceを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:134
 msgid "Create a secret for use with a Docker registry"
-msgstr "Dockerレジストリで使用するシークレットを作成する"
+msgstr "Dockerレジストリで使用するSecretを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:49
 msgid "Create a secret using specified subcommand"
-msgstr "指定されたサブコマンドでシークレットを作成する"
+msgstr "指定されたサブコマンドでSecretを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:85
 msgid "Create a service account with the specified name"
-msgstr "指定された名前でサービスアカウントを作成する"
+msgstr "指定された名前でServiceAccountを作成する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
@@ -457,7 +457,7 @@ msgstr "1つまたは複数のリソースを表示する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:184
 msgid "Drain node in preparation for maintenance"
-msgstr "メンテナンスを準備するため、ノードをdrainする"
+msgstr "メンテナンスを準備するため、Nodeをdrainする"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
 #: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:77
@@ -477,7 +477,7 @@ msgstr "コンテナ内でコマンドを実行する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
 #: staging/src/k8s.io/kubectl/pkg/cmd/portforward/portforward.go:109
 msgid "Forward one or more local ports to a pod"
-msgstr "1つまたは複数のポートをポッドに転送する"
+msgstr "1つまたは複数のポートをPodに転送する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
 #: staging/src/k8s.io/kubectl/pkg/cmd/help/help.go:37
@@ -490,7 +490,7 @@ msgid ""
 "If non-empty, set the session affinity for the service to this; legal values: "
 "'None', 'ClientIP'"
 msgstr ""
-"指定された場合、サービスのセッション アフィニティを設定します; 有効な値: "
+"指定された場合、Serviceのセッション アフィニティを設定します; 有効な値: "
 "'None', 'ClientIP'"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L135
@@ -514,12 +514,12 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:98
 msgid "Mark node as schedulable"
-msgstr "ノードをスケジュール可能な状態としてマークする"
+msgstr "Nodeをスケジュール可能な状態としてマークする"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:69
 msgid "Mark node as unschedulable"
-msgstr "マークをスケジュール不可能な状態としてマークする"
+msgstr "Nodeをスケジュール不可能な状態としてマークする"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_pause.go#L73
 #: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_pause.go:83
@@ -543,7 +543,7 @@ msgid ""
 "Name or number for the port on the container that the service should direct "
 "traffic to. Optional."
 msgstr ""
-"サービスがトラフィックを転送する宛先であるところの、コンテナにおけるポートを示"
+"Serviceがトラフィックを転送する宛先であるところの、コンテナにおけるポートを示"
 "す名前または番号 (任意)。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
@@ -598,7 +598,7 @@ msgstr "すべてのコマンドに引き継がれるフラグの一覧を表示
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L86
 #: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:152
 msgid "Print the logs for a container in a pod"
-msgstr "ポッドに属するコンテナのログを表示する"
+msgstr "Podに属するコンテナのログを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_resume.go#L71
 #: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_resume.go:87
@@ -667,7 +667,7 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:111
 msgid "The minimum number or percentage of available pods this budget requires."
-msgstr "このbudgetが必要とする利用可能なポッドの最小の数、または割合。"
+msgstr "このbudgetが必要とする利用可能なPodの最小の数、または割合。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:159
@@ -691,14 +691,14 @@ msgid ""
 "is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
 msgstr ""
 "使用するAPIジェネレーターの名前です。ジェネレーターには、'service/v1'と'service/v2'の2つがあります。"
-"これらのジェネレーターの違いは、v1ではサービスのポート名が'default'で、v2では未指定になる点です。"
+"これらのジェネレーターの違いは、v1ではServiceのポート名が'default'で、v2では未指定になる点です。"
 "既定では'service/v2'が使われます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:148
 msgid "The network protocol for the service to be created. Default is 'TCP'."
 msgstr ""
-"作成されるサービスのネットワークプロトコルです。既定では'TCP'が使われます。"
+"作成されるServiceのネットワークプロトコルです。既定では'TCP'が使われます。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:149
@@ -706,7 +706,7 @@ msgid ""
 "The port that the service should serve on. Copied from the resource being "
 "exposed, if unspecified"
 msgstr ""
-"サービスがリソースを提供するポート。未指定の場合、サービスによって公開されるリ"
+"Serviceがリソースを提供するポート。未指定の場合、Serviceによって公開されるリ"
 "ソースからコピーされる"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
@@ -732,7 +732,7 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:155
 msgid "The type of secret to create"
-msgstr "作成するシークレットの種類"
+msgstr "作成するSecretの種類"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
 #: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:87
@@ -743,7 +743,7 @@ msgstr "現在のロールアウトを取り消す"
 #: staging/src/k8s.io/kubectl/pkg/cmd/set/set_resources.go:116
 msgid "Update resource requests/limits on objects with pod templates"
 msgstr ""
-"ポッド テンプレートを使用して、オブジェクトのリソースの要求または制限を更新す"
+"Podテンプレートを使用して、オブジェクトのリソースの要求または制限を更新す"
 "る"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:135
@@ -758,7 +758,7 @@ msgstr "リソースのラベルを更新する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
 #: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:109
 msgid "Update the taints on one or more nodes"
-msgstr "1つまたは複数のノードのtaintを更新する"
+msgstr "1つまたは複数のNodeのtaintを更新する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:150
