@@ -59,6 +59,7 @@ func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operat
 	// field certificatesv1beta1.CertificateSigningRequest.Spec
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// +k8s:required on non-pointer structs is accepted for schema/linting, but does not emit presence validation; requiredness may be implied by nested validations
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil

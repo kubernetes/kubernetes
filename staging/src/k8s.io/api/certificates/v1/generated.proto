@@ -49,6 +49,7 @@ message CertificateSigningRequest {
   // Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
   // Other fields are derived by Kubernetes and cannot be modified by users.
   // +required
+  // +k8s:required
   optional CertificateSigningRequestSpec spec = 2;
 
   // status contains information about whether the request is approved or denied,
