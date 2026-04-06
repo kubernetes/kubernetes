@@ -1157,13 +1157,13 @@ func TestGetRequestCaching(t *testing.T) {
 		req, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
 
 		if err != nil {
-			t.Errorf("Unexpected error: %v.", err)
+			t.Errorf("Expect no error, got: %v.", err)
 		}
 
 		req2, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
 
 		if err != nil {
-			t.Errorf("Unexpected error: %v.", err)
+			t.Errorf("Expect no error, got: %v.", err)
 		}
 
 		if req != req2 {
