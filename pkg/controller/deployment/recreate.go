@@ -95,6 +95,22 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(ctx context.C
 	return scaled, nil
 }
 
+// isPodTerminalForRecreate returns true if the pod is in a terminal phase (Failed or Succeeded).
+func isPodTerminalForRecreate(pod *v1.Pod) bool {
+	switch pod.Status.Phase {
+	case v1.PodFailed, v1.PodSucceeded:
+		return true
+	case v1.PodUnknown:
+		// v1.PodUnknown is a deprecated status.
+		// This logic is kept for backward compatibility.
+		// This used to happen in situation like when the node is temporarily disconnected from the cluster.
+		// If we can't be sure that the pod is not running, we have to count it.
+		return false
+	default:
+		return false
+	}
+}
+
 // oldPodsRunning returns whether there are old pods running or any of the old ReplicaSets thinks that it runs pods.
 func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) bool {
 	if oldPods := util.GetActualReplicaCountForReplicaSets(oldRSs); oldPods > 0 {
@@ -106,18 +122,7 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 			continue
 		}
 		for _, pod := range podList {
-			switch pod.Status.Phase {
-			case v1.PodFailed, v1.PodSucceeded:
-				// Don't count pods in terminal state.
-				continue
-			case v1.PodUnknown:
-				// v1.PodUnknown is a deprecated status.
-				// This logic is kept for backward compatibility.
-				// This used to happen in situation like when the node is temporarily disconnected from the cluster.
-				// If we can't be sure that the pod is not running, we have to count it.
-				return true
-			default:
-				// Pod is not in terminal phase.
+			if !isPodTerminalForRecreate(pod) {
 				return true
 			}
 		}

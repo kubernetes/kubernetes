@@ -528,6 +528,45 @@ func TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment(t 
 	}
 }
 
+// TestPodDeletionEnqueuesRecreateDeploymentWithTerminalPods ensures that the
+// deletion of a pod will requeue a Recreate deployment when the only remaining
+// pods are in a terminal phase (Failed or Succeeded).
+func TestPodDeletionEnqueuesRecreateDeploymentWithTerminalPods(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	f := newFixture(t)
+
+	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+	rs := newReplicaSet(foo, "foo-1", 1)
+	pod := generatePodFromRS(rs)
+
+	terminatedPod := generatePodFromRS(rs)
+	terminatedPod.Name = "terminated"
+	terminatedPod.Status.Phase = v1.PodSucceeded
+
+	f.dLister = append(f.dLister, foo)
+	f.rsLister = append(f.rsLister, rs)
+	f.podLister = append(f.podLister, terminatedPod)
+
+	c, _, err := f.newController(ctx)
+	if err != nil {
+		t.Fatalf("error creating Deployment controller: %v", err)
+	}
+	enqueued := false
+	c.enqueueDeployment = func(d *apps.Deployment) {
+		if d.Name == "foo" {
+			enqueued = true
+		}
+	}
+
+	c.deletePod(logger, pod)
+
+	if !enqueued {
+		t.Errorf("expected deployment %q to be queued after pod deletion when only terminal pods remain", foo.Name)
+	}
+}
+
 func TestGetReplicaSetsForDeployment(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
