@@ -223,8 +223,35 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
-func (a *HorizontalController) updateHPA(old, cur interface{}) {
-	a.enqueueHPA(cur)
+func (a *HorizontalController) updateHPA(oldObj, curObj interface{}) {
+	oldHPA, ok := oldObj.(*autoscalingv2.HorizontalPodAutoscaler)
+	if !ok {
+		a.enqueueHPA(curObj)
+		return
+	}
+	curHPA, ok := curObj.(*autoscalingv2.HorizontalPodAutoscaler)
+	if !ok {
+		a.enqueueHPA(curObj)
+		return
+	}
+
+	// Only enqueue immediately if the spec changed (Generation is bumped by the
+	// API server on spec mutations). For status-only or metadata-only changes
+	// (e.g. the controller's own status write) we use rate-limited enqueue to
+	// avoid a hot-loop: metrics that change on every fetch would otherwise cause
+	// continuous status writes that re-trigger immediate reconciliation.
+	// See https://github.com/kubernetes/kubernetes/pull/42715.
+	if oldHPA.Generation != curHPA.Generation {
+		a.enqueueHPA(curHPA)
+		return
+	}
+
+	key, err := controller.KeyFunc(curHPA)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", curHPA, err))
+		return
+	}
+	a.queue.AddRateLimited(key)
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
@@ -235,10 +262,9 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		return
 	}
 
-	// Requests are always added to queue with resyncPeriod delay.  If there's already
-	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
-	// interval in queue so HPAs are processed every resync interval.
-	a.queue.AddRateLimited(key)
+	// Add the HPA to the queue for immediate processing. Deduplication is handled
+	// by the queue: if the key is already queued or being processed, this is a no-op.
+	a.queue.Add(key)
 
 	// Register HPA in the hpaSelectors map if it's not present yet. Attaching the Nothing selector
 	// that does not select objects. The actual selector is going to be updated
