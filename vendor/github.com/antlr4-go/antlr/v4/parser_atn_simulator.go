@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-var ()
-
 // ClosureBusy is a store of ATNConfigs and is a tiny abstraction layer over
 // a standard JStore so that we can use Lazy instantiation of the JStore, mostly
 // to avoid polluting the stats module with a ton of JStore instances with nothing in them.
@@ -883,7 +881,7 @@ func (p *ParserATNSimulator) getPredicatePredictions(ambigAlts *BitSet, altToPre
 // the ERROR state was reached, outerContext as the initial parser context from the paper
 // or the parser stack at the instant before prediction commences.
 //
-// Teh func returns the value to return from [AdaptivePredict], or
+// The func returns the value to return from [AdaptivePredict], or
 // [ATNInvalidAltNumber] if a suitable alternative was not
 // identified and [AdaptivePredict] should report an error instead.
 func (p *ParserATNSimulator) getSynValidOrSemInvalidAltThatFinishedDecisionEntryRule(configs *ATNConfigSet, outerContext ParserRuleContext) int {

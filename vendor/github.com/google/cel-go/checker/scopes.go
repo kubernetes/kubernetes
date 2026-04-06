@@ -15,6 +15,8 @@
 package checker
 
 import (
+	"strings"
+
 	"github.com/google/cel-go/common/decls"
 )
 
@@ -76,6 +78,7 @@ func (s *Scopes) AddIdent(decl *decls.VariableDecl) {
 // found.
 // Note: The search is performed from innermost to outermost.
 func (s *Scopes) FindIdent(name string) *decls.VariableDecl {
+	name = strings.TrimPrefix(name, ".")
 	if ident, found := s.scopes.idents[name]; found {
 		return ident
 	}
@@ -89,10 +92,31 @@ func (s *Scopes) FindIdent(name string) *decls.VariableDecl {
 // nil if one does not exist.
 // Note: The search is only performed on the current scope and does not search outer scopes.
 func (s *Scopes) FindIdentInScope(name string) *decls.VariableDecl {
+	name = strings.TrimPrefix(name, ".")
 	if ident, found := s.scopes.idents[name]; found {
 		return ident
 	}
 	return nil
+}
+
+// FindLocalIdent finds a locally scoped variable with a given name, ignoring the root scope.
+func (s *Scopes) FindLocalIdent(name string) *decls.VariableDecl {
+	if s == nil || s.parent == nil {
+		return nil
+	}
+	if ident := s.FindIdentInScope(name); ident != nil {
+		return ident
+	}
+	return s.parent.FindLocalIdent(name)
+}
+
+// FindGlobalIdent finds an identifier in the global scope, ignoring all local scopes.
+func (s *Scopes) FindGlobalIdent(name string) *decls.VariableDecl {
+	scope := s
+	for scope.parent != nil {
+		scope = scope.parent
+	}
+	return scope.FindIdentInScope(name)
 }
 
 // SetFunction adds the function Decl to the current scope.
@@ -105,6 +129,7 @@ func (s *Scopes) SetFunction(fn *decls.FunctionDecl) {
 // The search is performed from innermost to outermost.
 // Returns nil if no such function in Scopes.
 func (s *Scopes) FindFunction(name string) *decls.FunctionDecl {
+	name = strings.TrimPrefix(name, ".")
 	if fn, found := s.scopes.functions[name]; found {
 		return fn
 	}

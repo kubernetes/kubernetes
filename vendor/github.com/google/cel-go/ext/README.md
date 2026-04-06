@@ -931,10 +931,10 @@ type will cause a key collision.
 Elements in the map may optionally be filtered according to a predicate
 expression, where elements that satisfy the predicate are transformed.
 
-    <list>.transformMap(indexVar, valueVar, <transform>)
-    <list>.transformMap(indexVar, valueVar, <filter>, <transform>)
-    <map>.transformMap(keyVar, valueVar, <transform>)
-    <map>.transformMap(keyVar, valueVar, <filter>, <transform>)
+    <list>.transformMapEntry(indexVar, valueVar, <transform>)
+    <list>.transformMapEntry(indexVar, valueVar, <filter>, <transform>)
+    <map>.transformMapEntry(keyVar, valueVar, <transform>)
+    <map>.transformMapEntry(keyVar, valueVar, <filter>, <transform>)
 
 Examples:
 
@@ -945,3 +945,73 @@ Examples:
 
     {'greeting': 'aloha', 'farewell': 'aloha'}
       .transformMapEntry(keyVar, valueVar, {valueVar: keyVar}) // error, duplicate key
+
+## Regex
+
+Regex introduces functions for regular expressions in CEL.
+
+Note: Please ensure that the cel.OptionalTypes() is enabled when using regex
+extensions. All functions use the 'regex' namespace. If you are currently
+using a variable named 'regex', the functions will likely work as intended.
+However, there is some chance for collision.
+
+### Replace
+
+The `regex.replace` function replaces all non-overlapping substring of a regex
+pattern in the target string with a replacement string. Optionally, you can
+limit the number of replacements by providing a count argument. When the count
+is a negative number, the function acts as replace all. Only numeric (\N)
+capture group references are supported in the replacement string, with
+validation for correctness. Backslashed-escaped digits (\1 to \9) within the
+replacement argument can be used to insert text matching the corresponding
+parenthesized group in the regexp pattern. An error will be thrown for invalid
+regex or replace string.
+
+
+    regex.replace(target: string, pattern: string, replacement: string) -> string
+    regex.replace(target: string, pattern: string, replacement: string, count: int) -> string
+
+
+Examples:
+
+    regex.replace('hello world hello', 'hello', 'hi') == 'hi world hi'
+    regex.replace('banana', 'a', 'x', 0) == 'banana'
+    regex.replace('banana', 'a', 'x', 1) == 'bxnana'
+    regex.replace('banana', 'a', 'x', 2) == 'bxnxna'
+    regex.replace('banana', 'a', 'x', -12) == 'bxnxnx'
+    regex.replace('foo bar', '(fo)o (ba)r', '\\2 \\1') == 'ba fo'
+
+    regex.replace('test', '(.)', '$2') \\ Runtime Error invalid replace string
+    regex.replace('foo bar', '(', '$2 $1') \\ Runtime Error invalid regex string
+    regex.replace('id=123', 'id=(?P<value>\\\\d+)', 'value: \\values') \\ Runtime Error invalid replace string
+
+### Extract
+
+The `regex.extract` function returns the first match of a regex pattern as an
+`optional` string. If no match is found, it returns an optional none value.
+An error will be thrown for invalid regex or for multiple capture groups.
+
+    regex.extract(target: string, pattern: string) -> optional<string>
+
+Examples:
+
+    regex.extract('hello world', 'hello(.*)') == optional.of(' world')
+    regex.extract('item-A, item-B', 'item-(\\w+)') == optional.of('A')
+    regex.extract('HELLO', 'hello') == optional.none()
+
+    regex.extract('testuser@testdomain', '(.*)@([^.]*)')) \\ Runtime Error multiple extract group
+
+### Extract All
+
+The `regex.extractAll` function returns a `list` of all matches of a regex
+pattern in a target string. If no matches are found, it returns an empty list.
+An error will be thrown for invalid regex or for multiple capture groups.
+
+    regex.extractAll(target: string, pattern: string) -> list<string>
+
+Examples:
+
+    regex.extractAll('id:123, id:456', 'id:\\d+') == ['id:123', 'id:456']
+    regex.extractAll('id:123, id:456', 'assa') == []
+
+    regex.extractAll('testuser@testdomain', '(.*)@([^.]*)') \\ Runtime Error multiple capture group
