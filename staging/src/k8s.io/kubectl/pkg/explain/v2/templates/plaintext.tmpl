@@ -101,6 +101,16 @@ Takes dictionary as argument with keys:
         {{- with include "externalDocs" (dict "schema" $resolved) -}}
             {{- "\n" -}}{{- . -}}
         {{- end -}}
+        {{- with $resolved.default -}}
+            {{- "\n" -}}
+            DEFAULT:{{- "\n" -}}
+            {{- toPrettyJson . | indent 4 -}}{{- "\n" -}}
+        {{- end -}}
+        {{- with $resolved.example -}}
+            {{- "\n" -}}
+            EXAMPLE:{{- "\n" -}}
+            {{- toPrettyJson . | indent 4 -}}{{- "\n" -}}
+        {{- end -}}
         {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive) -}}
             FIELDS:{{- "\n" -}}
             {{- . -}}
@@ -223,6 +233,14 @@ Takes dictionary as argument with keys:
             {{- with .url -}}
                 {{- (print "URL: " .) | indent (add $indentAmount 4) -}}{{- "\n" -}}
             {{- end -}}
+        {{- end -}}
+        {{- with $fieldSchema.default -}}
+            {{- "\n" -}}
+            {{- (print "DEFAULT: " (toJson .)) | indent (add $indentAmount 2) -}}{{- "\n" -}}
+        {{- end -}}
+        {{- with $fieldSchema.example -}}
+            {{- "\n" -}}
+            {{- (print "EXAMPLE: " (toJson .)) | indent (add $indentAmount 2) -}}{{- "\n" -}}
         {{- end -}}
         {{- "\n" -}}
     {{- end -}}
