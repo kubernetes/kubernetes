@@ -21,6 +21,7 @@ import (
 
 	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -181,13 +182,17 @@ func TestValidate(t *testing.T) {
 
 			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 			plugin.SetExternalKubeInformerFactory(informerFactory)
-			for _, w := range tc.workloads {
+
+			// Populate both informer store and fake client with workloads
+			objs := make([]runtime.Object, len(tc.workloads))
+			for i, w := range tc.workloads {
 				if err := informerFactory.Scheduling().V1alpha2().Workloads().Informer().GetStore().Add(w); err != nil {
 					t.Fatalf("failed to add Workload: %v", err)
 				}
+				objs[i] = w
 			}
 			plugin.SetReadyFunc(func() bool { return true })
-			plugin.SetExternalKubeClientSet(fake.NewSimpleClientset())
+			plugin.SetExternalKubeClientSet(fake.NewSimpleClientset(objs...))
 
 			err := plugin.Validate(ctx, tc.attrs, nil)
 			if tc.wantErr && err == nil {

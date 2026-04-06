@@ -131,14 +131,13 @@ func (p *PodGroupWorkloadExists) Validate(ctx context.Context, a admission.Attri
 	}
 
 	workloadRef := podGroup.Spec.PodGroupTemplateRef.Workload
-	workload, err := p.workloadLister.Workloads(a.GetNamespace()).Get(workloadRef.WorkloadName)
+
+	// Always fetch from API server to avoid informer cache race with DeletionTimestamp
+	workload, err := p.client.SchedulingV1alpha2().Workloads(
+		a.GetNamespace()).Get(ctx, workloadRef.WorkloadName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		workload, err = p.client.SchedulingV1alpha2().Workloads(
-			a.GetNamespace()).Get(ctx, workloadRef.WorkloadName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return admission.NewForbidden(a,
-				fmt.Errorf("PodGroup rejected: Workload %q not found", workloadRef.WorkloadName))
-		}
+		return admission.NewForbidden(a,
+			fmt.Errorf("PodGroup rejected: Workload %q not found", workloadRef.WorkloadName))
 	}
 	if err != nil {
 		return apierrors.NewInternalError(err)
