@@ -1167,7 +1167,7 @@ func TestGetRequestCaching(t *testing.T) {
 		}
 
 		if req != req2 {
-			t.Errorf("expected the same request pointer for subsequent calls, but got %p != %p", req, req2)
+			t.Errorf("Expected the same request pointer for subsequent calls, but got %p != %p.", req, req2)
 		}
 
 		worker.httpProbeRequest.reset()
@@ -1175,7 +1175,7 @@ func TestGetRequestCaching(t *testing.T) {
 		req3, _ := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
 
 		if req2 == req3 {
-			t.Errorf("Cache not invalidated.")
+			t.Errorf("Expected result: %p != %p, but got %p == %p.", req2, req3, req2, req3)
 		}
 
 	})
