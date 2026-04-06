@@ -311,6 +311,59 @@ func TestK8sUUID(t *testing.T) {
 	}
 }
 
+func TestIPSloppy(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+	ipErr := func(s string) field.ErrorList {
+		return field.ErrorList{
+			field.Invalid(fldPath, s, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)").WithOrigin("format=k8s-ip"),
+		}
+	}
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid IPv4",
+		input:    "10.0.0.1",
+		wantErrs: nil,
+	}, {
+		name:     "valid IPv4 with leading zeros in octets",
+		input:    "192.168.01.1",
+		wantErrs: nil,
+	}, {
+		name:     "valid IPv6",
+		input:    "2001:db8::1",
+		wantErrs: nil,
+	}, {
+		name:     "invalid: empty",
+		input:    "",
+		wantErrs: ipErr(""),
+	}, {
+		name:     "invalid: not an IP",
+		input:    "not-an-ip",
+		wantErrs: ipErr("not-an-ip"),
+	}, {
+		name:     "invalid: out of range octets",
+		input:    "256.256.256.256",
+		wantErrs: ipErr("256.256.256.256"),
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := IPSloppy(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+	t.Run("nil value", func(t *testing.T) {
+		matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact()
+		matcher.Test(t, nil, IPSloppy[string](ctx, operation.Operation{}, fldPath, nil, nil))
+	})
+}
+
 func TestLabelValue(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
