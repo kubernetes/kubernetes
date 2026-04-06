@@ -35,6 +35,12 @@ func MaxError[T constraints.Integer](max T) string {
 	return fmt.Sprintf("must be less than or equal to %d", max)
 }
 
+// MultipleOfError returns a string explanation of a "must be a multiple of"
+// validation failure.
+func MultipleOfError[T constraints.Integer](divisor T) string {
+	return fmt.Sprintf("must be a multiple of %d", divisor)
+}
+
 // MaxLenError returns a string explanation of a "string too long" validation
 // failure.
 func MaxLenError(length int) string {
