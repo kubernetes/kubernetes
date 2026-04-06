@@ -153,19 +153,7 @@ var (
 	GKENodePool = framework.WithFeature(framework.ValidFeatures.Add("GKENodePool"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	GPUClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterDowngrade"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	GPUClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterUpgrade"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	GPUDevicePlugin = framework.WithFeature(framework.ValidFeatures.Add("GPUDevicePlugin"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	GPUMasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUMasterUpgrade"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	GPUUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUUpgrade"))
 
 	// OWNER: sig-node
 	// Testing graceful node shutdown
@@ -180,10 +168,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
-
-	// OWNER: sig-autoscaling
-	// Marks tests that require HPA configurable tolerance (https://kep.k8s.io/4951).
-	HPAConfigurableTolerance = framework.WithFeature(framework.ValidFeatures.Add("HPAConfigurableTolerance"))
 
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
@@ -240,10 +224,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
 
-	// Owner: sig-node
-	// Testing kubelet PSI metrics KEP
-	KubeletPSI = framework.WithFeature(framework.ValidFeatures.Add("KubeletPSI"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
 
@@ -253,9 +233,6 @@ var (
 
 	// Owner: sig-storage
 	LSCIQuotaMonitoring = framework.WithFeature(framework.ValidFeatures.Add("LSCIQuotaMonitoring"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
 
 	// Owner: sig-network
 	// Marks tests that require a cloud provider that implements LoadBalancer Services
@@ -273,10 +250,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
-
-	// Owner: sig-api-machinery
-	// Marks tests that enforce ordered namespace deletion.
-	MutatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("MutatingAdmissionPolicy"))
 
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
@@ -363,18 +336,7 @@ var (
 	Reboot = framework.WithFeature(framework.ValidFeatures.Add("Reboot"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ReclaimPolicy = framework.WithFeature(framework.ValidFeatures.Add("ReclaimPolicy"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RegularResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
-
-	// Owner: sig-network
-	// Marks tests of KEP-4427 that require the `RelaxedDNSSearchValidation` feature gate
-	RelaxedDNSSearchValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedDNSSearchValidation"))
-
-	// Owner: sig-node
-	// resource health Status for device plugins and DRA <https://kep.k8s.io/4680>
-	ResourceHealthStatus = framework.WithFeature(framework.ValidFeatures.Add("ResourceHealthStatus"))
 
 	// Owner: sig-node
 	// Device Management metrics
@@ -406,17 +368,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
 
-	// Owner: sig-auth
-	// Marks tests that require a conforming implementation of
-	// Node claims for serviceaccounts. Typically this means that the
-	// ServiceAccountTokenNodeBindingValidation feature must be enabled.
-	ServiceAccountTokenNodeBindingValidation = framework.WithFeature(framework.ValidFeatures.Add("ServiceAccountTokenNodeBindingValidation"))
-
-	// Owner: sig-network
-	// Marks tests of KEP-1880 that require the `MultiCIDRServiceAllocator` feature gate
-	// and the networking.k8s.io/v1alpha1 API.
-	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
-
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314
 	// Tests marked with this feature require:
@@ -425,21 +376,6 @@ var (
 	// - The SnapshotMetadataService CRD (cbt.storage.k8s.io/v1beta1) installed
 	// - A storage driver that implements the CapSnapshotMetadata capability
 	SnapshotMetadata = framework.WithFeature(framework.ValidFeatures.Add("snapshotmetadata"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StackdriverCustomMetrics = framework.WithFeature(framework.ValidFeatures.Add("StackdriverCustomMetrics"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StackdriverExternalMetrics = framework.WithFeature(framework.ValidFeatures.Add("StackdriverExternalMetrics"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StackdriverMetadataAgent = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMetadataAgent"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StackdriverMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMonitoring"))
 
 	// Tests marked with this feature require the kubelet to be running in standalone mode (--standalone-mode=true) like this:
 	// make test-e2e-node PARALLELISM=1 FOCUS="StandaloneMode" TEST_ARGS='--kubelet-flags="--fail-swap-on=false" --standalone-mode=true'
@@ -473,18 +409,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
 
-	// Owner: sig-node
-	// Test marked with this feature must run on nodes where container runtime allows to pods with hostNetwork to use user namespaces.
-	// This feature can be removed once Containerd and CRI-O both added this support.
-	UserNamespacesHostNetworkSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesHostNetworkSupport"))
-
 	// UserNamespacesSupport is in test-infra nodes that have runtimes with user-namespaces
 	// support. It will be dropped after containerd 1.7 support is removed from CI.
 	// Owner: sig-node
 	UserNamespacesSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
 
 	// Owner: sig-storage
 	// TODO: Remove it once the csi driver is promoted to GA and the manifest is updated.
@@ -502,9 +430,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Volumes = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	Vsphere = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
