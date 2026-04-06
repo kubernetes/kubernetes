@@ -44,6 +44,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -5834,4 +5836,271 @@ func TestBuildQuantity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// spyWorkQueue wraps a real rate-limiting workqueue and records whether items
+// were enqueued via Add (immediate) or AddRateLimited (delayed).
+type spyWorkQueue struct {
+	workqueue.TypedRateLimitingInterface[string]
+	mu                  sync.Mutex
+	addCalls            []string
+	addRateLimitedCalls []string
+	onAdd               func(string)
+}
+
+func newSpyWorkQueue(resyncPeriod time.Duration) *spyWorkQueue {
+	return &spyWorkQueue{
+		TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
+			NewDefaultHPARateLimiter(resyncPeriod),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "test-spy",
+			},
+		),
+	}
+}
+
+func (s *spyWorkQueue) Add(item string) {
+	s.mu.Lock()
+	s.addCalls = append(s.addCalls, item)
+	onAdd := s.onAdd
+	s.mu.Unlock()
+	if onAdd != nil {
+		onAdd(item)
+	}
+	s.TypedRateLimitingInterface.Add(item)
+}
+
+func (s *spyWorkQueue) AddRateLimited(item string) {
+	s.mu.Lock()
+	s.addRateLimitedCalls = append(s.addRateLimitedCalls, item)
+	s.mu.Unlock()
+	s.TypedRateLimitingInterface.AddRateLimited(item)
+}
+
+func (s *spyWorkQueue) getAddCalls() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]string, len(s.addCalls))
+	copy(result, s.addCalls)
+	return result
+}
+
+func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]string, len(s.addRateLimitedCalls))
+	copy(result, s.addRateLimitedCalls)
+	return result
+}
+
+func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
+	monitor.Register()
+	return &HorizontalController{
+		queue:        spy,
+		hpaSelectors: selectors.NewBiMultimap(),
+		monitor:      monitor.New(),
+	}
+}
+
+func TestEnqueueHPAAddsImmediately(t *testing.T) {
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hpa",
+			Namespace: "test-ns",
+		},
+	}
+	ctrl.enqueueHPA(hpa)
+
+	expectedKey := "test-ns/test-hpa"
+	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+		"enqueueHPA should use queue.Add for immediate processing")
+	assert.Empty(t, spy.getAddRateLimitedCalls(),
+		"enqueueHPA should not use queue.AddRateLimited")
+}
+
+func TestEnqueueHPARegistersSelectorBeforeQueueAdd(t *testing.T) {
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	expectedKey := "test-ns/test-hpa"
+	expectedSelectorKey := selectors.Key{Name: "test-hpa", Namespace: "test-ns"}
+	spy.onAdd = func(item string) {
+		assert.Equal(t, expectedKey, item)
+		ctrl.hpaSelectorsMux.Lock()
+		defer ctrl.hpaSelectorsMux.Unlock()
+		assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
+			"selector registration should happen before queue.Add")
+	}
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hpa",
+			Namespace: "test-ns",
+		},
+	}
+	ctrl.enqueueHPA(hpa)
+
+	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+		"enqueueHPA should still enqueue immediately")
+}
+
+func TestUpdateHPAEnqueueBehavior(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, true)
+
+	tests := []struct {
+		name                 string
+		oldObj               interface{}
+		curObj               interface{}
+		expectImmediateAdd   bool
+		expectRateLimitedAdd bool
+	}{
+		{
+			name: "generation change enqueues immediately",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 2,
+				},
+			},
+			expectImmediateAdd:   true,
+			expectRateLimitedAdd: false,
+		},
+		{
+			name: "status-only change uses rate limiting",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 3,
+					DesiredReplicas: 3,
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 5,
+					DesiredReplicas: 5,
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+		{
+			name: "unrecognized old object type falls back to rate-limited enqueue",
+			oldObj: cache.DeletedFinalStateUnknown{
+				Key: "test-ns/test-hpa",
+				Obj: &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hpa",
+					Namespace: "test-ns",
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+		{
+			name: "unrecognized new object type falls back to rate-limited enqueue",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hpa",
+					Namespace: "test-ns",
+				},
+			},
+			curObj: cache.DeletedFinalStateUnknown{
+				Key: "test-ns/test-hpa",
+				Obj: &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spy := newSpyWorkQueue(10 * time.Minute)
+			defer spy.ShutDown()
+			ctrl := newTestEnqueueController(spy)
+
+			ctrl.updateHPA(tt.oldObj, tt.curObj)
+
+			expectedKey := "test-ns/test-hpa"
+			if tt.expectImmediateAdd {
+				assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+					"expected queue.Add to be called for immediate processing")
+			} else {
+				assert.Empty(t, spy.getAddCalls(),
+					"expected queue.Add not to be called")
+			}
+			if tt.expectRateLimitedAdd {
+				assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
+					"expected queue.AddRateLimited to be called for delayed processing")
+			} else {
+				assert.Empty(t, spy.getAddRateLimitedCalls(),
+					"expected queue.AddRateLimited not to be called")
+			}
+		})
+	}
+}
+
+func TestUpdateHPAFallsBackWhenFeatureDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, false)
+
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	ctrl.updateHPA(
+		&autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-hpa",
+				Namespace:  "test-ns",
+				Generation: 1,
+			},
+		},
+		&autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-hpa",
+				Namespace:  "test-ns",
+				Generation: 2,
+			},
+		},
+	)
+
+	expectedKey := "test-ns/test-hpa"
+	assert.Empty(t, spy.getAddCalls(),
+		"with HPAGeneration disabled, generation changes should not trigger immediate enqueue")
+	assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
+		"with HPAGeneration disabled, all updates should be rate-limited")
 }
