@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -104,4 +105,37 @@ func TestObjectMetricAverageValue_RoundTripV2V1(t *testing.T) {
 
 	validationErrors = validation.ValidateHorizontalPodAutoscaler(hpaInternalFromV1, validation.HorizontalPodAutoscalerSpecValidationOptions{})
 	assert.Zero(t, len(validationErrors), "Validation should not produce errors")
+}
+
+func TestSyncPeriodSeconds_RoundTripV2Internal(t *testing.T) {
+	hpaV2 := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-hpa",
+			Namespace: "default",
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				Name:       "my-deployment",
+				APIVersion: "apps/v1",
+			},
+			MinReplicas:       ptr.To[int32](1),
+			MaxReplicas:       3,
+			SyncPeriodSeconds: ptr.To[int32](45),
+		},
+	}
+
+	hpaInternal := &autoscaling.HorizontalPodAutoscaler{}
+	err := Convert_v2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(hpaV2, hpaInternal, nil)
+	require.NoError(t, err, "Conversion to internal should not fail")
+	if assert.NotNil(t, hpaInternal.Spec.SyncPeriodSeconds, "SyncPeriodSeconds should survive v2->internal conversion") {
+		assert.Equal(t, int32(45), *hpaInternal.Spec.SyncPeriodSeconds)
+	}
+
+	roundTripped := &autoscalingv2.HorizontalPodAutoscaler{}
+	err = Convert_autoscaling_HorizontalPodAutoscaler_To_v2_HorizontalPodAutoscaler(hpaInternal, roundTripped, nil)
+	require.NoError(t, err, "Conversion back to v2 should not fail")
+	if assert.NotNil(t, roundTripped.Spec.SyncPeriodSeconds, "SyncPeriodSeconds should survive internal->v2 conversion") {
+		assert.Equal(t, int32(45), *roundTripped.Spec.SyncPeriodSeconds)
+	}
 }

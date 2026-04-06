@@ -123,6 +123,9 @@ type HorizontalController struct {
 	// Storage of HPAs and their selectors.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
+
+	resyncPeriod time.Duration
+	rateLimiter  *PerItemIntervalRateLimiter
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -146,6 +149,7 @@ func NewHorizontalController(
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
+	rateLimiter := NewDefaultHPARateLimiter(resyncPeriod)
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
@@ -154,12 +158,14 @@ func NewHorizontalController(
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
 		monitor:                      monitor.New(),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(resyncPeriod),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Name: "horizontalpodautoscaler",
 			},
 		),
 		mapper:              mapper,
+		resyncPeriod:        resyncPeriod,
+		rateLimiter:         rateLimiter,
 		recommendations:     map[string][]timestampedRecommendation{},
 		recommendationsLock: sync.Mutex{},
 		scaleUpEvents:       map[string][]timestampedScaleEvent{},
@@ -248,7 +254,7 @@ func (a *HorizontalController) updateHPA(oldObj, curObj interface{}) {
 
 	key, err := controller.KeyFunc(curHPA)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", curHPA, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", curHPA, err))
 		return
 	}
 	a.queue.AddRateLimited(key)
@@ -258,7 +264,7 @@ func (a *HorizontalController) updateHPA(oldObj, curObj interface{}) {
 func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", obj, err))
 		return
 	}
 
@@ -281,12 +287,13 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 func (a *HorizontalController) deleteHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", obj, err))
 		return
 	}
 
 	// TODO: could we leak if we fail to get the key?
 	a.queue.Forget(key)
+	a.rateLimiter.RemoveItem(key)
 
 	// Remove HPA and attached selector.
 	a.hpaSelectorsMux.Lock()
@@ -816,6 +823,12 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpa := hpaShared.DeepCopy()
 	hpaStatusOriginal := hpa.Status.DeepCopy()
+
+	if hpa.Spec.SyncPeriodSeconds != nil && *hpa.Spec.SyncPeriodSeconds > 0 {
+		a.rateLimiter.SetItemInterval(key, time.Duration(*hpa.Spec.SyncPeriodSeconds)*time.Second)
+	} else {
+		a.rateLimiter.RemoveItem(key)
+	}
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
 

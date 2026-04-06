@@ -125,5 +125,6 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 
 	// field autoscalingv2.HorizontalPodAutoscalerSpec.Metrics has no validation
 	// field autoscalingv2.HorizontalPodAutoscalerSpec.Behavior has no validation
+	// field autoscalingv2.HorizontalPodAutoscalerSpec.SyncPeriodSeconds has no validation
 	return errs
 }

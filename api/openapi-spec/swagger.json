@@ -4267,6 +4267,11 @@
         "scaleTargetRef": {
           "$ref": "#/definitions/io.k8s.api.autoscaling.v2.CrossVersionObjectReference",
           "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count."
+        },
+        "syncPeriodSeconds": {
+          "description": "syncPeriodSeconds is the period in seconds between each sync (reconciliation) of this autoscaler. If not set, the global controller default (--horizontal-pod-autoscaler-sync-period) is used. Must be greater than zero and less than or equal to 3600 (one hour).",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "required": [

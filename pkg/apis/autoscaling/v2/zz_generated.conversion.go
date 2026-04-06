@@ -606,6 +606,7 @@ func autoConvert_v2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAuto
 		out.Metrics = nil
 	}
 	out.Behavior = (*autoscaling.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
+	out.SyncPeriodSeconds = (*int32)(unsafe.Pointer(in.SyncPeriodSeconds))
 	return nil
 }
 
@@ -632,6 +633,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2_HorizontalPodAuto
 		out.Metrics = nil
 	}
 	out.Behavior = (*autoscalingv2.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
+	out.SyncPeriodSeconds = (*int32)(unsafe.Pointer(in.SyncPeriodSeconds))
 	return nil
 }
 

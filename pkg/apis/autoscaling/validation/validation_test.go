@@ -2000,3 +2000,94 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 		t.Error("expected error, APIVersion should be checked")
 	}
 }
+
+func TestValidateSyncPeriodSeconds(t *testing.T) {
+	baseHPA := func(syncPeriod *int32) autoscaling.HorizontalPodAutoscaler {
+		return autoscaling.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind:       "Deployment",
+					Name:       "myrc",
+					APIVersion: "apps/v1",
+				},
+				MinReplicas:       ptr.To[int32](1),
+				MaxReplicas:       5,
+				SyncPeriodSeconds: syncPeriod,
+			},
+		}
+	}
+
+	successCases := []struct {
+		name string
+		hpa  autoscaling.HorizontalPodAutoscaler
+	}{
+		{
+			name: "nil syncPeriodSeconds",
+			hpa:  baseHPA(nil),
+		},
+		{
+			name: "syncPeriodSeconds = 1",
+			hpa:  baseHPA(ptr.To[int32](1)),
+		},
+		{
+			name: "syncPeriodSeconds = 30",
+			hpa:  baseHPA(ptr.To[int32](30)),
+		},
+		{
+			name: "syncPeriodSeconds = 3600 (max)",
+			hpa:  baseHPA(ptr.To[int32](3600)),
+		},
+	}
+	for _, tc := range successCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateHorizontalPodAutoscaler(&tc.hpa, hpaSpecValidationOpts); len(errs) != 0 {
+				t.Errorf("expected success, got: %v", errs)
+			}
+		})
+	}
+
+	errorCases := []struct {
+		name string
+		hpa  autoscaling.HorizontalPodAutoscaler
+		msg  string
+	}{
+		{
+			name: "syncPeriodSeconds = 0",
+			hpa:  baseHPA(ptr.To[int32](0)),
+			msg:  "must be greater than zero",
+		},
+		{
+			name: "syncPeriodSeconds = -1",
+			hpa:  baseHPA(ptr.To[int32](-1)),
+			msg:  "must be greater than zero",
+		},
+		{
+			name: "syncPeriodSeconds = 3601 (above max)",
+			hpa:  baseHPA(ptr.To[int32](3601)),
+			msg:  "must be less than or equal to 3600",
+		},
+	}
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateHorizontalPodAutoscaler(&tc.hpa, hpaSpecValidationOpts)
+			if len(errs) == 0 {
+				t.Errorf("expected error containing %q, got success", tc.msg)
+			} else {
+				found := false
+				for _, e := range errs {
+					if strings.Contains(e.Error(), tc.msg) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q, got: %v", tc.msg, errs)
+				}
+			}
+		})
+	}
+}
