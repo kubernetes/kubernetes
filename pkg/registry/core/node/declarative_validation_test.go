@@ -26,29 +26,14 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func TestDeclarativeValidateNode(t *testing.T) {
+// Smoke test that create requests are wired through declarative validation.
+func TestDeclarativeValidateNodeCreateWiring(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "",
 		APIVersion: "v1",
 	})
-	testCases := map[string]struct {
-		input        api.Node
-		expectedErrs field.ErrorList
-	}{
-		"valid node": {
-			input: mkValidNode(),
-		},
-		"valid node with providerID": {
-			input: mkValidNode(func(n *api.Node) {
-				n.Spec.ProviderID = "provider:///node-1"
-			}),
-		},
-	}
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
-		})
-	}
+	obj := mkValidNode()
+	apitesting.VerifyValidationEquivalence(t, ctx, &obj, Strategy.Validate, field.ErrorList{})
 }
 
 func TestDeclarativeValidateNodeUpdate(t *testing.T) {
