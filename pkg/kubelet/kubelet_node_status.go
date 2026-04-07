@@ -245,6 +245,10 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		kubeletapis.LabelArch,
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
+		defaultLabels = append(defaultLabels, v1.LabelRunningInUserNamespace)
+	}
+
 	needsUpdate := false
 	if existingNode.Labels == nil {
 		existingNode.Labels = make(map[string]string)
