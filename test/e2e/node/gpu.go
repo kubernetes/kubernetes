@@ -57,7 +57,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "lambda")
 		podClient = e2epod.NewPodClient(f)
 	})
 
@@ -86,7 +86,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "lambda")
 		podClient = e2epod.NewPodClient(f)
 	})
 
@@ -116,7 +116,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "lambda")
 	})
 
 	f.It("should run gpu based jobs", func(ctx context.Context) {
