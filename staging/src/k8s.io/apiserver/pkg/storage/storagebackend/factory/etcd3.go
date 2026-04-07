@@ -95,6 +95,9 @@ func init() {
 		l = zap.NewNop()
 	}
 	etcd3ClientLogger = l.Named("etcd-client")
+
+	clientv3.SetSubstreamBufferDepthObserver(metrics.RecordEtcdWatchSubstreamBufferDepthMilestone)
+	clientv3.SetSubstreamBufferOverloadObserver(metrics.RecordEtcdWatchSubstreamBufferOverload)
 }
 
 // etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.

@@ -44,6 +44,15 @@ const (
 
 	// InvalidWatchID represents an invalid watch ID and prevents duplication with an existing watch.
 	InvalidWatchID = -1
+
+	// maxWatcherStreamBuffer caps the number of decoded watch responses queued per substream.
+	// Beyond this, the watch is canceled so the client can reconnect (avoids unbounded memory
+	// growth when consumers cannot keep up). See kubernetes/kubernetes#138217.
+	maxWatcherStreamBuffer = 50000
+
+	// firstWatcherBufferDepthReport is the first buffer depth at which we log and invoke the
+	// optional depth observer (then we report at exponentially increasing thresholds).
+	firstWatcherBufferDepthReport = 1024
 )
 
 type Event mvccpb.Event
@@ -241,6 +250,50 @@ type watcherStream struct {
 
 	// buf holds all events received from etcd but not yet consumed by the client
 	buf []*WatchResponse
+
+	// nextBufferDepthReport is the next depth (len(buf)) at which to log/emit metrics; zero means unset.
+	nextBufferDepthReport int
+}
+
+var (
+	bufferDepthObsMu  sync.RWMutex
+	bufferDepthObs    func(depth int)
+	bufferOverloadObs func()
+)
+
+// SetSubstreamBufferDepthObserver registers a function called when a watch substream's internal
+// buffer crosses exponentially spaced depths starting at firstWatcherBufferDepthReport. Pass nil to
+// disable. Safe for use before any Watch calls; typically used for metrics.
+func SetSubstreamBufferDepthObserver(observe func(depth int)) {
+	bufferDepthObsMu.Lock()
+	bufferDepthObs = observe
+	bufferDepthObsMu.Unlock()
+}
+
+// SetSubstreamBufferOverloadObserver registers a function invoked once when a substream hits
+// maxWatcherStreamBuffer and the watch is canceled. Pass nil to disable.
+func SetSubstreamBufferOverloadObserver(onOverload func()) {
+	bufferDepthObsMu.Lock()
+	bufferOverloadObs = onOverload
+	bufferDepthObsMu.Unlock()
+}
+
+func callSubstreamBufferDepthObserver(depth int) {
+	bufferDepthObsMu.RLock()
+	f := bufferDepthObs
+	bufferDepthObsMu.RUnlock()
+	if f != nil {
+		f(depth)
+	}
+}
+
+func callSubstreamBufferOverloadObserver() {
+	bufferDepthObsMu.RLock()
+	f := bufferOverloadObs
+	bufferDepthObsMu.RUnlock()
+	if f != nil {
+		f()
+	}
 }
 
 func NewWatcher(c *Client) Watcher {
@@ -710,6 +763,60 @@ func (w *watchGRPCStream) nextResume() *watcherStream {
 	return nil
 }
 
+func (w *watchGRPCStream) noteWatcherSubstreamBufferDepth(ws *watcherStream, depth int) {
+	if depth < firstWatcherBufferDepthReport {
+		return
+	}
+	if ws.nextBufferDepthReport == 0 {
+		ws.nextBufferDepthReport = firstWatcherBufferDepthReport
+	}
+	for ws.nextBufferDepthReport <= depth {
+		callSubstreamBufferDepthObserver(ws.nextBufferDepthReport)
+		if w.lg != nil {
+			if ws.nextBufferDepthReport >= 4096 {
+				w.lg.Warn("etcd watch client substream buffer depth is high",
+					zap.Int("buffer-depth", ws.nextBufferDepthReport),
+					zap.Int64("watch-id", ws.id),
+				)
+			} else {
+				w.lg.Info("etcd watch client substream buffer depth is elevated",
+					zap.Int("buffer-depth", ws.nextBufferDepthReport),
+					zap.Int64("watch-id", ws.id),
+				)
+			}
+		}
+		if ws.nextBufferDepthReport < 1<<16 {
+			ws.nextBufferDepthReport <<= 1
+		} else {
+			ws.nextBufferDepthReport += 1 << 16
+		}
+	}
+}
+
+func (w *watchGRPCStream) cancelWatchForBufferOverload(ws *watcherStream, depth int) {
+	callSubstreamBufferOverloadObserver()
+	if w.lg != nil {
+		w.lg.Error("etcd watch client substream buffer exceeded limit; canceling watch",
+			zap.Int("buffer-depth", depth),
+			zap.Int64("watch-id", ws.id),
+		)
+	}
+	resp := WatchResponse{
+		Canceled:     true,
+		cancelReason: "etcdclient: watch substream buffer size exceeded",
+	}
+	// Send asynchronously so this goroutine can exit and close(ws.donec) in defer,
+	// unblocking run()'s unicast (which selects on donec). Do not close outc here;
+	// closeSubstream does that after serveSubstream returns.
+	go func() {
+		select {
+		case ws.outc <- resp:
+		case <-ws.initReq.ctx.Done():
+		case <-time.After(closeSendErrTimeout):
+		}
+	}()
+}
+
 // dispatchEvent sends a WatchResponse to the appropriate watcher stream
 func (w *watchGRPCStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
 	events := make([]*Event, len(pbresp.Events))
@@ -863,8 +970,12 @@ func (w *watchGRPCStream) serveSubstream(ws *watcherStream, resumec chan struct{
 				continue
 			}
 
-			// TODO pause channel if buffer gets too large
+			if len(ws.buf) >= maxWatcherStreamBuffer {
+				w.cancelWatchForBufferOverload(ws, len(ws.buf))
+				return
+			}
 			ws.buf = append(ws.buf, wr)
+			w.noteWatcherSubstreamBufferDepth(ws, len(ws.buf))
 		case <-w.ctx.Done():
 			return
 		case <-ws.initReq.ctx.Done():

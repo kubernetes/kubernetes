@@ -142,6 +142,25 @@ var (
 		},
 		[]string{},
 	)
+	// etcdWatchSubstreamBufferDepth records buffer depth at exponentially spaced reporting milestones
+	// in the etcd v3 client (go.etcd.io/etcd/client/v3). See https://github.com/kubernetes/kubernetes/issues/138217.
+	etcdWatchSubstreamBufferDepth = compbasemetrics.NewHistogram(
+		&compbasemetrics.HistogramOpts{
+			Subsystem:      "apiserver",
+			Name:           "etcd_watch_substream_buffer_depth_milestone",
+			Help:           "Histogram of etcd watch client substream buffer depth at reporting milestones when the consumer is slower than etcd.",
+			Buckets:        []float64{1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
+	etcdWatchSubstreamBufferOverload = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      "apiserver",
+			Name:           "etcd_watch_substream_buffer_overload_cancellations_total",
+			Help:           "Count of etcd watches canceled after the client substream buffer reached its configured limit.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
 	listStorageCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_storage_list_total",
@@ -203,6 +222,8 @@ func Register() {
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(etcdWatchSubstreamBufferDepth)
+		legacyregistry.MustRegister(etcdWatchSubstreamBufferOverload)
 		legacyregistry.MustRegister(listStorageCount)
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
@@ -295,6 +316,17 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// RecordEtcdWatchSubstreamBufferDepthMilestone records a milestone depth from the etcd client's
+// per-watch substream buffer (go.etcd.io/etcd/client/v3).
+func RecordEtcdWatchSubstreamBufferDepthMilestone(depth int) {
+	etcdWatchSubstreamBufferDepth.Observe(float64(depth))
+}
+
+// RecordEtcdWatchSubstreamBufferOverload records that a watch was canceled due to buffer limit.
+func RecordEtcdWatchSubstreamBufferOverload() {
+	etcdWatchSubstreamBufferOverload.Inc()
 }
 
 // RecordStorageListMetrics notes various metrics of the cost to serve a LIST request
