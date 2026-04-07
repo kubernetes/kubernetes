@@ -17,14 +17,20 @@ limitations under the License.
 package kubelet
 
 import (
+	"strconv"
+
 	"github.com/moby/sys/userns"
 
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
 func getOSSpecificLabels() (map[string]string, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
+		return map[string]string{v1.LabelRunningInUserNamespace: strconv.FormatBool(userns.RunningInUserNS())}, nil
+	}
 	return nil, nil
 }
 

@@ -71,4 +71,8 @@ const (
 	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
 	// LabelMetadataName is the label name which, in-tree, is used to automatically label namespaces, so they can be selected easily by tools which require definitive labels
 	LabelMetadataName = "kubernetes.io/metadata.name"
+
+	// LabelRunningInUserNamespace is added by kubelet to a node to indicate whether the kubelet is running in a user namespace.
+	// The value is either "true" or "false".
+	LabelRunningInUserNamespace = "node.kubernetes.io/running-in-user-namespace"
 )
