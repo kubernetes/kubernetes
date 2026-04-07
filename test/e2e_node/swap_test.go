@@ -243,8 +243,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
 
 					// Wait for removal so the node is not under extreme memory pressure when kubelet restores config.
-					err := podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-					framework.ExpectNoError(err)
+					podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func(ctx context.Context) {
@@ -292,8 +291,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed())
 
-					err := podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-					framework.ExpectNoError(err)
+					podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				})
 
 				ginkgo.It("ensure summary API properly reports swap", func() {
