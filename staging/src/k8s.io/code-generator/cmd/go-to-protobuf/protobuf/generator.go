@@ -652,7 +652,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		}
 
 		// extract information from JSON field tag
-		if tag := tags.Get("json"); len(tag) > 0 {
+		if tag, _ := tags.Lookup("json"); len(tag) > 0 {
 			parts := strings.Split(tag, ",")
 			if len(field.Name) == 0 && len(parts[0]) != 0 {
 				field.Name = parts[0]

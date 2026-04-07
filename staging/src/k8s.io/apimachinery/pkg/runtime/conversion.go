@@ -20,7 +20,6 @@ package runtime
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -39,18 +38,6 @@ func DefaultMetaV1FieldSelectorConversion(label, value string) (string, string, 
 	default:
 		return "", "", fmt.Errorf("%q is not a known field selector: only %q, %q", label, "metadata.name", "metadata.namespace")
 	}
-}
-
-// JSONKeyMapper uses the struct tags on a conversion to determine the key value for
-// the other side. Use when mapping from a map[string]* to a struct or vice versa.
-func JSONKeyMapper(key string, sourceTag, destTag reflect.StructTag) (string, string) {
-	if s := destTag.Get("json"); len(s) > 0 {
-		return strings.SplitN(s, ",", 2)[0], key
-	}
-	if s := sourceTag.Get("json"); len(s) > 0 {
-		return key, strings.SplitN(s, ",", 2)[0]
-	}
-	return key, key
 }
 
 func Convert_Slice_string_To_string(in *[]string, out *string, s conversion.Scope) error {

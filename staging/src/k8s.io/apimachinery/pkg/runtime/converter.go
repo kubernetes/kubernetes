@@ -376,8 +376,8 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	// Cache miss - we need to compute the field name.
 	info := &fieldInfo{}
 	typeField := structType.Field(field)
-	jsonTag := typeField.Tag.Get("json")
-	if len(jsonTag) == 0 {
+	jsonTag, exists := typeField.Tag.Lookup("json")
+	if !exists || len(jsonTag) == 0 {
 		if !typeField.Anonymous {
 			// match stdlib behavior for naming fields that don't specify a json tag name
 			info.name = typeField.Name
