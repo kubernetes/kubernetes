@@ -32,7 +32,7 @@ import (
 //
 // Describes a certificate signing request
 type CertificateSigningRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.

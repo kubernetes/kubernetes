@@ -184,7 +184,7 @@ func TestValidateDeclaratively(t *testing.T) {
 
 // Fake internal pod type, since core.Pod cannot be imported by this package
 type Pod struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	RestartPolicy     string `json:"restartPolicy"`
 }

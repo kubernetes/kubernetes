@@ -33,7 +33,7 @@ import (
 // implementing the scale subresource based on the metrics specified.
 // +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -606,7 +606,7 @@ type MetricValueStatus struct {
 
 // HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

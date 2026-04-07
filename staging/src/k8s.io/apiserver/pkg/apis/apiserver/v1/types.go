@@ -26,7 +26,7 @@ import (
 
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Plugins allows specifying a configuration per admission control plugin.
 	// +optional
@@ -558,8 +558,8 @@ type WebhookMatchCondition struct {
 
 // TracingConfiguration provides versioned configuration for tracing clients.
 type TracingConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Embed the component config tracing configuration struct
-	tracingapi.TracingConfiguration `json:",inline"`
+	tracingapi.TracingConfiguration `json:""`
 }

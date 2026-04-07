@@ -592,7 +592,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 }
 
 type StructWithFloatsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithFloats `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -602,7 +602,7 @@ func (l *StructWithFloatsList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithFloats struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Int     int
@@ -615,7 +615,7 @@ func (s *StructWithFloats) DeepCopyObject() runtime.Object {
 }
 
 type StructWithDuplicatedTagsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithDuplicatedTags `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -625,7 +625,7 @@ func (l *StructWithDuplicatedTagsList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithDuplicatedTags struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Key1 string `json:"key"`
@@ -637,7 +637,7 @@ func (s *StructWithDuplicatedTags) DeepCopyObject() runtime.Object {
 }
 
 type ListWithMarshalJSONList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []string `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -651,7 +651,7 @@ func (l *ListWithMarshalJSONList) MarshalJSON() ([]byte, error) {
 }
 
 type StructWithMarshalJSONList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithMarshalJSON `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -661,7 +661,7 @@ func (s *StructWithMarshalJSONList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithMarshalJSON struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
 
@@ -674,7 +674,7 @@ func (l *StructWithMarshalJSON) MarshalJSON() ([]byte, error) {
 }
 
 type StructWithRawBytesList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithRawBytes `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -684,7 +684,7 @@ func (s *StructWithRawBytesList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithRawBytes struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Slice             []byte
 	Array             [3]byte
@@ -695,7 +695,7 @@ func (s *StructWithRawBytes) DeepCopyObject() runtime.Object {
 }
 
 type ListWithAdditionalFields struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []testapigroupv1.Carp `json:"items" protobuf:"bytes,2,rep,name=items"`
 	AdditionalField int

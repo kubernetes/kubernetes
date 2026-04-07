@@ -36,7 +36,7 @@ import (
 )
 
 type testDecodable struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	Other     string
 	Value     int           `json:"value"`
@@ -81,7 +81,7 @@ func (d *testDecodable) DeepCopyInto(out *testDecodable) {
 }
 
 type testDecodeCoercion struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	Bool bool `json:"bool"`
 
@@ -939,7 +939,7 @@ func (t *mockTyper) Recognizes(_ schema.GroupVersionKind) bool {
 }
 
 type testEncodableDuplicateTag struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	A1 int `json:"a"`
 	A2 int `json:"a"` //nolint:govet // This is intentional to test that the encoder will not encode two map entries with the same key.
@@ -950,7 +950,7 @@ func (testEncodableDuplicateTag) DeepCopyObject() runtime.Object {
 }
 
 type testEncodableTagMatchesUntaggedName struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	A       int
 	TaggedA int `json:"A"`

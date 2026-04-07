@@ -335,7 +335,7 @@ func getEtcdBucket(path string) string {
 
 // stable fields to compare as a sanity check
 type metaObject struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// parts of object meta
 	Metadata struct {

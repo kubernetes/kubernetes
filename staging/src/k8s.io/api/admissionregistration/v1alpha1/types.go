@@ -83,7 +83,7 @@ const (
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 // +k8s:supportsSubresource="/status"
 type ValidatingAdmissionPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -139,7 +139,7 @@ type ExpressionWarning struct {
 
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -388,7 +388,7 @@ type AuditAnnotation struct {
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBinding struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -402,7 +402,7 @@ type ValidatingAdmissionPolicyBinding struct {
 
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -653,7 +653,7 @@ type NamedRuleWithOperations struct {
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,1,rep,name=resourceNames"`
 	// RuleWithOperations is a tuple of Operations and Resources.
-	RuleWithOperations `json:",inline" protobuf:"bytes,2,opt,name=ruleWithOperations"`
+	RuleWithOperations `json:"" protobuf:"bytes,2,opt,name=ruleWithOperations"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -680,7 +680,7 @@ const (
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -693,7 +693,7 @@ type MutatingAdmissionPolicy struct {
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 type MutatingAdmissionPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -968,7 +968,7 @@ const (
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 type MutatingAdmissionPolicyBinding struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -981,7 +981,7 @@ type MutatingAdmissionPolicyBinding struct {
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional

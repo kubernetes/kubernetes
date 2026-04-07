@@ -28,7 +28,7 @@ import (
 // including scheduling, preemption, eviction and other phases.
 // Workload API enablement is toggled by the GenericWorkload feature gate.
 type Workload struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	//
@@ -45,7 +45,7 @@ type Workload struct {
 
 // WorkloadList contains a list of Workload resources.
 type WorkloadList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	//
 	// +optional
@@ -321,7 +321,7 @@ const (
 // Workload.podGroupTemplates.
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
 type PodGroup struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	//
@@ -343,7 +343,7 @@ type PodGroup struct {
 
 // PodGroupList contains a list of PodGroup resources.
 type PodGroupList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	//
 	// +optional

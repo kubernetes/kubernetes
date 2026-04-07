@@ -42,7 +42,7 @@ import (
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -98,7 +98,7 @@ type ClusterTrustBundleSpec struct {
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//

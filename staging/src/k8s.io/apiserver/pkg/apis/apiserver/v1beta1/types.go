@@ -25,7 +25,7 @@ import (
 
 // EgressSelectorConfiguration provides versioned configuration for egress selector clients.
 type EgressSelectorConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// connectionServices contains a list of egress selection client configurations
 	EgressSelections []EgressSelection `json:"egressSelections"`
@@ -128,10 +128,10 @@ type TLSConfig struct {
 
 // TracingConfiguration provides versioned configuration for tracing clients.
 type TracingConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Embed the component config tracing configuration struct
-	tracingapi.TracingConfiguration `json:",inline"`
+	tracingapi.TracingConfiguration `json:""`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

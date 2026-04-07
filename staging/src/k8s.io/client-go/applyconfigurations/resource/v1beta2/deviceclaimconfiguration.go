@@ -30,7 +30,7 @@ type DeviceClaimConfigurationApplyConfiguration struct {
 	// and may include the subrequest using the format <main request>[/<subrequest>]. If just
 	// the main request is given, the configuration applies to all subrequests.
 	Requests                              []string `json:"requests,omitempty"`
-	DeviceConfigurationApplyConfiguration `json:",inline"`
+	DeviceConfigurationApplyConfiguration `json:""`
 }
 
 // DeviceClaimConfigurationApplyConfiguration constructs a declarative configuration of the DeviceClaimConfiguration type for use with

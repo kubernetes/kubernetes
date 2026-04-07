@@ -94,7 +94,7 @@ type HorizontalPodAutoscalerStatus struct {
 // configuration of a horizontal pod autoscaler.
 // +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -113,7 +113,7 @@ type HorizontalPodAutoscaler struct {
 
 // list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -128,7 +128,7 @@ type HorizontalPodAutoscalerList struct {
 
 // Scale represents a scaling request for a resource.
 type Scale struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

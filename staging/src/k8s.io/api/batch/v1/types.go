@@ -68,7 +68,7 @@ const (
 // Job represents the configuration of a single job.
 // +k8s:supportsSubresource="/status"
 type Job struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -90,7 +90,7 @@ type Job struct {
 
 // JobList is a collection of jobs.
 type JobList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -675,7 +675,7 @@ type JobTemplateSpec struct {
 // CronJob represents the configuration of a single cron job.
 // +k8s:supportsSubresource="/status"
 type CronJob struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -697,7 +697,7 @@ type CronJob struct {
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

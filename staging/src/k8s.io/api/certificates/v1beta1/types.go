@@ -35,7 +35,7 @@ import (
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/approval"
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -230,7 +230,7 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -292,7 +292,7 @@ const (
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -348,7 +348,7 @@ type ClusterTrustBundleSpec struct {
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//
@@ -369,7 +369,7 @@ type ClusterTrustBundleList struct {
 // Kubelets use this API to implement podCertificate projected volumes
 // +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	//
@@ -624,7 +624,7 @@ const (
 
 // PodCertificateRequestList is a collection of PodCertificateRequest objects
 type PodCertificateRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//
