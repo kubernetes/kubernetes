@@ -100,7 +100,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(ctx context.Contex
 	preemptionMsg := fmt.Sprintf("%s: %s", message, admitPod.UID)
 	for _, pod := range podsToPreempt {
 		// record that we are evicting the pod
-		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, preemptionMsg)
+		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, "%s", preemptionMsg)
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		logger.V(2).Info("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources.toString(), "requestingPod", klog.KObj(admitPod))
 		err := c.killPodFunc(pod, true, nil, func(status *v1.PodStatus) {
