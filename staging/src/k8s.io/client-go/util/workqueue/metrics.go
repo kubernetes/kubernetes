@@ -169,6 +169,21 @@ func (m *defaultRetryMetrics) retry() {
 	m.retries.Inc()
 }
 
+type rateLimiterMetrics interface {
+	addRateLimiterDelay(delay time.Duration)
+}
+
+type defaultRateLimiterMetrics struct {
+	delay HistogramMetric
+}
+
+func (m *defaultRateLimiterMetrics) addRateLimiterDelay(delay time.Duration) {
+	if m == nil {
+		return
+	}
+	m.delay.Observe(delay.Seconds())
+}
+
 // MetricsProvider generates various metrics used by the queue.
 type MetricsProvider interface {
 	NewDepthMetric(name string) GaugeMetric
@@ -178,6 +193,7 @@ type MetricsProvider interface {
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
+	NewRateLimiterDelayMetric(name string) HistogramMetric
 }
 
 type noopMetricsProvider struct{}
@@ -207,6 +223,10 @@ func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string
 }
 
 func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewRateLimiterDelayMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
@@ -243,6 +263,21 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 
 	return &defaultRetryMetrics{
 		retries: provider.NewRetriesMetric(name),
+	}
+}
+
+func newRateLimiterMetrics(name string, provider MetricsProvider) rateLimiterMetrics {
+	var ret *defaultRateLimiterMetrics
+	if len(name) == 0 {
+		return ret
+	}
+
+	if provider == nil {
+		provider = globalMetricsProvider
+	}
+
+	return &defaultRateLimiterMetrics{
+		delay: provider.NewRateLimiterDelayMetric(name),
 	}
 }
 
