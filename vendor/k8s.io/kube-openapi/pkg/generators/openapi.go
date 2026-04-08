@@ -330,6 +330,13 @@ func (g openAPITypeWriter) shouldUseOpenAPIModelName(t *types.Type) bool {
 	return value != ""
 }
 
+// legacyOpenAPIMapKey is the OpenAPI definitions map key for types that do not use OpenAPIModelName() or
+// +k8s:openapi-model-package. Raw Go type ids contain '/'; in OpenAPI v2 those become '~1' in JSON pointers.
+// ToRESTFriendlyName matches historical behavior and k8s.io/apimachinery runtime.Scheme.toOpenAPIDefinitionName.
+func legacyOpenAPIMapKey(t *types.Type) string {
+	return openapiutil.ToRESTFriendlyName(t.Name.String())
+}
+
 // typeShortName returns short package name (e.g. the name x appears in package x definition) dot type name.
 func typeShortName(t *types.Type) string {
 	// `path` vs. `filepath` because packages use '/'
@@ -383,11 +390,7 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 		if g.shouldUseOpenAPIModelName(t) {
 			g.Do("$.|raw${}.OpenAPIModelName(): ", t)
 		} else {
-			// Legacy case: use a REST-friendly OpenAPI model name derived from the Go canonical
-			// name (package path + "." + type). Using the raw path would leave '/' in the name;
-			// those become "~1" in JSON pointer fragments and break aggregated OpenAPI v2.
-			legacyKey := openapiutil.ToRESTFriendlyName(t.Name.Package + "." + t.Name.Name)
-			g.Do(fmt.Sprintf("%q: ", legacyKey), nil)
+			g.Do("\"$.$\": ", legacyOpenAPIMapKey(t))
 		}
 
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
@@ -722,7 +725,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				if g.shouldUseOpenAPIModelName(t) {
 					g.Do("$.|raw${}.OpenAPIModelName(),", t)
 				} else {
-					g.Do("\"$.$\",", k)
+					g.Do("\"$.$\",", legacyOpenAPIMapKey(t))
 				}
 			}
 			g.Do("},\n", nil)
@@ -1088,7 +1091,7 @@ func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	if g.shouldUseOpenAPIModelName(t) {
 		g.Do("Ref: ref($.|raw${}.OpenAPIModelName()),\n", t)
 	} else {
-		g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
+		g.Do("Ref: ref(\"$.$\"),\n", legacyOpenAPIMapKey(t))
 	}
 }
 
