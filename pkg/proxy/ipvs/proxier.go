@@ -681,6 +681,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		return
 	}
 
+	proxy.WarnIfNodePortsOverlapEphemeralRange(proxier.logger, proxier.svcPortMap)
+
 	// its safe to set initialSync to false as it acts as a flag for startup actions
 	// and the mutex is held.
 	defer func() {

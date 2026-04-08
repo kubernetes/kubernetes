@@ -645,6 +645,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		return
 	}
 
+	proxy.WarnIfNodePortsOverlapEphemeralRange(proxier.logger, proxier.svcPortMap)
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 
