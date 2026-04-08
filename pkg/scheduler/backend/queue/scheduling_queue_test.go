@@ -2770,6 +2770,31 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 	}
 }
 
+// TestPriorityQueue_NominatedNodeNameEmptyNodeKey ensures ModeOverride with an empty
+// NominatedNodeName does not store pods under nominatedPods[""] (kubernetes/kubernetes#138267).
+func TestPriorityQueue_NominatedNodeNameEmptyNodeKey(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	cs := fake.NewClientset(highPriorityPodInfo.Pod)
+	informerFactory := informers.NewSharedInformerFactory(cs, 0)
+	q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(informerFactory.Core().V1().Pods().Lister()))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	q.AddNominatedPod(logger, highPriorityPodInfo, &fwk.NominatingInfo{
+		NominatingMode:    fwk.ModeOverride,
+		NominatedNodeName: "",
+	})
+
+	if len(q.nominator.nominatedPods) != 0 {
+		t.Errorf("expected nominatedPods empty, got %v", q.nominator.nominatedPods)
+	}
+	if len(q.nominator.nominatedPodToNode) != 0 {
+		t.Errorf("expected nominatedPodToNode empty, got %v", q.nominator.nominatedPodToNode)
+	}
+}
+
 func TestPriorityQueue_PendingPods(t *testing.T) {
 	makeSet := func(pods []*v1.Pod) map[*v1.Pod]struct{} {
 		pendingSet := map[*v1.Pod]struct{}{}

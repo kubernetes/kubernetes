@@ -85,6 +85,12 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 		nodeName = pi.GetPod().Status.NominatedNodeName
 	}
 
+	// Never index nominatedPods by "". ModeOverride with an empty NominatedNodeName
+	// means "clear nomination"; deleteUnlocked above already removed any prior entry.
+	if nodeName == "" {
+		return
+	}
+
 	if npm.podLister != nil {
 		// If the pod was removed or if it was already scheduled, don't nominate it.
 		updatedPod, err := npm.podLister.Pods(pi.GetPod().Namespace).Get(pi.GetPod().Name)
@@ -121,7 +127,7 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	// (2) NominatedNode info is updated
 	// (3) NominatedNode info is removed
 	if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.GetPod()) == "" {
-		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
+		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok && nnn != "" {
 			// This is the only case we should continue reserving the NominatedNode
 			nominatingInfo = &fwk.NominatingInfo{
 				NominatingMode:    fwk.ModeOverride,
