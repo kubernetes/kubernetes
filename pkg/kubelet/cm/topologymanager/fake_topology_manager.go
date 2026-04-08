@@ -92,6 +92,8 @@ func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }
 
+func (m *fakeManager) SetNUMAScorer(NUMAScorer) {}
+
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	// Use context.TODO() because we currently do not have a proper context to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a context parameter.

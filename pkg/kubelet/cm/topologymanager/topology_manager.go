@@ -87,6 +87,9 @@ type Manager interface {
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
+	// SetNUMAScorer registers a NUMA scorer for single-numa-node policy
+	// when prefer-most-allocated-numa-node is enabled.
+	SetNUMAScorer(scorer NUMAScorer)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -249,6 +252,10 @@ func (m *manager) Name() string {
 
 func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {
 	m.scope.AddHintProvider(h)
+}
+
+func (m *manager) SetNUMAScorer(scorer NUMAScorer) {
+	m.scope.SetNUMAScorer(scorer)
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

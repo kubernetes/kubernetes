@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	tmbitmask "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
@@ -98,6 +99,10 @@ func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
 	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID, "containerName", containerName)
 	logger.Info("Get Memory")
 	return []state.Block{}
+}
+
+func (m *fakeManager) GetNUMAUtilizationScores(tmbitmask.BitMask, tmbitmask.BitMask) (int64, int64) {
+	return 0, 0
 }
 
 // NewFakeManager creates empty/fake memory manager

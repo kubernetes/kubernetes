@@ -20,8 +20,9 @@ import "k8s.io/klog/v2"
 
 type singleNumaNodePolicy struct {
 	// numaInfo represents list of NUMA Nodes available on the underlying machine and distances between them
-	numaInfo *NUMAInfo
-	opts     PolicyOptions
+	numaInfo   *NUMAInfo
+	opts       PolicyOptions
+	numaScorer NUMAScorer
 }
 
 var _ Policy = &singleNumaNodePolicy{}
@@ -32,6 +33,10 @@ const PolicySingleNumaNode string = "single-numa-node"
 // NewSingleNumaNodePolicy returns single-numa-node policy.
 func NewSingleNumaNodePolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
 	return &singleNumaNodePolicy{numaInfo: numaInfo, opts: opts}
+}
+
+func (p *singleNumaNodePolicy) setNUMAScorer(s NUMAScorer) {
+	p.numaScorer = s
 }
 
 func (p *singleNumaNodePolicy) Name() string {
@@ -65,7 +70,8 @@ func (p *singleNumaNodePolicy) Merge(logger klog.Logger, providersHints []map[st
 	// Filter to only include don't cares and hints with a single NUMA node.
 	singleNumaHints := filterSingleNumaHints(filteredHints)
 
-	merger := NewHintMerger(p.numaInfo, singleNumaHints, p.Name(), p.opts)
+	merger := NewHintMerger(logger, p.numaInfo, singleNumaHints, p.Name(), p.opts)
+	merger.NUMAScorer = p.numaScorer
 	bestHint := merger.Merge()
 
 	if bestHint.NUMANodeAffinity.IsEqual(p.numaInfo.DefaultAffinityMask()) {

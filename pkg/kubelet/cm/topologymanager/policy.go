@@ -137,6 +137,7 @@ func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
 type HintMerger struct {
 	NUMAInfo *NUMAInfo
 	Hints    [][]TopologyHint
+	Logger   klog.Logger
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -145,9 +146,10 @@ type HintMerger struct {
 	// NUMA nodes to satisfy its allocation.
 	BestNonPreferredAffinityCount int
 	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
+	NUMAScorer                    NUMAScorer
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+func NewHintMerger(logger klog.Logger, numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
@@ -170,6 +172,7 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string
 	merger := HintMerger{
 		NUMAInfo:                      numaInfo,
 		Hints:                         hints,
+		Logger:                        logger,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
 		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
 	}
@@ -304,6 +307,8 @@ func (m HintMerger) Merge() TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
 	var bestHint *TopologyHint
+	var preferredSingleNUMA []TopologyHint
+
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
@@ -312,10 +317,49 @@ func (m HintMerger) Merge() TopologyHint {
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
 		bestHint = m.compare(bestHint, &mergedHint)
+
+		if m.NUMAScorer != nil && mergedHint.Preferred &&
+			mergedHint.NUMANodeAffinity != nil && mergedHint.NUMANodeAffinity.Count() == 1 {
+			unique := true
+			for _, h := range preferredSingleNUMA {
+				if h.NUMANodeAffinity.IsEqual(mergedHint.NUMANodeAffinity) {
+					unique = false
+					break
+				}
+			}
+			if unique {
+				preferredSingleNUMA = append(preferredSingleNUMA, mergedHint)
+			}
+		}
 	})
 
 	if bestHint == nil {
 		bestHint = &TopologyHint{defaultAffinity, false}
+	}
+
+	if m.NUMAScorer != nil && bestHint.Preferred && len(preferredSingleNUMA) > 1 {
+		current := preferredSingleNUMA[0]
+		var lastResult NUMAScoringResult
+		for _, candidate := range preferredSingleNUMA[1:] {
+			result := m.NUMAScorer.Score(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
+			if result.Ok && result.PreferCandidate {
+				current = candidate
+				lastResult = result
+			}
+		}
+		if !current.NUMANodeAffinity.IsEqual(bestHint.NUMANodeAffinity) {
+			m.Logger.V(2).Info("Prefer-most-allocated scorer overrode default NUMA selection",
+				"selectedNUMA", current.NUMANodeAffinity,
+				"defaultNUMA", bestHint.NUMANodeAffinity,
+				"cpuScoreSelected", lastResult.CPUScoreCandidate,
+				"cpuScoreDefault", lastResult.CPUScoreCurrent,
+				"memScoreSelected", lastResult.MemScoreCandidate,
+				"memScoreDefault", lastResult.MemScoreCurrent,
+				"aggregateScoreSelected", lastResult.AggregateScoreCandidate,
+				"aggregateScoreDefault", lastResult.AggregateScoreCurrent,
+			)
+		}
+		bestHint = &current
 	}
 
 	return *bestHint

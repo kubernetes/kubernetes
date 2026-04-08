@@ -1492,3 +1492,29 @@ func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bit
 	}
 	return false
 }
+
+func getRegularMemoryAssignedBytesOnNUMANode(s state.State, numa int) uint64 {
+	var total uint64
+	addBlocks := func(blocks []state.Block) {
+		for _, b := range blocks {
+			if b.Type != v1.ResourceMemory {
+				continue
+			}
+			if len(b.NUMAAffinity) != 1 || b.NUMAAffinity[0] != numa {
+				continue
+			}
+			total += b.Size
+		}
+	}
+	for _, byContainer := range s.GetMemoryAssignments() {
+		for _, blocks := range byContainer {
+			addBlocks(blocks)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		for _, pe := range s.GetPodMemoryAssignments() {
+			addBlocks(pe.MemoryBlocks)
+		}
+	}
+	return total
+}
