@@ -32,6 +32,7 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
+	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/klog/v2"
@@ -382,8 +383,11 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 		if g.shouldUseOpenAPIModelName(t) {
 			g.Do("$.|raw${}.OpenAPIModelName(): ", t)
 		} else {
-			// Legacy case: use the "canonical type name"
-			g.Do("\"$.$\": ", t.Name)
+			// Legacy case: use a REST-friendly OpenAPI model name derived from the Go canonical
+			// name (package path + "." + type). Using the raw path would leave '/' in the name;
+			// those become "~1" in JSON pointer fragments and break aggregated OpenAPI v2.
+			legacyKey := openapiutil.ToRESTFriendlyName(t.Name.Package + "." + t.Name.Name)
+			g.Do(fmt.Sprintf("%q: ", legacyKey), nil)
 		}
 
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
