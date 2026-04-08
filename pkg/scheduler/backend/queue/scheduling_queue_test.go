@@ -2770,6 +2770,109 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 	}
 }
 
+// TestPriorityQueue_NominatedNodeNameEmptyNodeKey ensures an empty NominatedNodeName does not
+// store pods under nominatedPods[""] (#138267), including ModeNoop behavior.
+func TestPriorityQueue_NominatedNodeNameEmptyNodeKey(t *testing.T) {
+	tests := []struct {
+		name                 string
+		initialNominatedNode string // if set, nominate the pod to this node before the test call
+		podNominatedNode     string // pod.Status.NominatedNodeName
+		nominatingMode       fwk.NominatingMode
+		nominatingNodeName   string // NominatedNodeName in nominatingInfo
+		wantNominatedNode    string // expected node after the call; empty means no nomination
+	}{
+		{
+			name:           "ModeOverride empty without prior nomination",
+			nominatingMode: fwk.ModeOverride,
+		},
+		{
+			name:                 "nominated then cleared with ModeOverride empty",
+			initialNominatedNode: "node1",
+			nominatingMode:       fwk.ModeOverride,
+		},
+		{
+			name:           "ModeNoop empty without prior nomination",
+			nominatingMode: fwk.ModeNoop,
+		},
+		{
+			name:                 "nominated then cleared with ModeNoop empty",
+			initialNominatedNode: "node1",
+			nominatingMode:       fwk.ModeNoop,
+		},
+		{
+			name:               "ModeNoop with non-empty nominatingInfo NNN ignored when pod NNN empty",
+			nominatingMode:     fwk.ModeNoop,
+			nominatingNodeName: "node1",
+		},
+		{
+			name:               "ModeNoop with non-empty nominatingInfo NNN uses pod NNN",
+			nominatingMode:     fwk.ModeNoop,
+			podNominatedNode:   "node2",
+			nominatingNodeName: "node1",
+			wantNominatedNode:  "node2",
+		},
+		{
+			name:              "ModeNoop empty nominatingInfo NNN with non-empty pod NNN",
+			nominatingMode:    fwk.ModeNoop,
+			podNominatedNode:  "node2",
+			wantNominatedNode: "node2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podBuilder := st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority)
+			if tt.podNominatedNode != "" {
+				podBuilder = podBuilder.NominatedNodeName(tt.podNominatedNode)
+			}
+			podInfo := mustNewTestPodInfo(t, podBuilder.Obj())
+
+			logger, ctx := ktesting.NewTestContext(t)
+			cs := fake.NewClientset(podInfo.Pod)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(informerFactory.Core().V1().Pods().Lister()))
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			if tt.initialNominatedNode != "" {
+				q.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
+					NominatingMode:    fwk.ModeOverride,
+					NominatedNodeName: tt.initialNominatedNode,
+				})
+				if got := len(q.nominator.nominatedPods[tt.initialNominatedNode]); got != 1 {
+					t.Fatalf("expected 1 nominated pod on %s before clear, got %d", tt.initialNominatedNode, got)
+				}
+			}
+
+			q.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
+				NominatingMode:    tt.nominatingMode,
+				NominatedNodeName: tt.nominatingNodeName,
+			})
+
+			if len(q.nominator.nominatedPods[""]) != 0 {
+				t.Errorf("expected no pods under nominatedPods[\"\"], got %v", q.nominator.nominatedPods[""])
+			}
+			if tt.wantNominatedNode == "" {
+				if len(q.nominator.nominatedPods) != 0 {
+					t.Errorf("expected nominatedPods empty, got %v", q.nominator.nominatedPods)
+				}
+				if len(q.nominator.nominatedPodToNode) != 0 {
+					t.Errorf("expected nominatedPodToNode empty, got %v", q.nominator.nominatedPodToNode)
+				}
+			} else {
+				if got := len(q.nominator.nominatedPods[tt.wantNominatedNode]); got != 1 {
+					t.Errorf("expected 1 nominated pod on %s, got %d", tt.wantNominatedNode, got)
+				}
+				if got := q.nominator.nominatedPodToNode[podInfo.Pod.UID]; got != tt.wantNominatedNode {
+					t.Errorf("expected nominatedPodToNode[%s]=%s, got %s", podInfo.Pod.UID, tt.wantNominatedNode, got)
+				}
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_PendingPods(t *testing.T) {
 	makeSet := func(pods []*v1.Pod) map[*v1.Pod]struct{} {
 		pendingSet := map[*v1.Pod]struct{}{}

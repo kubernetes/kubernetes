@@ -79,10 +79,12 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 	if nominatingInfo.Mode() == fwk.ModeOverride {
 		nodeName = nominatingInfo.NominatedNodeName
 	} else if nominatingInfo.Mode() == fwk.ModeNoop {
-		if pi.GetPod().Status.NominatedNodeName == "" {
-			return
-		}
 		nodeName = pi.GetPod().Status.NominatedNodeName
+	}
+
+	// Empty nodeName clears nomination; do not key nominatedPods by "".
+	if nodeName == "" {
+		return
 	}
 
 	if npm.podLister != nil {
