@@ -682,6 +682,9 @@ type PodGroupAssignments struct {
 	// during the pod group scheduling cycle.
 	// The pods are guaranteed to also be present in the PodGroupInfo.
 	ProposedAssignments []ProposedAssignment
+	// PlacementCycleState holds the state that was accumulated during the simulation of this placement.
+	// Placement score plugins can use this to access per-placement cached data.
+	PlacementCycleState PlacementCycleState
 }
 
 // NodeAllocatableDRAClaimState holds information about a node allocatable resource DRA claim's allocation on a node.
