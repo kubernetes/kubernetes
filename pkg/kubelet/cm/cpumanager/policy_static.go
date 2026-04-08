@@ -1091,7 +1091,31 @@ func getTotalAssignedExclusiveCPUs(s state.State) cpuset.CPUSet {
 			totalAssignedCPUs = totalAssignedCPUs.Union(cset)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		for _, pe := range s.GetPodCPUAssignments() {
+			totalAssignedCPUs = totalAssignedCPUs.Union(pe.CPUSet)
+		}
+	}
 	return totalAssignedCPUs
+}
+
+func (p *staticPolicy) getAllocatableExclusiveCPUsOnNUMANode(numa int) int {
+	total := p.topology.CPUDetails.CPUsInNUMANodes(numa)
+	return total.Difference(p.reservedCPUs).Size()
+}
+
+func (p *staticPolicy) getExclusiveAssignedCPUsOnNUMANode(s state.State, numa int) int {
+	n := 0
+	for _, cpuID := range getTotalAssignedExclusiveCPUs(s).UnsortedList() {
+		nodeID, err := p.topology.CPUNUMANodeID(cpuID)
+		if err != nil {
+			continue
+		}
+		if nodeID == numa {
+			n++
+		}
+	}
+	return n
 }
 
 func updateAllocationPerNUMAMetric(logger logr.Logger, topo *topology.CPUTopology, allocatedCPUs cpuset.CPUSet) {

@@ -356,6 +356,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		return nil, err
 	}
 	cm.topologyManager.AddHintProvider(logger, cm.memoryManager)
+	cm.topologyManager.SetNUMAScorer(NewNUMAScorerAggregator(cm.cpuManager, cm.memoryManager))
 
 	// Create a single channel for all resource updates. This channel is consumed
 	// by the Kubelet's main sync loop.

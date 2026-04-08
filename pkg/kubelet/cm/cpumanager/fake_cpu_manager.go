@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	tmbitmask "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
@@ -107,6 +108,10 @@ func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 
 func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *fakeManager) GetNUMAUtilizationScores(tmbitmask.BitMask, tmbitmask.BitMask) (int64, int64) {
+	return 0, 0
 }
 
 // NewFakeManager creates empty/fake cpu manager

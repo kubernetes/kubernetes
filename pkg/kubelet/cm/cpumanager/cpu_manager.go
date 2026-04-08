@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	tmbitmask "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -110,6 +111,10 @@ type Manager interface {
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
+
+	// GetNUMAUtilizationScores returns per-NUMA exclusive-CPU utilization scores for the
+	// prefer-most-allocated-numa-node NUMA scorer. Returns (0, 0) for non-static policy.
+	GetNUMAUtilizationScores(current, candidate tmbitmask.BitMask) (currentScore, candidateScore int64)
 }
 
 type manager struct {
@@ -589,4 +594,39 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 	}
 
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *manager) GetNUMAUtilizationScores(current, candidate tmbitmask.BitMask) (currentScore, candidateScore int64) {
+	m.Lock()
+	defer m.Unlock()
+	sp, static := m.policy.(*staticPolicy)
+	if !static {
+		return 0, 0
+	}
+	curBits := current.GetBits()
+	candBits := candidate.GetBits()
+	if len(curBits) != 1 || len(candBits) != 1 {
+		return 0, 0
+	}
+	currentScore = getMostAllocatedNUMAScore(
+		int64(sp.getExclusiveAssignedCPUsOnNUMANode(m.state, curBits[0])),
+		int64(sp.getAllocatableExclusiveCPUsOnNUMANode(curBits[0])),
+	)
+	candidateScore = getMostAllocatedNUMAScore(
+		int64(sp.getExclusiveAssignedCPUsOnNUMANode(m.state, candBits[0])),
+		int64(sp.getAllocatableExclusiveCPUsOnNUMANode(candBits[0])),
+	)
+	return currentScore, candidateScore
+}
+
+// getMostAllocatedNUMAScore mirrors kube-scheduler's mostRequestedScore:
+// (requested * 100) / capacity.  Returns 0 when capacity is zero.
+func getMostAllocatedNUMAScore(requested, capacity int64) int64 {
+	if capacity == 0 {
+		return 0
+	}
+	if requested > capacity {
+		requested = capacity
+	}
+	return (requested * 100) / capacity
 }
