@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
+	"k8s.io/apiserver/pkg/storage/cacher/watchgroup"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/client-go/tools/cache"
@@ -44,13 +46,23 @@ func StorageWithCacher() generic.StorageDecorator {
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 
-		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, resourcePrefix)
+		s, d, etcdClient, err := factory.CreateWithEtcdClient(*storageConfig, newFunc, newListFunc, resourcePrefix)
 		if err != nil {
 			return s, d, err
 		}
 		if klogV := klog.V(5); klogV.Enabled() {
 			//nolint:logcheck // It complains about the key/value pairs because it cannot check them.
 			klogV.InfoS("Storage caching is enabled", objectTypeToArgs(newFunc())...)
+		}
+
+		// Create a per-resource WatchGroupManager. Each resource type gets its own
+		// Manager with its own EtcdGroupStore, ensuring membership isolation.
+		var wgManager *watchgroup.Manager
+		if etcdClient != nil {
+			if rawClient, ok := etcdClient.Client().(*clientv3.Client); ok {
+				etcdStore := watchgroup.NewEtcdGroupStore(rawClient, "/watchgroups/", storageConfig.GroupResource)
+				wgManager = watchgroup.NewManager(etcdStore, nil)
+			}
 		}
 
 		cacherConfig := cacherstorage.Config{
@@ -66,11 +78,18 @@ func StorageWithCacher() generic.StorageDecorator {
 			IndexerFuncs:        triggerFuncs,
 			Indexers:            indexers,
 			Codec:               storageConfig.Codec,
+			WatchGroupManager:   wgManager,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {
 			return nil, func() {}, err
 		}
+
+		// Wire up the rebalance callback now that we have the cacher
+		if wgManager != nil {
+			wgManager.SetOnRebalance(cacher.HandleRebalance)
+		}
+
 		delegator := cacherstorage.NewCacheDelegator(cacher, s)
 		var once sync.Once
 		destroyFunc := func() {

@@ -401,6 +401,10 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		}
 		p.ShardSelector = sel
 	}
+	if options.WatchGroup != "" {
+		p.WatchGroup = options.WatchGroup
+		p.MemberID = options.MemberID
+	}
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	storageOpts := storage.ListOptions{
@@ -1443,6 +1447,10 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 				return nil, fmt.Errorf("invalid shard selector: %w", err)
 			}
 			predicate.ShardSelector = sel
+		}
+		if options.WatchGroup != "" {
+			predicate.WatchGroup = options.WatchGroup
+			predicate.MemberID = options.MemberID
 		}
 	}
 	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)

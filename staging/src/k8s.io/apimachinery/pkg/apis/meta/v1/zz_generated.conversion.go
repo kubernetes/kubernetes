@@ -447,6 +447,20 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 	} else {
 		out.ShardSelector = ""
 	}
+	if values, ok := map[string][]string(*in)["watchGroup"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.WatchGroup, s); err != nil {
+			return err
+		}
+	} else {
+		out.WatchGroup = ""
+	}
+	if values, ok := map[string][]string(*in)["memberID"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.MemberID, s); err != nil {
+			return err
+		}
+	} else {
+		out.MemberID = ""
+	}
 	return nil
 }
 

@@ -94,6 +94,12 @@ type ListOptions struct {
 	// Parsing is deferred to the apiserver storage layer where the CEL
 	// parser dependency is available.
 	ShardSelector string
+
+	// WatchGroup specifies the name of the watch group for load-balanced watching.
+	WatchGroup string
+
+	// MemberID identifies this watcher within the watch group.
+	MemberID string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

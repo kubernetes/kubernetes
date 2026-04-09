@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/watchgroup"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
 	"k8s.io/klog/v2"
@@ -68,6 +69,11 @@ type cacheWatcher struct {
 	// instance with request
 	identifier string
 
+	// watchGroup is the name of the watch group this watcher belongs to (empty if ungrouped).
+	watchGroup string
+	// memberID is the member ID of this watcher within the watch group.
+	memberID watchgroup.MemberID
+
 	// drainInputBuffer indicates whether we should delay closing this watcher
 	// and send all event in the input buffer.
 	drainInputBuffer bool
@@ -96,6 +102,8 @@ func newCacheWatcher(
 	allowWatchBookmarks bool,
 	groupResource schema.GroupResource,
 	identifier string,
+	wgName string,
+	wgMemberID watchgroup.MemberID,
 ) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan *watchCacheEvent, chanSize),
@@ -109,6 +117,8 @@ func newCacheWatcher(
 		allowWatchBookmarks: allowWatchBookmarks,
 		groupResource:       groupResource,
 		identifier:          identifier,
+		watchGroup:          wgName,
+		memberID:            wgMemberID,
 	}
 }
 
@@ -360,6 +370,12 @@ func updateResourceVersion(object runtime.Object, versioner storage.Versioner, r
 }
 
 func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event {
+	if event.Type == watch.Assigned {
+		return &watch.Event{Type: watch.Assigned, Object: getMutableObject(event.Object)}
+	}
+	if event.Type == watch.Unassigned {
+		return &watch.Event{Type: watch.Unassigned, Object: getMutableObject(event.Object)}
+	}
 	if event.Type == watch.Bookmark {
 		e := &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
 		if !c.wasBookmarkAfterRvSent() {

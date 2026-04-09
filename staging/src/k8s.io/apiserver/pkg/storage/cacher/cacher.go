@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	"k8s.io/apiserver/pkg/storage/cacher/watchgroup"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -121,6 +122,10 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.WithTicker
+
+	// WatchGroupManager is the manager for watch group load balancing.
+	// If nil, watch group load balancing is disabled.
+	WatchGroupManager *watchgroup.Manager
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -341,6 +346,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watchGroupManager       *watchgroup.Manager
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -412,7 +418,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		stopCh:           stopCh,
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
-		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		bookmarkWatchers:  newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watchGroupManager: config.WatchGroupManager,
 	}
 
 	// Ensure that timer is stopped.
@@ -507,6 +514,18 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.Predicate.WatchGroup != "" {
+		klog.Infof("cacher.Watch: watchGroup=%q, memberID=%q, key=%q, resource=%v", opts.Predicate.WatchGroup, opts.Predicate.MemberID, key, c.groupResource)
+		if c.watchGroupManager != nil {
+			group := c.watchGroupManager.GetGroup(opts.Predicate.WatchGroup)
+			if group != nil {
+				ring := group.GetRing()
+				klog.Infof("cacher.Watch: group members=%v, ring nodes=%d", ring.GetAllNodes(), ring.NodeCount())
+			} else {
+				klog.Infof("cacher.Watch: group %q not found yet", opts.Predicate.WatchGroup)
+			}
+		}
+	}
 	ctx, span := tracing.Start(ctx, "cacher.Watch",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
@@ -597,19 +616,36 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	isGrouped := pred.WatchGroup != "" && pred.MemberID != "" && c.watchGroupManager != nil
+
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
+	filterFunc := filterWithAttrsAndPrefixFunction(key, pred, c.groupResource)
+	if isGrouped {
+		memberID := watchgroup.MemberID(pred.MemberID)
+		groupName := pred.WatchGroup
+		mgr := c.watchGroupManager
+		baseFilter := filterFunc
+		filterFunc = func(objKey string, l labels.Set, f fields.Set, obj runtime.Object) bool {
+			if !baseFilter(objKey, l, f, obj) {
+				return false
+			}
+			return mgr.IsOwner(groupName, memberID, objKey)
+		}
+	}
 	watcher := newCacheWatcher(
 		chanSize,
-		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
+		filterFunc,
 		emptyFunc,
 		c.versioner,
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
 		identifier,
+		pred.WatchGroup,
+		watchgroup.MemberID(pred.MemberID),
 	)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
@@ -683,6 +719,38 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		watcher.forget = func(drainWatcher bool) {
 			metrics.RecordShardedWatchStopped(c.groupResource)
 			originalForget(drainWatcher)
+		}
+	}
+
+	// Join the watch group AFTER addWatcher but BEFORE processInterval.
+	// JoinGroup writes to etcd and synchronously syncs the local hash ring,
+	// so that the filter function in processInterval sees the correct ownership.
+	if isGrouped {
+		memberID := watchgroup.MemberID(pred.MemberID)
+		err := c.watchGroupManager.JoinGroup(ctx, pred.WatchGroup, memberID, func(eventType string, objKey string, obj interface{}) {
+			rtObj, ok := obj.(runtime.Object)
+			if !ok {
+				return
+			}
+			var evType watch.EventType
+			switch eventType {
+			case "ASSIGNED":
+				evType = watch.Assigned
+			case "UNASSIGNED":
+				evType = watch.Unassigned
+			default:
+				return
+			}
+			wcEvent := &watchCacheEvent{
+				Type:            evType,
+				Object:          rtObj,
+				Key:             objKey,
+				ResourceVersion: c.watchCache.resourceVersion,
+			}
+			watcher.nonblockingAdd(wcEvent)
+		})
+		if err != nil {
+			klog.Errorf("Failed to join watch group %s for member %s: %v", pred.WatchGroup, pred.MemberID, err)
 		}
 	}
 
@@ -1177,6 +1245,50 @@ func (c *Cacher) isStopped() bool {
 	return c.stopped
 }
 
+// HandleRebalance is called by the watch group manager when group membership changes.
+// It computes which resource keys changed ownership and sends ASSIGNED/UNASSIGNED events
+// to local watchers.
+func (c *Cacher) HandleRebalance(groupName string, oldRing *watchgroup.HashRing, newRing *watchgroup.HashRing) {
+	if c.watchGroupManager == nil {
+		return
+	}
+	group := c.watchGroupManager.GetGroup(groupName)
+	if group == nil {
+		return
+	}
+
+	// Get all keys from the watch cache store.
+	allKeys := c.watchCache.ListKeys()
+
+	reassignments := watchgroup.ComputeReassignments(oldRing, newRing, allKeys)
+	if len(reassignments) == 0 {
+		return
+	}
+
+	localWatchers := group.GetLocalWatchers()
+
+	for _, r := range reassignments {
+		obj, exists, err := c.watchCache.GetByKey(r.Key)
+		if err != nil || !exists {
+			continue
+		}
+		storeElem, ok := obj.(*store.Element)
+		if !ok {
+			continue
+		}
+
+		// Send UNASSIGNED to old owner if they are a local watcher
+		if oldInfo, ok := localWatchers[r.OldOwner]; ok && oldInfo.SendEvent != nil {
+			oldInfo.SendEvent("UNASSIGNED", r.Key, storeElem.Object)
+		}
+
+		// Send ASSIGNED to new owner if they are a local watcher
+		if newInfo, ok := localWatchers[r.NewOwner]; ok && newInfo.SendEvent != nil {
+			newInfo.SendEvent("ASSIGNED", r.Key, storeElem.Object)
+		}
+	}
+}
+
 func (c *Cacher) Compact(resourceVersion string) error {
 	rv, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
@@ -1221,6 +1333,15 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
 		c.stopWatcherLocked(w)
+
+		// Leave the watch group if this watcher was part of one.
+		if w.watchGroup != "" && c.watchGroupManager != nil {
+			go func() {
+				if err := c.watchGroupManager.LeaveGroup(context.Background(), w.watchGroup, w.memberID); err != nil {
+					klog.Errorf("Failed to leave watch group %s for member %s: %v", w.watchGroup, w.memberID, err)
+				}
+			}()
+		}
 	}
 }
 

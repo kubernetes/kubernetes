@@ -41,6 +41,24 @@ func Create(c storagebackend.ConfigForResource, newFunc, newListFunc func() runt
 	}
 }
 
+// CreateWithEtcdClient creates a storage backend and also returns the underlying etcd client.
+// This is used by the cacher to create a WatchGroupManager that needs direct etcd access.
+func CreateWithEtcdClient(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, DestroyFunc, EtcdClient, error) {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return nil, nil, nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return newETCD3StorageWithClient(c, newFunc, newListFunc, resourcePrefix)
+	default:
+		return nil, nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}
+
+// EtcdClient is the interface for accessing the underlying etcd client.
+type EtcdClient interface {
+	Client() interface{} // returns *clientv3.Client
+}
+
 // CreateHealthCheck creates a healthcheck function based on given config.
 func CreateHealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
 	switch c.Type {

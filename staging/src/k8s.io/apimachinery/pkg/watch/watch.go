@@ -54,11 +54,13 @@ type Interface interface {
 type EventType string
 
 const (
-	Added    EventType = "ADDED"
-	Modified EventType = "MODIFIED"
-	Deleted  EventType = "DELETED"
-	Bookmark EventType = "BOOKMARK"
-	Error    EventType = "ERROR"
+	Added      EventType = "ADDED"
+	Modified   EventType = "MODIFIED"
+	Deleted    EventType = "DELETED"
+	Bookmark   EventType = "BOOKMARK"
+	Error      EventType = "ERROR"
+	Assigned   EventType = "ASSIGNED"
+	Unassigned EventType = "UNASSIGNED"
 )
 
 var (

@@ -88,6 +88,12 @@ type SelectionPredicate struct {
 	AllowWatchBookmarks bool
 	// ShardSelector is the parsed shard selector for filtering objects by hash range.
 	ShardSelector sharding.Selector
+
+	// WatchGroup specifies the name of the watch group for load-balanced watching.
+	WatchGroup string
+
+	// MemberID identifies this watcher within the watch group.
+	MemberID string
 }
 
 // Matches returns true if the given object's labels and fields (as

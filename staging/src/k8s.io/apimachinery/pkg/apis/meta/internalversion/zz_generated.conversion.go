@@ -117,6 +117,8 @@ func autoConvert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, 
 	out.Continue = in.Continue
 	out.SendInitialEvents = (*bool)(unsafe.Pointer(in.SendInitialEvents))
 	out.ShardSelector = in.ShardSelector
+	out.WatchGroup = in.WatchGroup
+	out.MemberID = in.MemberID
 	return nil
 }
 
@@ -136,5 +138,7 @@ func autoConvert_v1_ListOptions_To_internalversion_ListOptions(in *v1.ListOption
 	out.Continue = in.Continue
 	out.SendInitialEvents = (*bool)(unsafe.Pointer(in.SendInitialEvents))
 	out.ShardSelector = in.ShardSelector
+	out.WatchGroup = in.WatchGroup
+	out.MemberID = in.MemberID
 	return nil
 }

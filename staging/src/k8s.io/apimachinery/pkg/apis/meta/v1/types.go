@@ -482,6 +482,18 @@ type ListOptions struct {
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardSelector string `json:"shardSelector,omitempty" protobuf:"bytes,15,opt,name=shardSelector"`
+
+	// WatchGroup specifies the name of the watch group for load-balanced watching.
+	// When set together with MemberID, the API server distributes resources among
+	// group members using consistent hashing, so each member only receives events
+	// for its assigned subset of resources.
+	// +optional
+	WatchGroup string `json:"watchGroup,omitempty" protobuf:"bytes,16,opt,name=watchGroup"`
+
+	// MemberID identifies this watcher within the watch group.
+	// Must be set when WatchGroup is set. Typically the Pod name of the controller.
+	// +optional
+	MemberID string `json:"memberID,omitempty" protobuf:"bytes,17,opt,name=memberID"`
 }
 
 const (

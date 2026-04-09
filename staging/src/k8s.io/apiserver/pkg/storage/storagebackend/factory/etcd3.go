@@ -486,6 +486,70 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	return storage, destroyFunc, nil
 }
 
+type etcdClientWrapper struct {
+	client *clientv3.Client
+}
+
+func (w *etcdClientWrapper) Client() interface{} {
+	return w.client
+}
+
+func newETCD3StorageWithClient(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, DestroyFunc, EtcdClient, error) {
+	compactor, stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	client, err := newETCD3Client(c.Transport)
+	if err != nil {
+		stopCompactor()
+		return nil, nil, nil, err
+	}
+
+	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
+
+	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client.Client, c.DBMetricPollInterval)
+	if err != nil {
+		stopCompactor()
+		_ = client.Close()
+		return nil, nil, nil, err
+	}
+
+	transformer := c.Transformer
+	if transformer == nil {
+		transformer = identity.NewEncryptCheckTransformer()
+	}
+
+	versioner := storage.APIObjectVersioner{}
+	decoder := etcd3.NewDefaultDecoder(c.Codec, versioner)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		transformer = etcd3.WithCorruptObjErrorHandlingTransformer(transformer)
+		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
+	}
+	s, err := etcd3.New(client, compactor, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	if err != nil {
+		stopCompactor()
+		stopDBSizeMonitor()
+		_ = client.Close()
+		return nil, nil, nil, err
+	}
+	var once sync.Once
+	destroyFunc := func() {
+		once.Do(func() {
+			stopCompactor()
+			stopDBSizeMonitor()
+			s.Close()
+			_ = client.Close()
+		})
+	}
+	var st storage.Interface = s
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		st = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(st, c.GroupResource)
+	}
+	return st, destroyFunc, &etcdClientWrapper{client: client.Client}, nil
+}
+
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the
 // corresponding metric etcd_db_total_size_in_bytes for each etcd server endpoint.
 // Deprecated: Will be replaced with newETCD3ProberMonitor
