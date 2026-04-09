@@ -18,20 +18,24 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"os"
+	"path/filepath"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
@@ -98,6 +102,36 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	nodeStatusUpdateTimeout := 1 * time.Minute
 	devicePluginUpdateTimeout := 1 * time.Minute
 	devicePluginGracefulTimeout := 5 * time.Minute // see endpointStopGracePeriod in pkg/kubelet/cm/devicemanager/types.go
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		var triggerPathFile, triggerPathDir string
+
+		ginkgo.By("Wait for node to be ready")
+		gomega.Eventually(ctx, e2enode.TotalReady).
+			WithArguments(f.ClientSet).
+			WithTimeout(time.Minute).
+			Should(gomega.BeEquivalentTo(1))
+
+		ginkgo.By("Setting up the directory and file for controlling registration")
+		triggerPathDir = filepath.Join(devicePluginDir, "sample")
+		if _, err := os.Stat(triggerPathDir); errors.Is(err, os.ErrNotExist) {
+			err := os.Mkdir(triggerPathDir, os.ModePerm)
+			if err != nil {
+				klog.Errorf("Directory creation %s failed: %v ", triggerPathDir, err)
+				panic(err)
+			}
+			klog.InfoS("Directory created successfully")
+
+			triggerPathFile = filepath.Join(triggerPathDir, "registration")
+			if _, err := os.Stat(triggerPathFile); errors.Is(err, os.ErrNotExist) {
+				_, err = os.Create(triggerPathFile)
+				if err != nil {
+					klog.Errorf("File creation %s failed: %v ", triggerPathFile, err)
+					panic(err)
+				}
+			}
+		}
+	})
 
 	ginkgo.It("when GetDevicePluginOptions fails, device plugin will not be used", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
