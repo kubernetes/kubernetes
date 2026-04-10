@@ -463,8 +463,11 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	}
 
 	initEventCount := 0
+	var totalNextTime, totalConvertTime, totalSendTime time.Duration
 	for {
+		nextStart := time.Now()
 		event, err := cacheInterval.Next()
+		totalNextTime += time.Since(nextStart)
 		if err != nil {
 			// An error indicates that the cache interval
 			// has been invalidated and can no longer serve
@@ -486,7 +489,24 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		if event == nil {
 			break
 		}
-		c.sendWatchCacheEvent(event)
+		convertStart := time.Now()
+		watchEvent := c.convertToWatchEvent(event)
+		totalConvertTime += time.Since(convertStart)
+
+		if watchEvent != nil {
+			sendStart := time.Now()
+			select {
+			case <-c.done:
+				return
+			default:
+			}
+			select {
+			case c.result <- *watchEvent:
+				c.markBookmarkAfterRvSent(event)
+			case <-c.done:
+			}
+			totalSendTime += time.Since(sendStart)
+		}
 
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
@@ -509,6 +529,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
+	}
+	if processingTime > 37*time.Second {
+		klog.V(2).Infof("TRACE-CACHER %s (%s): events=%d total=%v next=%v (cache read) convert=%v (deep copy) send=%v (to chan)", c.groupResource, c.identifier, initEventCount, processingTime, totalNextTime, totalConvertTime, totalSendTime)
 	}
 
 	// send bookmark after sending all events in cacheInterval for watchlist request

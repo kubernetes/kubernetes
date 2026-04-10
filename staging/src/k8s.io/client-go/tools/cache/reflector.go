@@ -772,7 +772,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
-	initTrace.Step("Objects extracted")
+	initTrace.Step("Objects extracted", trace.Field{Key: "count", Value: len(items)})
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
