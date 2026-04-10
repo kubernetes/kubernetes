@@ -288,6 +288,11 @@ func (s *Serializer) RecognizesData(data []byte) (bool, bool, error) {
 	return bytes.HasPrefix(data, s.prefix), false, nil
 }
 
+// SupportsStreamingCollectionEncoding implements runtime.StreamingCollectionEncoder.
+func (s *Serializer) SupportsStreamingCollectionEncoding() bool {
+	return s.options.StreamingCollectionsEncoding
+}
+
 // copyKindDefaults defaults dst to the value in src if dst does not have a value set.
 func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 	if src == nil {
