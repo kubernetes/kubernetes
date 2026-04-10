@@ -25,7 +25,7 @@ import (
 const (
 	// maxInt64Factors is the highest value that will be checked when removing factors of 10 from an int64.
 	// It is also the maximum decimal digits that can be represented with an int64.
-	maxInt64Factors = 18
+	maxInt64Factors = 19
 )
 
 var (
