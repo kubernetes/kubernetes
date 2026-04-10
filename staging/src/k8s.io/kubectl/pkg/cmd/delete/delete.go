@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -41,6 +43,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -128,6 +131,7 @@ type DeleteOptions struct {
 
 	GracePeriod int
 	Timeout     time.Duration
+	Concurrency int
 
 	DryRunStrategy cmdutil.DryRunStrategy
 
@@ -271,6 +275,9 @@ func (o *DeleteOptions) Validate() error {
 	if o.Output != "" && o.Output != "name" {
 		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'", o.Output)
 	}
+	if o.Concurrency < 1 {
+		return fmt.Errorf("--concurrency must be at least 1")
+	}
 
 	if o.DeleteAll && len(o.LabelSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
@@ -365,96 +372,113 @@ func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
 }
 
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
-	found := 0
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
+
+	// Phase 1: Collect all resource.Info objects to delete.
 	warnClusterScope := o.WarnClusterScope
-	deletedInfos := []*resource.Info{}
-	uidMap := cmdwait.UIDMap{}
+	var infos []*resource.Info
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
 		if o.Interactive {
 			if _, ok := o.previewResourceMap[cmdwait.ResourceLocation{
 				GroupResource: info.Mapping.Resource.GroupResource(),
 				Namespace:     info.Namespace,
 				Name:          info.Name,
 			}]; !ok {
-				// resource not in the list of previewed resources based on resourceLocation
 				return nil
 			}
 		}
-
-		deletedInfos = append(deletedInfos, info)
-		found++
-
-		options := &metav1.DeleteOptions{}
-		if o.GracePeriod >= 0 {
-			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
-		}
-		options.PropagationPolicy = &o.CascadingStrategy
-
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.WarningPrinter.Print("deleting cluster-scoped resources, not scoped to the provided namespace")
 			warnClusterScope = false
 		}
-
-		if o.DryRunStrategy == cmdutil.DryRunClient {
-			if !o.Quiet {
-				o.PrintObj(info)
-			}
-			return nil
-		}
-		response, err := o.deleteResource(info, options)
-		if err != nil {
-			return err
-		}
-		resourceLocation := cmdwait.ResourceLocation{
-			GroupResource: info.Mapping.Resource.GroupResource(),
-			Namespace:     info.Namespace,
-			Name:          info.Name,
-		}
-		if status, ok := response.(*metav1.Status); ok && status.Details != nil {
-			uidMap[resourceLocation] = status.Details.UID
-			return nil
-		}
-		responseMetadata, err := meta.Accessor(response)
-		if err != nil {
-			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
-			klog.V(1).Info(err)
-			return nil
-		}
-		uidMap[resourceLocation] = responseMetadata.GetUID()
-
+		infos = append(infos, info)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
-	if found == 0 {
+	if len(infos) == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
 		return nil
 	}
+
+	// Phase 2: Delete resources, concurrently when concurrency > 1.
+	deletedInfos := make([]*resource.Info, 0, len(infos))
+	uidMap := cmdwait.UIDMap{}
+
+	if o.DryRunStrategy == cmdutil.DryRunClient {
+		for _, info := range infos {
+			if !o.Quiet {
+				o.PrintObj(info)
+			}
+			deletedInfos = append(deletedInfos, info)
+		}
+	} else if o.Concurrency <= 1 {
+		// Sequential deletion (default, preserves original behavior).
+		for _, info := range infos {
+			if err := o.deleteSingleResource(info, &deletedInfos, &uidMap); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Concurrent deletion.
+		var mu sync.Mutex
+		g, _ := errgroup.WithContext(context.Background())
+		g.SetLimit(o.Concurrency)
+		for _, info := range infos {
+			info := info // capture loop variable
+			g.Go(func() error {
+				response, err := o.deleteResource(info, o.newDeleteOptions())
+				if err != nil {
+					return err
+				}
+
+				loc := cmdwait.ResourceLocation{
+					GroupResource: info.Mapping.Resource.GroupResource(),
+					Namespace:     info.Namespace,
+					Name:          info.Name,
+				}
+				uid := extractUID(response)
+
+				mu.Lock()
+				deletedInfos = append(deletedInfos, info)
+				if uid != "" {
+					uidMap[loc] = uid
+				}
+				mu.Unlock()
+
+				if !o.Quiet {
+					// PrintObj is not concurrency-safe (writes to o.Out),
+					// serialize it.
+					mu.Lock()
+					o.PrintObj(info)
+					mu.Unlock()
+				}
+				return nil
+			})
+		}
+		if err := g.Wait(); err != nil {
+			return err
+		}
+	}
+
 	if !o.WaitForDeletion {
 		return nil
 	}
-	// if we don't have a dynamic client, we don't want to wait.  Eventually when delete is cleaned up, this will likely
-	// drop out.
 	if o.DynamicClient == nil {
 		return nil
 	}
-
-	// If we are dry-running, then we don't want to wait
 	if o.DryRunStrategy != cmdutil.DryRunNone {
 		return nil
 	}
 
 	effectiveTimeout := o.Timeout
 	if effectiveTimeout == 0 {
-		// if we requested to wait forever, set it to a week.
 		effectiveTimeout = 168 * time.Hour
 	}
 	waitOptions := cmdwait.WaitOptions{
@@ -469,12 +493,53 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 	err = waitOptions.RunWaitContext(context.Background())
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
-		// if we're forbidden from waiting, we shouldn't fail.
-		// if the resource doesn't support a verb we need, we shouldn't fail.
 		klog.V(1).Info(err)
 		return nil
 	}
 	return err
+}
+
+// deleteSingleResource deletes one resource and records its UID for wait tracking.
+func (o *DeleteOptions) deleteSingleResource(info *resource.Info, deletedInfos *[]*resource.Info, uidMap *cmdwait.UIDMap) error {
+	response, err := o.deleteResource(info, o.newDeleteOptions())
+	if err != nil {
+		return err
+	}
+	*deletedInfos = append(*deletedInfos, info)
+
+	loc := cmdwait.ResourceLocation{
+		GroupResource: info.Mapping.Resource.GroupResource(),
+		Namespace:     info.Namespace,
+		Name:          info.Name,
+	}
+	if uid := extractUID(response); uid != "" {
+		(*uidMap)[loc] = uid
+	}
+	return nil
+}
+
+// newDeleteOptions builds the metav1.DeleteOptions from the user's flags.
+func (o *DeleteOptions) newDeleteOptions() *metav1.DeleteOptions {
+	options := &metav1.DeleteOptions{}
+	if o.GracePeriod >= 0 {
+		options = metav1.NewDeleteOptions(int64(o.GracePeriod))
+	}
+	options.PropagationPolicy = &o.CascadingStrategy
+	return options
+}
+
+// extractUID returns the UID from a delete response, or empty string if
+// it cannot be determined.
+func extractUID(response runtime.Object) types.UID {
+	if status, ok := response.(*metav1.Status); ok && status.Details != nil {
+		return status.Details.UID
+	}
+	responseMetadata, err := meta.Accessor(response)
+	if err != nil {
+		klog.V(1).Info(err)
+		return ""
+	}
+	return responseMetadata.GetUID()
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
