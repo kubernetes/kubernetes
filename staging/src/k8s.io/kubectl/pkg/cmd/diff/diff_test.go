@@ -197,7 +197,7 @@ func TestDiffer(t *testing.T) {
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
-	err = diff.Diff(&obj, Printer{}, true, false)
+	err = diff.Diff(&obj, Printer{}, true, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,86 @@ metadata:
 				},
 			}
 
-			err = diff.Diff(&obj, Printer{}, tc.showManagedFields, false)
+			err = diff.Diff(&obj, Printer{}, tc.showManagedFields, false, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actualFromContent, _ := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
+			if string(actualFromContent) != tc.expectedFromContent {
+				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
+			}
+
+			actualToContent, _ := os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
+			if string(actualToContent) != tc.expectedToContent {
+				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
+			}
+		})
+	}
+}
+
+func TestShowGeneration(t *testing.T) {
+	diff, err := NewDiffer("LIVE", "MERGED")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer diff.TearDown()
+
+	testCases := []struct {
+		name                string
+		showGeneration      bool
+		expectedFromContent string
+		expectedToContent   string
+	}{
+		{
+			name:           "with generation",
+			showGeneration: true,
+			expectedFromContent: `live: true
+metadata:
+  generation: 1
+  name: foo
+`,
+			expectedToContent: `merged: true
+metadata:
+  generation: 2
+  name: foo
+`,
+		},
+		{
+			name:           "without generation",
+			showGeneration: false,
+			expectedFromContent: `live: true
+metadata:
+  name: foo
+`,
+			expectedToContent: `merged: true
+metadata:
+  name: foo
+`,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := FakeObject{
+				name: fmt.Sprintf("TestShowGen%d", i),
+				live: map[string]interface{}{
+					"live": true,
+					"metadata": map[string]interface{}{
+						"generation": int64(1),
+						"name":       "foo",
+					},
+				},
+				merged: map[string]interface{}{
+					"merged": true,
+					"metadata": map[string]interface{}{
+						"generation": int64(2),
+						"name":       "foo",
+					},
+				},
+			}
+
+			err = diff.Diff(&obj, Printer{}, false, false, tc.showGeneration)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -703,7 +782,7 @@ metadata:
 				merged: secretArgs,
 			}
 
-			err = diff.Diff(&obj, Printer{}, false, tc.showSecrets)
+			err = diff.Diff(&obj, Printer{}, false, tc.showSecrets, true)
 			if err != nil {
 				t.Fatal(err)
 			}
