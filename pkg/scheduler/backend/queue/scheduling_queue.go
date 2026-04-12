@@ -103,7 +103,11 @@ type SchedulingQueue interface {
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
 	// returned by calling SchedulingCycle().
-	AddUnschedulableIfNotPresent(logger klog.Logger, pod *framework.QueuedPodInfo, podSchedulingCycle int64) error
+	// schedulingCycleInFlightUID is the UID under which the pod is registered in inFlightPods (from Pop).
+	// Use the empty string to mean pInfo.Pod.UID. When the pod object is refreshed from the API/informer
+	// after a delete+recreate with the same name, pInfo.Pod.UID may differ; pass the pre-refresh UID so
+	// Done and queueing-hint logic use the correct in-flight entry (see kubernetes/kubernetes#138316).
+	AddUnschedulableIfNotPresent(logger klog.Logger, pod *framework.QueuedPodInfo, podSchedulingCycle int64, schedulingCycleInFlightUID types.UID) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
@@ -780,7 +784,8 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 
 // determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
 // and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
-func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) queueingStrategy {
+// inFlightListUID is the key in inFlightPods for this scheduling attempt (empty means pInfo.Pod.UID).
+func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, inFlightListUID types.UID) queueingStrategy {
 	if len(pInfo.UnschedulablePlugins) == 0 && len(pInfo.PendingPlugins) == 0 {
 		// No failed plugins are associated with this Pod.
 		// Meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
@@ -788,7 +793,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 		return queueAfterBackoff
 	}
 
-	events, err := p.activeQ.clusterEventsForPod(logger, pInfo)
+	events, err := p.activeQ.clusterEventsForPod(logger, pInfo, inFlightListUID)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
@@ -861,12 +866,18 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulablePods`. But if there has been a recent move
 // request, then the pod is put in `backoffQ`.
-func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64, schedulingCycleInFlightUID types.UID) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// In any case, this Pod will be moved back to the queue and we should call Done.
-	defer p.Done(pInfo.Pod.UID)
+	doneUID := pInfo.Pod.UID
+	if schedulingCycleInFlightUID != "" {
+		doneUID = schedulingCycleInFlightUID
+	}
+	// In any case, this scheduling attempt will be moved back to the queue and we should call Done
+	// for the UID registered in inFlightPods at Pop time (doneUID), which may differ from pInfo.Pod.UID
+	// if the pod was refreshed from the informer after a same-name recreate.
+	defer p.Done(doneUID)
 
 	pod := pInfo.Pod
 	if p.unschedulablePods.get(pod) != nil {
@@ -908,7 +919,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	}
 
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
-	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo)
+	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo, doneUID)
 
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)
