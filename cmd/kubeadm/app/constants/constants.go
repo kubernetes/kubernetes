@@ -326,7 +326,7 @@ const (
 	MinExternalEtcdVersion = "3.5.24-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.6.8-0"
+	DefaultEtcdVersion = "3.6.10-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -364,7 +364,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.14.2"
+	CoreDNSVersion = "v1.14.3"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -508,9 +508,9 @@ var (
 	// an etcd version even if the map is not yet updated before a release. The user will
 	// get a warning in that case, so ideally the map should be updated for each release.
 	SupportedEtcdVersion = map[uint8]string{
-		34: "3.6.8-0",
-		35: "3.6.8-0",
-		36: "3.6.8-0",
+		34: "3.6.10-0",
+		35: "3.6.10-0",
+		36: "3.6.10-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
