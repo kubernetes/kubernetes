@@ -20,6 +20,7 @@ import (
 	"bytes"
 
 	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -31,6 +32,8 @@ type KustomizeVisitor struct {
 	dirPath string
 	// File system containing dirPath.
 	fSys filesys.FileSystem
+	// loadRestrictions holds the raw --load-restrictor flag value.
+	loadRestrictions string
 	// Holds result of kustomize build, retained for tests.
 	yml []byte
 }
@@ -39,6 +42,10 @@ type KustomizeVisitor struct {
 func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
 	kOpts := krusty.MakeDefaultOptions()
 	kOpts.Reorder = krusty.ReorderOptionLegacy
+	switch v.loadRestrictions {
+	case types.LoadRestrictionsNone.String(), "none":
+		kOpts.LoadRestrictions = types.LoadRestrictionsNone
+	}
 	k := krusty.MakeKustomizer(kOpts)
 	m, err := k.Run(v.fSys, v.dirPath)
 	if err != nil {

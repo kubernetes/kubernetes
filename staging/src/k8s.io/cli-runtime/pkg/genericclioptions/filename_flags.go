@@ -32,9 +32,10 @@ import (
 type FileNameFlags struct {
 	Usage string
 
-	Filenames *[]string
-	Kustomize *string
-	Recursive *bool
+	Filenames        *[]string
+	Kustomize        *string
+	Recursive        *bool
+	LoadRestrictions *string
 }
 
 // ToOptions creates a new FileNameOptions struct and sets FilenameOptions based on FileNameflags
@@ -53,6 +54,9 @@ func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	}
 	if o.Kustomize != nil {
 		options.Kustomize = *o.Kustomize
+	}
+	if o.LoadRestrictions != nil {
+		options.LoadRestrictions = *o.LoadRestrictions
 	}
 
 	return options
@@ -78,5 +82,23 @@ func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	if o.Kustomize != nil {
 		flags.StringVarP(o.Kustomize, "kustomize", "k", *o.Kustomize,
 			"Process a kustomization directory. This flag can't be used together with -f or -R.")
+	}
+	if o.LoadRestrictions != nil {
+		flags.StringVar(o.LoadRestrictions, "load-restrictor", *o.LoadRestrictions,
+			"if set to 'LoadRestrictionsNone', local kustomizations may load files from outside their root. "+
+				"This does, however, break the relocatability of the kustomization.")
+	}
+}
+
+// AddFlagCompletions registers shell completions for the flags. Must be called
+// after AddFlags and requires access to the cobra.Command.
+func (o *FileNameFlags) AddFlagCompletions(cmd *cobra.Command) {
+	if o == nil {
+		return
+	}
+	if o.LoadRestrictions != nil {
+		cmd.RegisterFlagCompletionFunc("load-restrictor", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"LoadRestrictionsNone", "LoadRestrictionsRootOnly"}, cobra.ShellCompDirectiveNoFileComp
+		})
 	}
 }

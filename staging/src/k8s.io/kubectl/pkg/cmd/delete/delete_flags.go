@@ -116,6 +116,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	f.FileNameFlags.AddFlags(cmd.Flags())
+	f.FileNameFlags.AddFlagCompletions(cmd)
 	if f.LabelSelector != nil {
 		cmdutil.AddLabelSelectorFlagVar(cmd, f.LabelSelector)
 	}
@@ -187,10 +188,11 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	filenames := []string{}
 	recursive := false
 	kustomize := ""
+	loadRestrictions := "LoadRestrictionsRootOnly"
 
 	return &DeleteFlags{
 		// Not using helpers.go since it provides function to add '-k' for FileNameOptions, but not FileNameFlags
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive, LoadRestrictions: &loadRestrictions},
 		LabelSelector: &labelSelector,
 		FieldSelector: &fieldSelector,
 
@@ -222,9 +224,10 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	filenames := []string{}
 	kustomize := ""
 	recursive := false
+	loadRestrictions := "LoadRestrictionsRootOnly"
 
 	return &DeleteFlags{
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive, LoadRestrictions: &loadRestrictions},
 
 		CascadingStrategy: &cascadingStrategy,
 		GracePeriod:       &gracePeriod,

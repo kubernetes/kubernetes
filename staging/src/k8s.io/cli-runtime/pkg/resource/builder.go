@@ -142,9 +142,10 @@ func IsUsageError(err error) bool {
 }
 
 type FilenameOptions struct {
-	Filenames []string
-	Kustomize string
-	Recursive bool
+	Filenames        []string
+	Kustomize        string
+	Recursive        bool
+	LoadRestrictions string
 }
 
 func (o *FilenameOptions) validate() []error {
@@ -286,10 +287,11 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		b.paths = append(
 			b.paths,
 			&KustomizeVisitor{
-				mapper:  b.mapper,
-				dirPath: filenameOptions.Kustomize,
-				schema:  b.schema,
-				fSys:    filesys.MakeFsOnDisk(),
+				mapper:           b.mapper,
+				dirPath:          filenameOptions.Kustomize,
+				schema:           b.schema,
+				fSys:             filesys.MakeFsOnDisk(),
+				loadRestrictions: filenameOptions.LoadRestrictions,
 			})
 	}
 

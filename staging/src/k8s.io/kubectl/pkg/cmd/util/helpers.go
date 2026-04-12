@@ -477,7 +477,7 @@ func AddValidateFlags(cmd *cobra.Command) {
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
-	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
+	AddKustomizeFlags(cmd, &options.Kustomize, &options.LoadRestrictions)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
@@ -490,9 +490,19 @@ func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 	flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }
 
-// AddKustomizeFlag adds kustomize flag to a command
-func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
-	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
+// AddKustomizeFlags adds kustomize flag to a command
+func AddKustomizeFlags(cmd *cobra.Command, value *string, loadRestrictions *string) {
+	cmd.Flags().StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
+	cmd.Flags().StringVar(
+		loadRestrictions,
+		"load-restrictor",
+		"LoadRestrictionsRootOnly",
+		"if set to 'LoadRestrictionsNone', local kustomizations may load files from outside their root. "+
+			"This does, however, break the relocatability of the kustomization.",
+	)
+	cmd.RegisterFlagCompletionFunc("load-restrictor", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"LoadRestrictionsNone", "LoadRestrictionsRootOnly"}, cobra.ShellCompDirectiveNoFileComp
+	})
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
