@@ -412,6 +412,12 @@ const (
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
+	// owner @amritansh1502
+	// kep: https://kep.k8s.io/5999
+
+	// Enables container probe handler h2cGet (HTTP GET over HTTP/2 cleartext).
+	H2CContainerProbe featuregate.Feature = "H2CContainerProbe"
+
 	// owner: @jm-franc
 	// kep: https://kep.k8s.io/4951
 	//
@@ -1499,6 +1505,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	H2CContainerProbe: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	HPAConfigurableTolerance: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2491,6 +2501,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	GracefulNodeShutdown: {},
 
 	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
+
+	H2CContainerProbe: {},
 
 	HPAConfigurableTolerance: {},
 
