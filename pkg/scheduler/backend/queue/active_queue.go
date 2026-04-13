@@ -45,9 +45,8 @@ type activeQueuer interface {
 
 	listInFlightEvents() []interface{}
 	listInFlightPods() []*v1.Pod
-	// clusterEventsForPod collects cluster events recorded while the pod registered under inFlightListUID
-	// was in flight. If inFlightListUID is empty, pInfo.Pod.UID is used.
-	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, inFlightListUID types.UID) ([]*clusterEvent, error)
+	// clusterEventsForPod collects cluster events recorded while pInfo.Pod was in flight.
+	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
 	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
 
@@ -382,21 +381,16 @@ func (aq *activeQueue) listInFlightPods() []*v1.Pod {
 	return pods
 }
 
-// clusterEventsForPod gets all cluster events that have happened while the scheduling attempt
-// for the pod keyed by inFlightListUID (in inFlightPods) was in flight.
-func (aq *activeQueue) clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, inFlightListUID types.UID) ([]*clusterEvent, error) {
+// clusterEventsForPod gets all cluster events that have happened while pInfo.Pod was in flight.
+func (aq *activeQueue) clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error) {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	logger.V(5).Info("Checking events for in-flight pod", "pod", klog.KObj(pInfo.Pod), "unschedulablePlugins", pInfo.UnschedulablePlugins, "inFlightEventsSize", aq.inFlightEvents.Len(), "inFlightPodsSize", len(aq.inFlightPods))
 
-	listUID := inFlightListUID
-	if listUID == "" {
-		listUID = pInfo.Pod.UID
-	}
 	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
 	// So, given pInfo should have been Pop()ed before,
-	// we can assume listUID must be recorded in inFlightPods and thus inFlightEvents.
-	inFlightPod, ok := aq.inFlightPods[listUID]
+	// we can assume pInfo.Pod.UID must be recorded in inFlightPods and thus inFlightEvents.
+	inFlightPod, ok := aq.inFlightPods[pInfo.Pod.UID]
 	if !ok {
 		return nil, fmt.Errorf("in flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler")
 	}
