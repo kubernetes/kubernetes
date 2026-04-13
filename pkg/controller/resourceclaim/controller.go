@@ -142,7 +142,10 @@ type Controller struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	queue workqueue.TypedRateLimitingInterface[string]
+	// syncHandlerFunc runs for each item in the workqueue. It is replaced in
+	// some tests that exercise the workqueue.
+	syncHandlerFunc func(context.Context, string) error
+	queue           workqueue.TypedRateLimitingInterface[string]
 
 	// The deletedObjects cache keeps track of Pods for which we know that
 	// they have existed and have been removed. For those we can be sure
@@ -178,6 +181,11 @@ func (f controllerFeatures) String() string {
 		enabled(f.PrioritizedList),
 		enabled(f.WorkloadResourceClaims),
 	)
+}
+
+// nonRetryableError is an error for a key in the workqueue that will not be requeued.
+type nonRetryableError struct {
+	error
 }
 
 // NewController creates a ResourceClaim controller.
@@ -229,6 +237,7 @@ func newControllerWithFeatures(
 		),
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
+	ec.syncHandlerFunc = ec.syncHandler
 
 	resourceclaimmetrics.RegisterMetrics()
 	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
@@ -830,8 +839,12 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(ctx, key)
-	if err == nil {
+	err := ec.syncHandlerFunc(ctx, key)
+	_, nonRetryable := errors.AsType[nonRetryableError](err)
+	if nonRetryable {
+		runtime.HandleErrorWithContext(ctx, err, "Work item failed, will not retry", "item", key)
+	}
+	if err == nil || nonRetryable {
 		ec.queue.Forget(key)
 		return true
 	}
@@ -1042,7 +1055,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 	var claim *resourceapi.ResourceClaim
 	if isPodGroupClaim(bindTo) {
 		if !ec.features.WorkloadResourceClaims {
-			return fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)
+			return nonRetryableError{fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)}
 		}
 		claim, err = ec.findPodGroupResourceClaim(podGroup, schedulingapi.PodGroupResourceClaim{
 			Name: podClaim.Name,
@@ -1646,7 +1659,7 @@ func (ec *Controller) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) 
 		return nil, nil
 	}
 	if !ec.features.GenericWorkload {
-		return nil, fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)
+		return nil, nonRetryableError{fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)}
 	}
 	return ec.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 }

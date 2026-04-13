@@ -17,11 +17,13 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
@@ -34,10 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
@@ -1399,6 +1403,102 @@ func testEventHandlers(tCtx ktesting.TContext) {
 	}
 }
 
+func TestWorkqueue(t *testing.T) { testWorkqueue(ktesting.Init(t)) }
+func testWorkqueue(tCtx ktesting.TContext) {
+	tests := map[string]struct {
+		shutdown       bool
+		syncHandlerErr error
+		expectStopLoop bool
+		expectSynced   bool
+		expectRequeue  bool
+	}{
+		"no-error": {
+			syncHandlerErr: nil,
+			expectSynced:   true,
+		},
+		"retryable-error": {
+			syncHandlerErr: fmt.Errorf("will retry"),
+			expectSynced:   true,
+			expectRequeue:  true,
+		},
+		"nonretryable-error": {
+			syncHandlerErr: nonRetryableError{fmt.Errorf("will not retry")},
+			expectSynced:   true,
+			expectRequeue:  false,
+		},
+		"wrapped-nonretryable-error": {
+			syncHandlerErr: fmt.Errorf("%w", nonRetryableError{fmt.Errorf("will not retry")}),
+			expectSynced:   true,
+			expectRequeue:  false,
+		},
+		"shutdown": {
+			shutdown:       true,
+			expectSynced:   false,
+			expectStopLoop: true,
+		},
+	}
+	for name, test := range tests {
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			// The default [utilruntime.ErrorHandlers] use [time] but are
+			// initialized before the synctest bubble is established. As a
+			// result, when the error handler is invoked the default rate
+			// limiting begins a sleep for the duration between *fake* now and
+			// *actual* now. The workqueue in turn spins through its internal
+			// periodic accounting for more than 26 years(!) which eventually
+			// resolves, but wastes actual CPU time.
+			oldErrorHandlers := utilruntime.ErrorHandlers
+			tCtx.Cleanup(func() {
+				utilruntime.ErrorHandlers = oldErrorHandlers
+			})
+			utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+				func(ctx context.Context, err error, msg string, keysAndValues ...any) {
+					klog.FromContext(ctx).Error(err, msg, keysAndValues...)
+				},
+			}
+
+			rateLimitDelay := 1 * time.Second
+			ec := &Controller{
+				queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+					&staticRateLimiter[string]{delay: rateLimitDelay, requeues: map[string]int{}},
+					workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
+				),
+			}
+			tCtx.Cleanup(ec.queue.ShutDown)
+
+			synced := false
+			ec.syncHandlerFunc = func(ctx context.Context, s string) error {
+				synced = true
+				return test.syncHandlerErr
+			}
+
+			if test.shutdown {
+				ec.queue.ShutDown()
+			}
+
+			var key string
+			ec.queue.Add(key)
+
+			actual := ec.processNextWorkItem(tCtx)
+			tCtx.Expect(actual).To(gomega.Equal(!test.expectStopLoop))
+
+			if test.expectSynced {
+				tCtx.Expect(synced).To(gomega.BeTrueBecause("sync handler should have run but did not"))
+			} else {
+				tCtx.Expect(synced).To(gomega.BeFalseBecause("sync handler should not have run but did"))
+			}
+			time.Sleep(rateLimitDelay)
+			// The delayed Add races with checking the length of the queue. Wait
+			// for the Add to finish before checking the length.
+			tCtx.Wait()
+			if test.expectRequeue {
+				tCtx.Expect(ec.queue.Len()).To(gomega.Equal(1), "key should have been queued")
+			} else {
+				tCtx.Expect(ec.queue.Len()).To(gomega.Equal(0), "no key should have been queued")
+			}
+		})
+	}
+}
+
 func TestGetAdminAccessMetricLabel(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -1898,4 +1998,36 @@ func (em numMetrics) withUpdates(rcLabels controllermetrics.NumResourceClaimLabe
 		metrics: em.metrics,
 		lister:  em.lister,
 	}
+}
+
+// staticRateLimiter delays any item by a fixed amount of time. It allows a test
+// to know exactly how long to wait before rate-limited items are added to the
+// queue.
+type staticRateLimiter[T comparable] struct {
+	delay time.Duration
+
+	requeuesLock sync.Mutex
+	requeues     map[T]int
+}
+
+// Forget implements [workqueue.TypedRateLimiter].
+func (s *staticRateLimiter[T]) Forget(item T) {
+	s.requeuesLock.Lock()
+	defer s.requeuesLock.Unlock()
+	delete(s.requeues, item)
+}
+
+// NumRequeues implements [workqueue.TypedRateLimiter].
+func (s *staticRateLimiter[T]) NumRequeues(item T) int {
+	s.requeuesLock.Lock()
+	defer s.requeuesLock.Unlock()
+	return s.requeues[item]
+}
+
+// When implements [workqueue.TypedRateLimiter].
+func (s *staticRateLimiter[T]) When(item T) time.Duration {
+	s.requeuesLock.Lock()
+	defer s.requeuesLock.Unlock()
+	s.requeues[item]++
+	return s.delay
 }
