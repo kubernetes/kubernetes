@@ -377,10 +377,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		if result == results.Failure {
 			// Emit an event indicating the failure was ignored because FailureThreshold has not been reached.
+			msg := fmt.Sprintf("probe failure %d/%d: failure ignored, FailureThreshold not yet reached",
+				w.resultRun, int(w.spec.FailureThreshold))
 			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container,
-				v1.EventTypeWarning, events.ContainerUnhealthy,
-				fmt.Sprintf("probe failure %d/%d: failure ignored, FailureThreshold not yet reached",
-					w.resultRun, int(w.spec.FailureThreshold)))
+				v1.EventTypeWarning, events.ContainerUnhealthy, "%s", msg)
 		}
 		return true
 	}

@@ -119,8 +119,8 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		return results.Success, nil
 
 	case probe.Failure:
-		logger.V(1).Info("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		logger.V(1).Info("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s", output)
 		return results.Failure, nil
 
 	case probe.Unknown:
