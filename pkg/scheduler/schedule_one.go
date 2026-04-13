@@ -1093,14 +1093,21 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
 			// Remember the UID under which this pod is tracked as in-flight (from Pop) before we
-			// replace podInfo with the informer copy. A delete+recreate with the same name can change
-			// the UID; Done and queueing hints must still target the popped UID (kubernetes/kubernetes#138316).
+			// replace podInfo with the informer copy. If the pod was deleted and recreated with the
+			// same name, skip requeueing or updating the new pod; informer handlers will handle it (#138316).
 			poppedInFlightUID := podInfo.Pod.UID
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle(), poppedInFlightUID); err != nil {
+			pod = podInfo.Pod
+			if pod.UID != poppedInFlightUID {
+				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", poppedInFlightUID, "newUID", pod.UID)
+				sched.SchedulingQueue.Done(poppedInFlightUID)
+				calledDone = true
+				return
+			}
+			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
 			calledDone = true
