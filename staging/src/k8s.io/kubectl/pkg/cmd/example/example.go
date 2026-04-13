@@ -41,7 +41,7 @@ var (
         Output a practical example manifest for a resource.
 
         Resolves the provided TYPE using discovery (like 'kubectl explain') and prints
-        a sensible, immediately applicable YAML manifest you can pipe to 'kubectl apply -f -'.`))
+        a sensible, immediately applicable YAML manifest you can pipe to 'kubectl create -f -'.`))
 
 	examples = templates.Examples(i18n.T(`
         # Example Pod manifest
