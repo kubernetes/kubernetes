@@ -265,6 +265,9 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	}
 
 	if rw == nil {
+		if span != nil {
+			span.End(500 * time.Millisecond)
+		}
 		return errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch")
 	}
 	// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
@@ -281,10 +284,16 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	defer func() { cancel() }()
 	watcher, err := rw.Watch(ctx, &opts)
 	if err != nil {
+		if span != nil {
+			span.End(500 * time.Millisecond)
+		}
 		return err
 	}
 	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), onWatchListComplete)
 	if err != nil {
+		if span != nil {
+			span.End(500 * time.Millisecond)
+		}
 		return err
 	}
 	// Invalidate cancel() to defer until serve() is complete.
