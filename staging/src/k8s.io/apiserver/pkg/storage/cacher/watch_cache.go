@@ -197,7 +197,7 @@ func newWatchCache(
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshottingEnabled.Store(true)
-		wc.snapshots = store.NewSnapshotter()
+		wc.snapshots = store.NewSnapshotter(wc.capacity)
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())

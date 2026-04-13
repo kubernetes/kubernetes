@@ -71,7 +71,7 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
-	cache := NewSnapshotter()
+	cache := NewSnapshotter(4)
 	cache.Add(10, fakeOrderedLister{rv: 10})
 	cache.Add(20, fakeOrderedLister{rv: 20})
 	cache.Add(30, fakeOrderedLister{rv: 30})

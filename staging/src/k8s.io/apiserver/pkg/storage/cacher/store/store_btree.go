@@ -426,10 +426,10 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*Element
 // However, this solution is more complex and is deferred for future implementation.
 //
 // TODO: Rewrite to use a cyclic buffer
-func NewSnapshotter() Snapshotter {
+func NewSnapshotter(capacity int) Snapshotter {
 	s := &storeSnapshotter{
-		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
-			return a.resourceVersion < b.resourceVersion
+		snapshots: newRingBuffer(capacity, func(item snapshotItem) int64 {
+			return int64(item.resourceVersion)
 		}),
 	}
 	return s
@@ -445,56 +445,59 @@ type Snapshotter interface {
 	Len() int
 }
 
-type storeSnapshotter struct {
-	mux       sync.RWMutex
-	snapshots *btree.BTree[rvSnapshot]
-}
-
-type rvSnapshot struct {
+// snapshotItem pairs a snapshot with the resource version used to index it.
+type snapshotItem struct {
 	resourceVersion uint64
 	snapshot        OrderedLister
+}
+
+type storeSnapshotter struct {
+	mux       sync.RWMutex
+	snapshots *ringBuffer[snapshotItem]
 }
 
 func (s *storeSnapshotter) Reset() {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.snapshots.Clear(false)
+	s.snapshots.RebaseHistory()
 }
 
 func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
-
-	var result *rvSnapshot
-	s.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
-		result = &rvs
+	var result OrderedLister
+	found := false
+	s.snapshots.DescendLessOrEqual(int64(rv), func(_ int64, item snapshotItem) bool {
+		result = item.snapshot
+		found = true
 		return false
 	})
-	if result == nil {
-		return nil, false
-	}
-	return result.snapshot, true
+	return result, found
 }
 
 func (s *storeSnapshotter) Add(rv uint64, indexer OrderedLister) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
+	item := snapshotItem{resourceVersion: rv, snapshot: indexer.Clone()}
+	rv64 := int64(rv)
+	if s.snapshots.Len() > 0 {
+		latestRV := s.snapshots.PeekLatest()
+		if rv64 < latestRV {
+			panic(fmt.Sprintf("snapshot with resourceVersion %d is older than the last snapshot with resourceVersion %d", rv64, latestRV))
+		}
+		if rv64 == latestRV {
+			s.snapshots.ReplaceLatest(item)
+			return
+		}
+	}
+	s.snapshots.ensureCapacity(s.snapshots.Len() + 1)
+	s.snapshots.Append(item)
 }
 
 func (s *storeSnapshotter) RemoveLess(rv uint64) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	for s.snapshots.Len() > 0 {
-		oldest, ok := s.snapshots.Min()
-		if !ok {
-			break
-		}
-		if rv <= oldest.resourceVersion {
-			break
-		}
-		s.snapshots.DeleteMin()
-	}
+	s.snapshots.RemoveLess(int64(rv))
 }
 
 func (s *storeSnapshotter) Len() int {
