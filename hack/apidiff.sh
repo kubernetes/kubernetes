@@ -38,6 +38,11 @@ Usage: $0 [-r <revision>] [directory ...]"
                   absolute path.
                   WARNING: this will modify the go.mod in that directory.
    -u             Update ${CHANGELOG} files if incompatible changes are found.
+   -m             When enabled, -t must be used and must be given a merge commit
+                  for a GitHub pull request. The diff is then calculated for
+                  the merged branch. When updating the changelog, populates
+                  the new changelog section with information about the pull request.
+                  -r is ignored.
    [directory]:   Check one or more specific directory instead of everything.
 
 EOF
@@ -55,7 +60,8 @@ base=
 target=
 builds=()
 update_changelog=false
-while getopts "r:t:b:u" o; do
+from_merge_commit=false
+while getopts "r:t:b:um" o; do
     case "${o}" in
         r)
             base="${OPTARG}"
@@ -84,12 +90,26 @@ while getopts "r:t:b:u" o; do
        u)
             update_changelog=true
             ;;
+       m)
+            from_merge_commit=true
+            ;;
         *)
             usage
             ;;
     esac
 done
 shift $((OPTIND - 1))
+
+if ${from_merge_commit}; then
+    # Populating the changelog from merge commits is not a common
+    # operation and thus skips detailed error handling.
+    #
+    # shellcheck disable=SC2207 # Here we intentionally split into words.
+    parents=( $(git show --no-patch --format=%P "$target") )
+    base=$(git merge-base "${parents[0]}" "${parents[1]}")
+    merge_commit=${target}
+    target=${parents[1]}
+fi
 
 # default from prow env if unset from args
 # https://docs.prow.k8s.io/docs/jobs/#job-environment-variables
@@ -250,10 +270,7 @@ compare () {
         echo "can not compare changes, module didn't exist before or after"
         return
     fi
-    # Output order is non-deterministic. Fix that by sorting.
-    # Here its mostly cosmetic, but for checking for incompatible changes
-    # in a changelog it really matters.
-    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package" | LC=C sort) || true
+    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
     echo "## ${what}"
     if [ -z "$changes" ]; then
         echo "no changes"
@@ -261,6 +278,10 @@ compare () {
         echo "$changes"
         echo
     fi
+    # Output order is non-deterministic. Fix that by sorting because it
+    # matters for comparing against the changelog. Above we cannot
+    # sort because it would break the ordering into
+    # "Compatible:" and "Incompatible:" changes.
     incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package" | LC=C sort) || true
     if [ -n "$incompatible" ]; then
         # Does this directory have a changelog?
@@ -293,8 +314,34 @@ ${incompatible}
 "
                 fi
                 head -n $((line - 1)) "${changelog}" >"${changelog}.tmp"
-                cat >>"${changelog}.tmp" <<EOF
-${before}### Replace with a short title
+                echo -n "${before}" >>"${changelog}.tmp"
+                if ${from_merge_commit}; then
+                    # Example for a body:
+                    #
+                    # Merge pull request #137170 from pohly/dra-device-taints-beta
+                    #
+                    # DRA device taints: graduate to beta
+                    #
+                    # Parsing this is good enough for actual merge commits in Kubernetes 1.36.
+                    # It's not meant to catch errors or unexpected body content.
+                    body=$(git show --no-patch --format=%B "${merge_commit}")
+                    # shellcheck disable=SC2207 # Here we intentionally split into words.
+                    commit_summary=( $(echo "${body}" | head -n 1) )
+                    pr=${commit_summary[3]}
+                    pr=${pr#?}
+                    title=$(echo "${body}" | tail -n 1)
+                    cat >>"${changelog}.tmp" <<EOF
+### ${title}
+
+See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr}).
+
+\`\`\`
+${incompatible}
+\`\`\`
+EOF
+                else
+                    cat >>"${changelog}.tmp" <<EOF
+### Replace with a short title
 
 Replace this text with a short summary of the change
 and how users of the package can deal with this breaking
@@ -303,8 +350,10 @@ instead explain why.
 
 \`\`\`
 ${incompatible}
-\`\`\`${after}
+\`\`\`
 EOF
+                fi
+                echo -n "${after}" >>"${changelog}.tmp"
                 tail -n "+${line}" "${changelog}" >>"${changelog}.tmp"
                 mv "${changelog}.tmp" "${changelog}"
 
