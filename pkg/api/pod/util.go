@@ -757,6 +757,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
+	dropDisabledH2CGetProbeField(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -2040,4 +2041,65 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+// dropDisabledH2CGetProbeField removes the h2cGet probe handler from container
+// probes when the H2CContainerProbe feature gate is disabled, unless the old pod
+// already used h2cGet (round-trip safety for gate-toggle scenarios).
+func dropDisabledH2CGetProbeField(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+		return
+	}
+	if h2cGetInUse(oldPodSpec) {
+		return
+	}
+	for i := range podSpec.Containers {
+		dropH2CGetFromContainerProbes(&podSpec.Containers[i])
+	}
+	for i := range podSpec.InitContainers {
+		dropH2CGetFromContainerProbes(&podSpec.InitContainers[i])
+	}
+	for i := range podSpec.EphemeralContainers {
+		dropH2CGetFromContainerProbes((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+}
+
+func dropH2CGetFromContainerProbes(c *api.Container) {
+	if c.LivenessProbe != nil {
+		c.LivenessProbe.H2CGet = nil
+	}
+	if c.ReadinessProbe != nil {
+		c.ReadinessProbe.H2CGet = nil
+	}
+	if c.StartupProbe != nil {
+		c.StartupProbe.H2CGet = nil
+	}
+}
+
+func h2cGetInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, c := range podSpec.Containers {
+		if containerUsesH2CGet(c) {
+			return true
+		}
+	}
+	for _, c := range podSpec.InitContainers {
+		if containerUsesH2CGet(c) {
+			return true
+		}
+	}
+	for _, c := range podSpec.EphemeralContainers {
+		if containerUsesH2CGet(api.Container(c.EphemeralContainerCommon)) {
+			return true
+		}
+	}
+	return false
+}
+
+func containerUsesH2CGet(c api.Container) bool {
+	return (c.LivenessProbe != nil && c.LivenessProbe.H2CGet != nil) ||
+		(c.ReadinessProbe != nil && c.ReadinessProbe.H2CGet != nil) ||
+		(c.StartupProbe != nil && c.StartupProbe.H2CGet != nil)
 }

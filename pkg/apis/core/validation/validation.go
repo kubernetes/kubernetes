@@ -3345,6 +3345,7 @@ type commonHandler struct {
 	HTTPGet   *core.HTTPGetAction
 	TCPSocket *core.TCPSocketAction
 	GRPC      *core.GRPCAction
+	H2CGet    *core.H2CGetAction
 	Sleep     *core.SleepAction
 }
 
@@ -3354,6 +3355,7 @@ func handlerFromProbe(ph *core.ProbeHandler) commonHandler {
 		HTTPGet:   ph.HTTPGet,
 		TCPSocket: ph.TCPSocket,
 		GRPC:      ph.GRPC,
+		H2CGet:    ph.H2CGet,
 	}
 }
 
@@ -3493,6 +3495,18 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
 }
+
+func validateH2CGetAction(h2c *core.H2CGetAction, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePortNumOrName(intstr.FromInt32(h2c.Port), fldPath.Child("port"))...)
+	for _, header := range h2c.HTTPHeaders {
+		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	return allErrs
+}
+
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
@@ -3526,6 +3540,16 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 		} else {
 			numHandlers++
 			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
+		}
+	}
+	if handler.H2CGet != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("h2cGet"), "only supported when the H2CContainerProbe feature gate is enabled"))
+		} else if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("h2cGet"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateH2CGetAction(handler.H2CGet, fldPath.Child("h2cGet"))...)
 		}
 	}
 	if handler.Sleep != nil {

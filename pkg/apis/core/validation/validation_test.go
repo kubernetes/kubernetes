@@ -7899,6 +7899,45 @@ func TestValidateHandler(t *testing.T) {
 	}
 }
 
+func TestValidateHandlerH2CGet(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, true)
+
+	successCases := []core.ProbeHandler{
+		{H2CGet: &core.H2CGetAction{Port: 1, Path: "/"}},
+		{H2CGet: &core.H2CGetAction{Port: 65535, Path: "/healthz"}},
+		{H2CGet: &core.H2CGetAction{Port: 8080, Path: "/", HTTPHeaders: []core.HTTPHeader{{Name: "Host", Value: "foo.example.com"}}}},
+		{H2CGet: &core.H2CGetAction{Port: 9090, Path: "/", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
+	}
+	for _, h := range successCases {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []core.ProbeHandler{
+		{
+			HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(1), Host: "", Scheme: "HTTP"},
+			H2CGet:  &core.H2CGetAction{Port: 2, Path: "/"},
+		},
+		{H2CGet: &core.H2CGetAction{Port: 0, Path: "/"}},
+		{H2CGet: &core.H2CGetAction{Port: 1, Path: "/", HTTPHeaders: []core.HTTPHeader{{Name: "Host:", Value: "x"}}}},
+	}
+	for _, h := range errorCases {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+			t.Errorf("expected failure for %#v", h)
+		}
+	}
+}
+
+func TestValidateHandlerH2CGetFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
+
+	h := core.ProbeHandler{H2CGet: &core.H2CGetAction{Port: 8080, Path: "/"}}
+	if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		t.Errorf("expected failure when H2CContainerProbe feature gate is disabled for %#v", h)
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      core.Container

@@ -6611,6 +6611,141 @@ func TestDisabledSchedulingGroup(t *testing.T) {
 	}
 }
 
+func TestDropDisabledH2CGetProbeField(t *testing.T) {
+	h2cProbe := &api.Probe{
+		ProbeHandler: api.ProbeHandler{
+			H2CGet: &api.H2CGetAction{Port: 8080, Path: "/healthz"},
+		},
+	}
+	execProbe := &api.Probe{
+		ProbeHandler: api.ProbeHandler{
+			Exec: &api.ExecAction{Command: []string{"true"}},
+		},
+	}
+
+	podWithH2C := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:           "c",
+						LivenessProbe:  h2cProbe.DeepCopy(),
+						ReadinessProbe: h2cProbe.DeepCopy(),
+						StartupProbe:   h2cProbe.DeepCopy(),
+					},
+				},
+			},
+		}
+	}
+	podWithExec := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:          "c",
+						LivenessProbe: execProbe.DeepCopy(),
+					},
+				},
+			},
+		}
+	}
+	podWithNilProbes := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{Containers: []api.Container{{Name: "c"}}}}
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		oldPod  *api.Pod
+		newPod  *api.Pod
+		wantPod *api.Pod
+	}{
+		{
+			name:    "gate disabled / old has h2cGet / new has h2cGet — preserve (round-trip safety)",
+			enabled: false,
+			oldPod:  podWithH2C(),
+			newPod:  podWithH2C(),
+			wantPod: podWithH2C(),
+		},
+		{
+			name:    "gate disabled / old has no h2cGet / new has h2cGet — drop h2cGet field",
+			enabled: false,
+			oldPod:  podWithNilProbes(),
+			newPod:  podWithH2C(),
+			wantPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:           "c",
+						LivenessProbe:  &api.Probe{},
+						ReadinessProbe: &api.Probe{},
+						StartupProbe:   &api.Probe{},
+					}},
+				},
+			},
+		},
+		{
+			name:    "gate disabled / old has no h2cGet / new has no h2cGet — unchanged",
+			enabled: false,
+			oldPod:  podWithExec(),
+			newPod:  podWithExec(),
+			wantPod: podWithExec(),
+		},
+		{
+			name:    "gate enabled / old has no h2cGet / new has h2cGet — allowed",
+			enabled: true,
+			oldPod:  podWithNilProbes(),
+			newPod:  podWithH2C(),
+			wantPod: podWithH2C(),
+		},
+		{
+			name:    "gate enabled / old has h2cGet / new has h2cGet — preserved",
+			enabled: true,
+			oldPod:  podWithH2C(),
+			newPod:  podWithH2C(),
+			wantPod: podWithH2C(),
+		},
+		{
+			name:    "gate disabled / nil old pod / new has h2cGet — drop h2cGet field",
+			enabled: false,
+			oldPod:  nil,
+			newPod:  podWithH2C(),
+			wantPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:           "c",
+						LivenessProbe:  &api.Probe{},
+						ReadinessProbe: &api.Probe{},
+						StartupProbe:   &api.Probe{},
+					}},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, tc.enabled)
+
+			var oldPod *api.Pod
+			if tc.oldPod != nil {
+				oldPod = tc.oldPod.DeepCopy()
+			}
+			newPod := tc.newPod.DeepCopy()
+
+			DropDisabledPodFields(newPod, oldPod)
+
+			if tc.oldPod != nil {
+				if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+					t.Errorf("old pod was mutated (-got +want):\n%s", diff)
+				}
+			}
+			if diff := cmp.Diff(tc.wantPod, newPod); diff != "" {
+				t.Errorf("unexpected new pod (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateRestartAllContainersOption(t *testing.T) {
 	policyAlways := api.ContainerRestartPolicyAlways
 	testCases := []struct {
