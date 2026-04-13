@@ -18,6 +18,7 @@ package prober
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -373,6 +375,13 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
+		if result == results.Failure {
+			// Emit an event indicating the failure was ignored because FailureThreshold has not been reached.
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container,
+				v1.EventTypeWarning, events.ContainerUnhealthy,
+				fmt.Sprintf("probe failure %d/%d: failure ignored, FailureThreshold not yet reached",
+					w.resultRun, int(w.spec.FailureThreshold)))
+		}
 		return true
 	}
 
