@@ -17,25 +17,26 @@ limitations under the License.
 package evictionrequest
 
 import (
+	"time"
+
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
-	"k8s.io/utils/clock"
 )
 
 // setCondition creates or updates a condition in the apply configuration,
 // preserving the LastTransitionTime when the status has not changed.
 // Inspired by k8s.io/apimachinery/pkg/api/meta.SetStatusCondition.
 func setCondition(
-	clock clock.PassiveClock,
+	now time.Time,
 	existingConditions []metav1.Condition,
 	conditionType coordinationv1alpha1.EvictionRequestConditionType,
 	status metav1.ConditionStatus,
 	reason coordinationv1alpha1.EvictionRequestConditionReason,
 	message string,
 ) *metav1ac.ConditionApplyConfiguration {
-	transitionTime := metav1.Time{Time: clock.Now()}
+	transitionTime := metav1.Time{Time: now}
 
 	existing := meta.FindStatusCondition(existingConditions, string(conditionType))
 	if existing != nil && existing.Status == status && !existing.LastTransitionTime.IsZero() {

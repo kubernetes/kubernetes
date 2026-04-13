@@ -27,31 +27,18 @@ import (
 const EvictionRequestControllerSubsystem = "evictionrequest_controller"
 
 var (
-	// ActiveResponder tracks the active responder per EvictionRequest.
+	// ResponderState tracks the state of each responder per EvictionRequest.
 	// Combined with the EvictionRequest creationTimestamp, this can help
-	// identify stuck evictions. The responder label identifies which
+	// identify stuck evictions. The state label identifies which
 	// responder is currently active.
-	ActiveResponder = metrics.NewGaugeVec(
+	ResponderState = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "active_responder",
+			Name:           "responder_state",
 			Help:           "Whether the named responder is active for the EvictionRequest (1 = active)",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target", "responder"},
-	)
-
-	// ProcessedResponder tracks whether an responder has been processed
-	// for a given EvictionRequest. The responder label identifies which
-	// responder has been processed.
-	ProcessedResponder = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "processed_responder",
-			Help:           "Whether the named responder has been processed for the EvictionRequest (1 = processed)",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"namespace", "evictionrequest", "target", "responder"},
+		[]string{"namespace", "evictionrequest", "target", "state", "responder"},
 	)
 
 	// ActiveRequester tracks active requesters per EvictionRequest.
@@ -84,8 +71,7 @@ var registerMetrics sync.Once
 // Register registers EvictionRequest controller metrics.
 func Register() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ActiveResponder)
-		legacyregistry.MustRegister(ProcessedResponder)
+		legacyregistry.MustRegister(ResponderState)
 		legacyregistry.MustRegister(ActiveRequester)
 		legacyregistry.MustRegister(PodResponders)
 	})

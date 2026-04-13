@@ -25,7 +25,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"slices"
 	"sync"
 	"time"
 
@@ -48,6 +47,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/evictionrequest/metrics"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -241,7 +241,7 @@ func (c *EvictionRequestController) deletePod(logger klog.Logger, obj any) {
 		}
 	}
 	evictionRequestKey := evictionRequestKeyForPod(pod)
-	c.queue.Add(evictionRequestKey)
+	c.queue.AddAfter(evictionRequestKey, GracefulCompletionDelay)
 }
 
 // enqueueLabelSync adds a Pod to the label sync queue.
@@ -366,8 +366,8 @@ func (c *EvictionRequestController) sync(ctx context.Context, key string) error 
 
 	statusApply, resyncAfter := c.computeStatus(ctx, evictionRequest, target)
 
-	if resyncAfter > 0 {
-		c.queue.AddAfter(key, resyncAfter)
+	if resyncAfter != nil {
+		c.queue.AddAfter(key, *resyncAfter)
 	}
 
 	return c.applyStatus(ctx, evictionRequest, statusApply)
@@ -439,65 +439,84 @@ func (c *EvictionRequestController) computeStatus(
 	ctx context.Context,
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
 	target targetInfo,
-) (*coordinationapply.EvictionRequestStatusApplyConfiguration, time.Duration) {
+) (*coordinationapply.EvictionRequestStatusApplyConfiguration, *time.Duration) {
+	var resyncAfter *time.Duration
+	// all operations should reference the same time instant
+	now := c.clock.Now()
 	logger := klog.FromContext(ctx)
 
 	statusApply := coordinationapply.EvictionRequestStatus().
 		WithObservedGeneration(evictionRequest.Generation)
 
-	completionResync := shouldDeferCompletion(evictionRequest, target, c.clock)
-	failed, evicted := computeConditions(c.clock, evictionRequest, target, completionResync > 0)
-	statusApply.WithConditions(failed, evicted)
-
-	isTerminal := *failed.Status == metav1.ConditionTrue || *evicted.Status == metav1.ConditionTrue
-	if isTerminal {
-		logger.V(4).Info("Terminal condition reached", "evictionRequest", klog.KObj(evictionRequest))
+	var isGone, isTerminal, isCanceled bool
+	switch {
+	case target.isGone():
+		isGone = true
+	case target.isTerminal():
+		isTerminal = true
+	case hasAllRequestersWithdrawn(evictionRequest.Spec.Requesters):
+		isCanceled = true
 	}
 
-	targetResponders := computeTargetResponders(evictionRequest, target)
-	active, processed, progressionResync := computeResponderProgression(evictionRequest, targetResponders, isTerminal, c.clock)
+	targetResponders := getOrInitializeTargetResponders(evictionRequest, target)
+
+	progressionResync := computeResponderProgression(now, evictionRequest, targetResponders, target, isGone, isTerminal, isCanceled)
 
 	// Report metrics per KEP-4563
 	targetEntityType := target.targetType()
-	if len(active) > 0 {
-		metrics.ActiveResponder.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), active[0]).Set(1)
-	}
-	for _, p := range processed {
-		metrics.ProcessedResponder.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), p).Set(1)
+	for _, p := range targetResponders {
+		metrics.ResponderState.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), string(p.State), p.Name).Set(1)
 	}
 	for _, r := range evictionRequest.Spec.Requesters {
 		metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), r.Name).Set(1)
 	}
 	metrics.PodResponders.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String()).Set(float64(len(targetResponders)))
 
-	resyncAfter := progressionResync
-	if completionResync > 0 {
-		resyncAfter = completionResync
+	for _, responder := range targetResponders {
+		statusApply.WithTargetResponders(coordinationapply.TargetResponder().
+			WithName(responder.Name).
+			WithState(responder.State),
+		)
 	}
 
-	for _, ti := range targetResponders {
-		statusApply.WithTargetResponders(coordinationapply.TargetResponder().WithName(ti))
-	}
-
-	statusApply.WithActiveResponders(active...)
-	statusApply.WithProcessedResponders(processed...)
-
-	// Include responder entries for all target responders so SSA doesn't
+	// Include targetResponder entries for all target responders so SSA doesn't
 	// remove them. Only set Name and StartTime — other fields (HeartbeatTime,
 	// CompletionTime, Message) are owned by the responders via their own
 	// field manager.
-	for _, ti := range targetResponders {
-		isApply := coordinationapply.ResponderStatus().WithName(ti)
+	for _, targetResponder := range targetResponders {
+		isApply := coordinationapply.ResponderStatus().WithName(targetResponder.Name)
 
-		existing := findResponderStatus(evictionRequest.Status.Responders, ti)
+		existing := findResponderStatus(evictionRequest.Status.Responders, targetResponder.Name)
 		if existing != nil && existing.StartTime != nil {
 			isApply.WithStartTime(*existing.StartTime)
-		} else if len(active) > 0 && ti == active[0] {
-			isApply.WithStartTime(metav1.NewTime(c.clock.Now()))
+		} else if targetResponder.State == coordinationv1alpha1.ResponderStateActive {
+			isApply.WithStartTime(metav1.NewTime(now))
 		}
 
 		statusApply.WithResponders(isApply)
 	}
+
+	activeIdx := findActiveTargetResponderIdx(targetResponders)
+	var activeResponderStatus *coordinationv1alpha1.ResponderStatus
+	if activeIdx != -1 {
+		activeResponderStatus = findResponderStatus(evictionRequest.Status.Responders, targetResponders[activeIdx].Name)
+	}
+
+	isWaitingForResponderUpdate := false
+	switch {
+	case isGone || isTerminal:
+		resyncAfter = shouldDeferCompletion(now, activeResponderStatus, target)
+		isWaitingForResponderUpdate = resyncAfter != nil
+	default:
+		resyncAfter = progressionResync
+	}
+
+	failed, evicted := computeConditions(now, evictionRequest, isWaitingForResponderUpdate, isGone, isTerminal, isCanceled)
+	isFinal := *failed.Status == metav1.ConditionTrue || *evicted.Status == metav1.ConditionTrue
+	if isFinal {
+		logger.V(4).Info("Terminal condition reached", "evictionRequest", klog.KObj(evictionRequest), "isGone", isGone, "isTerminal", isTerminal, "isCanceled", isCanceled)
+	}
+	statusApply.WithConditions(failed, evicted)
 
 	return statusApply, resyncAfter
 }
@@ -542,10 +561,11 @@ func validate(
 	}
 
 	if len(failureMsg) > 0 {
-		failed = setCondition(clock, evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionFailed,
+		now := clock.Now()
+		failed = setCondition(now, evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionFailed,
 			metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid, failureMsg)
-		evicted = setCondition(clock, evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionEvicted,
-			metav1.ConditionFalse, "UnableToPerform", "")
+		evicted = setCondition(now, evictionRequest.Status.Conditions, coordinationv1alpha1.EvictionRequestConditionEvicted,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, "")
 		return failed, evicted
 	}
 	return nil, nil
@@ -556,32 +576,36 @@ func validate(
 // Precondition checks run only on first sync (ObservedGeneration == nil).
 // Completion checks are skipped when deferCompletion is true.
 func computeConditions(
-	clock clock.PassiveClock,
+	now time.Time,
 	evictionRequest *coordinationv1alpha1.EvictionRequest,
-	target targetInfo,
-	deferCompletion bool,
+	isWaitingForResponderUpdate bool,
+	isGone, isTerminal, isCanceled bool,
 ) (failed, evicted *metav1ac.ConditionApplyConfiguration) {
 	existing := evictionRequest.Status.Conditions
-	failed = setCondition(clock, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
-		metav1.ConditionFalse, "Pending", "")
-	evicted = setCondition(clock, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
-		metav1.ConditionFalse, "Pending", "")
-
-	if deferCompletion {
-		return failed, evicted
-	}
-
+	switch {
 	// Completion checks
-	if target.isGone() {
-		evicted = setCondition(clock, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
+	case isGone && !isWaitingForResponderUpdate:
+		evicted = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 			metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonPodDeleted, "Target pod has been deleted")
-	} else if target.isTerminal() {
-		evicted = setCondition(clock, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
+		failed = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonSucceeded, "")
+	case isTerminal && !isWaitingForResponderUpdate:
+		evicted = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
 			metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonPodTerminal, "Pod has reached terminal state")
-	} else if len(evictionRequest.Spec.Requesters) == 0 {
-		failed = setCondition(clock, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+		failed = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonSucceeded, "")
+	case isCanceled:
+		failed = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
 			metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonCanceledDueToNoRequesters, "Requesters list is empty")
+		evicted = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, "")
+	default:
+		failed = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionFailed,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonAwaitingEviction, "")
+		evicted = setCondition(now, existing, coordinationv1alpha1.EvictionRequestConditionEvicted,
+			metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonAwaitingEviction, "")
 	}
+	// TODO: incorporate coordinationv1alpha1.EvictionRequestConditionReasonNoFurtherResponder
 
 	return failed, evicted
 }
@@ -589,110 +613,120 @@ func computeConditions(
 // shouldDeferCompletion returns how long to wait before setting the completion
 // condition, giving the active responder time to report its final status
 // before the eviction is finalized. Returns 0 when no deferral is needed.
-func shouldDeferCompletion(
-	evictionRequest *coordinationv1alpha1.EvictionRequest,
-	target targetInfo,
-	clock clock.PassiveClock,
-) time.Duration {
-	if len(evictionRequest.Status.ActiveResponders) == 0 {
-		return 0
-	}
-
-	activeResponder := evictionRequest.Status.ActiveResponders[0]
-	responderStatus := findResponderStatus(evictionRequest.Status.Responders, activeResponder)
-	if responderStatus != nil && responderStatus.CompletionTime != nil {
-		return 0
+func shouldDeferCompletion(now time.Time, activeResponderStatus *coordinationv1alpha1.ResponderStatus, target targetInfo) *time.Duration {
+	if activeResponderStatus == nil || activeResponderStatus.CompletionTime != nil {
+		return nil
 	}
 
 	meta := target.GetObjectMeta()
 	if meta == nil || meta.GetDeletionTimestamp() == nil {
-		return 0
-	}
-
-	if remaining := GracefulCompletionDelay - clock.Since(meta.GetDeletionTimestamp().Time); remaining > 0 {
-		return remaining
-	}
-	return 0
-}
-
-// computeTargetResponders computes the target responders list.
-// Returns the existing list if already initialized, or a new list from the target's eviction responders.
-func computeTargetResponders(
-	evictionRequest *coordinationv1alpha1.EvictionRequest,
-	target targetInfo,
-) []string {
-	// TargetResponders is immutable after first initialization
-	if len(evictionRequest.Status.TargetResponders) > 0 {
-		targets := make([]string, len(evictionRequest.Status.TargetResponders))
-		for i, ti := range evictionRequest.Status.TargetResponders {
-			targets[i] = ti.Name
-		}
-		return targets
-	}
-
-	// Target may be unavailable if it was deleted before TargetResponders were initialized
-	// (e.g., precondition failure on first sync, then re-queued after status update).
-	if target.isGone() {
 		return nil
 	}
 
-	responders := target.evictionResponders()
-	targets := make([]string, 0, len(responders)+1)
-	for _, ei := range responders {
-		targets = append(targets, ei.Name)
+	if remaining := GracefulCompletionDelay - now.Sub(meta.GetDeletionTimestamp().Time); remaining > 0 {
+		return ptr.To(remaining)
 	}
-	// Default imperative-eviction responder triggers actual pod eviction
-	targets = append(targets, string(coordinationv1alpha1.EvictionResponderImperativeEviction))
+	return nil
+}
+
+// getOrInitializeTargetResponders initializers the target responders list.
+// Returns the existing list if already initialized, or a new list from the target's eviction responders.
+func getOrInitializeTargetResponders(
+	evictionRequest *coordinationv1alpha1.EvictionRequest,
+	target targetInfo,
+) []coordinationv1alpha1.TargetResponder {
+	// TargetResponders entries cannot be added or removed after first initialization
+	if len(evictionRequest.Status.TargetResponders) > 0 {
+		targets := make([]coordinationv1alpha1.TargetResponder, len(evictionRequest.Status.TargetResponders))
+		copy(targets, evictionRequest.Status.TargetResponders)
+		return targets
+	}
+
+	responders := target.evictionResponders()
+	targets := make([]coordinationv1alpha1.TargetResponder, 0, len(responders)+1)
+	for _, responder := range responders {
+		targets = append(targets, coordinationv1alpha1.TargetResponder{
+			Name:  responder.Name,
+			State: coordinationv1alpha1.ResponderStateInactive,
+		})
+	}
+	// Default imperative-eviction responder triggers imperative pod /eviction endpoint
+	targets = append(targets, coordinationv1alpha1.TargetResponder{
+		Name:  string(coordinationv1alpha1.EvictionResponderImperativeEviction),
+		State: coordinationv1alpha1.ResponderStateInactive,
+	})
 	return targets
 }
 
 // computeResponderProgression computes the active and processed responders.
 // When isComplete is true, moves any active responder to processed and clears active.
-func computeResponderProgression(evictionRequest *coordinationv1alpha1.EvictionRequest, targetResponders []string, isComplete bool, clock clock.PassiveClock) (active []string, processed []string, resyncAfter time.Duration) {
-	processed = slices.Clone(evictionRequest.Status.ProcessedResponders)
-
-	activeResponder := ""
-	if len(evictionRequest.Status.ActiveResponders) > 0 {
-		activeResponder = evictionRequest.Status.ActiveResponders[0]
-	}
-
-	// Completion: move active responder to processed (if any) and clear active.
-	if isComplete {
-		if activeResponder != "" && !slices.Contains(processed, activeResponder) {
-			processed = append(processed, activeResponder)
-		}
-		return nil, processed, 0
-	}
-
-	// No target responders: nothing to activate
+func computeResponderProgression(now time.Time, evictionRequest *coordinationv1alpha1.EvictionRequest, targetResponders []coordinationv1alpha1.TargetResponder, target targetInfo, isGone, isTerminal, isCanceled bool) *time.Duration {
+	// No target responders: nothing to process
 	if len(targetResponders) == 0 {
-		return nil, processed, 0
+		return nil
+	}
+	switch targetResponders[len(targetResponders)-1].State {
+	case coordinationv1alpha1.ResponderStateInterrupted,
+		coordinationv1alpha1.ResponderStateCanceled,
+		coordinationv1alpha1.ResponderStateCompleted:
+		// no other progression possible
+		return nil
+	}
+	activeIdx := findActiveTargetResponderIdx(targetResponders)
+	activeResponderNotFound := activeIdx == -1
+	switch {
+	case isGone || isTerminal:
+		if activeResponderNotFound {
+			// all responder work is done - do not start a new one
+			return nil
+		}
+		activeResponderStatus := findResponderStatus(evictionRequest.Status.Responders, targetResponders[activeIdx].Name)
+		if activeResponderStatus != nil && activeResponderStatus.CompletionTime != nil {
+			// successful completion
+			targetResponders[activeIdx].State = coordinationv1alpha1.ResponderStateCompleted
+			return nil
+		}
+		isWaitingForResponderUpdate := shouldDeferCompletion(now, activeResponderStatus, target) != nil
+		if isWaitingForResponderUpdate {
+			// the responder might report status later
+			return nil
+		}
+		// responder got stuck reporting the completion time
+		targetResponders[activeIdx].State = coordinationv1alpha1.ResponderStateInterrupted
+		return nil
+	case isCanceled:
+		if activeResponderNotFound {
+			// all responder work is done - do not start a new one
+			return nil
+		}
+		// canceled
+		targetResponders[activeIdx].State = coordinationv1alpha1.ResponderStateCanceled
+		return nil
 	}
 
-	activeResponderStatus := findResponderStatus(evictionRequest.Status.Responders, activeResponder)
-	shouldAdvance, resyncAfter := shouldAdvanceResponder(activeResponderStatus, clock)
-
-	// Keep current active responder: not yet complete and hasn't timed out
-	if !shouldAdvance {
-		return []string{activeResponder}, processed, resyncAfter
+	// activate the first responder
+	if activeResponderNotFound && targetResponders[0].State == coordinationv1alpha1.ResponderStateInactive {
+		activeIdx = 0
 	}
 
-	// Advance to next responder: mark current as processed, then select next unprocessed
-	if activeResponder != "" && !slices.Contains(processed, activeResponder) {
-		processed = append(processed, activeResponder)
+	activeResponderStatus := findResponderStatus(evictionRequest.Status.Responders, targetResponders[activeIdx].Name)
+	assignedResponderState, resyncAfter := computeResponderStateAndNextResync(now, activeResponderStatus)
+	targetResponders[activeIdx].State = assignedResponderState
+	if assignedResponderState != coordinationv1alpha1.ResponderStateActive && activeIdx+1 < len(targetResponders) {
+		// activate the next one
+		targetResponders[activeIdx+1].State = coordinationv1alpha1.ResponderStateActive
+		resyncAfter = ptr.To(ResponderHeartbeatTimeout)
 	}
-	active = selectNextUnprocessed(targetResponders, processed)
-	return active, processed, 0
+	return resyncAfter
 }
 
-// selectNextUnprocessed finds the first unprocessed responder from the target list.
-func selectNextUnprocessed(targetResponders, processed []string) []string {
-	for _, ti := range targetResponders {
-		if !slices.Contains(processed, ti) {
-			return []string{ti}
+func findActiveTargetResponderIdx(targetResponders []coordinationv1alpha1.TargetResponder) int {
+	for i, responder := range targetResponders {
+		if responder.State == coordinationv1alpha1.ResponderStateActive {
+			return i
 		}
 	}
-	return nil
+	return -1
 }
 
 // findResponderStatus finds the status for a given responder name.
@@ -705,40 +739,48 @@ func findResponderStatus(statuses []coordinationv1alpha1.ResponderStatus, name s
 	return nil
 }
 
-// shouldAdvanceResponder determines if we should advance from the current responder.
-// Returns (shouldAdvance, resyncAfter). If not advancing, resyncAfter indicates when to check again.
-func shouldAdvanceResponder(status *coordinationv1alpha1.ResponderStatus, clock clock.PassiveClock) (bool, time.Duration) {
-	// Advance as there is no current active responder
+// computeResponderStateAndNextResync determines if we should advance from the current responder.
+// Returns (current responder state, resyncAfter). If not advancing, resyncAfter indicates when to check again.
+func computeResponderStateAndNextResync(now time.Time, status *coordinationv1alpha1.ResponderStatus) (coordinationv1alpha1.ResponderStateType, *time.Duration) {
+	// First sync, advance as there is no current active responder
 	if status == nil {
-		return true, 0
+		return coordinationv1alpha1.ResponderStateActive, ptr.To(ResponderHeartbeatTimeout)
 	}
 
 	// Advance as responder has completed
 	if status.CompletionTime != nil {
-		return true, 0
+		return coordinationv1alpha1.ResponderStateCompleted, nil
 	}
-
-	t := status.StartTime
+	// If there is no startTime, we will set it during the same sync, so we can set now here.
+	lastUpdate := now
+	if status.StartTime != nil {
+		lastUpdate = status.StartTime.Time
+	}
 	if status.HeartbeatTime != nil {
-		t = status.HeartbeatTime
+		lastUpdate = status.HeartbeatTime.Time
 	}
 
-	if t != nil {
-		elapsed := clock.Since(t.Time)
-		// Advance as heartbeat timeout has been reached
-		if elapsed >= ResponderHeartbeatTimeout {
-			return true, 0
-		}
-		// Schedule resync when timeout would occur
-		return false, ResponderHeartbeatTimeout - elapsed
+	elapsed := now.Sub(lastUpdate)
+	// Advance as heartbeat timeout has been reached
+	if elapsed >= ResponderHeartbeatTimeout {
+		return coordinationv1alpha1.ResponderStateInterrupted, nil
 	}
+	// Schedule resync when timeout would occur
+	return coordinationv1alpha1.ResponderStateActive, ptr.To(ResponderHeartbeatTimeout - elapsed)
 
-	// Should not be reached, as an active responder is initialized with a StartTime
-	return false, 0
 }
 
 // evictionRequestKeyForPod returns the work queue key for an EvictionRequest
 // that targets the given pod. EvictionRequests are named after their target pod's UID.
 func evictionRequestKeyForPod(pod *v1.Pod) string {
 	return pod.Namespace + "/" + string(pod.UID)
+}
+
+func hasAllRequestersWithdrawn(requesters []coordinationv1alpha1.Requester) bool {
+	for _, requester := range requesters {
+		if requester.Intent != coordinationv1alpha1.RequesterIntentWithdrawn {
+			return false
+		}
+	}
+	return true
 }
