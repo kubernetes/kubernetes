@@ -2699,6 +2699,22 @@ type GRPCAction struct {
 	Service *string `json:"service" protobuf:"bytes,2,opt,name=service"`
 }
 
+// H2CGetAction describes an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+// and the given container port. There is no host field; use httpHeaders if a custom Host is required.
+type H2CGetAction struct {
+	// Port number on the container. Number must be in the range 1 to 65535.
+	Port int32 `json:"port" protobuf:"bytes,1,opt,name=port"`
+
+	// Path to access on the HTTP server. Defaults to "/" if empty.
+	// +optional
+	Path string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+
+	// Custom headers to set in the request. HTTP allows repeated headers.
+	// +optional
+	// +listType=atomic
+	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,3,rep,name=httpHeaders"`
+}
+
 // ExecAction describes a "run in container" action.
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
@@ -3128,6 +3144,10 @@ type ProbeHandler struct {
 	// GRPC specifies a GRPC HealthCheckRequest.
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
+	// H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+	// and the given container port.
+	// +optional
+	H2CGet *H2CGetAction `json:"h2cGet,omitempty" protobuf:"bytes,5,opt,name=h2cGet"`
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle

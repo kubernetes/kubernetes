@@ -2759,6 +2759,10 @@ type ProbeHandler struct {
 	// GRPC specifies an action involving a GRPC port.
 	// +optional
 	GRPC *GRPCAction
+
+	// H2CGet specifies an HTTP GET over HTTP/2 cleartext (h2c) to the pod IP and container port.
+	// +optional
+	H2CGet *H2CGetAction
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
@@ -2791,6 +2795,21 @@ type GRPCAction struct {
 	// If this is not specified, the default behavior is to probe the server's overall health status.
 	// +optional
 	Service *string
+}
+
+// H2CGetAction describes an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+// and the given container port. There is no host field; use httpHeaders if a custom Host is required.
+type H2CGetAction struct {
+	// Port number on the container. Number must be in the range 1 to 65535.
+	Port int32
+
+	// Path to access on the HTTP server. Defaults to "/" if empty.
+	// +optional
+	Path string
+
+	// Custom headers to set in the request. HTTP allows repeated headers.
+	// +optional
+	HTTPHeaders []HTTPHeader
 }
 
 // Signal defines the stop signal of containers
