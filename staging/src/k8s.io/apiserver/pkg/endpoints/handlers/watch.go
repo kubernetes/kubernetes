@@ -240,14 +240,21 @@ func (c *watchEventMetricsRecorder) RecordEvent() {
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	ctx, span := tracing.Start(ctx, "WatchServer.HandleHTTP",
-		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
-		attribute.String("method", req.Method),
-		attribute.String("url", req.URL.Path),
-		attribute.String("protocol", req.Proto),
-		attribute.String("mediaType", s.MediaType),
-		attribute.String("encoder", string(s.Encoder.Identifier())))
-	req = req.WithContext(ctx)
+	// Only trace the initial-list phase for WatchList requests, where the span has a
+	// defined endpoint (the "initial events done" bookmark). For regular watches there
+	// is no such endpoint, so creating a span would cause it to leak for the entire
+	// (potentially minutes-long) lifetime of the connection.
+	var span *tracing.Span
+	if s.watchListCompleteHook != nil {
+		ctx, span = tracing.Start(ctx, "WatchServer.HandleHTTP",
+			attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+			attribute.String("method", req.Method),
+			attribute.String("url", req.URL.Path),
+			attribute.String("protocol", req.Proto),
+			attribute.String("mediaType", s.MediaType),
+			attribute.String("encoder", string(s.Encoder.Identifier())))
+		req = req.WithContext(ctx)
+	}
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -293,7 +300,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
-	span.AddEvent("About to start writing response")
+	if span != nil {
+		span.AddEvent("About to start writing response")
+	}
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -331,6 +340,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
 				if !ok {
 					utilruntime.HandleErrorWithContext(req.Context(), nil, "Unable to measure watchlist latency, no received timestamp found in the context", "gvr", s.Scope.Resource)
+					span.End(5 * time.Second)
 				} else {
 					initLatency := time.Since(receivedTimestamp)
 					metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope, initLatency)
