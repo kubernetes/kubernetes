@@ -194,6 +194,7 @@ linters:
           arguments:
             - ["ID"] # AllowList
             - ["Otel", "Aws", "Gcp"] # DenyList
+            - - skip-package-name-collision-with-go-std: true
         - name: waitgroup-by-value
     testifylint:
       enable-all: true

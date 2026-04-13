@@ -61,6 +61,9 @@ func checkValue(val string) bool {
 func checkKeyRemain(key string) bool {
 	// ( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )
 	for _, v := range key {
+		if v > 127 {
+			return false
+		}
 		if isAlphaNum(byte(v)) {
 			continue
 		}

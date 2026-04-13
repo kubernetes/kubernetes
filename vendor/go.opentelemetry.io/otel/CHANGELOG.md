@@ -8,6 +8,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [1.41.0/0.63.0/0.17.0/0.0.15] 2026-03-02
+
+This release is the last to support [Go 1.24].
+The next release will require at least [Go 1.25].
+
+### Added
+
+- Support testing of [Go 1.26]. (#7902)
+
+### Fixed
+
+- Update `Baggage` in `go.opentelemetry.io/otel/propagation` and `Parse` and `New` in `go.opentelemetry.io/otel/baggage` to comply with W3C Baggage specification limits.
+  `New` and `Parse` now return partial baggage along with an error when limits are exceeded.
+  Errors from baggage extraction are reported to the global error handler. (#7880)
+- Return an error when the endpoint is configured as insecure and with TLS configuration in `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp`. (#7914)
+- Return an error when the endpoint is configured as insecure and with TLS configuration in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#7914)
+- Return an error when the endpoint is configured as insecure and with TLS configuration in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp`. (#7914)
+
 <!-- Released section -->
 <!-- Don't change this section unless doing release -->
 
@@ -3535,7 +3553,8 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.40.0...HEAD
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.41.0...HEAD
+[1.41.0/0.63.0/0.17.0/0.0.15]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.41.0
 [1.40.0/0.62.0/0.16.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.40.0
 [1.39.0/0.61.0/0.15.0/0.0.14]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.39.0
 [1.38.0/0.60.0/0.14.0/0.0.13]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.38.0
@@ -3635,6 +3654,7 @@ It contains api and sdk for trace and meter.
 
 <!-- Released section ended -->
 
+[Go 1.26]: https://go.dev/doc/go1.26
 [Go 1.25]: https://go.dev/doc/go1.25
 [Go 1.24]: https://go.dev/doc/go1.24
 [Go 1.23]: https://go.dev/doc/go1.23

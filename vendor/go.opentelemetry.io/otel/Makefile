@@ -215,7 +215,7 @@ go-mod-tidy/%: crosslink
 		&& $(GO) mod tidy -compat=1.21
 
 .PHONY: lint
-lint: misspell go-mod-tidy golangci-lint govulncheck
+lint: misspell go-mod-tidy golangci-lint
 
 .PHONY: vanity-import-check
 vanity-import-check: $(PORTO)
