@@ -3467,14 +3467,35 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 			// there are two UIDs for host events:
 			// controller use node.uid
 			// kubelet use node.name
+			// some kubelet events have involvedObject.uid unset (null)
 			// TODO: Uniform use of UID
 			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
 
 			ref.UID = types.UID(ref.Name)
 			eventsInvName, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
 
-			// Merge the results of two queries
-			events.Items = append(events.Items, eventsInvName.Items...)
+			// Search for events with no UID set (involvedObject.uid is null),
+			// which can happen with kubelet-emitted node events.
+			ref.UID = ""
+			eventsNoUID, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			// Merge and deduplicate the results of the three queries
+			seen := make(map[types.UID]bool, len(events.Items))
+			for _, e := range events.Items {
+				seen[e.UID] = true
+			}
+			for _, e := range eventsInvName.Items {
+				if !seen[e.UID] {
+					events.Items = append(events.Items, e)
+					seen[e.UID] = true
+				}
+			}
+			for _, e := range eventsNoUID.Items {
+				if !seen[e.UID] {
+					events.Items = append(events.Items, e)
+					seen[e.UID] = true
+				}
+			}
 		}
 	}
 
