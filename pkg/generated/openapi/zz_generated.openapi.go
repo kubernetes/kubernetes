@@ -539,6 +539,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.GitRepoVolumeSource{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_GitRepoVolumeSource(ref),
 		corev1.GlusterfsPersistentVolumeSource{}.OpenAPIModelName():                                                     schema_k8sio_api_core_v1_GlusterfsPersistentVolumeSource(ref),
 		corev1.GlusterfsVolumeSource{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref),
+		corev1.H2CGetAction{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_H2CGetAction(ref),
 		corev1.HTTPGetAction{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_HTTPGetAction(ref),
 		corev1.HTTPHeader{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_HTTPHeader(ref),
 		corev1.HostAlias{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_HostAlias(ref),
@@ -23662,6 +23663,56 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 	}
 }
 
+func schema_k8sio_api_core_v1_H2CGetAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "H2CGetAction describes an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address and the given container port. There is no host field; use httpHeaders if a custom Host is required.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Port number on the container. Number must be in the range 1 to 65535.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"path": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Path to access on the HTTP server. Defaults to \"/\" if empty.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"httpHeaders": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Custom headers to set in the request. HTTP allows repeated headers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.HTTPHeader{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"port"},
+			},
+		},
+		Dependencies: []string{
+			corev1.HTTPHeader{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -29539,6 +29590,12 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 							Ref:         ref(corev1.GRPCAction{}.OpenAPIModelName()),
 						},
 					},
+					"h2cGet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address and the given container port.",
+							Ref:         ref(corev1.H2CGetAction{}.OpenAPIModelName()),
+						},
+					},
 					"initialDelaySeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
@@ -29585,7 +29642,7 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 			},
 		},
 		Dependencies: []string{
-			corev1.ExecAction{}.OpenAPIModelName(), corev1.GRPCAction{}.OpenAPIModelName(), corev1.HTTPGetAction{}.OpenAPIModelName(), corev1.TCPSocketAction{}.OpenAPIModelName()},
+			corev1.ExecAction{}.OpenAPIModelName(), corev1.GRPCAction{}.OpenAPIModelName(), corev1.H2CGetAction{}.OpenAPIModelName(), corev1.HTTPGetAction{}.OpenAPIModelName(), corev1.TCPSocketAction{}.OpenAPIModelName()},
 	}
 }
 
@@ -29620,11 +29677,17 @@ func schema_k8sio_api_core_v1_ProbeHandler(ref common.ReferenceCallback) common.
 							Ref:         ref(corev1.GRPCAction{}.OpenAPIModelName()),
 						},
 					},
+					"h2cGet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address and the given container port.",
+							Ref:         ref(corev1.H2CGetAction{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ExecAction{}.OpenAPIModelName(), corev1.GRPCAction{}.OpenAPIModelName(), corev1.HTTPGetAction{}.OpenAPIModelName(), corev1.TCPSocketAction{}.OpenAPIModelName()},
+			corev1.ExecAction{}.OpenAPIModelName(), corev1.GRPCAction{}.OpenAPIModelName(), corev1.H2CGetAction{}.OpenAPIModelName(), corev1.HTTPGetAction{}.OpenAPIModelName(), corev1.TCPSocketAction{}.OpenAPIModelName()},
 	}
 }
 

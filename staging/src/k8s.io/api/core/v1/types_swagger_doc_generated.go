@@ -892,6 +892,17 @@ func (GlusterfsVolumeSource) SwaggerDoc() map[string]string {
 	return map_GlusterfsVolumeSource
 }
 
+var map_H2CGetAction = map[string]string{
+	"":            "H2CGetAction describes an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address and the given container port. There is no host field; use httpHeaders if a custom Host is required.",
+	"port":        "Port number on the container. Number must be in the range 1 to 65535.",
+	"path":        "Path to access on the HTTP server. Defaults to \"/\" if empty.",
+	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
+}
+
+func (H2CGetAction) SwaggerDoc() map[string]string {
+	return map_H2CGetAction
+}
+
 var map_HTTPGetAction = map[string]string{
 	"":            "HTTPGetAction describes an action based on HTTP Get requests.",
 	"path":        "Path to access on the HTTP server.",
@@ -2102,6 +2113,7 @@ var map_ProbeHandler = map[string]string{
 	"httpGet":   "HTTPGet specifies an HTTP GET request to perform.",
 	"tcpSocket": "TCPSocket specifies a connection to a TCP port.",
 	"grpc":      "GRPC specifies a GRPC HealthCheckRequest.",
+	"h2cGet":    "H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address and the given container port.",
 }
 
 func (ProbeHandler) SwaggerDoc() map[string]string {

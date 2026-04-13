@@ -382,6 +382,11 @@ func (in GlusterfsVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in H2CGetAction) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.H2CGetAction"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in HTTPGetAction) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.HTTPGetAction"
 }

@@ -732,6 +732,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GlusterfsVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("GRPCAction"):
 		return &applyconfigurationscorev1.GRPCActionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("H2CGetAction"):
+		return &applyconfigurationscorev1.H2CGetActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostIP"):

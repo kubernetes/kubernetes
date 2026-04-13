@@ -2067,6 +2067,22 @@ message GlusterfsVolumeSource {
   optional bool readOnly = 3;
 }
 
+// H2CGetAction describes an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+// and the given container port. There is no host field; use httpHeaders if a custom Host is required.
+message H2CGetAction {
+  // Port number on the container. Number must be in the range 1 to 65535.
+  optional int32 port = 1;
+
+  // Path to access on the HTTP server. Defaults to "/" if empty.
+  // +optional
+  optional string path = 2;
+
+  // Custom headers to set in the request. HTTP allows repeated headers.
+  // +optional
+  // +listType=atomic
+  repeated HTTPHeader httpHeaders = 3;
+}
+
 // HTTPGetAction describes an action based on HTTP Get requests.
 message HTTPGetAction {
   // Path to access on the HTTP server.
@@ -5190,6 +5206,11 @@ message ProbeHandler {
   // GRPC specifies a GRPC HealthCheckRequest.
   // +optional
   optional GRPCAction grpc = 4;
+
+  // H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+  // and the given container port.
+  // +optional
+  optional H2CGetAction h2cGet = 5;
 }
 
 // Represents a projected volume source

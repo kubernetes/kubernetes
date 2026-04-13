@@ -5584,6 +5584,22 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readOnly
       type:
         scalar: boolean
+- name: io.k8s.api.core.v1.H2CGetAction
+  map:
+    fields:
+    - name: httpHeaders
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.HTTPHeader
+          elementRelationship: atomic
+    - name: path
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.core.v1.HTTPGetAction
   map:
     fields:
@@ -7311,6 +7327,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: grpc
       type:
         namedType: io.k8s.api.core.v1.GRPCAction
+    - name: h2cGet
+      type:
+        namedType: io.k8s.api.core.v1.H2CGetAction
     - name: httpGet
       type:
         namedType: io.k8s.api.core.v1.HTTPGetAction
