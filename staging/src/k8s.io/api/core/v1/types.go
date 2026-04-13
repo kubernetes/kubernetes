@@ -3144,8 +3144,7 @@ type ProbeHandler struct {
 	// GRPC specifies a GRPC HealthCheckRequest.
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
-	// H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
-	// and the given container port.
+	// H2CGet specifies an HTTP GET over HTTP/2 cleartext (h2c).
 	// +optional
 	H2CGet *H2CGetAction `json:"h2cGet,omitempty" protobuf:"bytes,5,opt,name=h2cGet"`
 }

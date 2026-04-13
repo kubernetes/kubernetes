@@ -18,6 +18,7 @@ package prober
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -29,8 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -361,7 +365,80 @@ func TestNewProber(t *testing.T) {
 	assert.NotNil(t, prober.http, "http probe initialized")
 	assert.NotNil(t, prober.tcp, "tcp probe initialized")
 	assert.NotNil(t, prober.grpc, "grpc probe initialized")
+	assert.NotNil(t, prober.h2c, "h2c probe initialized")
+}
 
+func TestRunProbeH2CGetFeatureGateDisabled(t *testing.T) {
+	testCases := []struct {
+		name          string
+		wantResult    probe.Result
+		wantErrSubstr string
+	}{
+		{
+			name:          "H2CGet when H2CContainerProbe feature gate is disabled",
+			wantResult:    probe.Unknown,
+			wantErrSubstr: "H2CContainerProbe",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
+
+			runner := &containertest.FakeContainerCommandRunner{}
+			recorder := &record.FakeRecorder{}
+			pb := newProber(runner, recorder)
+
+			pod := &v1.Pod{}
+			status := v1.PodStatus{PodIP: "127.0.0.1"}
+			container := v1.Container{}
+			containerID := kubecontainer.ContainerID{Type: "docker", ID: "cid"}
+			p := &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					H2CGet: &v1.H2CGetAction{Port: 8080, Path: "/healthz"},
+				},
+			}
+
+			res, msg, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+			if res != tc.wantResult {
+				t.Errorf("got result %v, want %v", res, tc.wantResult)
+			}
+			if err == nil {
+				t.Errorf("expected error, got nil")
+			} else if !strings.Contains(err.Error(), tc.wantErrSubstr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tc.wantErrSubstr)
+			}
+			if msg != "" {
+				t.Errorf("got message %q, want empty", msg)
+			}
+		})
+	}
+}
+
+// TestRunProbeVersionSkew simulates the version-skew scenario described in the KEP:
+// a new apiserver (gate on) admits a pod with h2cGet, but the kubelet is old and
+// does not recognise h2cGet — the ProbeHandler arrives with no known field set.
+// The kubelet must return an explicit failure, not silently fall back to HTTP/1.1.
+func TestRunProbeVersionSkew(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, true)
+
+	runner := &containertest.FakeContainerCommandRunner{}
+	recorder := &record.FakeRecorder{}
+	pb := newProber(runner, recorder)
+
+	pod := &v1.Pod{}
+	status := v1.PodStatus{PodIP: "127.0.0.1"}
+	container := v1.Container{}
+	containerID := kubecontainer.ContainerID{Type: "docker", ID: "cid"}
+
+	// An old kubelet would decode the pod spec and drop the unknown h2cGet field,
+	// leaving an empty ProbeHandler (no Exec, HTTPGet, TCPSocket, GRPC, or H2CGet set).
+	p := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{},
+	}
+
+	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+	assert.Equal(t, probe.Unknown, res, "empty ProbeHandler must return Unknown, not a silent success")
+	assert.Error(t, err, "empty ProbeHandler must return an explicit error")
 }
 
 func TestRecordContainerEventUnknownStatus(t *testing.T) {

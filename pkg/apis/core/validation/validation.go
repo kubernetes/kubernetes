@@ -3456,6 +3456,16 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
 
+func validateHTTPHeaders(headers []core.HTTPHeader, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	for _, header := range headers {
+		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	return allErrors
+}
+
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
@@ -3465,11 +3475,7 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 	if !supportedHTTPSchemes.Has(http.Scheme) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, sets.List(supportedHTTPSchemes)))
 	}
-	for _, header := range http.HTTPHeaders {
-		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
-		}
-	}
+	allErrors = append(allErrors, validateHTTPHeaders(http.HTTPHeaders, fldPath)...)
 	return allErrors
 }
 
@@ -3499,11 +3505,7 @@ func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorL
 func validateH2CGetAction(h2c *core.H2CGetAction, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidatePortNumOrName(intstr.FromInt32(h2c.Port), fldPath.Child("port"))...)
-	for _, header := range h2c.HTTPHeaders {
-		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
-		}
-	}
+	allErrs = append(allErrs, validateHTTPHeaders(h2c.HTTPHeaders, fldPath)...)
 	return allErrs
 }
 
