@@ -16,7 +16,14 @@
 
 # This script analyzes API changes between specified revisions this repository.
 # It uses the apidiff tool to detect differences, reports incompatible changes, and optionally
-# builds downstream projects to assess the impact of those changes. 
+# builds downstream projects to assess the impact of those changes.
+#
+# Any directory with a CHANGELOG.md file must have incompatible changes documented
+# in that file, otherwise the script fails with an error. If there are only
+# compatible changes or all incompatible changes are documented, the script
+# returns success.
+
+CHANGELOG="CHANGELOG.md"
 
 usage () {
   cat <<EOF >&2
@@ -30,7 +37,9 @@ Usage: $0 [-r <revision>] [directory ...]"
                   staging repo. May be given more than once. Must be an
                   absolute path.
                   WARNING: this will modify the go.mod in that directory.
+   -u             Update ${CHANGELOG} files if incompatible changes are found.
    [directory]:   Check one or more specific directory instead of everything.
+
 EOF
   exit 1
 }
@@ -45,7 +54,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 base=
 target=
 builds=()
-while getopts "r:t:b:" o; do
+update_changelog=false
+while getopts "r:t:b:u" o; do
     case "${o}" in
         r)
             base="${OPTARG}"
@@ -70,6 +80,9 @@ while getopts "r:t:b:" o; do
                 usage
             fi
             builds+=("${OPTARG}")
+            ;;
+       u)
+            update_changelog=true
             ;;
         *)
             usage
@@ -227,6 +240,7 @@ inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 #
 # The report is Markdown-formatted and can be copied into a PR comment verbatim.
 failures=()
+can_update_changelog=false
 echo
 compare () {
     what="$1"
@@ -236,7 +250,10 @@ compare () {
         echo "can not compare changes, module didn't exist before or after"
         return
     fi
-    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
+    # Output order is non-deterministic. Fix that by sorting.
+    # Here its mostly cosmetic, but for checking for incompatible changes
+    # in a changelog it really matters.
+    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package" | LC=C sort) || true
     echo "## ${what}"
     if [ -z "$changes" ]; then
         echo "no changes"
@@ -244,8 +261,59 @@ compare () {
         echo "$changes"
         echo
     fi
-    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
+    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package" | LC=C sort) || true
     if [ -n "$incompatible" ]; then
+        # Does this directory have a changelog?
+        # If yes, then maybe it already contains this incompatible change.
+        changelog="${what}/${CHANGELOG}"
+        if [ -f "${changelog}" ]; then
+            # This checks that the incompatible change is in a verbatim text blog of the changelog.
+            # Any surrounding text (section header, human-readable explanation) must be checked
+            # by reviewers of the new changelog entry.
+            if [[ $(cat "${changelog}") = *"\`\`\`
+${incompatible}
+\`\`\`"* ]]; then
+                # Documented => don't track it as a reason for failure.
+                return 0
+            fi
+            if ${update_changelog}; then
+                # Add a new section before the earliest one or, if there is none, at the end.
+                # Add an empty line before or after the new text, depending on where we insert.
+                # This way the most recent information is directly visible.
+                line=$(grep -m 1 -n '^#' "${changelog}") || true
+                if [[ -z "${line}" ]]; then
+                    line=$(( $(wc -l <"${changelog}")  + 1 ))
+                    before="
+"
+                    after=""
+                else
+                    line=${line/:*/}
+                    before=""
+                    after="
+"
+                fi
+                head -n $((line - 1)) "${changelog}" >"${changelog}.tmp"
+                cat >>"${changelog}.tmp" <<EOF
+${before}### Replace with a short title
+
+Replace this text with a short summary of the change
+and how users of the package can deal with this breaking
+change. If users are not expected to be affected, then
+instead explain why.
+
+\`\`\`
+${incompatible}
+\`\`\`${after}
+EOF
+                tail -n "+${line}" "${changelog}" >>"${changelog}.tmp"
+                mv "${changelog}.tmp" "${changelog}"
+
+                # Because we have updated the changelog as requested, we don't
+                # need to describe how to do that nor treat it as a failure.
+                return 0
+            fi
+            can_update_changelog=true
+        fi
         failures+=("${what}")
     fi
 }
@@ -344,6 +412,19 @@ EOF
             fi
             echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
         done
+    fi
+
+    if ${can_update_changelog}; then
+        cat <<EOF
+
+Run the following command to add add the incompatible changes to
+the ${CHANGELOG} file(s), edit the modified file(s) to
+replace the template text in the new section at the top
+with and explanation of the changes, then include the result
+in the pull request for review:
+
+    hack/apidiff.sh -u -r ${base} ${target:+-t ${target} }${targets[*]}
+EOF
     fi
 fi
 
