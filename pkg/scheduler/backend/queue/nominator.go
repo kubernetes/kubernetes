@@ -79,9 +79,6 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 	if nominatingInfo.Mode() == fwk.ModeOverride {
 		nodeName = nominatingInfo.NominatedNodeName
 	} else if nominatingInfo.Mode() == fwk.ModeNoop {
-		if pi.GetPod().Status.NominatedNodeName == "" {
-			return
-		}
 		nodeName = pi.GetPod().Status.NominatedNodeName
 	}
 
@@ -127,7 +124,7 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	// (2) NominatedNode info is updated
 	// (3) NominatedNode info is removed
 	if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.GetPod()) == "" {
-		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok && nnn != "" {
+		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
 			// This is the only case we should continue reserving the NominatedNode
 			nominatingInfo = &fwk.NominatingInfo{
 				NominatingMode:    fwk.ModeOverride,
