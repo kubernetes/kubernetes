@@ -3614,9 +3614,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 				}
 
 				pInfo.UnschedulablePlugins = sets.New("plugin")
-				if err := queue.AddUnschedulableIfNotPresent(logger, pInfo, 1); err != nil {
-					t.Fatalf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
-				}
+				queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
 				// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
 				// will be moved to activeQ
 				c.SetTime(timestamp.Add(DefaultPodMaxInUnschedulablePodsDuration + 1))
@@ -3636,9 +3634,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 				}
 
 				pInfo.UnschedulablePlugins = sets.New("plugin")
-				if err := queue.AddUnschedulableIfNotPresent(logger, pInfo, 1); err != nil {
-					t.Fatalf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
-				}
+				queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
 				// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
 				// will be moved to activeQ
 				updatedTimestamp := timestamp
