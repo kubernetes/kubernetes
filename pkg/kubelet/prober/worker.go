@@ -55,6 +55,9 @@ type worker struct {
 	// The type of the worker.
 	probeType probeType
 
+	// The action to perform for probing
+	probeAction ProberAction
+
 	// The probe value during the initial delay.
 	initialValue results.Result
 
@@ -123,6 +126,8 @@ func newWorker(
 		w.resultsManager = m.startupManager
 		w.initialValue = results.Unknown
 	}
+
+	w.probeAction = m.prober.newProberAction(probeType, w.spec, pod, container)
 
 	basicMetricLabels := metrics.Labels{
 		"probe_type": w.probeType.String(),
@@ -346,7 +351,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeAction, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
