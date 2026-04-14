@@ -1217,6 +1217,9 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Pop: %v", err)
 	}
+	if got := queue.InFlightPods(); !podListContainsPod(got, oldPod) {
+		t.Fatalf("expected popped pod to be in-flight before failure handling, got %v", got)
+	}
 
 	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
 	sched.handleSchedulingFailure(ctx, schedFramework, popped, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
