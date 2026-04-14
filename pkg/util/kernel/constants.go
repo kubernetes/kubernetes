@@ -64,3 +64,11 @@ const TCPTransmitMemoryNamespacedKernelVersion = "4.15"
 // reclaim loop at the memory.high boundary.
 // (ref: https://github.com/torvalds/linux/commit/b3ff92916af3156df27716bb080a407e4caf9085)
 const MemoryQoSMinKernelVersion = "5.9"
+
+// TCPSlowStartAfterIdleNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_slow_start_after_idle was namespaced(netns).
+// (ref: https://github.com/torvalds/linux/commit/b510f0d23a47c3d1f074fe583e7867dc4918fe02)
+const TCPSlowStartAfterIdleNamespacedKernelVersion = "4.15"
+
+// TCPNotSentLowatNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_notsent_lowat was namespaced(netns).
+// (ref: https://github.com/torvalds/linux/commit/4979f2d9f7262b9b180bc83de8d70f7a7721c085)
+const TCPNotSentLowatNamespacedKernelVersion = "4.7"
