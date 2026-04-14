@@ -299,6 +299,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -333,6 +334,10 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
 	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+
+	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
+	// pass a number larger than 1 to move Pod to unschedulablePods.
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
