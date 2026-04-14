@@ -254,13 +254,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
+	_, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
 		utilruntime.HandleErrorWithContext(req.Context(), err, "Unable to start watch")
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+	writer := NewTraceWriter("Network", w)
 
 	framer := s.Framer.NewFrameWriter(w)
 	if framer == nil {
@@ -279,7 +280,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	writer.Flush()
 
 	gvr := s.Scope.Resource
 
@@ -294,6 +295,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	done := req.Context().Done()
 
 	span.AddEvent("About to start writing response")
+	var duration time.Duration
+	var count int64
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -316,15 +319,18 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
+			start := time.Now()
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
 			recorder.RecordEvent()
+			duration += time.Since(start)
+			count++
 
 			if len(ch) == 0 {
-				flusher.Flush()
+				writer.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
 				// Record completion of initial listing phase for WatchList
@@ -338,6 +344,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
 					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
 					span.AddEvent("Writing initial events done")
+					span.AddParallelEvent(writer.name, writer.writeDuration, attribute.Int64("size", writer.writeBytes), attribute.Int64("count", writer.writeCount))
+					span.AddParallelEvent("Flush", writer.flushDuration, attribute.Int64("count", writer.flushCount))
+					span.AddParallelEvent("Serialize", duration-writer.writeDuration, attribute.Int64("count", count-1))
 					span.End(5 * time.Second)
 					s.watchListCompleteHook()
 				}
@@ -442,4 +451,48 @@ func shouldRecordWatchListLatency(ctx context.Context, event watch.Event) bool {
 		return false
 	}
 	return hasAnnotation
+}
+
+func NewTraceWriter(name string, next io.Writer) *TraceWriter {
+	return &TraceWriter{
+		name: name,
+		next: next,
+	}
+}
+
+type TraceWriter struct {
+	name     string
+	writeDuration time.Duration
+	writeBytes    int64
+	writeCount    int64
+	flushDuration time.Duration
+	flushCount    int64
+	next          io.Writer
+}
+
+func (t *TraceWriter) Write(p []byte) (n int, err error) {
+	start := time.Now()
+	n, err = t.next.Write(p)
+	t.writeDuration += time.Since(start)
+	t.writeBytes += int64(n)
+	t.writeCount++
+	return n, err
+}
+
+func (t *TraceWriter) Flush() {
+	flusher, ok := t.next.(http.Flusher)
+	if !ok {
+		return
+	}
+	start := time.Now()
+	flusher.Flush()
+	t.flushDuration += time.Since(start)
+	t.flushCount++
+}
+
+func (t *TraceWriter) Close() error {
+	if closer, ok := t.next.(io.WriteCloser); ok {
+		return closer.Close()
+	}
+	return nil
 }

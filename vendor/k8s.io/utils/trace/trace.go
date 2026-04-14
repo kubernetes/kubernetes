@@ -80,6 +80,7 @@ type traceItem interface {
 
 type traceStep struct {
 	stepTime time.Time
+	duration time.Duration
 	msg      string
 	fields   []Field
 }
@@ -94,6 +95,9 @@ func (s traceStep) time() time.Time {
 
 func (s traceStep) writeItem(b *bytes.Buffer, formatter string, startTime time.Time, stepThreshold *time.Duration) {
 	stepDuration := s.stepTime.Sub(startTime)
+	if s.duration > 0 {
+		stepDuration = s.duration
+	}
 	if stepThreshold == nil || *stepThreshold == 0 || stepDuration >= *stepThreshold || klogV(4) {
 		b.WriteString(fmt.Sprintf("%s---", formatter))
 		writeTraceItemSummary(b, s.msg, stepDuration, s.stepTime, s.fields)
@@ -166,6 +170,16 @@ func (t *Trace) Step(msg string, fields ...Field) {
 		t.traceItems = make([]traceItem, 0, 6)
 	}
 	t.traceItems = append(t.traceItems, traceStep{stepTime: time.Now(), msg: msg, fields: fields})
+}
+
+func (t *Trace) ParallelStep(msg string, duration time.Duration, fields ...Field) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.traceItems == nil {
+		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
+		t.traceItems = make([]traceItem, 0, 6)
+	}
+	t.traceItems = append(t.traceItems, traceStep{stepTime: time.Now(), duration: duration, msg: msg, fields: fields})
 }
 
 // Nest adds a nested trace with the given message and fields and returns it.

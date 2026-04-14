@@ -260,7 +260,10 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	var onWatchListComplete WatchListCompleteHook
 	if isListWatchRequest(opts) {
 		ctx, span = tracing.Start(ctx, "WatchList", traceFields(req)...)
-		onWatchListComplete = func() { span.End(500 * time.Millisecond) }
+		onWatchListComplete = func() { 
+
+			span.End(500 * time.Millisecond) 
+		}
 		req = req.WithContext(ctx)
 	}
 
