@@ -2773,9 +2773,8 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 // TestPriorityQueue_NominatedNodeNameEmptyNodeKey ensures ModeOverride with an empty
 // NominatedNodeName does not store pods under nominatedPods[""] (#138267).
 func TestPriorityQueue_NominatedNodeNameEmptyNodeKey(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-
 	t.Run("ModeOverride empty without prior nomination", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
 		cs := fake.NewClientset(highPriorityPodInfo.Pod)
 		informerFactory := informers.NewSharedInformerFactory(cs, 0)
 		q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(informerFactory.Core().V1().Pods().Lister()))
@@ -2798,6 +2797,7 @@ func TestPriorityQueue_NominatedNodeNameEmptyNodeKey(t *testing.T) {
 	})
 
 	t.Run("nominated then cleared with ModeOverride empty", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
 		cs := fake.NewClientset(highPriNominatedPodInfo.Pod)
 		informerFactory := informers.NewSharedInformerFactory(cs, 0)
 		q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(informerFactory.Core().V1().Pods().Lister()))
