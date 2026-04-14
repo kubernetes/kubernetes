@@ -348,7 +348,8 @@ func TestCustomResourceController_Sync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			var initialSVMs []runtime.Object
 			for _, svm := range tc.svms {
 				initialSVMs = append(initialSVMs, svm)
@@ -384,6 +385,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 				svmInformer,
 				crdClientSet.ApiextensionsV1().CustomResourceDefinitions(),
 			)
+			defer controller.queue.ShutDown()
 
 			resource := metav1.GroupResource{Group: "example.com", Resource: "widgets"}
 			if len(tc.svms) > 0 {
