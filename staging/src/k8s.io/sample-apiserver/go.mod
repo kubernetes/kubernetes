@@ -17,7 +17,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260511211612-da4e56fe5676
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
 )
 
 require (

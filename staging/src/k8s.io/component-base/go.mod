@@ -90,7 +90,7 @@ require (
 	k8s.io/api v0.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260511211612-da4e56fe5676 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
