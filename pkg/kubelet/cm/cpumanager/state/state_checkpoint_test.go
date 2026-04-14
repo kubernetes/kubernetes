@@ -452,7 +452,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	require.NoError(t, err)
-	defer os.RemoveAll(testingDir)
+	defer removeAll(testingDir, t)
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
@@ -517,7 +517,7 @@ func TestCheckpointStateStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	defer removeAll(testingDir, t)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -591,7 +591,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	defer removeAll(testingDir, t)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -651,7 +651,7 @@ func TestCheckpointStateClear(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.RemoveAll(testingDir)
+			defer removeAll(testingDir, t)
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
@@ -744,5 +744,12 @@ func TestCPUManagerCheckpointV2_MarshalCheckpoint_ForwardCompatibility(t *testin
 	// what a 1.35 Kubelet would expect to see.
 	if writtenChecksum != expectedLegacyChecksum {
 		t.Errorf("Written Checksum %d does not match legacy calculation %d. Forward compatibility broken.", writtenChecksum, expectedLegacyChecksum)
+	}
+}
+
+func removeAll(dir string, t *testing.T) {
+	t.Helper()
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatalf("unable to remove dir %s: %v", dir, err)
 	}
 }
