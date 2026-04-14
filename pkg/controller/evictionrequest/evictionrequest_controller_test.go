@@ -160,7 +160,7 @@ func hasEvictedCondition(er *coordinationv1alpha1.EvictionRequest) bool {
 // getLastStatusPatch finds the last patch action targeting the status subresource
 // and unmarshals it into an EvictionRequest. This is needed because the fake client
 // doesn't implement SSA field ownership tracking, so fields absent from the apply
-// config (e.g. cleared ActiveResponders) aren't removed from the stored object.
+// config (e.g. TargetResponders with terminal states) aren't removed from the stored object.
 func getLastStatusPatch(t *testing.T, client *fake.Clientset) *coordinationv1alpha1.EvictionRequest {
 	t.Helper()
 	for i := len(client.Actions()) - 1; i >= 0; i-- {
@@ -176,6 +176,16 @@ func getLastStatusPatch(t *testing.T, client *fake.Clientset) *coordinationv1alp
 	}
 	t.Fatal("no status patch action found")
 	return nil
+}
+
+// findTargetResponderState looks up the state of a named target responder.
+func findTargetResponderState(targetResponders []coordinationv1alpha1.TargetResponder, name string) coordinationv1alpha1.ResponderStateType {
+	for _, tr := range targetResponders {
+		if tr.Name == name {
+			return tr.State
+		}
+	}
+	return ""
 }
 
 // errorPodLister is a PodLister that always returns an error.
@@ -436,10 +446,9 @@ func TestSyncHandler_PodNotFound_MovesActiveResponderToProcessed(t *testing.T) {
 	er.Generation = 1
 	er.Status.ObservedGeneration = ptr.To[int64](1)
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: testResponder},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: testResponder, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{testResponder}
 	// Set responder status with heartbeat so it doesn't auto-advance
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
@@ -466,17 +475,16 @@ func TestSyncHandler_PodNotFound_MovesActiveResponderToProcessed(t *testing.T) {
 		t.Error("expected Evicted condition to be set when pod deleted")
 	}
 
-	// Active responders should be cleared (not present in apply config)
-	if len(updated.Status.ActiveResponders) != 0 {
-		t.Errorf("expected active responders to be cleared, got %v", updated.Status.ActiveResponders)
+	// No responder should be active
+	if findActiveTargetResponderIdx(updated.Status.TargetResponders) != -1 {
+		t.Error("expected no active target responder")
 	}
 
-	// The active responder should be moved to processed
-	if len(updated.Status.ProcessedResponders) != 1 {
-		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
-	}
-	if updated.Status.ProcessedResponders[0] != testResponder {
-		t.Errorf("expected %s in processed, got %s", testResponder, updated.Status.ProcessedResponders[0])
+	// The active responder should now have a terminal state (Interrupted, since pod is gone
+	// and the responder did not report CompletionTime)
+	state := findTargetResponderState(updated.Status.TargetResponders, testResponder)
+	if state != coordinationv1alpha1.ResponderStateInterrupted {
+		t.Errorf("expected responder %s to be in terminal state, got %s", testResponder, state)
 	}
 
 	// The responder status entry should still exist (controller includes all entries
@@ -518,10 +526,9 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T
 	er.Generation = 1
 	er.Status.ObservedGeneration = ptr.To[int64](1)
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: testResponder},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: testResponder, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{testResponder}
 	heartbeatTime := metav1.NewTime(now.Add(-10 * time.Second))
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
@@ -549,8 +556,11 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T
 	}
 
 	// Active responder should still be active
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Errorf("expected 1 active responder during grace period, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Error("expected an active responder during grace period")
+	} else if updated.Status.TargetResponders[activeIdx].Name != testResponder {
+		t.Errorf("expected active responder to be %s, got %s", testResponder, updated.Status.TargetResponders[activeIdx].Name)
 	}
 
 	// Advance clock past the grace period — this makes the delayed resync item ready
@@ -571,7 +581,7 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T
 	}
 
 	// Use getLastStatusPatch because the fake client doesn't implement SSA field
-	// ownership (cleared ActiveResponders won't be reflected via Get).
+	// ownership (TargetResponder state changes won't be reflected via Get).
 	updated = getLastStatusPatch(t, client)
 
 	// Now it should be Evicted
@@ -579,12 +589,13 @@ func TestSyncHandler_PodTerminal_DefersCompletionForActiveResponder(t *testing.T
 		t.Error("expected Evicted condition after grace period elapsed")
 	}
 
-	// Active should be cleared and the responder should be moved to processed
-	if len(updated.Status.ActiveResponders) != 0 {
-		t.Errorf("expected active responders to be cleared, got %v", updated.Status.ActiveResponders)
+	// No responder should be active and the responder should have a terminal state
+	if findActiveTargetResponderIdx(updated.Status.TargetResponders) != -1 {
+		t.Error("expected no active target responder after grace period")
 	}
-	if len(updated.Status.ProcessedResponders) != 1 || updated.Status.ProcessedResponders[0] != testResponder {
-		t.Errorf("expected %s in processed, got %s", testResponder, updated.Status.ProcessedResponders[0])
+	state := findTargetResponderState(updated.Status.TargetResponders, testResponder)
+	if state != coordinationv1alpha1.ResponderStateCompleted && state != coordinationv1alpha1.ResponderStateInterrupted {
+		t.Errorf("expected responder %s to be in terminal state, got %s", testResponder, state)
 	}
 }
 
@@ -597,6 +608,7 @@ func TestSyncHandler_InitializeTargetResponders(t *testing.T) {
 	}
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
+
 	c, _, client := newTestController(t, []*coordinationv1alpha1.EvictionRequest{er}, []*v1.Pod{pod}, nil)
 
 	// Sync
@@ -664,19 +676,20 @@ func TestSyncHandler_SelectFirstResponder(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify ActiveResponders set to first responder
+	// Verify the first responder is set to Active in TargetResponders
 	updated, err := client.CoordinationV1alpha1().EvictionRequests("default").Get(ctx, "test-uid", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Errorf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Fatal("expected an active responder")
 	}
 
 	// Since pod has no EvictionResponders, first should be imperative
-	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
-		t.Errorf("expected active responder to be imperative, got %s", updated.Status.ActiveResponders[0])
+	if updated.Status.TargetResponders[activeIdx].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to be imperative, got %s", updated.Status.TargetResponders[activeIdx].Name)
 	}
 
 	// Verify responder status was initialized
@@ -712,10 +725,9 @@ func TestSyncHandler_AdvanceOnCompletion(t *testing.T) {
 	// Set up status as if first responder is active and completed
 	now := metav1.Now()
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: testEvictionResponderClass},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: testEvictionResponderClass, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{testEvictionResponderClass}
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
 			Name:           testEvictionResponderClass,
@@ -738,20 +750,19 @@ func TestSyncHandler_AdvanceOnCompletion(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Fatal("expected an active responder after advancement")
 	}
 
-	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
-		t.Errorf("expected active responder to advance to imperative, got %s", updated.Status.ActiveResponders[0])
+	if updated.Status.TargetResponders[activeIdx].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative, got %s", updated.Status.TargetResponders[activeIdx].Name)
 	}
 
-	// Verify first responder is in ProcessedResponders
-	if len(updated.Status.ProcessedResponders) != 1 {
-		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
-	}
-	if updated.Status.ProcessedResponders[0] != testEvictionResponderClass {
-		t.Errorf("expected first responder in processed, got %s", updated.Status.ProcessedResponders[0])
+	// Verify first responder has a terminal state (Completed)
+	state := findTargetResponderState(updated.Status.TargetResponders, testEvictionResponderClass)
+	if state != coordinationv1alpha1.ResponderStateCompleted {
+		t.Errorf("expected first responder to be Completed, got %s", state)
 	}
 
 	// Verify newly active responder (imperative) has StartTime set
@@ -791,10 +802,9 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: slowEvictionResponderClass},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: slowEvictionResponderClass, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{slowEvictionResponderClass}
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
 			Name:          slowEvictionResponderClass,
@@ -820,17 +830,19 @@ func TestSyncHandler_AdvanceOnTimeout(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Fatal("expected an active responder after timeout advancement")
 	}
 
-	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
-		t.Errorf("expected active responder to advance to imperative after timeout, got %s", updated.Status.ActiveResponders[0])
+	if updated.Status.TargetResponders[activeIdx].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative after timeout, got %s", updated.Status.TargetResponders[activeIdx].Name)
 	}
 
-	// Verify slow responder is in ProcessedResponders
-	if len(updated.Status.ProcessedResponders) != 1 {
-		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
+	// Verify slow responder has a terminal state (Interrupted due to timeout)
+	state := findTargetResponderState(updated.Status.TargetResponders, slowEvictionResponderClass)
+	if state != coordinationv1alpha1.ResponderStateInterrupted {
+		t.Errorf("expected slow responder to be Interrupted, got %s", state)
 	}
 }
 
@@ -848,10 +860,9 @@ func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: staleResponder},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: staleResponder, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{staleResponder}
 	// Responder has StartTime but never heartbeated
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
@@ -877,17 +888,19 @@ func TestSyncHandler_AdvanceOnTimeoutWithoutHeartbeat(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Fatal("expected an active responder after StartTime timeout advancement")
 	}
 
-	if updated.Status.ActiveResponders[0] != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
-		t.Errorf("expected active responder to advance to imperative after StartTime timeout, got %s", updated.Status.ActiveResponders[0])
+	if updated.Status.TargetResponders[activeIdx].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected active responder to advance to imperative after StartTime timeout, got %s", updated.Status.TargetResponders[activeIdx].Name)
 	}
 
-	// Verify stale responder is in ProcessedResponders
-	if len(updated.Status.ProcessedResponders) != 1 {
-		t.Fatalf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
+	// Verify stale responder has a terminal state (Interrupted due to timeout)
+	state := findTargetResponderState(updated.Status.TargetResponders, staleResponder)
+	if state != coordinationv1alpha1.ResponderStateInterrupted {
+		t.Errorf("expected stale responder to be Interrupted, got %s", state)
 	}
 }
 
@@ -906,10 +919,9 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: activeEvictionResponderClass},
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: activeEvictionResponderClass, State: coordinationv1alpha1.ResponderStateActive},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateInactive},
 	}
-	er.Status.ActiveResponders = []string{activeEvictionResponderClass}
 	er.Status.ObservedGeneration = ptr.To[int64](er.Generation)
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
@@ -939,17 +951,20 @@ func TestSyncHandler_NoAdvanceBeforeTimeout(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if len(updated.Status.ActiveResponders) != 1 {
-		t.Fatalf("expected 1 active responder, got %d", len(updated.Status.ActiveResponders))
+	activeIdx := findActiveTargetResponderIdx(updated.Status.TargetResponders)
+	if activeIdx == -1 {
+		t.Fatal("expected an active responder before timeout")
 	}
 
-	if updated.Status.ActiveResponders[0] != activeEvictionResponderClass {
-		t.Errorf("expected active responder to remain unchanged before timeout, got %s", updated.Status.ActiveResponders[0])
+	if updated.Status.TargetResponders[activeIdx].Name != activeEvictionResponderClass {
+		t.Errorf("expected active responder to remain unchanged before timeout, got %s", updated.Status.TargetResponders[activeIdx].Name)
 	}
 
-	// Verify ProcessedResponders is empty
-	if len(updated.Status.ProcessedResponders) != 0 {
-		t.Fatalf("expected no processed responders before timeout, got %d", len(updated.Status.ProcessedResponders))
+	// Verify no responder has a terminal state yet
+	for _, tr := range updated.Status.TargetResponders {
+		if tr.State == coordinationv1alpha1.ResponderStateCompleted || tr.State == coordinationv1alpha1.ResponderStateInterrupted {
+			t.Errorf("expected no responder in terminal state before timeout, but %s is %s", tr.Name, tr.State)
+		}
 	}
 }
 
@@ -959,12 +974,11 @@ func TestSyncHandler_AllRespondersProcessed(t *testing.T) {
 	pod := newPod("default", "test-pod", "test-uid")
 
 	er := newEvictionRequest("default", "test-pod", "test-uid")
-	// Set up status where all responders are processed
+	// Set up status where the last responder is active and has completed
 	now := metav1.Now()
 	er.Status.TargetResponders = []coordinationv1alpha1.TargetResponder{
-		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction)},
+		{Name: string(coordinationv1alpha1.EvictionResponderImperativeEviction), State: coordinationv1alpha1.ResponderStateActive},
 	}
-	er.Status.ActiveResponders = []string{string(coordinationv1alpha1.EvictionResponderImperativeEviction)}
 	er.Status.Responders = []coordinationv1alpha1.ResponderStatus{
 		{
 			Name:           string(coordinationv1alpha1.EvictionResponderImperativeEviction),
@@ -982,16 +996,17 @@ func TestSyncHandler_AllRespondersProcessed(t *testing.T) {
 	}
 
 	// Use getLastStatusPatch because the fake client doesn't implement SSA field
-	// ownership (cleared ActiveResponders won't be reflected via Get).
+	// ownership (TargetResponder state changes won't be reflected via Get).
 	updated := getLastStatusPatch(t, client)
 
-	if len(updated.Status.ActiveResponders) != 0 {
-		t.Errorf("expected no active responders when all processed, got %d", len(updated.Status.ActiveResponders))
+	if findActiveTargetResponderIdx(updated.Status.TargetResponders) != -1 {
+		t.Error("expected no active responder when all are in terminal state")
 	}
 
-	// Verify imperative responder is in ProcessedResponders
-	if len(updated.Status.ProcessedResponders) != 1 {
-		t.Errorf("expected 1 processed responder, got %d", len(updated.Status.ProcessedResponders))
+	// Verify imperative responder has terminal state (Completed)
+	state := findTargetResponderState(updated.Status.TargetResponders, string(coordinationv1alpha1.EvictionResponderImperativeEviction))
+	if state != coordinationv1alpha1.ResponderStateCompleted {
+		t.Errorf("expected imperative responder to be Completed, got %s", state)
 	}
 }
 
@@ -1016,7 +1031,7 @@ func TestSyncHandler_ObservedGenerationSet(t *testing.T) {
 		t.Fatalf("failed to get eviction request: %v", err)
 	}
 
-	if ptr.Equal(updated.Status.ObservedGeneration, ptr.To[int64](5)) {
+	if !ptr.Equal(updated.Status.ObservedGeneration, ptr.To[int64](5)) {
 		t.Errorf("expected ObservedGeneration to be 5, got %d", ptr.Deref(updated.Status.ObservedGeneration, -1))
 	}
 }
@@ -1361,10 +1376,17 @@ func TestDeletePod_HandlesAllObjectTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, _, _ := newTestController(t, nil, nil, nil)
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			c, _, _ := newTestController(t, nil, nil, fakeClock)
 
 			initialLen := c.queue.Len()
 			c.deletePod(logger, tt.obj)
+
+			// The controller uses AddAfter with GracefulCompletionDelay, so advance the clock
+			fakeClock.Step(GracefulCompletionDelay + time.Second)
+			// Give the queue time to process the delayed item
+			time.Sleep(10 * time.Millisecond)
+
 			finalLen := c.queue.Len()
 
 			if tt.wantQueue {
@@ -1413,7 +1435,7 @@ func TestValidate(t *testing.T) {
 					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
 					"Target pod not found"),
 				*setCondition(clock.Now(), nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
-					metav1.ConditionFalse, "UnableToPerform", ""),
+					metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, ""),
 			},
 		},
 		{
@@ -1425,7 +1447,7 @@ func TestValidate(t *testing.T) {
 					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
 					"Target pod UID mismatch: expected uid-1, got uid-2"),
 				*setCondition(clock.Now(), nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
-					metav1.ConditionFalse, "UnableToPerform", ""),
+					metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, ""),
 			},
 		},
 		{
@@ -1441,7 +1463,7 @@ func TestValidate(t *testing.T) {
 					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
 					"Target pod references a SchedulingGroup. Eviction is currently not supported."),
 				*setCondition(clock.Now(), nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
-					metav1.ConditionFalse, "UnableToPerform", ""),
+					metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, ""),
 			},
 		},
 		{
@@ -1453,7 +1475,7 @@ func TestValidate(t *testing.T) {
 					metav1.ConditionTrue, coordinationv1alpha1.EvictionRequestConditionReasonEvictionRequestInvalid,
 					"Unsupported target type"),
 				*setCondition(clock.Now(), nil, coordinationv1alpha1.EvictionRequestConditionEvicted,
-					metav1.ConditionFalse, "UnableToPerform", ""),
+					metav1.ConditionFalse, coordinationv1alpha1.EvictionRequestConditionReasonEvictionFailed, ""),
 			},
 		},
 	}

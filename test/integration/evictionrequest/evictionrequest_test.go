@@ -117,13 +117,13 @@ func newTestEvictionRequest(pod *v1.Pod) *coordinationv1alpha1.EvictionRequest {
 		},
 		Spec: coordinationv1alpha1.EvictionRequestSpec{
 			Target: coordinationv1alpha1.EvictionTarget{
-				Pod: &coordinationv1alpha1.LocalTargetReference{
+				Pod: &coordinationv1alpha1.PodReference{
 					Name: pod.Name,
 					UID:  pod.UID,
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
-				{Name: "test-requester.example.com"},
+				{Name: "test-requester.example.com/default", Intent: coordinationv1alpha1.RequesterIntentEviction},
 			},
 		},
 	}
@@ -217,13 +217,13 @@ func TestValidation_PodNotFound(t *testing.T) {
 		},
 		Spec: coordinationv1alpha1.EvictionRequestSpec{
 			Target: coordinationv1alpha1.EvictionTarget{
-				Pod: &coordinationv1alpha1.LocalTargetReference{
+				Pod: &coordinationv1alpha1.PodReference{
 					Name: "nonexistent-pod",
 					UID:  apimachinerytypes.UID(nonexistentUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
-				{Name: "test-requester.example.com"},
+				{Name: "test-requester.example.com/default", Intent: coordinationv1alpha1.RequesterIntentEviction},
 			},
 		},
 	}
@@ -268,13 +268,13 @@ func TestValidation_UIDMismatch(t *testing.T) {
 		},
 		Spec: coordinationv1alpha1.EvictionRequestSpec{
 			Target: coordinationv1alpha1.EvictionTarget{
-				Pod: &coordinationv1alpha1.LocalTargetReference{
+				Pod: &coordinationv1alpha1.PodReference{
 					Name: pod.Name,
 					UID:  apimachinerytypes.UID(wrongUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
-				{Name: "test-requester.example.com"},
+				{Name: "test-requester.example.com/default", Intent: coordinationv1alpha1.RequesterIntentEviction},
 			},
 		},
 	}
@@ -292,26 +292,66 @@ func TestValidation_UIDMismatch(t *testing.T) {
 	}
 }
 
-// TestInitializeTargetInterceptors verifies that the controller initializes target interceptors
-// from the pod's EvictionInterceptors list plus the default imperative interceptor, and that
-// matching InterceptorStatus entries are created in the same order.
-func TestInitializeTargetInterceptors(t *testing.T) {
+// hasActiveResponder returns true if any TargetResponder has Active state.
+func hasActiveResponder(targetResponders []coordinationv1alpha1.TargetResponder) bool {
+	for _, tr := range targetResponders {
+		if tr.State == coordinationv1alpha1.ResponderStateActive {
+			return true
+		}
+	}
+	return false
+}
+
+// activeResponderName returns the name of the active responder, or "" if none.
+func activeResponderName(targetResponders []coordinationv1alpha1.TargetResponder) string {
+	for _, tr := range targetResponders {
+		if tr.State == coordinationv1alpha1.ResponderStateActive {
+			return tr.Name
+		}
+	}
+	return ""
+}
+
+// findTargetResponderState returns the state of the named responder, or "" if not found.
+func findTargetResponderState(targetResponders []coordinationv1alpha1.TargetResponder, name string) coordinationv1alpha1.ResponderStateType {
+	for _, tr := range targetResponders {
+		if tr.Name == name {
+			return tr.State
+		}
+	}
+	return ""
+}
+
+// findResponderStatus finds the status for a given responder name.
+func findResponderStatus(statuses []coordinationv1alpha1.ResponderStatus, name string) *coordinationv1alpha1.ResponderStatus {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return &statuses[i]
+		}
+	}
+	return nil
+}
+
+// TestInitializeTargetResponders verifies that the controller initializes target responders
+// from the pod's EvictionResponders list plus the default imperative responder, and that
+// matching ResponderStatus entries are created in the same order.
+func TestInitializeTargetResponders(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
 	defer closeFn()
 
-	ns := framework.CreateNamespaceOrDie(cs, "evreq-interceptors", t)
+	ns := framework.CreateNamespaceOrDie(cs, "evreq-responders", t)
 	defer framework.DeleteNamespaceOrDie(cs, ns, t)
 	defer tCtx.Cancel("test has completed")
 
 	inf.Start(tCtx.Done())
 	go c.Run(tCtx, 1)
 
-	// Create pod with two custom eviction interceptors
+	// Create pod with two custom eviction responders
 	pod := newTestPod("test-pod")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: "first.example.com"},
-		{Name: "second.example.com"},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: "first.example.com/handler"},
+		{Name: "second.example.com/handler"},
 	}
 	pod = createPodAndWait(tCtx, t, cs, ns.Name, pod)
 
@@ -322,35 +362,35 @@ func TestInitializeTargetInterceptors(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	expectedNames := []string{"first.example.com", "second.example.com", string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)}
+	expectedNames := []string{"first.example.com/handler", "second.example.com/handler", string(coordinationv1alpha1.EvictionResponderImperativeEviction)}
 
-	// Wait for target interceptors and interceptor statuses to be initialized
+	// Wait for target responders and responder statuses to be initialized
 	updated := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.TargetInterceptors) == 3 && len(er.Status.Interceptors) == 3
+			return len(er.Status.TargetResponders) == 3 && len(er.Status.Responders) == 3
 		},
-		"waiting for 3 target interceptors and 3 interceptor statuses",
+		"waiting for 3 target responders and 3 responder statuses",
 	)
 
-	// Verify target interceptors order
+	// Verify target responders order
 	for i, expected := range expectedNames {
-		if updated.Status.TargetInterceptors[i].Name != expected {
-			t.Errorf("targetInterceptors[%d]: expected %q, got %q", i, expected, updated.Status.TargetInterceptors[i].Name)
+		if updated.Status.TargetResponders[i].Name != expected {
+			t.Errorf("targetResponders[%d]: expected %q, got %q", i, expected, updated.Status.TargetResponders[i].Name)
 		}
 	}
 
-	// Verify interceptor statuses match in the same order
+	// Verify responder statuses match in the same order
 	for i, expected := range expectedNames {
-		if updated.Status.Interceptors[i].Name != expected {
-			t.Errorf("interceptors[%d]: expected name %q, got %q", i, expected, updated.Status.Interceptors[i].Name)
+		if updated.Status.Responders[i].Name != expected {
+			t.Errorf("responders[%d]: expected name %q, got %q", i, expected, updated.Status.Responders[i].Name)
 		}
 	}
 }
 
-// TestSelectFirstInterceptor verifies that the controller selects the first interceptor,
-// initializes its StartTime, and that a pod with no custom interceptors gets only the
-// imperative interceptor as its target.
-func TestSelectFirstInterceptor(t *testing.T) {
+// TestSelectFirstResponder verifies that the controller selects the first responder,
+// initializes its StartTime, and that a pod with no custom responders gets only the
+// imperative responder as its target.
+func TestSelectFirstResponder(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
 	defer closeFn()
@@ -362,7 +402,7 @@ func TestSelectFirstInterceptor(t *testing.T) {
 	inf.Start(tCtx.Done())
 	go c.Run(tCtx, 1)
 
-	// Create pod (no custom interceptors, so only imperative will be used)
+	// Create pod (no custom responders, so only imperative will be used)
 	pod := createPodAndWait(tCtx, t, cs, ns.Name, newTestPod("test-pod"))
 
 	// Create EvictionRequest
@@ -372,35 +412,35 @@ func TestSelectFirstInterceptor(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for active interceptor to be set
+	// Wait for active responder to be set
 	updated := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.ActiveInterceptors) == 1
+			return hasActiveResponder(er.Status.TargetResponders)
 		},
-		"waiting for active interceptor",
+		"waiting for active responder",
 	)
 
-	// Verify only the imperative interceptor is present as target
-	if len(updated.Status.TargetInterceptors) != 1 {
-		t.Fatalf("expected 1 target interceptor, got %d", len(updated.Status.TargetInterceptors))
+	// Verify only the imperative responder is present as target
+	if len(updated.Status.TargetResponders) != 1 {
+		t.Fatalf("expected 1 target responder, got %d", len(updated.Status.TargetResponders))
 	}
-	if updated.Status.TargetInterceptors[0].Name != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected only imperative target interceptor, got %s", updated.Status.TargetInterceptors[0].Name)
+	if updated.Status.TargetResponders[0].Name != string(coordinationv1alpha1.EvictionResponderImperativeEviction) {
+		t.Errorf("expected only imperative target responder, got %s", updated.Status.TargetResponders[0].Name)
 	}
 
-	if updated.Status.ActiveInterceptors[0] != string(coordinationv1alpha1.EvictionInterceptorImperativeEviction) {
-		t.Errorf("expected active interceptor to be imperative, got %s", updated.Status.ActiveInterceptors[0])
+	if updated.Status.TargetResponders[0].State != coordinationv1alpha1.ResponderStateActive {
+		t.Errorf("expected responder state to be Active, got %s", updated.Status.TargetResponders[0].State)
 	}
 
 	// Verify start time was initialized (not heartbeat — controller sets StartTime,
-	// interceptor is responsible for setting HeartbeatTime)
-	if len(updated.Status.Interceptors) == 0 {
-		t.Fatal("expected interceptor status to be initialized")
+	// responder is responsible for setting HeartbeatTime)
+	if len(updated.Status.Responders) == 0 {
+		t.Fatal("expected responder status to be initialized")
 	}
-	if updated.Status.Interceptors[0].StartTime == nil {
-		t.Error("expected start time to be initialized for active interceptor")
+	if updated.Status.Responders[0].StartTime == nil {
+		t.Error("expected start time to be initialized for active responder")
 	}
-	if updated.Status.Interceptors[0].HeartbeatTime != nil {
+	if updated.Status.Responders[0].HeartbeatTime != nil {
 		t.Error("expected heartbeat time to not be set by controller")
 	}
 }
@@ -429,10 +469,10 @@ func TestPodDeleted_Evicted(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for controller to process the EvictionRequest (active interceptor set)
+	// Wait for controller to process the EvictionRequest (active responder set)
 	waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return er.Status.ObservedGeneration > 0
+			return er.Status.ObservedGeneration != nil && *er.Status.ObservedGeneration > 0
 		},
 		"waiting for initial processing",
 	)
@@ -611,13 +651,13 @@ func TestMultipleEvictionRequests(t *testing.T) {
 		}
 	}
 
-	// Wait for all EvictionRequests to be processed (active interceptor set)
+	// Wait for all EvictionRequests to be processed (active responder set)
 	for _, pod := range pods {
 		waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 			func(er *coordinationv1alpha1.EvictionRequest) bool {
-				return len(er.Status.ActiveInterceptors) == 1
+				return hasActiveResponder(er.Status.TargetResponders)
 			},
-			fmt.Sprintf("waiting for EvictionRequest for %s to have active interceptor", pod.Name),
+			fmt.Sprintf("waiting for EvictionRequest for %s to have active responder", pod.Name),
 		)
 	}
 }
@@ -684,13 +724,13 @@ func TestTerminalStateIdempotent(t *testing.T) {
 		},
 		Spec: coordinationv1alpha1.EvictionRequestSpec{
 			Target: coordinationv1alpha1.EvictionTarget{
-				Pod: &coordinationv1alpha1.LocalTargetReference{
+				Pod: &coordinationv1alpha1.PodReference{
 					Name: "nonexistent-pod",
 					UID:  apimachinerytypes.UID(nonexistentUID),
 				},
 			},
 			Requesters: []coordinationv1alpha1.Requester{
-				{Name: "test-requester.example.com"},
+				{Name: "test-requester.example.com/default", Intent: coordinationv1alpha1.RequesterIntentEviction},
 			},
 		},
 	}
@@ -729,9 +769,9 @@ func TestTerminalStateIdempotent(t *testing.T) {
 	}
 
 	// ObservedGeneration should not have been bumped by re-processing
-	if final.Status.ObservedGeneration != observedGenBefore {
+	if *final.Status.ObservedGeneration != *observedGenBefore {
 		t.Errorf("expected ObservedGeneration to remain %d after re-sync of terminal state, got %d",
-			observedGenBefore, final.Status.ObservedGeneration)
+			*observedGenBefore, *final.Status.ObservedGeneration)
 	}
 }
 
@@ -783,9 +823,9 @@ func TestPodTerminal_Evicted(t *testing.T) {
 	}
 }
 
-// TestInterceptorStatusPreservedOnAdvancement verifies that when the controller advances
-// to the next interceptor, the completed interceptor's status fields are preserved.
-func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
+// TestResponderStatusPreservedOnAdvancement verifies that when the controller advances
+// to the next responder, the completed responder's status fields are preserved.
+func TestResponderStatusPreservedOnAdvancement(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
 	defer closeFn()
@@ -798,8 +838,8 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 	go c.Run(tCtx, 1)
 
 	pod := newTestPod("test-pod")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: "first.example.com"},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: "first.example.com/handler"},
 	}
 	pod = createPodAndWait(tCtx, t, cs, ns.Name, pod)
 
@@ -809,17 +849,16 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for first interceptor to become active
+	// Wait for first responder to become active
 	waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.ActiveInterceptors) == 1 &&
-				er.Status.ActiveInterceptors[0] == "first.example.com"
+			return activeResponderName(er.Status.TargetResponders) == "first.example.com/handler"
 		},
-		"waiting for first interceptor to become active",
+		"waiting for first responder to become active",
 	)
 
-	// Simulate interceptor completion via SSA with the interceptor's own field manager.
-	// The interceptor must include startTime (set by the controller) to prevent SSA
+	// Simulate responder completion via SSA with the responder's own field manager.
+	// The responder must include startTime (set by the controller) to prevent SSA
 	// from removing it, since the immutability validation would reject that.
 	now := metav1.Now()
 	current, err := cs.CoordinationV1alpha1().EvictionRequests(ns.Name).Get(tCtx, string(pod.UID), metav1.GetOptions{})
@@ -827,17 +866,17 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 		t.Fatalf("Failed to get EvictionRequest: %v", err)
 	}
 	var startTime metav1.Time
-	for _, is := range current.Status.Interceptors {
-		if is.Name == "first.example.com" && is.StartTime != nil {
-			startTime = *is.StartTime
+	for _, rs := range current.Status.Responders {
+		if rs.Name == "first.example.com/handler" && rs.StartTime != nil {
+			startTime = *rs.StartTime
 			break
 		}
 	}
-	interceptorApply := coordinationapply.EvictionRequest(string(pod.UID), ns.Name).
+	responderApply := coordinationapply.EvictionRequest(string(pod.UID), ns.Name).
 		WithStatus(coordinationapply.EvictionRequestStatus().
-			WithInterceptors(
-				coordinationapply.InterceptorStatus().
-					WithName("first.example.com").
+			WithResponders(
+				coordinationapply.ResponderStatus().
+					WithName("first.example.com/handler").
 					WithStartTime(startTime).
 					WithHeartbeatTime(now).
 					WithCompletionTime(now).
@@ -845,33 +884,26 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 			),
 		)
 	_, err = cs.CoordinationV1alpha1().EvictionRequests(ns.Name).
-		ApplyStatus(tCtx, interceptorApply, metav1.ApplyOptions{
-			FieldManager: "first.example.com",
+		ApplyStatus(tCtx, responderApply, metav1.ApplyOptions{
+			FieldManager: "first.example.com/handler",
 			Force:        true,
 		})
 	if err != nil {
-		t.Fatalf("Failed to apply interceptor status: %v", err)
+		t.Fatalf("Failed to apply responder status: %v", err)
 	}
 
-	// Wait for controller to advance to imperative interceptor
+	// Wait for controller to advance to imperative responder
 	final := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.ActiveInterceptors) == 1 &&
-				er.Status.ActiveInterceptors[0] == string(coordinationv1alpha1.EvictionInterceptorImperativeEviction)
+			return activeResponderName(er.Status.TargetResponders) == string(coordinationv1alpha1.EvictionResponderImperativeEviction)
 		},
-		"waiting for advancement to imperative interceptor",
+		"waiting for advancement to imperative responder",
 	)
 
-	// Verify the completed interceptor's status fields are preserved
-	var firstStatus *coordinationv1alpha1.InterceptorStatus
-	for i := range final.Status.Interceptors {
-		if final.Status.Interceptors[i].Name == "first.example.com" {
-			firstStatus = &final.Status.Interceptors[i]
-			break
-		}
-	}
+	// Verify the completed responder's status fields are preserved
+	firstStatus := findResponderStatus(final.Status.Responders, "first.example.com/handler")
 	if firstStatus == nil {
-		t.Fatal("first interceptor status not found after advancement")
+		t.Fatal("first responder status not found after advancement")
 	}
 	if firstStatus.CompletionTime == nil {
 		t.Error("expected CompletionTime to be preserved")
@@ -883,22 +915,16 @@ func TestInterceptorStatusPreservedOnAdvancement(t *testing.T) {
 		t.Errorf("expected Message to be preserved, got %q", firstStatus.Message)
 	}
 
-	// Verify it was moved to processed
-	found := false
-	for _, name := range final.Status.ProcessedInterceptors {
-		if name == "first.example.com" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected first interceptor to be in processedInterceptors")
+	// Verify it was moved to Completed state
+	state := findTargetResponderState(final.Status.TargetResponders, "first.example.com/handler")
+	if state != coordinationv1alpha1.ResponderStateCompleted {
+		t.Errorf("expected first responder to be Completed, got %s", state)
 	}
 }
 
-// TestAllInterceptorsProcessed verifies that after all interceptors complete,
-// activeInterceptors is cleared and processedInterceptors contains all entries.
-func TestAllInterceptorsProcessed(t *testing.T) {
+// TestAllRespondersProcessed verifies that after all responders complete,
+// all are in terminal state with no active responder.
+func TestAllRespondersProcessed(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
 	defer closeFn()
@@ -911,8 +937,8 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 	go c.Run(tCtx, 1)
 
 	pod := newTestPod("test-pod")
-	pod.Spec.EvictionInterceptors = []v1.EvictionInterceptor{
-		{Name: "first.example.com"},
+	pod.Spec.EvictionResponders = []v1.EvictionResponder{
+		{Name: "first.example.com/handler"},
 	}
 	pod = createPodAndWait(tCtx, t, cs, ns.Name, pod)
 
@@ -922,15 +948,14 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// completeActiveInterceptor simulates the active interceptor completing.
-	completeActiveInterceptor := func(interceptorName string) {
+	// completeActiveResponder simulates the active responder completing.
+	completeActiveResponder := func(responderName string) {
 		t.Helper()
 		waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 			func(er *coordinationv1alpha1.EvictionRequest) bool {
-				return len(er.Status.ActiveInterceptors) == 1 &&
-					er.Status.ActiveInterceptors[0] == interceptorName
+				return activeResponderName(er.Status.TargetResponders) == responderName
 			},
-			fmt.Sprintf("waiting for %s to become active", interceptorName),
+			fmt.Sprintf("waiting for %s to become active", responderName),
 		)
 
 		now := metav1.Now()
@@ -938,11 +963,11 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to get EvictionRequest: %v", err)
 		}
-		for i := range current.Status.Interceptors {
-			if current.Status.Interceptors[i].Name == interceptorName {
-				current.Status.Interceptors[i].HeartbeatTime = &now
-				current.Status.Interceptors[i].CompletionTime = &now
-				current.Status.Interceptors[i].Message = "done"
+		for i := range current.Status.Responders {
+			if current.Status.Responders[i].Name == responderName {
+				current.Status.Responders[i].HeartbeatTime = &now
+				current.Status.Responders[i].CompletionTime = &now
+				current.Status.Responders[i].Message = "done"
 				break
 			}
 		}
@@ -952,35 +977,42 @@ func TestAllInterceptorsProcessed(t *testing.T) {
 		}
 	}
 
-	completeActiveInterceptor("first.example.com")
-	completeActiveInterceptor(string(coordinationv1alpha1.EvictionInterceptorImperativeEviction))
+	completeActiveResponder("first.example.com/handler")
+	completeActiveResponder(string(coordinationv1alpha1.EvictionResponderImperativeEviction))
 
-	// Wait for all interceptors to be processed
+	// Wait for all responders to reach terminal state
 	final := waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.ProcessedInterceptors) == 2 &&
-				len(er.Status.ActiveInterceptors) == 0
+			completed := 0
+			for _, tr := range er.Status.TargetResponders {
+				if tr.State == coordinationv1alpha1.ResponderStateCompleted {
+					completed++
+				}
+			}
+			return completed == 2 && !hasActiveResponder(er.Status.TargetResponders)
 		},
-		"waiting for all interceptors to be processed",
+		"waiting for all responders to be processed",
 	)
 
-	expectedProcessed := map[string]bool{
-		"first.example.com": false,
-		string(coordinationv1alpha1.EvictionInterceptorImperativeEviction): false,
+	expectedCompleted := map[string]bool{
+		"first.example.com/handler": false,
+		string(coordinationv1alpha1.EvictionResponderImperativeEviction): false,
 	}
-	for _, name := range final.Status.ProcessedInterceptors {
-		expectedProcessed[name] = true
+	for _, tr := range final.Status.TargetResponders {
+		if tr.State == coordinationv1alpha1.ResponderStateCompleted {
+			expectedCompleted[tr.Name] = true
+		}
 	}
-	for name, found := range expectedProcessed {
+	for name, found := range expectedCompleted {
 		if !found {
-			t.Errorf("expected %s in processedInterceptors", name)
+			t.Errorf("expected %s to be Completed", name)
 		}
 	}
 }
 
-// TestRequestersRemovedDuringProcessing verifies that removing all requesters
-// from the spec during active processing causes the EvictionRequest to be Canceled.
-func TestRequestersRemovedDuringProcessing(t *testing.T) {
+// TestRequestersWithdrawnDuringProcessing verifies that withdrawing all requesters
+// during active processing causes the EvictionRequest to be Failed.
+func TestRequestersWithdrawnDuringProcessing(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, c, inf, cs := setup(tCtx, t)
 	defer closeFn()
@@ -1000,20 +1032,22 @@ func TestRequestersRemovedDuringProcessing(t *testing.T) {
 		t.Fatalf("Failed to create EvictionRequest: %v", err)
 	}
 
-	// Wait for controller to process (active interceptor set)
+	// Wait for controller to process (active responder set)
 	waitForEvictionRequestStatus(tCtx, t, cs, ns.Name, string(pod.UID),
 		func(er *coordinationv1alpha1.EvictionRequest) bool {
-			return len(er.Status.ActiveInterceptors) == 1
+			return hasActiveResponder(er.Status.TargetResponders)
 		},
-		"waiting for active interceptor",
+		"waiting for active responder",
 	)
 
-	// Remove all requesters (cancellation signal)
+	// Withdraw all requesters (cancellation signal)
 	current, err := cs.CoordinationV1alpha1().EvictionRequests(ns.Name).Get(tCtx, string(pod.UID), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get EvictionRequest: %v", err)
 	}
-	current.Spec.Requesters = nil
+	for i := range current.Spec.Requesters {
+		current.Spec.Requesters[i].Intent = coordinationv1alpha1.RequesterIntentWithdrawn
+	}
 	_, err = cs.CoordinationV1alpha1().EvictionRequests(ns.Name).Update(tCtx, current, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update EvictionRequest: %v", err)
@@ -1029,6 +1063,6 @@ func TestRequestersRemovedDuringProcessing(t *testing.T) {
 	}
 
 	if meta.IsStatusConditionTrue(updated.Status.Conditions, "Evicted") {
-		t.Error("should not have Evicted condition when requesters are removed")
+		t.Error("should not have Evicted condition when requesters are withdrawn")
 	}
 }
