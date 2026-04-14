@@ -853,7 +853,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// In any case, this scheduling attempt will be moved back to the queue and we should call Done.
+	// In any case, this Pod will be moved back to the queue and we should call Done.
 	defer p.Done(pInfo.Pod.UID)
 
 	pod := pInfo.Pod
