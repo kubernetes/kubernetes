@@ -47,7 +47,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		return nil, err
 	}
 
-	deviceTaintEvictionController := devicetainteviction.New(
+	controller := devicetainteviction.New(
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
@@ -57,7 +57,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		controllerName,
 	)
 	return newControllerLoop(func(ctx context.Context) {
-		if err := deviceTaintEvictionController.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
+		if err := controller.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
 			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
 		}
 		<-ctx.Done()
@@ -81,7 +81,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	ephemeralController, err := resourceclaim.NewController(
+	controller, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -93,7 +93,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
+		controller.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
