@@ -898,29 +898,29 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	expectResult(t, w, results.Success, msg)
 }
 
-// TestProbeFailureEventEmittedBeforeThreshold verifies that when a probe fails
-// but FailureThreshold has not been reached, the probe result remains unchanged
-// and resultRun is incremented correctly, confirming the ignored-failure path.
-func TestProbeFailureEventEmittedBeforeThreshold(t *testing.T) {
+// TestProbeFailureBelowThresholdKeepsResultUnchanged verifies that when a probe
+// fails but FailureThreshold has not been reached, the probe result remains
+// unchanged and resultRun is incremented correctly.
+func TestProbeFailureBelowThresholdKeepsResultUnchanged(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
-	// First failure - below threshold, result should stay Success, event emitted with "1/3"
+	// First failure - below threshold, result should stay Success
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "1st probe failure, below threshold"
 	expectContinue(t, w, w.doProbe(ctx), msg)
-	expectResult(t, w, results.Success, msg) // result unchanged
+	expectResult(t, w, results.Success, msg)
 	if w.resultRun != 1 {
 		t.Errorf("resultRun should be 1, got %d", w.resultRun)
 	}
 
-	// Second failure - still below threshold, result should stay Success, event emitted with "2/3"
+	// Second failure - still below threshold, result should stay Success
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "2nd probe failure, below threshold"
 	expectContinue(t, w, w.doProbe(ctx), msg)
-	expectResult(t, w, results.Success, msg) // result still unchanged
+	expectResult(t, w, results.Success, msg)
 	if w.resultRun != 2 {
 		t.Errorf("resultRun should be 2, got %d", w.resultRun)
 	}
@@ -929,7 +929,7 @@ func TestProbeFailureEventEmittedBeforeThreshold(t *testing.T) {
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "3rd probe failure, threshold reached"
 	expectContinue(t, w, w.doProbe(ctx), msg)
-	expectResult(t, w, results.Failure, msg) // result now changes
+	expectResult(t, w, results.Failure, msg)
 	if w.resultRun != 0 {
 		t.Errorf("resultRun should be reset to 0, got %d", w.resultRun)
 	}
