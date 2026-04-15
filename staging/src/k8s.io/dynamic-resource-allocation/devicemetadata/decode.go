@@ -141,6 +141,7 @@ func readRequestDir(dir string) (*metadata.DeviceMetadata, error) {
 	}
 
 	var merged metadata.DeviceMetadata
+	mergedRequestIndex := map[string]int{}
 	for _, path := range matches {
 		dm, err := readMetadata(path)
 		if err != nil {
@@ -149,7 +150,14 @@ func readRequestDir(dir string) (*metadata.DeviceMetadata, error) {
 		if merged.PodClaimName == nil {
 			merged.PodClaimName = dm.PodClaimName
 		}
-		merged.Requests = append(merged.Requests, dm.Requests...)
+		for _, request := range dm.Requests {
+			if idx, ok := mergedRequestIndex[request.Name]; ok {
+				merged.Requests[idx].Devices = append(merged.Requests[idx].Devices, request.Devices...)
+				continue
+			}
+			mergedRequestIndex[request.Name] = len(merged.Requests)
+			merged.Requests = append(merged.Requests, request)
+		}
 	}
 	return &merged, nil
 }
