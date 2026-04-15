@@ -1153,29 +1153,39 @@ func TestGetRequestCaching(t *testing.T) {
 
 		worker := newWorker(manager, readiness, pod, container)
 
-		worker.initHttpProbeHolder()
-		req, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+		worker.initHttpProbeHolder(&worker.container)
+		req, err := worker.httpProbeRequest.getRequest(fakePodIp)
 
 		if err != nil {
 			t.Errorf("Expect no error, got: %v.", err)
 		}
 
-		req2, err := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+		req2, err := worker.httpProbeRequest.getRequest(fakePodIp)
 
 		if err != nil {
 			t.Errorf("Expect no error, got: %v.", err)
 		}
 
+		// Test caching
 		if req != req2 {
 			t.Errorf("Expected the same request pointer for subsequent calls, but got %p != %p.", req, req2)
 		}
 
+		// Cache invalidation
 		worker.httpProbeRequest.reset()
 
-		req3, _ := worker.httpProbeRequest.getRequest(&worker.container, fakePodIp)
+		req3, _ := worker.httpProbeRequest.getRequest(fakePodIp)
 
+		// Test cache invalidation by httpProbeRequest.reset()
 		if req2 == req3 {
 			t.Errorf("Expected result: %p != %p, but got %p == %p.", req2, req3, req2, req3)
+		}
+
+		// Test cache invalidation by change Pod-IP
+		req4, _ := worker.httpProbeRequest.getRequest(fakePodIp + "updated_podIp")
+
+		if req4 == req3 {
+			t.Errorf("Expected result: %p != %p, but got %p == %p.", req4, req3, req4, req3)
 		}
 
 	})
@@ -1240,8 +1250,8 @@ func TestGetRequest(t *testing.T) {
 
 			worker := newWorker(manager, readiness, pod, container)
 
-			worker.initHttpProbeHolder()
-			req, err := worker.httpProbeRequest.getRequest(&worker.container, c.podIp)
+			worker.initHttpProbeHolder(&worker.container)
+			req, err := worker.httpProbeRequest.getRequest(c.podIp)
 
 			if err != nil && !c.error {
 				t.Errorf("Not expected error: %v", err)

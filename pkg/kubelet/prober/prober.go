@@ -81,7 +81,7 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 }
 
 // probe probes the container.
-func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, req *http.Request) (results.Result, error) {
+func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, attr *probeAttributes) (results.Result, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -100,7 +100,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		return results.Success, nil
 	}
 
-	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, req, maxProbeRetries)
+	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, attr, maxProbeRetries)
 
 	if err != nil {
 		// Handle probe error
@@ -136,7 +136,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, req *http.Request, retries int) (probe.Result, string, error) {
+func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, req *probeAttributes, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
 	var output string
@@ -149,7 +149,7 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, 
 	return result, output, err
 }
 
-func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, req *http.Request) (probe.Result, string, error) {
+func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, attr *probeAttributes) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	switch {
@@ -160,9 +160,17 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 
 	case p.HTTPGet != nil:
 		var err error
+		var req *http.Request
 
-		if req == nil {
+		if attr.HttpRequestCacheHolder == nil {
 			req, err = httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
+		} else {
+			req, err = attr.HttpRequestCacheHolder.getRequest(pod.Status.PodIP)
+
+			if err != nil {
+				logger.V(4).Info("HTTP-Probe failed to get cached request", "error", err)
+				return probe.Unknown, "", err
+			}
 		}
 		if err != nil {
 			// Log and record event for Unknown result
