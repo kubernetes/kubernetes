@@ -297,6 +297,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var initEventCount int
 	var totalEncodeTime time.Duration
+	var totalFlushTime time.Duration
 	var initStart time.Time
 	isInitPhase := true
 
@@ -338,7 +339,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
+				flushStart := time.Now()
 				flusher.Flush()
+				if isInitPhase {
+					totalFlushTime += time.Since(flushStart)
+				}
 			}
 			if isWatchListLatencyRecordingRequired {
 				isInitPhase = false
@@ -349,8 +354,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 				if sendingEvents+setupTime > 37*time.Second {
 					totalTime := setupTime + sendingEvents
-					otherTime := sendingEvents - totalEncodeTime
-					klog.V(2).Infof("TRACE-WATCHLIST %s: events=%d total=%v setup=%v (PnF+watch init) sending=%v (event loop) encode=%v (serialization) other=%v (overhead)", req.URL.Path, initEventCount, totalTime, setupTime, sendingEvents, totalEncodeTime, otherTime)
+					otherTime := sendingEvents - totalEncodeTime - totalFlushTime
+					klog.V(2).Infof("TRACE-WATCHLIST %s: events=%d total=%v setup=%v (PnF+watch init) sending=%v (event loop) encode=%v (%s) network=%v (write) flush=%v other=%v (chan+overhead)", req.URL.Path, initEventCount, totalTime, setupTime, sendingEvents, watchEncoder.serializeTime, s.MediaType, watchEncoder.networkTime, totalFlushTime, otherTime)
 				}
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())

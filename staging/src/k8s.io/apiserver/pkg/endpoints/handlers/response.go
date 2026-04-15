@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -152,6 +153,10 @@ type watchEncoder struct {
 
 	currentEmbeddedIdentifier runtime.Identifier
 	identifiers               map[watch.EventType]runtime.Identifier
+
+	// Accumulated timing for init event analysis.
+	serializeTime time.Duration
+	networkTime   time.Duration
 }
 
 func newWatchEncoder(ctx context.Context, gvr schema.GroupVersionResource, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
@@ -183,6 +188,7 @@ func (e *watchEncoder) Encode(event watch.Event) error {
 func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writer) error {
 	defer e.buffer.Reset()
 
+	serializeStart := time.Now()
 	if err := e.embeddedEncoder.Encode(obj, e.buffer); err != nil {
 		return fmt.Errorf("unable to encode watch object %T: %v", obj, err)
 	}
@@ -197,8 +203,11 @@ func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writ
 	if err := e.encoder.Encode(outEvent, e.eventBuffer); err != nil {
 		return fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e)
 	}
+	e.serializeTime += time.Since(serializeStart)
 
+	networkStart := time.Now()
 	_, err := w.Write(e.eventBuffer.Bytes())
+	e.networkTime += time.Since(networkStart)
 	return err
 }
 
