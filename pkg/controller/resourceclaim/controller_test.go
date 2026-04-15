@@ -704,6 +704,36 @@ func TestSyncHandler(t *testing.T) {
 			}()},
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
+		{
+			name: "flapping-resourceclaim-statuses",
+			pods: func() []*v1.Pod {
+				pod := makePod(testPodName, testNamespace, testPodUID,
+					*makePodResourceClaim("claimA", templateName),
+					*makePodResourceClaim("claimB", templateName),
+				)
+				// Initially only claimA is in status
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
+				}
+				return []*v1.Pod{pod}
+			}(),
+			templates: []*resourceapi.ResourceClaimTemplate{template},
+			claims: []*resourceapi.ResourceClaim{
+				makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
+			},
+			key: podKeyPrefix + testNamespace + "/" + testPodName,
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodName: {
+					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
+					{Name: "claimB", ResourceClaimName: ptr.To("test-pod-claimB--1")},
+				},
+			},
+			expectedClaims: []resourceapi.ResourceClaim{
+				*makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
+				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, className, 1, makeOwnerReference(testPod, true), nil),
+			},
+			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+		},
 	}
 
 	for _, tc := range tests {
@@ -731,6 +761,14 @@ func TestSyncHandler(t *testing.T) {
 					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
 				})
 			}
+			var appliedPatches []string
+			fakeKubeClient.PrependReactor("patch", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				patchAction := action.(k8stesting.PatchAction)
+				if patchAction.GetSubresource() == "status" {
+					appliedPatches = append(appliedPatches, string(patchAction.GetPatch()))
+				}
+				return false, nil, nil
+			})
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
 			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
@@ -778,6 +816,12 @@ func TestSyncHandler(t *testing.T) {
 			}
 			if tc.expectedError != "" {
 				t.Fatalf("expected error, got none")
+			}
+
+			if tc.name == "flapping-resourceclaim-statuses" {
+				assert.Len(t, appliedPatches, 1, "should have applied status once")
+				assert.Contains(t, appliedPatches[0], `"name":"claimA"`, "patch should contain claimA")
+				assert.Contains(t, appliedPatches[0], `"name":"claimB"`, "patch should contain claimB")
 			}
 
 			claims, err := fakeKubeClient.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
