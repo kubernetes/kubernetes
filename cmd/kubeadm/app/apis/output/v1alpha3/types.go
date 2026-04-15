@@ -44,7 +44,7 @@ type Images struct {
 
 // ComponentUpgradePlan represents information about upgrade plan for one component
 type ComponentUpgradePlan struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	Name           string `json:"name"`
 	CurrentVersion string `json:"currentVersion"`
@@ -76,7 +76,7 @@ type ComponentConfigVersionState struct {
 
 // AvailableUpgrade represents information for a single available upgrade.
 type AvailableUpgrade struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	Description string `json:"description"`
 
@@ -88,7 +88,7 @@ type AvailableUpgrade struct {
 // UpgradePlan represents information about upgrade plan for the output
 // produced by 'kubeadm upgrade plan'
 type UpgradePlan struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	AvailableUpgrades []AvailableUpgrade `json:"availableUpgrades,omitempty"`
 
@@ -121,7 +121,7 @@ type Certificate struct {
 
 // CertificateExpirationInfo represents information for the output produced by 'kubeadm certs check-expiration'.
 type CertificateExpirationInfo struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	// Certificates holds a list of certificates to show expiration information for.
 	Certificates []Certificate `json:"certificates"`

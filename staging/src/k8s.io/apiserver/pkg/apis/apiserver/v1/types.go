@@ -54,7 +54,7 @@ type AdmissionPluginConfiguration struct {
 
 // AuthenticationConfiguration provides versioned configuration for authentication.
 type AuthenticationConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	// jwt is a list of authenticator to authenticate Kubernetes users using
 	// JWT compliant tokens. The authenticator will attempt to parse a raw ID token,
@@ -419,7 +419,7 @@ type UserValidationRule struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuthorizationConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	// Authorizers is an ordered list of authorizers to
 	// authorize requests against.
