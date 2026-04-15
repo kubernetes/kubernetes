@@ -383,8 +383,7 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		// skip deep copy for Added events
-		return &watch.Event{Type: watch.Added, Object: event.Object}
+		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
 	case curObjPasses && oldObjPasses:
 		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
