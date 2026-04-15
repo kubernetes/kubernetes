@@ -38,6 +38,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/dump"
 )
 
@@ -385,6 +386,7 @@ func TestNewInformerWatcher(t *testing.T) {
 //
 // Code from @liggitt
 func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	listCalls := 0
 	watchCalls := 0
 	lw := toListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
@@ -402,7 +404,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			return retval, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			w := watch.NewRaceFreeFake()
+			w := watch.NewRaceFreeFakeWithLogger(logger)
 			if options.ResourceVersion == "1" {
 				go func() {
 					// Close with a "Gone" error when trying to start a watch from the first list
