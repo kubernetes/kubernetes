@@ -164,7 +164,7 @@ type execProberAction struct {
 	p         *v1.Probe
 }
 
-func (a *execProberAction) Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (a *execProberAction) Run(ctx context.Context, _ v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
 	logger.V(4).Info("Exec-Probe runProbe", "pod", klog.KObj(a.pod), "containerName", a.container.Name, "execCommand", a.p.Exec.Command)
@@ -182,7 +182,7 @@ type httpProberAction struct {
 	req *http.Request
 }
 
-func (a *httpProberAction) Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (a *httpProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
 
@@ -200,7 +200,7 @@ func (a *httpProberAction) Run(ctx context.Context, status v1.PodStatus, contain
 		}
 	}
 
-	if loggerV4 := logger.V(4); logger.Enabled() {
+	if loggerV4 := logger.V(4); loggerV4.Enabled() {
 		port := req.URL.Port()
 		host := req.URL.Hostname()
 		path := req.URL.Path
@@ -219,7 +219,7 @@ type tcpProberAction struct {
 	p         *v1.Probe
 }
 
-func (a *tcpProberAction) Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (a *tcpProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
 	port, err := probe.ResolveContainerPort(a.p.TCPSocket.Port, &a.container)
@@ -240,7 +240,7 @@ type grpcProberAction struct {
 	p  *v1.Probe
 }
 
-func (a *grpcProberAction) Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (a *grpcProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
 	host := status.PodIP
@@ -257,7 +257,7 @@ type unknownProberAction struct {
 	container v1.Container
 }
 
-func (a *unknownProberAction) Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (a *unknownProberAction) Run(ctx context.Context, _ v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Failed to find probe builder for container", "containerName", a.container.Name)
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(a.pod), a.container.Name)
