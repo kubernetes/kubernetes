@@ -269,7 +269,7 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, action ProberAction, 
 	var err error
 	var result probe.Result
 	var output string
-	for i := 0; i < retries; i++ {
+	for i := range retries {
 		result, output, err = action.Run(ctx, status, containerID)
 		if err == nil {
 			return result, output, nil
