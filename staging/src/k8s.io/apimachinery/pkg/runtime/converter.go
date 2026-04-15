@@ -376,6 +376,10 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	// Cache miss - we need to compute the field name.
 	info := &fieldInfo{}
 	typeField := structType.Field(field)
+	if fieldShouldBeIgnored(typeField) {
+		info.name = "-"
+		return addFieldInfoToCache(structType, field, info)
+	}
 	jsonTag, exists := typeField.Tag.Lookup("json")
 	if !exists || len(jsonTag) == 0 {
 		if !typeField.Anonymous {
@@ -401,9 +405,27 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	}
 	info.nameValue = reflect.ValueOf(info.name)
 
+	return addFieldInfoToCache(structType, field, info)
+}
+
+func fieldShouldBeIgnored(typeField reflect.StructField) bool {
+	if typeField.Anonymous {
+		t := typeField.Type
+		if t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		// Match encoding/json: embedded unexported struct fields may still contribute
+		// exported fields, but other unexported embedded fields are ignored.
+		return !typeField.IsExported() && t.Kind() != reflect.Struct
+	}
+
+	return !typeField.IsExported()
+}
+
+func addFieldInfoToCache(structType reflect.Type, field int, info *fieldInfo) *fieldInfo {
 	fieldCache.Lock()
 	defer fieldCache.Unlock()
-	fieldCacheMap = fieldCache.value.Load().(fieldsCacheMap)
+	fieldCacheMap := fieldCache.value.Load().(fieldsCacheMap)
 	newFieldCacheMap := make(fieldsCacheMap)
 	for k, v := range fieldCacheMap {
 		newFieldCacheMap[k] = v
@@ -535,6 +557,9 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 		fieldInfo := fieldInfoFromField(dt, i)
 		fv := dv.Field(i)
 
+		if fieldInfo.name == "-" {
+			continue
+		}
 		if len(fieldInfo.name) == 0 {
 			// This field is inlined, recurse into fromUnstructured again
 			// with the same set of matched keys.
