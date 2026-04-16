@@ -82,7 +82,7 @@ __EOF__
 
   ### Test execute with pod and container before dash separator
   output_message=$(! kubectl exec -it pod-test -c container-a -- echo "test" 2>&1)
-  kube::test::if_has_not_string "${output_message}" 'exec [POD] [COMMAND] is not supported anymore'
+  kube::test::if_has_not_string "${output_message}" 'exec \[POD\] \[COMMAND\] is not supported anymore'
   kube::test::if_has_not_string "${output_message}" 'container container-a is not valid for pod pod-test'
   kube::test::if_has_not_string "${output_message}" 'pods "pod-test" not found'
 
