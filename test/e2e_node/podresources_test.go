@@ -2044,13 +2044,13 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				"kubelet_pod_resources_endpoint_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSampleAtLeast(1),
 				}),
-				"kubelet_pod_resources_endpoint_requests_list": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+				"kubelet_pod_resources_endpoint_requests_list_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSampleAtLeast(1),
 				}),
-				"kubelet_pod_resources_endpoint_requests_get_allocatable": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+				"kubelet_pod_resources_endpoint_requests_get_allocatable_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSampleAtLeast(1),
 				}),
-				"kubelet_pod_resources_endpoint_requests_get": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+				"kubelet_pod_resources_endpoint_requests_get_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSampleAtLeast(1),
 				}),
 				// not checking errors: the calls don't have non-catastrophic (e.g. out of memory) error conditions yet.

@@ -3414,7 +3414,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: client_expiration_renew_errors
+- name: client_expiration_renew_errors_total
   subsystem: certificate_manager
   namespace: kubelet
   help: Counter of certificate renewal errors.
@@ -3463,6 +3463,173 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: kubelet_credential_provider_config_info
+  help: Information about the last applied credential provider configuration with
+    hash as label
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - hash
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: credential_provider_plugin_duration
+  subsystem: kubelet
+  help: Duration of execution in seconds for credential provider plugin
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: credential_provider_plugin_errors_total
+  subsystem: kubelet
+  help: Number of errors from credential provider plugin
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: server_expiration_renew_errors_total
+  subsystem: kubelet
+  help: Counter of certificate renewal errors.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: container_swap_limit_bytes
+  help: Current amount of the container swap limit in bytes. Reported only on non-windows
+    systems
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/resource
+- name: container_swap_usage_bytes
+  help: Current amount of the container swap usage in bytes. Reported only on non-windows
+    systems
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/resource
+- name: grpc_operations_duration_seconds
+  subsystem: dra
+  help: Duration in seconds of the DRA gRPC operations
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  - grpc_status_code
+  - method_name
+  buckets:
+  - 0.1
+  - 0.1534127404634391
+  - 0.23535468936502524
+  - 0.36106407876409946
+  - 0.5539182980610752
+  - 0.849781240983936
+  - 1.303672689737678
+  - 1.9999999999999993
+  - 3.0682548092687805
+  - 4.7070937873005025
+  - 7.221281575281985
+  - 11.078365961221499
+  - 16.995624819678714
+  - 26.07345379475354
+  - 39.99999999999997
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: operations_duration_seconds
+  subsystem: dra
+  help: Latency histogram in seconds for the duration of handling all ResourceClaims
+    referenced by a pod when the pod starts or stops. Identified by the name of the
+    operation (PrepareResources or UnprepareResources) and separated by the success
+    of the operation. The number of failed operations is provided through the histogram's
+    overall count.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - is_error
+  - operation_name
+  buckets:
+  - 0.1
+  - 0.1534127404634391
+  - 0.23535468936502524
+  - 0.36106407876409946
+  - 0.5539182980610752
+  - 0.849781240983936
+  - 1.303672689737678
+  - 1.9999999999999993
+  - 3.0682548092687805
+  - 4.7070937873005025
+  - 7.221281575281985
+  - 11.078365961221499
+  - 16.995624819678714
+  - 26.07345379475354
+  - 39.99999999999997
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: dra_resource_claims_in_use
+  help: The number of ResourceClaims that are currently in use on the node, by driver
+    name (driver_name label value) and across all drivers (special value <any> for
+    driver_name). Note that the sum of all by-driver counts is not the total number
+    of in-use ResourceClaims because the same ResourceClaim might use devices from
+    different drivers. Instead, use the count for the <any> driver_name.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: active_pods
+  subsystem: kubelet
+  help: The number of pods the kubelet considers active and which are being considered
+    when admitting new pods. static is true if the pod is not from the apiserver.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - static
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: admission_rejections_total
+  subsystem: kubelet
+  help: Cumulative number pod admission rejections by the Kubelet.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - reason
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: cgroup_manager_duration_seconds
   subsystem: kubelet
   help: Duration in seconds for cgroup manager operations. Broken down by method.
@@ -3493,7 +3660,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: container_aligned_compute_resources_count
+- name: container_aligned_compute_resources_total
   subsystem: kubelet
   help: Cumulative number of aligned compute resources allocated to containers by
     alignment type.
@@ -3505,7 +3672,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: container_aligned_compute_resources_failure_count
+- name: container_aligned_compute_resources_failure_total
   subsystem: kubelet
   help: Cumulative number of failures to allocate aligned compute resources to containers
     by alignment type.
@@ -3568,7 +3735,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: cpu_manager_exclusive_cpu_allocation_count
+- name: cpu_manager_exclusive_cpu_allocated
   subsystem: kubelet
   help: The total number of CPUs exclusively allocated to containers running on this
     node
@@ -3728,7 +3895,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: evented_pleg_connection_success_count
+- name: evented_pleg_connection_success_total
   subsystem: kubelet
   help: The number of times a streaming client was obtained to receive CRI Events.
   type: Counter
@@ -4081,7 +4248,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pleg_discard_events
+- name: pleg_discard_events_total
   subsystem: kubelet
   help: The number of discard events in PLEG.
   type: Counter
@@ -4220,7 +4387,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_errors_get
+- name: pod_resources_endpoint_errors_get_total
   subsystem: kubelet
   help: Number of requests to the PodResource Get endpoint which returned error. Broken
     down by server api version.
@@ -4231,7 +4398,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_errors_get_allocatable
+- name: pod_resources_endpoint_errors_get_allocatable_total
   subsystem: kubelet
   help: Number of requests to the PodResource GetAllocatableResources endpoint which
     returned error. Broken down by server api version.
@@ -4242,7 +4409,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_errors_list
+- name: pod_resources_endpoint_errors_list_total
   subsystem: kubelet
   help: Number of requests to the PodResource List endpoint which returned error.
     Broken down by server api version.
@@ -4253,7 +4420,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_requests_get
+- name: pod_resources_endpoint_requests_get_total
   subsystem: kubelet
   help: Number of requests to the PodResource Get endpoint. Broken down by server
     api version.
@@ -4264,7 +4431,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_requests_get_allocatable
+- name: pod_resources_endpoint_requests_get_allocatable_total
   subsystem: kubelet
   help: Number of requests to the PodResource GetAllocatableResources endpoint. Broken
     down by server api version.
@@ -4275,7 +4442,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_resources_endpoint_requests_list
+- name: pod_resources_endpoint_requests_list_total
   subsystem: kubelet
   help: Number of requests to the PodResource List endpoint. Broken down by server
     api version.
@@ -4488,7 +4655,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: preemptions
+- name: preemptions_total
   subsystem: kubelet
   help: Cumulative number of pod preemptions by preemption resource
   type: Counter
@@ -4711,9 +4878,9 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: topology_manager_admission_duration_ms
+- name: topology_manager_admission_duration_seconds
   subsystem: kubelet
-  help: Duration in milliseconds to serve a pod admission request.
+  help: Duration in seconds to serve a pod admission request.
   type: Histogram
   stabilityLevel: ALPHA
   buckets:
