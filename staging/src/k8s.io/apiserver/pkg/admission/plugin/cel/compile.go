@@ -231,14 +231,14 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 			var err error
 			{
 				decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}
-				envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				envs[decl], err = CreateEnvForOpts(baseEnv, namespaceType, requestType, decl)
 				if err != nil {
 					panic(err)
 				}
 			}
 			{
 				decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer, HasPatchTypes: true}
-				envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				envs[decl], err = CreateEnvForOpts(baseEnv, namespaceType, requestType, decl)
 				if err != nil {
 					panic(err)
 				}
@@ -248,7 +248,7 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 	return envs
 }
 
-func createEnvForOpts(baseEnv *environment.EnvSet, namespaceType *apiservercel.DeclType, requestType *apiservercel.DeclType, opts OptionalVariableDeclarations) (*environment.EnvSet, error) {
+func CreateEnvForOpts(baseEnv *environment.EnvSet, namespaceType *apiservercel.DeclType, requestType *apiservercel.DeclType, opts OptionalVariableDeclarations) (*environment.EnvSet, error) {
 	var envOpts []cel.EnvOption
 	envOpts = append(envOpts,
 		cel.Variable(ObjectVarName, cel.DynType),
