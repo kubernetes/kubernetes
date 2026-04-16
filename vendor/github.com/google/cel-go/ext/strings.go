@@ -303,8 +303,9 @@ func Strings(options ...StringsOption) cel.EnvOption {
 }
 
 type stringLib struct {
-	locale  string
-	version uint32
+	locale       string
+	version      uint32
+	maxPrecision int
 }
 
 // LibraryName implements the SingletonLibrary interface method.
@@ -350,6 +351,16 @@ func StringsVersion(version uint32) StringsOption {
 func StringsValidateFormatCalls(value bool) StringsOption {
 	return func(s *stringLib) *stringLib {
 		return s
+	}
+}
+
+// StringsMaxPrecision configures the maximum precision for floating-point format clauses.
+//
+// If not set, the default is 100 for version >= 5, and no limit for earlier versions.
+func StringsMaxPrecision(limit int) StringsOption {
+	return func(lib *stringLib) *stringLib {
+		lib.maxPrecision = limit
+		return lib
 	}
 }
 
@@ -470,6 +481,13 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					return stringOrError(upperASCII(string(s)))
 				}))),
 	}
+	// maxPrecision is unbounded (0) for versions < 5 to maintain backward
+	// compatibility. For version >= 5, the default is 100 if not explicitly
+	// configured via StringsMaxPrecision().
+	maxPrecision := lib.maxPrecision
+	if maxPrecision == 0 && lib.version >= 5 {
+		maxPrecision = 100
+	}
 	if lib.version >= 1 {
 		if lib.version >= 4 {
 			opts = append(opts, cel.Function("format",
@@ -477,7 +495,7 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 						s := string(args[0].(types.String))
 						formatArgs := args[1].(traits.Lister)
-						return stringOrError(parseFormatStringV2(s, &stringFormatterV2{}, &stringArgList{formatArgs}))
+						return stringOrError(parseFormatStringV2(s, &stringFormatterV2{}, &stringArgList{formatArgs}, maxPrecision))
 					}))))
 		} else {
 			opts = append(opts, cel.Function("format",
@@ -485,7 +503,7 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 						s := string(args[0].(types.String))
 						formatArgs := args[1].(traits.Lister)
-						return stringOrError(parseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale))
+						return stringOrError(parseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale, maxPrecision))
 					}))))
 		}
 		opts = append(opts,
@@ -544,9 +562,9 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 	}
 	if lib.version >= 1 {
 		if lib.version >= 4 {
-			opts = append(opts, cel.ASTValidators(stringFormatValidatorV2{}))
+			opts = append(opts, cel.ASTValidators(stringFormatValidatorV2{maxPrecision: maxPrecision}))
 		} else {
-			opts = append(opts, cel.ASTValidators(stringFormatValidator{}))
+			opts = append(opts, cel.ASTValidators(stringFormatValidator{maxPrecision: maxPrecision}))
 		}
 	}
 	return opts

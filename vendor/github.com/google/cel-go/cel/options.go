@@ -71,12 +71,16 @@ const (
 
 	// Enable escape syntax for field identifiers (`).
 	featureIdentEscapeSyntax
+
+	// Enable accessing fields by JSON names within protobuf messages
+	featureJSONFieldNames
 )
 
 var featureIDsToNames = map[int]string{
 	featureEnableMacroCallTracking:     "cel.feature.macro_call_tracking",
 	featureCrossTypeNumericComparisons: "cel.feature.cross_type_numeric_comparisons",
 	featureIdentEscapeSyntax:           "cel.feature.backtick_escape_syntax",
+	featureJSONFieldNames:              "cel.feature.json_field_names",
 }
 
 func featureNameByID(id int) (string, bool) {
@@ -91,6 +95,40 @@ func featureIDByName(name string) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// limitID is used as a key for configurable limits. These are options that
+// support exporting to YAML environment config.
+type limitID int
+
+const (
+	_ = limitID(iota)
+	// The number of recursive calls permitted in parsing.
+	limitParseRecursionDepth
+	// The number of code points permitted in an input expression string.
+	limitCodePointSize
+	// The number of attempts to recover from a parse error.
+	limitParseErrorRecovery
+)
+
+var limitIDsToNames = map[limitID]string{
+	limitCodePointSize:       "cel.limit.expression_code_points",
+	limitParseErrorRecovery:  "cel.limit.parse_error_recovery",
+	limitParseRecursionDepth: "cel.limit.parse_recursion_depth",
+}
+
+func limitNameByID(id limitID) (string, bool) {
+	v, ok := limitIDsToNames[id]
+	return v, ok
+}
+
+func limitIDByName(name string) (limitID, bool) {
+	for k, v := range limitIDsToNames {
+		if v == name {
+			return k, true
+		}
+	}
+	return limitID(0), false
 }
 
 // EnvOption is a functional interface for configuring the environment.
@@ -275,9 +313,9 @@ func Abbrevs(qualifiedNames ...string) EnvOption {
 	}
 }
 
-// customTypeRegistry is an internal-only interface containing the minimum methods required to support
+// protoTypeRegistry is an internal-only interface containing the minimum methods required to support
 // custom types. It is a subset of methods from ref.TypeRegistry.
-type customTypeRegistry interface {
+type protoTypeRegistry interface {
 	RegisterDescriptor(protoreflect.FileDescriptor) error
 	RegisterType(...ref.Type) error
 }
@@ -294,7 +332,7 @@ type customTypeRegistry interface {
 // Note: This option must be specified after the CustomTypeProvider option when used together.
 func Types(addTypes ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		reg, isReg := e.provider.(customTypeRegistry)
+		reg, isReg := e.provider.(protoTypeRegistry)
 		if !isReg {
 			return nil, fmt.Errorf("custom types not supported by provider: %T", e.provider)
 		}
@@ -331,7 +369,7 @@ func Types(addTypes ...any) EnvOption {
 // extension or by re-using the same EnvOption with another NewEnv() call.
 func TypeDescs(descs ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		reg, isReg := e.provider.(customTypeRegistry)
+		reg, isReg := e.provider.(protoTypeRegistry)
 		if !isReg {
 			return nil, fmt.Errorf("custom types not supported by provider: %T", e.provider)
 		}
@@ -379,7 +417,7 @@ func TypeDescs(descs ...any) EnvOption {
 	}
 }
 
-func registerFileSet(reg customTypeRegistry, fileSet *descpb.FileDescriptorSet) error {
+func registerFileSet(reg protoTypeRegistry, fileSet *descpb.FileDescriptorSet) error {
 	files, err := protodesc.NewFiles(fileSet)
 	if err != nil {
 		return fmt.Errorf("protodesc.NewFiles(%v) failed: %v", fileSet, err)
@@ -387,13 +425,22 @@ func registerFileSet(reg customTypeRegistry, fileSet *descpb.FileDescriptorSet) 
 	return registerFiles(reg, files)
 }
 
-func registerFiles(reg customTypeRegistry, files *protoregistry.Files) error {
+func registerFiles(reg protoTypeRegistry, files *protoregistry.Files) error {
 	var err error
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		err = reg.RegisterDescriptor(fd)
 		return err == nil
 	})
 	return err
+}
+
+// JSONFieldNames supports accessing protocol buffer fields by json-name.
+//
+// Enabling JSON field name support will create a copy of the types.Registry with fields indexed
+// by JSON name, and whether JSON name or Proto-style names are supported will be inferred from
+// the AST extensions metadata.
+func JSONFieldNames(enabled bool) EnvOption {
+	return features(featureJSONFieldNames, enabled)
 }
 
 // ProgramOption is a functional interface for configuring evaluation bindings and behaviors.
@@ -523,6 +570,17 @@ func configToEnvOptions(config *env.Config, provider types.Provider, optFactorie
 		envOpts = append(envOpts, Abbrevs(imp.Name))
 	}
 
+	// Configure features and common limits.
+	for _, feat := range config.Features {
+		// Note, if a feature is not found, it is skipped as it is possible the feature
+		// is not intended to be supported publicly. In the future, a refinement of
+		// to this strategy to report unrecognized features and validators should probably
+		// be covered as a standard ConfigOptionFactory
+		if id, found := featureIDByName(feat.Name); found {
+			envOpts = append(envOpts, features(id, feat.Enabled))
+		}
+	}
+
 	// Configure the context variable declaration
 	if config.ContextVariable != nil {
 		typeName := config.ContextVariable.TypeName
@@ -564,14 +622,9 @@ func configToEnvOptions(config *env.Config, provider types.Provider, optFactorie
 		envOpts = append(envOpts, FunctionDecls(funcs...))
 	}
 
-	// Configure features
-	for _, feat := range config.Features {
-		// Note, if a feature is not found, it is skipped as it is possible the feature
-		// is not intended to be supported publicly. In the future, a refinement of
-		// to this strategy to report unrecognized features and validators should probably
-		// be covered as a standard ConfigOptionFactory
-		if id, found := featureIDByName(feat.Name); found {
-			envOpts = append(envOpts, features(id, feat.Enabled))
+	for _, limit := range config.Limits {
+		if id, found := limitIDByName(limit.Name); found {
+			envOpts = append(envOpts, setLimit(id, limit.Value))
 		}
 	}
 
@@ -727,8 +780,11 @@ func fieldToCELType(field protoreflect.FieldDescriptor) (*Type, error) {
 	return nil, fmt.Errorf("field %s type %s not implemented", field.FullName(), field.Kind().String())
 }
 
-func fieldToVariable(field protoreflect.FieldDescriptor) (*decls.VariableDecl, error) {
+func fieldToVariable(field protoreflect.FieldDescriptor, jsonFieldNames bool) (*decls.VariableDecl, error) {
 	name := string(field.Name())
+	if jsonFieldNames {
+		name = field.JSONName()
+	}
 	if field.IsMap() {
 		mapKey := field.MapKey()
 		mapValue := field.MapValue()
@@ -759,6 +815,8 @@ func fieldToVariable(field protoreflect.FieldDescriptor) (*decls.VariableDecl, e
 // DeclareContextProto returns an option to extend CEL environment with declarations from the given context proto.
 // Each field of the proto defines a variable of the same name in the environment.
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#evaluation-environment
+//
+// If using JSONFieldNames(), ensure that the option is set before DeclareContextProto is provided.
 func DeclareContextProto(descriptor protoreflect.MessageDescriptor) EnvOption {
 	return func(e *Env) (*Env, error) {
 		if e.contextProto != nil {
@@ -768,9 +826,10 @@ func DeclareContextProto(descriptor protoreflect.MessageDescriptor) EnvOption {
 		e.contextProto = descriptor
 		fields := descriptor.Fields()
 		vars := make([]*decls.VariableDecl, 0, fields.Len())
+		jsonFieldNames := e.HasFeature(featureJSONFieldNames)
 		for i := 0; i < fields.Len(); i++ {
 			field := fields.Get(i)
-			variable, err := fieldToVariable(field)
+			variable, err := fieldToVariable(field, jsonFieldNames)
 			if err != nil {
 				return nil, err
 			}
@@ -789,11 +848,15 @@ func DeclareContextProto(descriptor protoreflect.MessageDescriptor) EnvOption {
 //
 // Consider using with `DeclareContextProto` to simplify variable type declarations and publishing when using
 // protocol buffers.
-func ContextProtoVars(ctx proto.Message) (Activation, error) {
+//
+// Use the types.JSONFieldNames(true) option to populate the context proto vars using the JSON field names.
+func ContextProtoVars(ctx proto.Message, opts ...types.RegistryOption) (Activation, error) {
 	if ctx == nil || !ctx.ProtoReflect().IsValid() {
 		return interpreter.EmptyActivation(), nil
 	}
-	reg, err := types.NewRegistry(ctx)
+	regOpts := []types.RegistryOption{types.ProtoTypeDefs(ctx)}
+	regOpts = append(regOpts, opts...)
+	reg, err := types.NewProtoRegistry(regOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -803,15 +866,19 @@ func ContextProtoVars(ctx proto.Message) (Activation, error) {
 	vars := make(map[string]any, fields.Len())
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		sft, found := reg.FindStructFieldType(typeName, field.TextName())
+		fieldName := field.TextName()
+		if reg.JSONFieldNames() {
+			fieldName = field.JSONName()
+		}
+		sft, found := reg.FindStructFieldType(typeName, fieldName)
 		if !found {
-			return nil, fmt.Errorf("no such field: %s", field.TextName())
+			return nil, fmt.Errorf("no such field: %s", fieldName)
 		}
 		fieldVal, err := sft.GetFrom(ctx)
 		if err != nil {
 			return nil, err
 		}
-		vars[field.TextName()] = fieldVal
+		vars[fieldName] = fieldVal
 	}
 	return NewActivation(vars)
 }
@@ -847,22 +914,32 @@ func features(flag int, enabled bool) EnvOption {
 	}
 }
 
-// ParserRecursionLimit adjusts the AST depth the parser will tolerate.
-// Defaults defined in the parser package.
-func ParserRecursionLimit(limit int) EnvOption {
+func setLimit(id limitID, limit int) EnvOption {
+	if limit < 0 {
+		limit = -1
+	}
 	return func(e *Env) (*Env, error) {
-		e.prsrOpts = append(e.prsrOpts, parser.MaxRecursionDepth(limit))
+		e.limits[id] = limit
 		return e, nil
 	}
 }
 
-// ParserExpressionSizeLimit adjusts the number of code points the expression parser is allowed to parse.
+// ParserRecursionLimit adjusts the AST depth the parser will tolerate.
 // Defaults defined in the parser package.
+func ParserRecursionLimit(limit int) EnvOption {
+	return setLimit(limitParseRecursionDepth, limit)
+}
+
+// ParserErrorRecoveryLimit sets the number of attemtps the parser will take
+// to recover after encountering an error.
+func ParserErrorRecoveryLimit(limit int) EnvOption {
+	return setLimit(limitParseErrorRecovery, limit)
+}
+
+// ParserExpressionSizeLimit adjusts the number of code points the expression parser is allowed to parse.
+// Defaults are defined in the parser package. A negative value means unbounded.
 func ParserExpressionSizeLimit(limit int) EnvOption {
-	return func(e *Env) (*Env, error) {
-		e.prsrOpts = append(e.prsrOpts, parser.ExpressionSizeCodePointLimit(limit))
-		return e, nil
-	}
+	return setLimit(limitCodePointSize, limit)
 }
 
 // EnableHiddenAccumulatorName sets the parser to use the identifier '@result' for accumulators

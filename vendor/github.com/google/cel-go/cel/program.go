@@ -16,10 +16,12 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/functions"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
@@ -191,16 +193,25 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 		}
 	}
 
+	e.funcBindOnce.Do(func() {
+		var bindings []*functions.Overload
+		e.functionBindings = []*functions.Overload{}
+		for _, fn := range e.functions {
+			bindings, err = fn.Bindings()
+			if err != nil {
+				return
+			}
+			e.functionBindings = append(e.functionBindings, bindings...)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// Add the function bindings created via Function() options.
-	for _, fn := range e.functions {
-		bindings, err := fn.Bindings()
-		if err != nil {
-			return nil, err
-		}
-		err = disp.Add(bindings...)
-		if err != nil {
-			return nil, err
-		}
+	err = disp.Add(e.functionBindings...)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set the attribute factory after the options have been set.
@@ -208,6 +219,12 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 	attrFactorOpts := []interpreter.AttrFactoryOption{
 		interpreter.EnableErrorOnBadPresenceTest(p.HasFeature(featureEnableErrorOnBadPresenceTest)),
 	}
+	if a.SourceInfo().HasExtension("json_name", ast.NewExtensionVersion(1, 1)) {
+		if !e.HasFeature(featureJSONFieldNames) {
+			return nil, errors.New("the AST extension 'json_name' requires the option cel.JSONFieldNames(true)")
+		}
+	}
+	// Configure the type provider, considering whether the AST indicates whether it supports JSON field names
 	if p.evalOpts&OptPartialEval == OptPartialEval {
 		attrFactory = interpreter.NewPartialAttributeFactory(e.Container, e.adapter, e.provider, attrFactorOpts...)
 	} else {
@@ -351,7 +368,11 @@ func (p *prog) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetail
 	default:
 		return nil, nil, fmt.Errorf("invalid input, wanted Activation or map[string]any, got: (%T)%v", input, input)
 	}
-	return p.Eval(vars)
+	out, det, err := p.Eval(vars)
+	if err != nil && errors.Is(err, interpreter.InterruptError{}) {
+		return out, det, context.Cause(ctx)
+	}
+	return out, det, err
 }
 
 type ctxEvalActivation struct {

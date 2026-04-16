@@ -71,7 +71,7 @@ func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (any, error) {
 			return srcPB, nil
 		}
 		return anypb.New(srcPB)
-	case jsonValueType:
+	case JSONValueType:
 		// Marshal the proto to JSON first, and then rehydrate as protobuf.Value as there is no
 		// support for direct conversion from proto.Message to protobuf.Value.
 		bytes, err := protojson.Marshal(srcPB)
@@ -187,8 +187,14 @@ func (o *protoObj) format(sb *strings.Builder) {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(fmt.Sprintf("%s: ", field.Name()))
-		formatTo(sb, o.Get(String(field.Name())))
+		name := String(field.Name())
+		if field.IsExtension() {
+			name = String(field.FullName())
+			fmt.Fprintf(sb, "`%s`: ", name)
+		} else {
+			fmt.Fprintf(sb, "%s: ", name)
+		}
+		formatTo(sb, o.Get(name))
 	}
 	sb.WriteString("}")
 }

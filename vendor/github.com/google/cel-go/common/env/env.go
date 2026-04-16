@@ -50,6 +50,7 @@ type Config struct {
 	Functions       []*Function      `yaml:"functions,omitempty"`
 	Validators      []*Validator     `yaml:"validators,omitempty"`
 	Features        []*Feature       `yaml:"features,omitempty"`
+	Limits          []*Limit         `yaml:"limits,omitempty"`
 }
 
 // Validate validates the whole configuration is well-formed.
@@ -92,6 +93,11 @@ func (c *Config) Validate() error {
 			errs = append(errs, err)
 		}
 	}
+	for _, limit := range c.Limits {
+		if err := limit.Validate(); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	for _, val := range c.Validators {
 		if err := val.Validate(); err != nil {
 			errs = append(errs, err)
@@ -122,7 +128,7 @@ func (c *Config) AddVariableDecls(vars ...*decls.VariableDecl) *Config {
 	return c.AddVariables(convVars...)
 }
 
-// AddVariables adds one or more vairables to the config.
+// AddVariables adds one or more variables to the config.
 func (c *Config) AddVariables(vars ...*Variable) *Config {
 	c.Variables = append(c.Variables, vars...)
 	return c
@@ -203,6 +209,12 @@ func (c *Config) AddValidators(vals ...*Validator) *Config {
 // AddFeatures appends one or more features to the config.
 func (c *Config) AddFeatures(feats ...*Feature) *Config {
 	c.Features = append(c.Features, feats...)
+	return c
+}
+
+// AddLimits appends one or more limits to the config.
+func (c *Config) AddLimits(limits ...*Limit) *Config {
+	c.Limits = append(c.Limits, limits...)
 	return c
 }
 
@@ -734,6 +746,29 @@ func (feat *Feature) Validate() error {
 	return nil
 }
 
+// Limit represents a named limit in the CEL environment. This is used to control
+// the complexity tolerated before failing parsing, type checking, or planning.
+type Limit struct {
+	Name  string `yaml:"name"`
+	Value int    `yaml:"value"`
+}
+
+// NewLimit creates a new limit.
+func NewLimit(name string, value int) *Limit {
+	return &Limit{name, value}
+}
+
+// Validate validates a limit.
+func (l *Limit) Validate() error {
+	if l == nil {
+		return errors.New("invalid limit: nil")
+	}
+	if l.Name == "" {
+		return errors.New("invalid limit: missing name")
+	}
+	return nil
+}
+
 // NewTypeDesc describes a simple or complex type with parameters.
 func NewTypeDesc(typeName string, params ...*TypeDesc) *TypeDesc {
 	return &TypeDesc{TypeName: typeName, Params: params}
@@ -796,6 +831,14 @@ func (td *TypeDesc) Validate() error {
 			return fmt.Errorf("invalid type: optional_type expects 1 parameter, got %d", len(td.Params))
 		}
 		return td.Params[0].Validate()
+	case "type":
+		if len(td.Params) == 0 {
+			return nil
+		}
+		if len(td.Params) != 1 {
+			return fmt.Errorf("invalid type: type expects 0 or 1 parameters, got %d", len(td.Params))
+		}
+		return td.Params[0].Validate()
 	default:
 	}
 	return nil
@@ -832,6 +875,15 @@ func (td *TypeDesc) AsCELType(tp types.Provider) (*types.Type, error) {
 			return nil, err
 		}
 		return types.NewOptionalType(et), nil
+	case "type":
+		if len(td.Params) == 0 {
+			return types.TypeType, nil
+		}
+		pt, err := td.Params[0].AsCELType(tp)
+		if err != nil {
+			return nil, err
+		}
+		return types.NewTypeTypeWithParam(pt), nil
 	default:
 		if td.IsTypeParam {
 			return types.NewTypeParamType(td.TypeName), nil

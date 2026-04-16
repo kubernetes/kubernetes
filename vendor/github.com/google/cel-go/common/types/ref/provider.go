@@ -93,6 +93,9 @@ type FieldType struct {
 
 	// GetFrom retrieves the field value on the input object, if set.
 	GetFrom FieldGetter
+
+	// IsJSONFIeld indicates that the field was accessed via its JSON name.
+	IsJSONField bool
 }
 
 // FieldTester is used to test field presence on an input object.
