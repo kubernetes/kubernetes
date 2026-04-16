@@ -35,12 +35,12 @@ const (
 	CgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey  = "pod_worker_start_duration_seconds"
 	PLEGRelistDurationKey      = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey       = "pleg_discard_events"
+	PLEGDiscardEventsKey       = "pleg_discard_events_total"
 	PLEGRelistIntervalKey      = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey            = "pleg_last_seen_seconds"
 	EvictionsKey               = "evictions"
 	EvictionStatsAgeKey        = "eviction_stats_age_seconds"
-	PreemptionsKey             = "preemptions"
+	PreemptionsKey             = "preemptions_total"
 	RunningPodsKey             = "running_pods"
 	RunningContainersKey       = "running_containers"
 	// Metrics keys of remote runtime operations
@@ -52,10 +52,10 @@ const (
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
 	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
-	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
-	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
-	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
-	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list_total"
+	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable_total"
+	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list_total"
+	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable_total"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"

@@ -48,16 +48,16 @@ const (
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey               = "pleg_discard_events"
+	PLEGDiscardEventsKey               = "pleg_discard_events_total"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
 	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"
 	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
-	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
+	EventedPLEGConnKey                 = "evented_pleg_connection_success_total"
 	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
-	EvictionsKey                       = "evictions"
+	EvictionsKey                       = "evictions_total"
 	EvictionStatsAgeKey                = "eviction_stats_age_seconds"
-	PreemptionsKey                     = "preemptions"
+	PreemptionsKey                     = "preemptions_total"
 	VolumeStatsCapacityBytesKey        = "volume_stats_capacity_bytes"
 	VolumeStatsAvailableBytesKey       = "volume_stats_available_bytes"
 	VolumeStatsUsedBytesKey            = "volume_stats_used_bytes"
@@ -86,12 +86,12 @@ const (
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
 	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
-	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
-	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
-	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
-	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
-	PodResourcesEndpointRequestsGetKey            = "pod_resources_endpoint_requests_get"
-	PodResourcesEndpointErrorsGetKey              = "pod_resources_endpoint_errors_get"
+	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list_total"
+	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable_total"
+	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list_total"
+	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable_total"
+	PodResourcesEndpointRequestsGetKey            = "pod_resources_endpoint_requests_get_total"
+	PodResourcesEndpointErrorsGetKey              = "pod_resources_endpoint_errors_get_total"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
@@ -136,7 +136,7 @@ const (
 	CPUManagerPinningRequestsTotalKey         = "cpu_manager_pinning_requests_total"
 	CPUManagerPinningErrorsTotalKey           = "cpu_manager_pinning_errors_total"
 	CPUManagerSharedPoolSizeMilliCoresKey     = "cpu_manager_shared_pool_size_millicores"
-	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocation_count"
+	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocated"
 	CPUManagerAllocationPerNUMAKey            = "cpu_manager_allocation_per_numa"
 
 	// Metrics to track the Memory manager behavior
@@ -146,7 +146,7 @@ const (
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
-	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_ms"
+	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_seconds"
 
 	// Metrics to track orphan pod cleanup
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
@@ -156,8 +156,8 @@ const (
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
 	// Metric for tracking alignment of compute resources
-	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
-	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_count"
+	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_total"
+	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_total"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
 	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
 
@@ -994,12 +994,12 @@ var (
 		},
 	)
 
-	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in milliseconds) to serve a pod admission request.
+	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
 	TopologyManagerAdmissionDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           TopologyManagerAdmissionDurationKey,
-			Help:           "Duration in milliseconds to serve a pod admission request.",
+			Help:           "Duration in seconds to serve a pod admission request.",
 			Buckets:        metrics.ExponentialBuckets(.05, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
