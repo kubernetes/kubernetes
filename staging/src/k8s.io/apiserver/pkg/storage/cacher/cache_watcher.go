@@ -529,9 +529,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
-	if processingTime > 37*time.Second {
-		klog.V(2).Infof("TRACE-CACHER %s (%s): events=%d total=%v next=%v (cache read) convert=%v (deep copy) send=%v (to chan)", c.groupResource, c.identifier, initEventCount, processingTime, totalNextTime, totalConvertTime, totalSendTime)
-	}
+	// if processingTime > 10*time.Second {
+	// 	klog.V(2).Infof("TRACE-CACHER %s (%s): events=%d total=%v next=%v (cache read) convert=%v (deep copy) send=%v (to chan)", c.groupResource, c.identifier, initEventCount, processingTime, totalNextTime, totalConvertTime, totalSendTime)
+	// }
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {

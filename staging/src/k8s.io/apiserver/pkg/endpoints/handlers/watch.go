@@ -352,10 +352,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				if receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
 					setupTime = initStart.Sub(receivedTimestamp)
 				}
-				if sendingEvents+setupTime > 37*time.Second {
+				if sendingEvents+setupTime > 10*time.Second {
 					totalTime := setupTime + sendingEvents
 					otherTime := sendingEvents - totalEncodeTime - totalFlushTime
-					klog.V(2).Infof("TRACE-WATCHLIST %s: events=%d total=%v setup=%v (PnF+watch init) sending=%v (event loop) encode=%v (%s) network=%v (write) flush=%v other=%v (chan+overhead)", req.URL.Path, initEventCount, totalTime, setupTime, sendingEvents, watchEncoder.serializeTime, s.MediaType, watchEncoder.networkTime, totalFlushTime, otherTime)
+					totalMB := float64(watchEncoder.totalBytes) / 1024 / 1024
+					klog.V(2).Infof("TRACE-WATCHLIST %s: events=%d bytes=%.0fMB total=%v setup=%v (PnF+watch init) sending=%v (event loop) encode=%v (%s) network=%v (write) flush=%v other=%v (chan+overhead)", req.URL.Path, initEventCount, totalMB, totalTime, setupTime, sendingEvents, watchEncoder.serializeTime, s.MediaType, watchEncoder.networkTime, totalFlushTime, otherTime)
 				}
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())

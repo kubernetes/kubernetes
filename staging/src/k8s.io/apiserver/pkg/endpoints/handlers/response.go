@@ -157,6 +157,7 @@ type watchEncoder struct {
 	// Accumulated timing for init event analysis.
 	serializeTime time.Duration
 	networkTime   time.Duration
+	totalBytes    int64
 }
 
 func newWatchEncoder(ctx context.Context, gvr schema.GroupVersionResource, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
@@ -206,8 +207,9 @@ func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writ
 	e.serializeTime += time.Since(serializeStart)
 
 	networkStart := time.Now()
-	_, err := w.Write(e.eventBuffer.Bytes())
+	n, err := w.Write(e.eventBuffer.Bytes())
 	e.networkTime += time.Since(networkStart)
+	e.totalBytes += int64(n)
 	return err
 }
 
