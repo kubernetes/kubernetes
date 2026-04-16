@@ -484,7 +484,7 @@ type HorizontalPodAutoscalerCondition struct {
 	// +optional
 	Type HorizontalPodAutoscalerConditionType `json:"type" protobuf:"bytes,1,name=type"`
 
-	// status is the status of the condition (True, False, Unknown)
+	// status is the status of the condition, one of True, False, Unknown.
 	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,name=status"`
 

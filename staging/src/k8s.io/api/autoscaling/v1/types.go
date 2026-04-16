@@ -377,7 +377,7 @@ type ExternalMetricSource struct {
 
 // MetricStatus describes the last-read state of a single metric.
 type MetricStatus struct {
-	// type is the type of metric source.  It will be one of "ContainerResource",
+	// type is the type of metric source.  It should be one of "ContainerResource",
 	// "External", "Object", "Pods" or "Resource", each corresponds to a matching field in the object.
 	// +optional
 	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
@@ -443,7 +443,7 @@ type HorizontalPodAutoscalerCondition struct {
 	// +optional
 	Type HorizontalPodAutoscalerConditionType `json:"type" protobuf:"bytes,1,name=type"`
 
-	// status is the status of the condition (True, False, Unknown)
+	// status is the status of the condition, one of True, False, Unknown.
 	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,name=status"`
 
