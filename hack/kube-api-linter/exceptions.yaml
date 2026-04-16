@@ -123,3 +123,14 @@
 # Validation makes this require at least one of the fields within to be set.
 - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
   path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+
+# These status fields are non-pointer structs whose inner fields are required, but the status structs themselves
+# have no validation, so the fields must be marked optional rather than required.
+- text: "nonpointerstructs: field ObjectMetricStatus.Target is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v1/types.go"
+- text: "nonpointerstructs: field ObjectMetricStatus.(Metric|DescribedObject) is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+- text: "nonpointerstructs: field PodsMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+- text: "nonpointerstructs: field ExternalMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
