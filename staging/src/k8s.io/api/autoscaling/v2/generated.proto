@@ -225,6 +225,12 @@ message HorizontalPodAutoscalerCondition {
   // the transition
   // +optional
   optional string message = 5;
+
+  // observedGeneration represents the .metadata.generation that the condition was set based upon.
+  // For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+  // with respect to the current state of the instance.
+  // +optional
+  optional int64 observedGeneration = 6;
 }
 
 // HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
