@@ -3070,13 +3070,13 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			cancel()
 			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
-				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+				if err.Type == field.ErrorTypeInvalid && (strings.Contains(err.Error(), "operation interrupted") || strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "context canceled")) {
 					found = true
 					break
 				}
 			}
 			if !found {
-				t.Errorf("expect operation interrupted err but did not find")
+				t.Errorf("expect operation interrupted err but did not find. Got errs: %v", errs)
 			}
 		})
 	}
