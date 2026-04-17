@@ -152,10 +152,19 @@ func (m *managerImpl) Start(ctx context.Context) error {
 	go func() {
 		for {
 			if stop != nil {
-				<-stop
+				select {
+				case <-ctx.Done():
+					return
+				case <-stop:
+				}
 			}
 
-			time.Sleep(dbusReconnectPeriod)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(dbusReconnectPeriod):
+			}
+
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
 			stop, err = m.start(ctx)
 			if err != nil {
@@ -248,9 +257,11 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case isShuttingDown, ok := <-events:
 				if !ok {
-					m.logger.Error(err, "Ended to watching the node for shutdown events")
+					m.logger.Error(nil, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
