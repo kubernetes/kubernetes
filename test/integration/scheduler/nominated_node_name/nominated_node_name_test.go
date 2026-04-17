@@ -731,3 +731,165 @@ func contains(pods []fwk.PodInfo, podName string) bool {
 	}
 	return false
 }
+
+type mockPreBindPlugin struct{}
+
+var _ fwk.PreBindPlugin = &mockPreBindPlugin{}
+
+func (p *mockPreBindPlugin) Name() string {
+	return "mockPreBindPlugin"
+}
+
+func (p *mockPreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (p *mockPreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, nil
+}
+
+type mockBindPlugin struct {
+	bindFn func() *fwk.Status
+}
+
+var _ fwk.BindPlugin = &mockBindPlugin{}
+
+func (p *mockBindPlugin) Name() string {
+	return "mockBindPlugin"
+}
+
+func (p *mockBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return p.bindFn()
+}
+
+type mockQueueSortPlugin struct {
+	t     *testing.T
+	order map[string]int
+}
+
+var _ fwk.QueueSortPlugin = &mockQueueSortPlugin{}
+
+func (p *mockQueueSortPlugin) Name() string {
+	return "mockQueueSortPlugin"
+}
+
+func (p *mockQueueSortPlugin) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
+	name1 := pInfo1.GetPodInfo().GetPod().Name
+	name2 := pInfo2.GetPodInfo().GetPod().Name
+	o1, ok1 := p.order[name1]
+	if !ok1 {
+		p.t.Errorf("order doesn't contain pod with the specified name: %s", name1)
+	}
+	o2, ok2 := p.order[name2]
+	if !ok2 {
+		p.t.Errorf("order doesn't contain pod with the specified name: %s", name2)
+	}
+	return o1 < o2
+}
+
+// TestSchedulerRestartWithNominatedNode checks that NNN properly reserves the pod's node despite scheduler restart during binding cycle.
+func TestSchedulerRestartWithNominatedNode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)
+	testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
+	ctx, cancel := context.WithCancel(testContext.Ctx)
+	cs := testContext.ClientSet
+	defer cancel()
+
+	// nodePreferred can only hold a single pod
+	nodePreferred := st.MakeNode().Name("node-preferred").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "1"}).Obj()
+	// nodeOther has taint with PreferNoSchedule
+	nodeOther := st.MakeNode().Name("node-other").Taints([]v1.Taint{{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule}}).Obj()
+
+	for _, n := range []*v1.Node{nodePreferred, nodeOther} {
+		if _, err := testutils.CreateNode(cs, n); err != nil {
+			t.Fatalf("Failed to create node %s: %v", n.Name, err)
+		}
+	}
+
+	createPod := func(name string) *v1.Pod {
+		t.Helper()
+		pod, err := testutils.CreatePausePod(cs, testutils.InitPausePod(&testutils.PausePodConfig{
+			Name: name, Namespace: testContext.NS.Name}))
+		if err != nil {
+			t.Fatalf("Failed to create %s: %v", name, err)
+		}
+		return pod
+	}
+
+	podA := createPod("pod-a")
+
+	// Ensures desired pod order without affecting priorities, which could impact NNN logic.
+	mockQueueSort := &mockQueueSortPlugin{t: t, order: map[string]int{}}
+	// Ensures NNN is set
+	mockPreBind := &mockPreBindPlugin{}
+
+	initSched := func(additionalPlugins ...fwk.Plugin) (*testutils.TestContext, testutils.ShutdownFunc) {
+		var pls []fwk.Plugin
+		pls = append(pls, mockQueueSort, mockPreBind)
+		pls = append(pls, additionalPlugins...)
+		registry, prof := schedulerutils.InitRegistryAndConfig(t, nil, pls...)
+		return schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0,
+			false, /* do not run scheduler immediately after init */
+			scheduler.WithProfiles(prof),
+			scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		)
+	}
+
+	// To allow triggering scheduler restart in binding phase, we need to initialize the scheduler
+	// and pass the testCtx.SchedulerCloseFn to the bind plugin before calling Scheduler.Run.
+	mockBind := &mockBindPlugin{}
+	testCtx, _ := initSched(mockBind)
+	// This will fail the binding cycle and stop the scheduler
+	// Scheduler should set NNN for podA before this step.
+	mockBind.bindFn = func() *fwk.Status {
+		testCtx.SchedulerCloseFn()
+		return fwk.NewStatus(fwk.Error, "simulated bind failure")
+	}
+	mockQueueSort.order[podA.Name] = 1
+
+	// Start scheduler
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+
+	// We expect the scheduler will stop due to SchedulerCloseFn being called in bind
+	<-testCtx.SchedulerCtx.Done()
+
+	podA, err := testutils.GetPod(cs, podA.Name, podA.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get pod %s: %v", podA.Name, err)
+	}
+	if podA.Status.NominatedNodeName != nodePreferred.Name {
+		t.Errorf("Unexpected NominatedNodeName after scheduler abort for pod %s, got %s, want %s", podA.Name, podA.Status.NominatedNodeName, nodePreferred.Name)
+	}
+	if podA.Spec.NodeName != "" {
+		t.Errorf("Unexpected NodeName after scheduler abort for pod %s, got %s, want unset", podA.Name, podA.Spec.NodeName)
+	}
+
+	podB := createPod("pod-b")
+
+	// Make sure podB is evaluated before podA after scheduler restart
+	// The scheduler should see podA's nominated node and schedule podB elsewhere
+	mockQueueSort.order[podB.Name] = mockQueueSort.order[podA.Name] - 1
+
+	// This time use the default bind plugin
+	testCtx, teardown := initSched()
+	defer teardown()
+
+	// Start scheduler again
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+
+	for _, pod := range []*v1.Pod{podA, podB} {
+		if err := testutils.WaitForPodToSchedule(ctx, cs, pod); err != nil {
+			t.Errorf("Failed waiting for pod %s: %v", pod.Name, err)
+		}
+	}
+
+	checkNode := func(pod *v1.Pod, expected string) {
+		t.Helper()
+		p, _ := testutils.GetPod(cs, pod.Name, pod.Namespace)
+		if p.Spec.NodeName != expected {
+			t.Errorf("%s scheduled on %s, wanted %s", pod.Name, p.Spec.NodeName, expected)
+		}
+	}
+	checkNode(podA, nodePreferred.Name)
+	checkNode(podB, nodeOther.Name)
+}
