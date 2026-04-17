@@ -1266,6 +1266,112 @@ func TestForgetPodGroupMember(t *testing.T) {
 	}
 }
 
+func TestRemoveAssumedPod(t *testing.T) {
+	pod := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").Obj()
+	assumedPod := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").Node("node-1").Obj()
+	assumedPodOnDifferentNode := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").Node("node-2").Obj()
+	assumedPodWithPodGroup := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").Node("node-1").PodGroupName("pg").Obj()
+
+	tests := []struct {
+		name                   string
+		addPod                 *v1.Pod
+		assumedPod             *v1.Pod
+		removePod              *v1.Pod
+		genericWorkloadEnabled bool
+		expectErr              bool
+	}{
+		{
+			name:       "remove assumed pod",
+			assumedPod: assumedPod,
+			removePod:  assumedPod,
+		},
+		{
+			name:      "pod is not assumed",
+			addPod:    pod,
+			removePod: pod,
+			expectErr: true,
+		},
+		{
+			name:      "pod doesn't exist in the cache",
+			removePod: assumedPod,
+		},
+		{
+			name:       "remove assumed pod with different node name",
+			assumedPod: assumedPod,
+			removePod:  assumedPodOnDifferentNode,
+			expectErr:  true,
+		},
+		{
+			name:       "remove assumed pod group member with GenericWorkload disabled",
+			assumedPod: assumedPodWithPodGroup,
+			removePod:  assumedPodWithPodGroup,
+		},
+		{
+			name:                   "remove assumed pod without a pod group",
+			assumedPod:             assumedPod,
+			removePod:              assumedPod,
+			genericWorkloadEnabled: true,
+		},
+		{
+			name:                   "remove assumed pod group member",
+			assumedPod:             assumedPodWithPodGroup,
+			removePod:              assumedPodWithPodGroup,
+			genericWorkloadEnabled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+
+			if tt.addPod != nil {
+				if err := cache.AddPod(logger, tt.addPod); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			} else if tt.assumedPod != nil {
+				if err := cache.AssumePod(logger, tt.assumedPod); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
+				}
+			}
+
+			pod := tt.addPod
+			if pod == nil {
+				pod = tt.assumedPod
+			}
+
+			if pod != nil && pod.Spec.SchedulingGroup != nil {
+				count := len(cache.podGroupStates)
+				if !tt.genericWorkloadEnabled && count == 1 {
+					t.Fatalf("Expected no pod group states to exist in cache, but found %d", count)
+				} else if tt.genericWorkloadEnabled && count == 0 {
+					t.Fatalf("Expected pod group state to exist in cache, but found none")
+				}
+			}
+
+			if err := cache.RemoveAssumedPod(logger, tt.removePod); err != nil {
+				if tt.expectErr {
+					return
+				}
+				t.Fatalf("RemoveAssumedPod failed: %v", err)
+			} else if tt.expectErr {
+				t.Fatalf("expected error but got nil")
+			}
+
+			if err := isForgottenFromCache(tt.removePod, cache); err != nil {
+				t.Errorf("pod %q not forgotten: %v", tt.removePod.Name, err)
+			}
+
+			if count := len(cache.podGroupStates); count != 0 {
+				t.Errorf("Expected no pod group states to exist in cache after removal, but found %d", count)
+			}
+		})
+	}
+}
+
 func TestAssumePodGroupMember(t *testing.T) {
 	pod := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").
 		PodGroupName("pg").Obj()
