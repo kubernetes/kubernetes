@@ -254,6 +254,38 @@ inTarget () {
 inTarget run "${KUBE_TEMP}/after"
 inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 
+# These are grep extended regular expressions matching known harmless incompatible changes
+# in client-go. For example, Kubernetes API changes imply changing the API's client-go typed interfaces.
+#
+# - ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+# - ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+# ...
+# - ./informers/autoscaling.Interface.V2beta1: removed
+# - ./informers/autoscaling.Interface.V2beta2: removed
+# ...
+# - package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
+# - package k8s.io/client-go/applyconfigurations/autoscaling/v2beta2: removed
+# ...
+# - package k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1: removed
+# ...
+# - package k8s.io/client-go/listers/autoscaling/v2beta2: removed
+# ...
+# - ./applyconfigurations/core/v1.PodCertificateProjectionApplyConfiguration: old is comparable, new is not
+# - ./informers/certificates/v1alpha1.NewFilteredPodCertificateRequestInformer: removed
+# - ./kubernetes/typed/certificates/v1alpha1.(*CertificatesV1alpha1Client).PodCertificateRequests: removed
+# - ./kubernetes/typed/certificates/v1alpha1.PodCertificateRequestsGetter.PodCertificateRequests, method set of CertificatesV1alpha1Interface: removed
+# - ./kubernetes/typed/certificates/v1alpha1/fake.(*FakeCertificatesV1alpha1).PodCertificateRequests: removed
+#
+# - ./kubernetes/typed/certificates/v1alpha1.PodCertificateRequestsGetter.PodCertificateRequests, method set of CertificatesV1alpha1Interface: removed
+incompatible_filters=(
+    -e '^- \./(informers|kubernetes/typed)/[a-z]+/v[a-z0-9]+(\.[a-zA-Z0-9]+)?\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$'
+    -e '^- \./kubernetes(\.Interface|/fake...Clientset.|...Clientset.)\.[A-Za-z]+V[a-z0-9]+(, method set of .*)?: (added|removed)$'
+    -e '^- \./kubernetes/typed/[a-z]+/v[a-z0-9]+(/fake)?\.(..[a-zA-Z0-9]+.|[a-zA-Z0-9]+)\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$'
+    -e '^- \./informers/[a-z]+\.Interface\.V[a-z0-9]+(, method set of .*)?: (added|removed)$'
+    -e '^- \./(listers|applyconfigurations)/[a-z]+/v1.*(, method set of .*)?: (added|removed|old is comparable, new is not)$'
+    -e '^- package k8s\.io/client-go/(applyconfigurations|informers|kubernetes/typed|listers)/[a-z]+/v[a-z0-9]+(/fake)?: (added|removed)$'
+)
+
 # Now produce a report. All changes get reported because exporting some API
 # unnecessarily might also be good to know, but the final exit code will only
 # be non-zero if there are incompatible changes.
@@ -271,18 +303,56 @@ compare () {
         return
     fi
     changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
+    incompatible=
     echo "## ${what}"
     if [ -z "$changes" ]; then
         echo "no changes"
     else
+        # The output contains incompatible changes first, then compatible ones.
+        # Both are optional. To find exactly the incompatible ones, we first
+        # drop the compatible ones (if present) at the end, then look for the
+        # incompatible changes. What's left is the header.
+        #
+        # The content of each section is unsorted. We fix this via sorting
+        # the lines within each section because it makes the output more
+        # predictable and is crucial for comparison of the incompatible
+        # changes against the CHANGELOG.md (if there is any).
+        sep=$(echo "$changes" | grep -n '^Compatible changes:$' | sed -e 's/:.*//') || true
+        compatible=
+        if [ -n "$sep" ]; then
+            compatible=$(echo "$changes" | tail -n "+$((sep + 1))" | LC_ALL=C sort) || true
+            changes=$(echo "$changes" | head -n "$((sep-1))") || true
+        fi
+        sep=$(echo "$changes" | grep -n '^Incompatible changes:$' | sed -e 's/:.*//') || true
+        tolerated=
+        if [ -n "$sep" ]; then
+            # This is where we filter out certain known harmless changes.
+            #
+            # We can do that here in a generic script because the regular expressions for client-go
+            # are unlikely to match incorrectly in a different component. If this ever changes,
+            # then we can also store per-component filters in special file in
+            # the component and load them from there.
+            incompatible=$(echo "$changes" | tail -n "+$((sep + 1))" | LC_ALL=C sort) || true
+            tolerated=$(echo "$incompatible" | grep -E "${incompatible_filters[@]}") || true
+            incompatible=$(echo "$incompatible" | grep -v -E "${incompatible_filters[@]}") || true
+            changes=$(echo "$changes" | head -n "$((sep-1))") || true
+        fi
         echo "$changes"
+        if [ -n "$incompatible" ]; then
+            echo "Incompatible changes:"
+            echo "${incompatible}"
+        fi
+        if [ -n "$tolerated" ]; then
+            echo "Acceptable incompatible changes:"
+            echo "${tolerated}"
+        fi
+        if [ -n "$compatible" ]; then
+            echo "Compatible changes:"
+            echo "${compatible}"
+        fi
+
         echo
     fi
-    # Output order is non-deterministic. Fix that by sorting because it
-    # matters for comparing against the changelog. Above we cannot
-    # sort because it would break the ordering into
-    # "Compatible:" and "Incompatible:" changes.
-    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package" | LC=C sort) || true
     if [ -n "$incompatible" ]; then
         # Does this directory have a changelog?
         # If yes, then maybe it already contains this incompatible change.
@@ -403,6 +473,7 @@ tryBuild () {
 res=0
 if [ ${#failures[@]} -gt 0 ]; then
     res=1
+    echo
     echo "Detected incompatible changes on modules:"
     printf '%s\n' "${failures[@]}"
     cat <<EOF
