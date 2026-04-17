@@ -105,7 +105,12 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testPVCRef)
+}
+
+func testPVCRef(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	logger := tCtx.Logger()
 	// Setup mock stats provider
 	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
@@ -163,7 +168,12 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testNormalVolumeEvent)
+}
+
+func testNormalVolumeEvent(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	logger := tCtx.Logger()
 	mockStats := statstest.NewMockProvider(t)
 
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
@@ -186,7 +196,12 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testAbnormalVolumeEvent)
+}
+
+func testAbnormalVolumeEvent(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	logger := tCtx.Logger()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	// Setup mock stats provider
