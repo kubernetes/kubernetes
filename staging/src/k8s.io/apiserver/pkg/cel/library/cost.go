@@ -107,6 +107,12 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost += traversalCost(args[0]) // these O(n) operations all cost roughly the cost of a single traversal
 		}
 		return &cost
+	case "allContainers":
+		var cost uint64
+		if len(args) > 0 {
+			cost += traversalCost(args[0])
+		}
+		return &cost
 	case "url", "lowerAscii", "upperAscii", "substring", "trim", "jsonpatch.escapeKey":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))

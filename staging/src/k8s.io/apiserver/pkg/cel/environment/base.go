@@ -188,6 +188,13 @@ var baseOpts = []VersionedOptions{
 			ext.Lists(ext.ListsVersion(3)),
 		},
 	},
+	// Pod library
+	{
+		IntroducedVersion: version.MajorMinor(1, 36),
+		EnvOptions: []cel.EnvOption{
+			UnversionedLib(library.Pod),
+		},
+	},
 	StrictCostOpt,
 }
 

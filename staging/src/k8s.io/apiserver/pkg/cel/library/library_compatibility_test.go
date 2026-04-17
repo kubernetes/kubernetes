@@ -59,7 +59,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"jsonpatch.escapeKey",
 		// Kubernetes <1.33>:
 		"semver", "isSemver", "major", "minor", "patch",
-		// Kubernetes <1.??>:
+		// Kubernetes <1.36>:
+		"allContainers",
 	)
 
 	// TODO: test celgo function lists

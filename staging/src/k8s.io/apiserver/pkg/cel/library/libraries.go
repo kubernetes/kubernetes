@@ -46,6 +46,7 @@ func KnownLibraries() []Library {
 		formatLib,
 		semverLib,
 		jsonPatchLib,
+		podLib,
 	}
 }
 
