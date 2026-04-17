@@ -63,7 +63,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		}
 	}
 
-	client, err := data.WaitControlPlaneClient()
+	client, err := data.Client()
 	if err != nil {
 		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}
