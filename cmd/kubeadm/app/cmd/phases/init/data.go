@@ -40,6 +40,7 @@ type InitData interface {
 	CertificateWriteDir() string
 	CertificateDir() string
 	KubeConfig() (*clientcmdapi.Config, error)
+	KubeConfigOriginal() (*clientcmdapi.Config, error)
 	KubeConfigDir() string
 	KubeConfigPath() string
 	ManifestDir() string
@@ -47,7 +48,6 @@ type InitData interface {
 	ExternalCA() bool
 	OutputWriter() io.Writer
 	Client() (clientset.Interface, error)
-	WaitControlPlaneClient() (clientset.Interface, error)
 	Tokens() []string
 	PatchesDir() string
 }
