@@ -33,6 +33,8 @@ type RuntimeVersioner interface {
 // container runtime. The methods are thread-safe.
 type ContainerManager interface {
 	// CreateContainer creates a new container in specified PodSandbox.
+	// sandboxConfig is the kubelet's view of the pod sandbox at creation time;
+	// see CreateContainerRequest.sandbox_config in the CRI API for semantics.
 	CreateContainer(ctx context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// StartContainer starts the container.
 	StartContainer(ctx context.Context, containerID string) error

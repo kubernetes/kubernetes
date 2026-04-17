@@ -5846,10 +5846,29 @@ type CreateContainerRequest struct {
 	PodSandboxId string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId,proto3" json:"pod_sandbox_id,omitempty"`
 	// Config of the container.
 	Config *ContainerConfig `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
-	// Config of the PodSandbox. This is the same config that was passed
-	// to RunPodSandboxRequest to create the PodSandbox. It is passed again
-	// here just for easy reference. The PodSandboxConfig is immutable and
-	// remains the same throughout the lifetime of the pod.
+	// PodSandboxConfig as understood by the kubelet at the time this container
+	// is created.
+	//
+	// This field is not guaranteed to match the PodSandboxConfig that was
+	// originally passed to RunPodSandboxRequest for pod_sandbox_id. The kubelet
+	// may surface an updated view of the pod (for example after in-place
+	// resource resize via UpdatePodSandboxResourcesRequest, or other pod spec
+	// changes that affect sandbox configuration).
+	//
+	// The container runtime MUST select the running sandbox using pod_sandbox_id.
+	// For information that affects the newly created container (including pod
+	// annotations the kubelet expects the workload to see at container creation
+	// time), the runtime MUST treat sandbox_config from this request as the
+	// kubelet's authoritative input, rather than inferring it solely from
+	// internal sandbox state that may be stale or modified out-of-band (for
+	// example by host-level extensions). If a requested value cannot be
+	// honored because it conflicts with the live sandbox, the runtime SHOULD
+	// fail this RPC with an error instead of silently diverging from the
+	// kubelet's requested configuration.
+	//
+	// Runtimes MUST NOT assume that fields omitted or unchanged in
+	// sandbox_config relative to an earlier RunPodSandboxRequest imply that no
+	// other sandbox mutation occurred in the meantime.
 	SandboxConfig *PodSandboxConfig `protobuf:"bytes,3,opt,name=sandbox_config,json=sandboxConfig,proto3" json:"sandbox_config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

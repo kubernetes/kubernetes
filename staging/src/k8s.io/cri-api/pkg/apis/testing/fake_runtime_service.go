@@ -76,6 +76,12 @@ type FakeRuntimeService struct {
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
 
 	ErrorOnSandboxCreate bool
+
+	// LastCreateContainerSandboxConfig holds a clone of the sandbox_config from
+	// the most recent successful CreateContainer call (nil if that argument was
+	// nil). It is intended for tests asserting CRI CreateContainerRequest
+	// semantics.
+	LastCreateContainerSandboxConfig *runtimeapi.PodSandboxConfig
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -366,6 +372,12 @@ func (r *FakeRuntimeService) CreateContainer(_ context.Context, podSandboxID str
 	r.Called = append(r.Called, "CreateContainer")
 	if err := r.popError("CreateContainer"); err != nil {
 		return "", err
+	}
+
+	if sandboxConfig != nil {
+		r.LastCreateContainerSandboxConfig = proto.Clone(sandboxConfig).(*runtimeapi.PodSandboxConfig)
+	} else {
+		r.LastCreateContainerSandboxConfig = nil
 	}
 
 	// ContainerID should be randomized for real container runtime, but here just use
