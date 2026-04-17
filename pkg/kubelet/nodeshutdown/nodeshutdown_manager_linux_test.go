@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	testutilsktesting "k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -111,6 +111,7 @@ func (f *fakeDbus) OverrideInhibitDelay(inhibitDelayMax time.Duration) error {
 }
 
 func TestManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -321,8 +322,10 @@ func TestManager(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(tc.desc, func(tCtx ktesting.TContext) {
+			defer tCtx.Cancel("test completed")
+			t := tCtx.TB()
+			logger := tCtx.Logger()
 
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
@@ -479,10 +482,13 @@ func TestFeatureEnabled(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(tCtx)
-	defer cancel()
+	ktesting.Init(t).SyncTest("", testRestart)
+}
 
+func testRestart(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -533,7 +539,7 @@ func TestRestart(t *testing.T) {
 		StateDirectory:                  os.TempDir(),
 	})
 
-	err := manager.Start(ctx)
+	err := manager.Start(tCtx)
 	lock.Unlock()
 
 	if err != nil {
@@ -554,9 +560,13 @@ func TestRestart(t *testing.T) {
 }
 
 func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(tCtx)
-	defer cancel()
+	ktesting.Init(t).SyncTest("", testStartDoesNotReconnectAfterContextCancel)
+}
+
+func testStartDoesNotReconnectAfterContextCancel(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
 
 	systemDbusTmp := systemDbus
 	defer func() {
@@ -594,6 +604,7 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 		StateDirectory:                  os.TempDir(),
 	})
 
+	ctx, cancel := context.WithCancel(tCtx.Context)
 	err := manager.Start(ctx)
 	lock.Unlock()
 	require.NoError(t, err)
@@ -616,7 +627,7 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 }
 
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
-	tCtx := testutilsktesting.Init(t)
+	tCtx := ktesting.Init(t)
 
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
@@ -682,10 +693,9 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use a buffered logger because this test asserts log output.
-			logger := ktesting.NewLogger(t,
-				ktesting.NewConfig(
-					ktesting.BufferLogs(true),
+			logger := klogtesting.NewLogger(t,
+				klogtesting.NewConfig(
+					klogtesting.BufferLogs(true),
 				),
 			)
 			m := &managerImpl{
@@ -713,7 +723,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
 			}
 
-			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			underlier, ok := logger.GetSink().(klogtesting.Underlier)
 			if !ok {
 				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 			}
@@ -729,8 +739,11 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 }
 
 func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
-	tCtx := testutilsktesting.Init(t)
+	ktesting.Init(t).SyncTest("", testProcessShutdownEventVolumeUnmountTimeout)
+}
 
+func testProcessShutdownEventVolumeUnmountTimeout(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	var (
 		fakeRecorder               = &record.FakeRecorder{}
 		syncNodeStatus             = func(context.Context) {}
@@ -746,7 +759,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 		fmt.Errorf("unmount timeout"), false,
 	)
 	// Use a buffered logger because this test asserts log output.
-	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true)))
 	m := &managerImpl{
 		logger:   logger,
 		recorder: fakeRecorder,
@@ -784,7 +797,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	actualDuration := int(end.Sub(start).Seconds())
 	assert.LessOrEqual(t, actualDuration, shutdownGracePeriodSeconds, "processShutdownEvent took too long")
 
-	underlier, ok := logger.GetSink().(ktesting.Underlier)
+	underlier, ok := logger.GetSink().(klogtesting.Underlier)
 	if !ok {
 		t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 	}
@@ -848,7 +861,14 @@ func TestStartDbusConnectionClosedOnError(t *testing.T) {
 // reconnects, the old dbus connection is closed before a new one is created.
 // See #120613.
 func TestRestartClosesOldConnection(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testRestartClosesOldConnection)
+}
+
+func testRestartClosesOldConnection(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	logger := tCtx.Logger()
+	t := tCtx.TB()
+
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
