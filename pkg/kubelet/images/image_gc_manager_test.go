@@ -499,7 +499,12 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
-	ctx := ktesting.Init(t)
+	ktesting.Init(t).SyncTest("", testDeleteUnusedImagesLimitByImageLiveTime)
+}
+
+func testDeleteUnusedImagesLimitByImageLiveTime(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	t := tCtx.TB()
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
@@ -518,15 +523,15 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 		}},
 	}
 	// start to detect images
-	manager.Start(ctx)
+	manager.Start(tCtx)
 	// try to delete images, but images are not old enough,so no image will be deleted
-	err := manager.DeleteUnusedImages(ctx)
+	err := manager.DeleteUnusedImages(tCtx)
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.Len(fakeRuntime.ImageList, 3)
 	// sleep 3 seconds, then images will be old enough to be deleted
 	time.Sleep(time.Second * 3)
-	err = manager.DeleteUnusedImages(ctx)
+	err = manager.DeleteUnusedImages(tCtx)
 	require.NoError(t, err)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
