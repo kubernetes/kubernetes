@@ -299,7 +299,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
 	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(err.Error())
 	}
@@ -335,15 +334,17 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0750); err != nil {
+	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0o750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
 
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
-		volDataKey.volHandle:  csiSource.VolumeHandle,
-		volDataKey.driverName: csiSource.Driver,
+		volDataKey.volHandle:           csiSource.VolumeHandle,
+		volDataKey.driverName:          csiSource.Driver,
+		volDataKey.specVolID:           spec.Name(),
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
@@ -575,7 +576,6 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	err = csi.NodeUnstageVolume(ctx,
 		volID,
 		deviceMountPath)
-
 	if err != nil {
 		return errors.New(log("attacher.UnmountDevice failed: %v", err))
 	}
