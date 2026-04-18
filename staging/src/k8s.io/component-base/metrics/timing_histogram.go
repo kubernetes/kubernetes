@@ -65,6 +65,38 @@ func NewTestableTimingHistogram(nowFunc func() time.Time, opts *TimingHistogramO
 	return h
 }
 
+func (h *TimingHistogram) Set(v float64) {
+	if !h.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !h.IsCreated() {
+			return
+		}
+	}
+	h.PrometheusTimingHistogram.Set(v)
+}
+
+func (h *TimingHistogram) Inc() {
+	h.Add(1)
+}
+
+func (h *TimingHistogram) Dec() {
+	h.Add(-1)
+}
+
+func (h *TimingHistogram) Add(v float64) {
+	if !h.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !h.IsCreated() {
+			return
+		}
+	}
+	h.PrometheusTimingHistogram.Add(v)
+}
+
 // setPrometheusHistogram sets the underlying KubeGauge object, i.e. the thing that does the measurement.
 func (h *TimingHistogram) setPrometheusHistogram(histogram promext.TimingHistogram) {
 	h.PrometheusTimingHistogram = histogram
@@ -97,6 +129,11 @@ func (h *TimingHistogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal TimingHistogram metric to pass in context. The context is no-op now.
 func (h *TimingHistogram) WithContext(ctx context.Context) GaugeMetric {
+	if !h.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+	}
 	return h.PrometheusTimingHistogram
 }
 
@@ -167,7 +204,12 @@ func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric,
 		if v.IsHidden() {
 			return noop, nil
 		}
-		return noop, errNotRegistered
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -217,7 +259,12 @@ func (v *TimingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric,
 		if v.IsHidden() {
 			return noop, nil
 		}
-		return noop, errNotRegistered
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -250,6 +297,38 @@ func (v *TimingHistogramVec) With(labels map[string]string) GaugeMetric {
 		return ans
 	}
 	panic(err)
+}
+
+func (v *TimingHistogramVec) GetMetricWithLabelValues(lvs ...string) (GaugeMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	ops, err := v.TimingHistogramVec.GetMetricWithLabelValues(lvs...)
+	if err != nil {
+		return noop, err
+	}
+	return ops.(GaugeMetric), err
+}
+
+func (v *TimingHistogramVec) GetMetricWith(labels map[string]string) (GaugeMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	ops, err := v.TimingHistogramVec.GetMetricWith(labels)
+	if err != nil {
+		return noop, err
+	}
+	return ops.(GaugeMetric), err
 }
 
 // Delete deletes the metric where the variable labels are the same as those

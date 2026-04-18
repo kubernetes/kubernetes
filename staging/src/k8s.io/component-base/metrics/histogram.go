@@ -18,11 +18,13 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -77,6 +79,18 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 	return h
 }
 
+func (h *Histogram) Observe(v float64) {
+	if !h.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !h.IsCreated() {
+			return
+		}
+	}
+	h.ObserverMetric.Observe(v)
+}
+
 // setPrometheusHistogram sets the underlying KubeGauge object, i.e. the thing that does the measurement.
 func (h *Histogram) setPrometheusHistogram(histogram prometheus.Histogram) {
 	h.ObserverMetric = histogram
@@ -105,7 +119,21 @@ func (h *Histogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
 func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	if !h.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+	}
 	return &exemplarHistogramMetric{ctx: ctx, delegate: h.ObserverMetric}
+}
+
+func (h *Histogram) Write(to *dto.Metric) error {
+	h.createLock.RLock()
+	defer h.createLock.RUnlock()
+	if m, ok := h.ObserverMetric.(prometheus.Metric); ok {
+		return m.Write(to)
+	}
+	return fmt.Errorf("underlying metric does not support Write")
 }
 
 // HistogramVec is the internal representation of our wrapping struct around prometheus
@@ -170,7 +198,12 @@ func (v *HistogramVec) initializeDeprecatedMetric() {
 // has been registered to a metrics registry.
 func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
-		return noop
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -189,13 +222,42 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
 
+func (v *HistogramVec) GetMetricWithLabelValues(lvs ...string) (ObserverMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.HistogramVec.GetMetricWithLabelValues(lvs...)
+}
+
+func (v *HistogramVec) GetMetricWith(labels map[string]string) (ObserverMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.HistogramVec.GetMetricWith(labels)
+}
+
 // With returns the ObserverMetric for the given Labels map (the label names
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new ObserverMetric is created IFF the HistogramVec has
 // been registered to a metrics registry.
 func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
-		return noop
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop
+		}
 	}
 
 	// Initialize label allow lists if not already initialized

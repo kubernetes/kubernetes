@@ -28,6 +28,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// FinalizedDefferedRegistries is invoked from vec hot-path methods
+// (WithLabelValues, With) when a metric is not yet created, giving
+// registries that have opted into deferred mode (via EnableDeferredInit) a
+// chance to finalize their deferred metrics.
+//
+// legacyregistry sets this at init() time to point at its default registry's
+// FinalizeDeferredMetrics.
+//
+// It is not safe to state this var concurrently with reads. Set it from init() only.
+var FinalizeDeferredRegistries func()
+
 /*
 kubeCollector extends the prometheus.Collector interface to allow customization of the metric
 registration process. Defer metric initialization until Create() is called, which then
@@ -58,12 +69,6 @@ type lazyKubeMetric interface {
 	IsDeprecated() bool
 }
 
-/*
-lazyMetric implements lazyKubeMetric. A lazy metric is lazy because it waits until metric
-registration time before instantiation. Add it as an anonymous field to a struct that
-implements kubeCollector to get deferred registration behavior. You must call lazyInit
-with the kubeCollector itself as an argument.
-*/
 type lazyMetric struct {
 	fqName              string
 	isDeprecated        atomic.Bool

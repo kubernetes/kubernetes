@@ -65,6 +65,9 @@ func (c *Counter) Desc() *prometheus.Desc {
 }
 
 func (c *Counter) Write(to *dto.Metric) error {
+	c.createLock.RLock()
+	defer c.createLock.RUnlock()
+	
 	return c.metric.Write(to)
 }
 
@@ -74,6 +77,22 @@ func (c *Counter) Reset() {
 		return
 	}
 	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
+}
+
+func (c *Counter) Inc() {
+	c.Add(1)
+}
+
+func (c *Counter) Add(v float64) {
+	if !c.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !c.IsCreated() {
+			return
+		}
+	}
+	c.CounterMetric.Add(v)
 }
 
 // setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
@@ -104,6 +123,12 @@ func (c *Counter) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Counter metric to pass in context.
 func (c *Counter) WithContext(ctx context.Context) CounterMetric {
+	if !c.IsCreated() {
+		if FinalizeDeferredRegistries != nil{
+			FinalizeDeferredRegistries()
+		
+		}
+	}
 	return &exemplarCounterMetric{ctx: ctx, delegate: c.CounterMetric}
 }
 
@@ -198,7 +223,12 @@ func (v *CounterVec) initializeDeprecatedMetric() {
 // has been registered to a metrics registry.
 func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	if !v.IsCreated() {
-		return noop // return no-op counter
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop // return no-op counter
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -218,13 +248,42 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
+func (v *CounterVec) GetMetricWithLabelValues(lvs ...string) (CounterMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.CounterVec.GetMetricWithLabelValues(lvs...)
+}
+
+func (v *CounterVec) GetMetricWith(labels map[string]string) (CounterMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.CounterVec.GetMetricWith(labels)
+}
+
 // With returns the Counter for the given Labels map (the label names
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new Counter is created IFF the counterVec has
 // been registered to a metrics registry.
 func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
-		return noop // return no-op counter
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop // return no-op counter
+		}
 	}
 
 	v.initializeLabelAllowListsOnce.Do(func() {

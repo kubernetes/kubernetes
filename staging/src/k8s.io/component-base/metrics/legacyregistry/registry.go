@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	defaultRegistry = metrics.NewKubeRegistry()
+	defaultRegistry = metrics.NewKubeRegistryWithDeferred()
 	// DefaultGatherer exposes the global registry gatherer
 	DefaultGatherer metrics.Gatherer = defaultRegistry
 	// Reset calls reset on the global registry
@@ -54,6 +54,12 @@ func init() {
 	RawMustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	RawMustRegister(collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll)))
 	defaultRegistry.RegisterMetaMetrics()
+	// Enable deferred mode so that metrics registered by other packages'
+	// init() functions are not created until feature gates are applied.
+	// This ensures feature-gate-dependent options (e.g. native histograms)
+	// are available at metric creation time.
+	defaultRegistry.EnableDeferredCreation()
+	metrics.FinalizeDeferredRegistries = defaultRegistry.FinalizeDeferredMetrics
 	processStart = time.Now()
 }
 
@@ -89,6 +95,13 @@ func CustomMustRegister(cs ...metrics.StableCollector) {
 	for _, c := range cs {
 		prometheus.MustRegister(c)
 	}
+}
+
+// FinalizeDeferredMetrics creates all metrics that were deferred during
+// init() registration. It must be called after feature gates are applied
+// and before the first metrics scrape. See KubeRegistry.FinalizeDeferredMetrics.
+func FinalizeDeferredMetrics() {
+	defaultRegistry.FinalizeDeferredMetrics()
 }
 
 // GetProcessStart return processStart value

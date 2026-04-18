@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"slices"
 	"strings"
 	"sync"
 
@@ -143,6 +144,24 @@ type KubeRegistry interface {
 	Gatherer() prometheus.Gatherer
 }
 
+// KubeRegistryWithDeferred extends KubeRegistry to support deferred metric creation.
+type KubeRegistryWithDeferred interface {
+	KubeRegistry
+	// EnableDeferredCreation puts the registry into deferred mode.
+	// While deferred, MustRegister and Register store metrics without
+	// creating the underlying prometheus objects. This allows
+	// feature-gate-dependent options (e.g. native histograms) to be
+	// configured before any metric is materialized.
+	EnableDeferredCreation()
+	// FinalizeDeferredMetrics creates all metrics that were deferred
+	// during registration and registers them with the underlying
+	// prometheus registry. After this call, subsequent MustRegister and
+	// Register calls create metrics immediately. It is safe to call
+	// multiple times; calls after the first are no-ops. Gather also
+	// calls this automatically as a safety net.
+	FinalizeDeferredMetrics()
+}
+
 // kubeRegistry is a wrapper around a prometheus registry-type object. Upon initialization
 // the kubernetes binary version information is loaded into the registry object, so that
 // automatic behavior can be configured for metric versioning.
@@ -155,6 +174,12 @@ type kubeRegistry struct {
 	stableCollectorsLock sync.RWMutex
 	resetLock            sync.RWMutex
 	resettables          []resettable
+
+	// deferLock guards deferredMode and the pending slices.
+	deferLock         sync.Mutex
+	deferredMode      bool
+	pendingCollectors []Registerable    // metrics deferred from MustRegister/Register
+	pendingCustom     []StableCollector // metrics deferred from CustomMustRegister/CustomRegister
 }
 
 // Register registers a new Collector to be included in metrics
@@ -163,6 +188,17 @@ type kubeRegistry struct {
 // already registered Collectors — do not fulfill the consistency and
 // uniqueness criteria described in the documentation of metric.Desc.
 func (kr *kubeRegistry) Register(c Registerable) error {
+	kr.deferLock.Lock()
+	if kr.deferredMode {
+		defer kr.deferLock.Unlock()
+		if slices.Contains(kr.pendingCollectors, c) {
+			return prometheus.AlreadyRegisteredError{ExistingCollector: c, NewCollector: c}
+		}
+		kr.pendingCollectors = append(kr.pendingCollectors, c)
+		return nil
+	}
+	kr.deferLock.Unlock()
+
 	if c.Create(&kr.version) {
 		defer kr.addResettable(c)
 		return kr.PromRegistry.Register(c)
@@ -186,20 +222,58 @@ func (kr *kubeRegistry) Gatherer() prometheus.Gatherer {
 // Collectors and panics upon the first registration that causes an
 // error.
 func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
-	metrics := make([]prometheus.Collector, 0, len(cs))
+	kr.deferLock.Lock()
+	if kr.deferredMode {
+		defer kr.deferLock.Unlock()
+		for _, c := range cs {
+			if slices.Contains(kr.pendingCollectors, c) {
+				panic(prometheus.AlreadyRegisteredError{ExistingCollector: c, NewCollector: c})
+			}
+			kr.pendingCollectors = append(kr.pendingCollectors, c)
+		}
+		return
+	}
+	kr.deferLock.Unlock()
+
+	kr.mustRegisterImmediate(cs)
+}
+
+// mustRegisterImmediate performs the actual Create + PromRegistry.MustRegister
+// work for a batch of collectors. It does NOT consult deferredMode; callers
+// must have already handled the deferred-mode check (either by checking and
+// returning, or by holding deferLock and ensuring deferredMode is false).
+//
+// The deferLock is intentionally not taken here so that this helper can be
+// called from inside FinalizeDeferredMetrics, which holds deferLock across
+// the work to prevent concurrent FinalizeDeferredRegistries hook callers
+// from observing deferredMode=false while a metric's Create() is still in
+// flight.
+func (kr *kubeRegistry) mustRegisterImmediate(cs []Registerable) {
+	toRegister := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
 		if c.Create(&kr.version) {
-			metrics = append(metrics, c)
+			toRegister = append(toRegister, c)
 			kr.addResettable(c)
 		} else {
 			kr.trackHiddenCollector(c)
 		}
 	}
-	kr.PromRegistry.MustRegister(metrics...)
+	kr.PromRegistry.MustRegister(toRegister...)
 }
 
 // CustomRegister registers a new custom collector.
 func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
+	kr.deferLock.Lock()
+	if kr.deferredMode {
+		defer kr.deferLock.Unlock()
+		if slices.Contains(kr.pendingCustom, c) {
+			return prometheus.AlreadyRegisteredError{ExistingCollector: c, NewCollector: c}
+		}
+		kr.pendingCustom = append(kr.pendingCustom, c)
+		return nil
+	}
+	kr.deferLock.Unlock()
+
 	kr.trackStableCollectors(c)
 	defer kr.addResettable(c)
 	if c.Create(&kr.version, c) {
@@ -212,15 +286,35 @@ func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
 // StableCollectors and panics upon the first registration that causes an
 // error.
 func (kr *kubeRegistry) CustomMustRegister(cs ...StableCollector) {
+	kr.deferLock.Lock()
+	if kr.deferredMode {
+		defer kr.deferLock.Unlock()
+		for _, c := range cs {
+			if slices.Contains(kr.pendingCustom, c) {
+				panic(prometheus.AlreadyRegisteredError{ExistingCollector: c, NewCollector: c})
+			}
+			kr.pendingCustom = append(kr.pendingCustom, c)
+		}
+		return
+	}
+	kr.deferLock.Unlock()
+
+	kr.customMustRegisterImmediate(cs)
+}
+
+// customMustRegisterImmediate is the StableCollector counterpart of
+// mustRegisterImmediate. Same locking contract: callers must have handled
+// the deferred-mode check.
+func (kr *kubeRegistry) customMustRegisterImmediate(cs []StableCollector) {
 	kr.trackStableCollectors(cs...)
-	collectors := make([]prometheus.Collector, 0, len(cs))
+	toRegister := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
 		if c.Create(&kr.version, c) {
 			kr.addResettable(c)
-			collectors = append(collectors, c)
+			toRegister = append(toRegister, c)
 		}
 	}
-	kr.PromRegistry.MustRegister(collectors...)
+	kr.PromRegistry.MustRegister(toRegister...)
 }
 
 // RawMustRegister takes a native prometheus.Collector and registers the collector
@@ -262,8 +356,57 @@ func (kr *kubeRegistry) Unregister(collector Collector) bool {
 // for valid exposition. As an exception to the strict consistency
 // requirements described for metric.Desc, Gather will tolerate
 // different sets of label names for metrics of the same metric family.
+//
+// If the registry is still in deferred mode, Gather finalizes all
+// pending metrics first so that they are included in the result.
 func (kr *kubeRegistry) Gather() ([]*dto.MetricFamily, error) {
+	kr.FinalizeDeferredMetrics()
 	return kr.PromRegistry.Gather()
+}
+
+// EnableDeferredCreation switches the registry into deferred mode.
+func (kr *kubeRegistry) EnableDeferredCreation() {
+	kr.deferLock.Lock()
+	defer kr.deferLock.Unlock()
+	kr.deferredMode = true
+}
+
+// FinalizeDeferredMetrics processes all deferred metric registrations.
+// It creates the underlying prometheus objects for every metric that was
+// stored while the registry was in deferred mode, registers them, and
+// disables deferred mode so future registrations take effect immediately.
+// It is safe to call multiple times; calls after the first are no-ops.
+//
+// deferLock is held across the actual Create/Register work (not just the
+// flag flip). This ensures that concurrent callers — in particular the
+// FinalizeDeferredRegistries hook firing from multiple goroutines — block
+// until finalization is complete, instead of observing deferredMode=false
+// while a metric's Create() is still in flight (which would cause the
+// caller to fall through to a noop and drop the write).
+func (kr *kubeRegistry) FinalizeDeferredMetrics() {
+	kr.deferLock.Lock()
+	defer kr.deferLock.Unlock()
+	if !kr.deferredMode {
+		return
+	}
+	pending := kr.pendingCollectors
+	pendingCustom := kr.pendingCustom
+	kr.pendingCollectors = nil
+	kr.pendingCustom = nil
+	kr.deferredMode = false
+
+	// Use the *Immediate helpers so we don't recurse back through
+	// MustRegister/CustomMustRegister, which would deadlock on deferLock.
+	// The lock stays held across the work, ensuring concurrent finalize
+	// callers (e.g. parallel FinalizeDeferredRegistries hook firings)
+	// block until everything is created instead of observing
+	// deferredMode=false while Create() is still in flight.
+	if len(pending) > 0 {
+		kr.mustRegisterImmediate(pending)
+	}
+	if len(pendingCustom) > 0 {
+		kr.customMustRegisterImmediate(pendingCustom)
+	}
 }
 
 // trackHiddenCollector stores all hidden collectors.
@@ -354,6 +497,12 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 
 // NewKubeRegistry creates a new vanilla Registry
 func NewKubeRegistry() KubeRegistry {
+	r := newKubeRegistry(BuildVersion())
+	return r
+}
+
+// NewKubeRegistryWithDeferred creates a new Registry with deferred metric creation support.
+func NewKubeRegistryWithDeferred() KubeRegistryWithDeferred {
 	r := newKubeRegistry(BuildVersion())
 	return r
 }

@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 	internalmetrics "k8s.io/component-base/metrics/internal"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -47,8 +48,10 @@ func AddFeatureGates(mutableFeatureGate featuregate.MutableVersionedFeatureGate)
 }
 
 // ApplyFeatureGates propagates the current feature gate state to the metrics
-// subsystem. It must be called after feature gates are finalised and before
-// any histogram metrics are registered.
+// subsystem and finalizes all deferred metric registrations so that
+// feature-gate-dependent options (e.g. native histograms) are applied.
+// It must be called after feature gates are finalized.
 func ApplyFeatureGates(featureGate featuregate.FeatureGate) {
 	internalmetrics.SetNativeHistogramsEnabled(featureGate.Enabled(NativeHistograms))
+	legacyregistry.FinalizeDeferredMetrics()
 }

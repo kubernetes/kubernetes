@@ -425,6 +425,168 @@ func TestMustRegister(t *testing.T) {
 
 }
 
+func TestDeferredMetricCreation(t *testing.T) {
+	resetMetricsGlobalState(t)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.EnableDeferredCreation()
+
+	counter := NewCounter(&CounterOpts{
+		Namespace:      "deferred",
+		Name:           "test_counter",
+		Help:           "counter help",
+		StabilityLevel: ALPHA,
+	})
+	histogram := NewHistogram(&HistogramOpts{
+		Namespace:      "deferred",
+		Name:           "test_histogram",
+		Help:           "histogram help",
+		Buckets:        prometheus.DefBuckets,
+		StabilityLevel: ALPHA,
+	})
+
+	// Metrics registered while in deferred mode should not be created yet.
+	registry.MustRegister(counter)
+	registry.MustRegister(histogram)
+	if counter.IsCreated() {
+		t.Error("counter should not be created while in deferred mode")
+	}
+	if histogram.IsCreated() {
+		t.Error("histogram should not be created while in deferred mode")
+	}
+
+	// After finalization, metrics should be created.
+	registry.FinalizeDeferredMetrics()
+	if !counter.IsCreated() {
+		t.Error("counter should be created after finalization")
+	}
+	if !histogram.IsCreated() {
+		t.Error("histogram should be created after finalization")
+	}
+
+	// Subsequent registrations should take effect immediately.
+	lateCounter := NewCounter(&CounterOpts{
+		Namespace:      "deferred",
+		Name:           "late_counter",
+		Help:           "registered after finalization",
+		StabilityLevel: ALPHA,
+	})
+	registry.MustRegister(lateCounter)
+	if !lateCounter.IsCreated() {
+		t.Error("late counter should be created immediately after finalization")
+	}
+}
+
+func TestDeferredGatherSafetyNet(t *testing.T) {
+	resetMetricsGlobalState(t)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.EnableDeferredCreation()
+
+	counter := NewCounter(&CounterOpts{
+		Namespace:      "deferred_gather",
+		Name:           "test_counter",
+		Help:           "counter help",
+		StabilityLevel: ALPHA,
+	})
+	registry.MustRegister(counter)
+
+	// Counter should not be created yet (deferred mode).
+	if counter.IsCreated() {
+		t.Error("counter should not be created before Gather")
+	}
+
+	// Gather should finalize deferred metrics automatically.
+	output := `
+		# HELP deferred_gather_test_counter [ALPHA] counter help
+		# TYPE deferred_gather_test_counter counter
+		deferred_gather_test_counter 0
+	`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(output), "deferred_gather_test_counter"); err != nil {
+		t.Fatal(err)
+	}
+	if !counter.IsCreated() {
+		t.Error("counter should be created after Gather")
+	}
+}
+
+func TestFinalizeDeferredMetricsIdempotent(t *testing.T) {
+	resetMetricsGlobalState(t)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.EnableDeferredCreation()
+
+	counter := NewCounter(&CounterOpts{
+		Namespace:      "idempotent",
+		Name:           "test_counter",
+		Help:           "counter help",
+		StabilityLevel: ALPHA,
+	})
+	registry.MustRegister(counter)
+
+	// Multiple calls should not panic or double-register.
+	registry.FinalizeDeferredMetrics()
+	registry.FinalizeDeferredMetrics()
+	if !counter.IsCreated() {
+		t.Error("counter should be created after finalization")
+	}
+}
+
+func TestVecHookTriggersFinalize(t *testing.T) {
+	resetMetricsGlobalState(t)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.EnableDeferredCreation()
+
+	counter := NewCounterVec(&CounterOpts{
+		Namespace:      "vec_hook",
+		Name:           "test_counter",
+		Help:           "counter help",
+		StabilityLevel: ALPHA,
+	}, []string{"label"})
+	registry.MustRegister(counter)
+
+	if counter.IsCreated() {
+		t.Error("vec should not be created while in deferred mode")
+	}
+
+	// Point the hook at this registry, mimicking what legacyregistry
+	// does at init() time for its default registry.
+	oldHook := FinalizeDeferredRegistries
+	FinalizeDeferredRegistries = registry.FinalizeDeferredMetrics
+	defer func() { FinalizeDeferredRegistries = oldHook }()
+
+	counter.WithLabelValues("foo").Inc()
+	if !counter.IsCreated() {
+		t.Error("vec should be created automatically after Inc")
+	}
+
+	output := `
+		# HELP vec_hook_test_counter [ALPHA] counter help
+		# TYPE vec_hook_test_counter counter
+		vec_hook_test_counter{label="foo"} 1
+	`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(output), "vec_hook_test_counter"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRegistryReset(t *testing.T) {
 	currentVersion := apimachineryversion.Info{
 		Major:      "1",

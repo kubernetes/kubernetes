@@ -57,6 +57,18 @@ func NewSummary(opts *SummaryOpts) *Summary {
 	return s
 }
 
+func (s *Summary) Observe(v float64) {
+	if !s.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !s.IsCreated() {
+			return
+		}
+	}
+	s.ObserverMetric.Observe(v)
+}
+
 // setPrometheusSummary sets the underlying KubeGauge object, i.e. the thing that does the measurement.
 func (s *Summary) setPrometheusSummary(summary prometheus.Summary) {
 	s.ObserverMetric = summary
@@ -85,6 +97,11 @@ func (s *Summary) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Summary metric to pass in context. The context is no-op now.
 func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
+	if !s.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+	}
 	return s.ObserverMetric
 }
 
@@ -152,7 +169,12 @@ func (v *SummaryVec) initializeDeprecatedMetric() {
 // has been registered to a metrics registry.
 func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
-		return noop
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -171,13 +193,42 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 	return v.SummaryVec.WithLabelValues(lvs...)
 }
 
+func (v *SummaryVec) GetMetricWithLabelValues(lvs ...string) (ObserverMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.SummaryVec.GetMetricWithLabelValues(lvs...)
+}
+
+func (v *SummaryVec) GetMetricWith(labels map[string]string) (ObserverMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.SummaryVec.GetMetricWith(labels)
+}
+
 // With returns the ObserverMetric for the given Labels map (the label names
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new ObserverMetric is created IFF the summaryVec has
 // been registered to a metrics registry.
 func (v *SummaryVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
-		return noop
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop
+		}
 	}
 
 	v.initializeLabelAllowListsOnce.Do(func() {

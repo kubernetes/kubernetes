@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 
 	"k8s.io/component-base/version"
 )
@@ -54,6 +55,38 @@ func NewGauge(opts *GaugeOpts) *Gauge {
 	return kc
 }
 
+func (g *Gauge) Set(v float64) {
+	if !g.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !g.IsCreated() {
+			return
+		}
+	}
+	g.GaugeMetric.Set(v)
+}
+
+func (g *Gauge) Inc() {
+	g.Add(1)
+}
+
+func (g *Gauge) Dec() {
+	g.Add(-1)
+}
+
+func (g *Gauge) Add(v float64) {
+	if !g.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !g.IsCreated() {
+			return
+		}
+	}
+	g.GaugeMetric.Add(v)
+}
+
 // setPrometheusGauge sets the underlying KubeGauge object, i.e. the thing that does the measurement.
 func (g *Gauge) setPrometheusGauge(gauge prometheus.Gauge) {
 	g.GaugeMetric = gauge
@@ -82,7 +115,18 @@ func (g *Gauge) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Gauge metric to pass in context. The context is no-op now.
 func (g *Gauge) WithContext(ctx context.Context) GaugeMetric {
+	if !g.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+	}
 	return g.GaugeMetric
+}
+
+func (g *Gauge) Write(to *dto.Metric) error {
+	g.createLock.RLock()
+	defer g.createLock.RUnlock()
+	return g.GaugeMetric.Write(to)
 }
 
 // GaugeVec is the internal representation of our wrapping struct around prometheus
@@ -141,7 +185,12 @@ func (v *GaugeVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 		if v.IsHidden() {
 			return noop, nil
 		}
-		return noop, errNotRegistered // return no-op gauge
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered // return no-op gauge
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
@@ -159,6 +208,30 @@ func (v *GaugeVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 	}
 
 	return v.GetMetricWithLabelValues(lvs...)
+}
+
+func (v *GaugeVec) GetMetricWithLabelValues(lvs ...string) (GaugeMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.GaugeVec.GetMetricWithLabelValues(lvs...)
+}
+
+func (v *GaugeVec) GetMetricWith(labels map[string]string) (GaugeMetric, error) {
+	if !v.IsCreated() {
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered
+		}
+	}
+	return v.GaugeVec.GetMetricWith(labels)
 }
 
 func (v *GaugeVec) DeleteLabelValuesChecked(lvs ...string) (bool, error) {
@@ -208,7 +281,12 @@ func (v *GaugeVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
 		if v.IsHidden() {
 			return noop, nil
 		}
-		return noop, errNotRegistered // return no-op gauge
+		if FinalizeDeferredRegistries != nil {
+			FinalizeDeferredRegistries()
+		}
+		if !v.IsCreated() {
+			return noop, errNotRegistered // return no-op gauge
+		}
 	}
 
 	// Initialize label allow lists if not already initialized
