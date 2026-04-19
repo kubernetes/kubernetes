@@ -275,14 +275,13 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 	}
 
 	if c.queue.NumRequeues(key) < maxRetries {
-		logger.Info("Error mirroring EndpointSlices for Endpoints, retrying", "key", key, "err", err)
+		utilruntime.HandleErrorWithLogger(logger, err, "Error mirroring EndpointSlices for Endpoints, retrying", "key", key)
 		c.queue.AddRateLimited(key)
 		return
 	}
 
-	logger.Info("Retry budget exceeded, dropping Endpoints out of the queue", "key", key, "err", err)
 	c.queue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithLogger(logger, err, "Reported exhausted-retry error for EndpointSlice mirroring", "key", key)
 }
 
 func (c *Controller) syncEndpoints(ctx context.Context, key string) error {
@@ -418,7 +417,7 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 func (c *Controller) onEndpointsAdd(logger klog.Logger, obj interface{}) {
 	endpoints := obj.(*v1.Endpoints)
 	if endpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsAdd() expected type v1.Endpoints, got %T", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "onEndpointsAdd() expected type v1.Endpoints", "obj", obj)
 		return
 	}
 	if !c.shouldMirror(endpoints) {
@@ -433,7 +432,7 @@ func (c *Controller) onEndpointsUpdate(logger klog.Logger, prevObj, obj interfac
 	endpoints := obj.(*v1.Endpoints)
 	prevEndpoints := prevObj.(*v1.Endpoints)
 	if endpoints == nil || prevEndpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "onEndpointsUpdate() expected type v1.Endpoints", "prevObj", prevObj, "obj", obj)
 		return
 	}
 	if !c.shouldMirror(endpoints) && !c.shouldMirror(prevEndpoints) {
@@ -447,7 +446,7 @@ func (c *Controller) onEndpointsUpdate(logger klog.Logger, prevObj, obj interfac
 func (c *Controller) onEndpointsDelete(logger klog.Logger, obj interface{}) {
 	endpoints := getEndpointsFromDeleteAction(obj)
 	if endpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsDelete() expected type v1.Endpoints, got %T", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "onEndpointsDelete() expected type v1.Endpoints", "obj", obj)
 		return
 	}
 	if !c.shouldMirror(endpoints) {
@@ -479,7 +478,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "onEndpointSliceUpdated() expected type discovery.EndpointSlice", "prevObj", prevObj, "obj", obj)
 		return
 	}
 	// EndpointSlice generation does not change when labels change. Although the
