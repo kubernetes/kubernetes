@@ -110,6 +110,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -711,6 +712,11 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
+	// Initialize NodeInfo cache for efficient pod admission.
+	// The node will be set when GetCachedNode is first called.
+	// Pods will be added incrementally via HandlePodAdditions.
+	klet.nodeInfoCache = nodeinfocache.New()
+
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
@@ -1115,7 +1121,7 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, klet.containerManager.GetAllocateResourcesPodAdmitHandler())
 
 	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.GetCachedNode, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.GetCachedNode, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources, klet.nodeInfoCache))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
@@ -1297,6 +1303,10 @@ type Kubelet struct {
 
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
+
+	// nodeInfoCache caches NodeInfo for efficient pod admission.
+	// Updated incrementally when pods are added/removed/updated.
+	nodeInfoCache *nodeinfocache.Cache
 
 	// podCertificateManager is fed updates as pods are added and removed from
 	// the node, and requests certificates for them based on their configured
@@ -2886,6 +2896,11 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+			// Update NodeInfo cache after successful admission.
+			// Use allocated resources (not desired) so resource accounting
+			// reflects what is actually committed on the node.
+			allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+			kl.nodeInfoCache.AddPod(allocatedPod)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
@@ -2923,6 +2938,14 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 	for _, pod := range pods {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
+		// Update NodeInfo cache with allocated resources (not desired) so
+		// resource accounting reflects what is actually committed.
+		// oldPod is nil for mirror pods (stored separately in podManager),
+		// so the cache update is naturally skipped for mirror pod events.
+		if oldPod != nil {
+			allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+			kl.nodeInfoCache.UpdatePod(logger, oldPod, allocatedPod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -3070,6 +3093,8 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 	for _, pod := range pods {
 		kl.podCertificateManager.ForgetPod(ctx, pod)
 		kl.podManager.RemovePod(pod)
+		// Remove from NodeInfo cache
+		kl.nodeInfoCache.RemovePod(logger, pod)
 		kl.allocationManager.RemovePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
@@ -3113,6 +3138,13 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// to the pod manager.
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
+		// Keep NodeInfo cache in sync — reconcile events carry the latest pod
+		// spec from the API server which may include resource changes.
+		// Use allocated resources so accounting reflects actual commitments.
+		if oldPod != nil {
+			allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+			kl.nodeInfoCache.UpdatePod(logger, oldPod, allocatedPod)
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
