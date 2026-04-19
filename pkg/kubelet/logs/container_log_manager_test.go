@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -267,6 +268,45 @@ func TestClean(t *testing.T) {
 	assert.Equal(t, testLogs[1], logs[1].Name())
 	assert.Equal(t, testLogs[3], logs[2].Name())
 	assert.Equal(t, testLogs[4], logs[3].Name())
+}
+
+func TestCleanEmptyLogPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	f := critest.NewFakeRuntimeService()
+	fakeOS := &containertest.FakeOS{}
+	var globPatterns []string
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		globPatterns = append(globPatterns, pattern)
+		return true
+	}
+	c := &containerLogManager{
+		runtimeService: f,
+		policy:         LogRotatePolicy{MaxSize: 10, MaxFiles: 3},
+		osInterface:    fakeOS,
+		clock:          testingclock.NewFakeClock(time.Now()),
+		mutex:          sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
+		maxWorkers:       10,
+		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
+	}
+	f.SetFakeContainers([]*critest.FakeContainer{
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "container-empty",
+				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath: "",
+			},
+		},
+	})
+
+	err := c.Clean(tCtx, "container-empty")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty log path")
+	assert.Empty(t, globPatterns, "Glob must not be called when log path is empty")
+	assert.Empty(t, fakeOS.Removes, "Remove must not be called when log path is empty")
 }
 
 func TestCleanupUnusedLog(t *testing.T) {
