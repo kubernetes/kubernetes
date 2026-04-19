@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -108,7 +109,7 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	// Remove duplicate nonResourceURLs
 	nonResourceURLs := []string{}
 	for _, n := range c.NonResourceURLs {
-		if !arrayContains(nonResourceURLs, n) {
+		if !slices.Contains(nonResourceURLs, n) {
 			nonResourceURLs = append(nonResourceURLs, n)
 		}
 	}
@@ -142,7 +143,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 	// validate resources
 	if len(c.Resources) > 0 {
 		for _, v := range c.Verbs {
-			if !arrayContains(validResourceVerbs, v) {
+			if !slices.Contains(validResourceVerbs, v) {
 				fmt.Fprintf(c.ErrOut, "Warning: '%s' is not a standard resource verb\n", v)
 			}
 		}
@@ -154,7 +155,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 	//validate non-resource-url
 	if len(c.NonResourceURLs) > 0 {
 		for _, v := range c.Verbs {
-			if !arrayContains(validNonResourceVerbs, v) {
+			if !slices.Contains(validNonResourceVerbs, v) {
 				return fmt.Errorf("invalid verb: '%s' for nonResourceURL", v)
 			}
 		}

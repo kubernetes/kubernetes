@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"slices"
 	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -83,15 +84,6 @@ func BreakdownRule(rule rbacv1.PolicyRule) []rbacv1.PolicyRule {
 	return subrules
 }
 
-func has(set []string, ele string) bool {
-	for _, s := range set {
-		if s == ele {
-			return true
-		}
-	}
-	return false
-}
-
 func hasAll(set, contains []string) bool {
 	owning := make(map[string]struct{}, len(set))
 	for _, ele := range set {
@@ -107,13 +99,13 @@ func hasAll(set, contains []string) bool {
 
 func resourceCoversAll(setResources, coversResources []string) bool {
 	// if we have a star or an exact match on all resources, then we match
-	if has(setResources, rbacv1.ResourceAll) || hasAll(setResources, coversResources) {
+	if slices.Contains(setResources, rbacv1.ResourceAll) || hasAll(setResources, coversResources) {
 		return true
 	}
 
 	for _, path := range coversResources {
 		// if we have an exact match, then we match.
-		if has(setResources, path) {
+		if slices.Contains(setResources, path) {
 			continue
 		}
 		// if we're not a subresource, then we definitely don't match.  fail.
@@ -122,7 +114,7 @@ func resourceCoversAll(setResources, coversResources []string) bool {
 		}
 		tokens := strings.SplitN(path, "/", 2)
 		resourceToCheck := "*/" + tokens[1]
-		if !has(setResources, resourceToCheck) {
+		if !slices.Contains(setResources, resourceToCheck) {
 			return false
 		}
 	}
@@ -156,8 +148,8 @@ func nonResourceURLCovers(ownerPath, subPath string) bool {
 // ruleCovers determines whether the ownerRule (which may have multiple verbs, resources, and resourceNames) covers
 // the subrule (which may only contain at most one verb, resource, and resourceName)
 func ruleCovers(ownerRule, subRule rbacv1.PolicyRule) bool {
-	verbMatches := has(ownerRule.Verbs, rbacv1.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
-	groupMatches := has(ownerRule.APIGroups, rbacv1.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
+	verbMatches := slices.Contains(ownerRule.Verbs, rbacv1.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
+	groupMatches := slices.Contains(ownerRule.APIGroups, rbacv1.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
 	resourceMatches := resourceCoversAll(ownerRule.Resources, subRule.Resources)
 	nonResourceURLMatches := nonResourceURLsCoversAll(ownerRule.NonResourceURLs, subRule.NonResourceURLs)
 

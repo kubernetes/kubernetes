@@ -19,6 +19,7 @@ package get
 import (
 	"bytes"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -137,7 +138,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 					t.Fatalf("An error occurred printing Pod: %#v", err)
 				}
 
-				if contains(strings.Fields(buffer.String()), "API_VERSION") {
+				if slices.Contains(strings.Fields(buffer.String()), "API_VERSION") {
 					t.Errorf("unexpected header API_VERSION")
 				}
 
@@ -146,15 +147,6 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(arr []string, s string) bool {
-	for i := range arr {
-		if arr[i] == s {
-			return true
-		}
-	}
-	return false
 }
 
 const exampleTemplateOne = `NAME               API_VERSION

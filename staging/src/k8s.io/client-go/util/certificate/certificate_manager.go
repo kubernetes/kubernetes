@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -336,7 +337,7 @@ func NewManager(config *Config) (Manager, error) {
 	if len(name) == 0 {
 		usages := getUsages(nil)
 		switch {
-		case hasKeyUsage(usages, certificates.UsageClientAuth):
+		case slices.Contains(usages, certificates.UsageClientAuth):
 			name = string(certificates.UsageClientAuth)
 		default:
 			name = "certificate"
@@ -797,13 +798,4 @@ func (m *manager) setLastRequest(cancel context.CancelFunc, r *x509.CertificateR
 	defer m.lastRequestLock.Unlock()
 	m.lastRequestCancel = cancel
 	m.lastRequest = r
-}
-
-func hasKeyUsage(usages []certificates.KeyUsage, usage certificates.KeyUsage) bool {
-	for _, u := range usages {
-		if u == usage {
-			return true
-		}
-	}
-	return false
 }

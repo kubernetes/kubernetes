@@ -342,6 +342,34 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
+			name: "anonymous-username-already-has-unauthenticated-group",
+			user: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{user.AllUnauthenticated},
+			},
+			impersonationUser: user.Anonymous,
+			expectedUser: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{user.AllUnauthenticated},
+				Extra:  map[string][]string{},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "anonymous-username-adding-unauthenticated-group",
+			user: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{},
+			},
+			impersonationUser: user.Anonymous,
+			expectedUser: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{user.AllUnauthenticated},
+				Extra:  map[string][]string{},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
 			name: "unauthenticated-group-prevents-adding-authenticated-group",
 			user: &user.DefaultInfo{
 				Name: "system:admin",

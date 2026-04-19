@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
@@ -143,15 +144,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				groups = append(groups, user.AllAuthenticated)
 			}
 		} else {
-			addUnauthenticated := true
-			for _, group := range groups {
-				if group == user.AllUnauthenticated {
-					addUnauthenticated = false
-					break
-				}
-			}
-
-			if addUnauthenticated {
+			if !slices.Contains(groups, user.AllUnauthenticated) {
 				groups = append(groups, user.AllUnauthenticated)
 			}
 		}

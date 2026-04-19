@@ -4466,14 +4466,7 @@ func TestRatcheting(t *testing.T) {
 
 			// Check that the ratcheting disabled errors were raised as warnings
 			for _, expectedWarning := range c.warnings {
-				found := false
-				for _, warning := range recorder.Warnings() {
-					if warning == expectedWarning {
-						found = true
-						break
-					}
-				}
-				assert.True(t, found, "expected warning %q not found", expectedWarning)
+				assert.Contains(t, recorder.Warnings(), expectedWarning, "expected warning %q not found", expectedWarning)
 			}
 
 		})
