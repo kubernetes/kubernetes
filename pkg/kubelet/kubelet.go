@@ -706,7 +706,6 @@ func NewMainKubelet(ctx context.Context,
 		klet.getRootDir(),
 		klet.statusManager,
 		klet.syncPodNow,
-		klet.GetActivePods,
 		klet.podManager.GetPodByUID,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
@@ -2885,9 +2884,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 		// We also do not try to admit the pod that is already in terminated state.
 		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
 			// Check if we can admit the pod; if not, reject it.
-			// We failed pods that we rejected, so activePods include all admitted
-			// pods that are alive.
-			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+			if ok, reason, message := kl.allocationManager.AddPod(pod); !ok {
 				kl.rejectPod(ctx, pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.

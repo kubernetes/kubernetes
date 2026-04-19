@@ -169,7 +169,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 
 	// Use cached NodeInfo snapshot instead of rebuilding from scratch.
-	// This is O(n) for the snapshot vs O(n*m) for NewNodeInfo where n=pods, m=containers.
+	// Snapshot copies pre-computed aggregates; NewNodeInfo recomputes from scratch
+	// by iterating all containers in all pods.
 	nodeInfo := w.nodeInfoProvider.Snapshot()
 	// Ensure node is current (cache may have slightly stale node if updated between events)
 	nodeInfo.SetNode(node)
