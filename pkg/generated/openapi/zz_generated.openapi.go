@@ -68865,6 +68865,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref 
 							Format:      "",
 						},
 					},
+					"snatNodeInternalIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "snatNodeInternalIP, if true, tells kube-proxy to SNAT service traffic using the node's InternalIP instead of the egress interface address. This ensures service traffic is recognized by NetworkPolicy rules that check for node identity. WARNING: This is an opt-in behavior that changes how SNAT works. Enable only if your cluster requires service traffic to be SNATed with the node's InternalIP.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"syncPeriod": {
 						SchemaProps: spec.SchemaProps{
 							Description: "syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.",
@@ -68878,7 +68885,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref 
 						},
 					},
 				},
-				Required: []string{"masqueradeBit", "masqueradeAll", "localhostNodePorts", "syncPeriod", "minSyncPeriod"},
+				Required: []string{"masqueradeBit", "masqueradeAll", "localhostNodePorts", "snatNodeInternalIP", "syncPeriod", "minSyncPeriod"},
 			},
 		},
 		Dependencies: []string{

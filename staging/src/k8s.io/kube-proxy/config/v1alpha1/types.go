@@ -37,6 +37,12 @@ type KubeProxyIPTablesConfiguration struct {
 	// iptables mode and IPv4; localhost NodePorts are never allowed with other proxy
 	// modes or with IPv6.)
 	LocalhostNodePorts *bool `json:"localhostNodePorts"`
+	// snatNodeInternalIP, if true, tells kube-proxy to SNAT service traffic using the
+	// node's InternalIP instead of the egress interface address. This ensures service
+	// traffic is recognized by NetworkPolicy rules that check for node identity.
+	// WARNING: This is an opt-in behavior that changes how SNAT works. Enable only if
+	// your cluster requires service traffic to be SNATed with the node's InternalIP.
+	SNATNodeInternalIP *bool `json:"snatNodeInternalIP"`
 	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
 	// various re-synchronizing and cleanup operations are performed. Must be greater
 	// than 0.

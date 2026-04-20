@@ -147,6 +147,11 @@ func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesCon
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SNATNodeInternalIP != nil {
+		in, out := &in.SNATNodeInternalIP, &out.SNATNodeInternalIP
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
