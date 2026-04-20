@@ -841,12 +841,13 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	handleWarnings(ctx, resp.Header, r.warningHandler)
 
-	frameReader := framer.NewFrameReader(resp.Body)
+	networkReader := &restclientwatch.TimingReadCloser{ReadCloser: resp.Body}
+	frameReader := framer.NewFrameReader(networkReader)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+		restclientwatch.NewDecoderWithNetworkTiming(watchEventDecoder, objectDecoder, networkReader),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),

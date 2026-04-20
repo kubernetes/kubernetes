@@ -996,6 +996,10 @@ func handleAnyWatch(
 		}
 	}()
 
+	var totalChanWaitTime, totalStoreTime time.Duration
+	handleStart := clock.Now()
+	chanWaitStart := handleStart
+
 loop:
 	for {
 		select {
@@ -1004,6 +1008,7 @@ loop:
 		case err := <-errCh:
 			return watchListBookmarkReceived, err
 		case event, ok := <-w.ResultChan():
+			totalChanWaitTime += clock.Since(chanWaitStart)
 			if !ok {
 				break loop
 			}
@@ -1013,12 +1018,14 @@ loop:
 			if expectedType != nil {
 				if e, a := expectedType, reflect.TypeOf(event.Object); e != a {
 					utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected watch event object type", "reflector", name, "expectedType", e, "actualType", a)
+					chanWaitStart = clock.Now()
 					continue
 				}
 			}
 			if expectedGVK != nil {
 				if e, a := *expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
 					utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected watch event object gvk", "reflector", name, "expectedGVK", e, "actualGVK", a)
+					chanWaitStart = clock.Now()
 					continue
 				}
 			}
@@ -1026,14 +1033,17 @@ loop:
 			// see #132926 for more info
 			if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
 				utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
+				chanWaitStart = clock.Now()
 				continue
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to understand watch event", "reflector", name, "event", event)
+				chanWaitStart = clock.Now()
 				continue
 			}
 			resourceVersion := meta.GetResourceVersion()
+			storeStart := clock.Now()
 			switch event.Type {
 			case watch.Added:
 				err := store.Add(event.Object)
@@ -1071,15 +1081,24 @@ loop:
 			default:
 				utilruntime.HandleErrorWithContext(ctx, err, "Unknown watch event", "reflector", name, "event", event)
 			}
+			totalStoreTime += clock.Since(storeStart)
 			// when eventReceivedBesidesAdded is true, that indicates we are definitely past any initial synthetic Added events
 			setLastSyncResourceVersion(resourceVersion, eventReceivedBesidesAdded)
 			eventCount++
 			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
 				stopWatcher = false
 				watchDuration := clock.Since(start)
+				handleDuration := clock.Since(handleStart)
+				// eventCount includes the bookmark event itself, subtract it for init event count
+				initEventCount := eventCount - 1
+				if handleDuration > 10*time.Second {
+					otherTime := handleDuration - totalChanWaitTime - totalStoreTime
+					klog.V(2).Infof("TRACE-REFLECTOR %s: events=%d total=%v chanWait=%v (waiting for events) store=%v (adding to store) other=%v (overhead)", name, initEventCount, handleDuration, totalChanWaitTime, totalStoreTime, otherTime)
+				}
 				klog.FromContext(ctx).V(4).Info("Exiting watch because received the bookmark that marks the end of initial events stream", "reflector", name, "totalItems", eventCount, "duration", watchDuration)
 				return watchListBookmarkReceived, nil
 			}
+			chanWaitStart = clock.Now()
 			initialEventsEndBookmarkWarningTicker.observeLastEventTimeStamp(clock.Now())
 		case <-initialEventsEndBookmarkWarningTicker.C():
 			initialEventsEndBookmarkWarningTicker.warnIfExpired()
