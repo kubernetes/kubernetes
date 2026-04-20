@@ -71,4 +71,4 @@ const TCPSlowStartAfterIdleNamespacedKernelVersion = "4.15"
 
 // TCPNotSentLowatNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_notsent_lowat was namespaced(netns).
 // (ref: https://github.com/torvalds/linux/commit/4979f2d9f7262b9b180bc83de8d70f7a7721c085)
-const TCPNotSentLowatNamespacedKernelVersion = "4.7"
+const TCPNotSentLowatNamespacedKernelVersion = "4.6"
