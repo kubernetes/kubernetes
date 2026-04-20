@@ -360,9 +360,9 @@ func (o *AuditOptions) newPolicyRuleEvaluator() (audit.PolicyRuleEvaluator, erro
 
 func (o *AuditBatchOptions) AddFlags(pluginName string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.Mode, fmt.Sprintf("audit-%s-mode", pluginName), o.Mode,
-		"Strategy for sending audit events. Blocking indicates sending events should block"+
-			" server responses. Batch causes the backend to buffer and write events"+
-			" asynchronously. Known modes are "+strings.Join(AllowedModes, ",")+".")
+		"Strategy for sending audit events. Blocking indicates sending events should block "+
+			"server responses. Batch causes the backend to buffer and write events "+
+			"asynchronously. Known modes are "+strings.Join(AllowedModes, ",")+".")
 	fs.IntVar(&o.BatchConfig.BufferSize, fmt.Sprintf("audit-%s-batch-buffer-size", pluginName),
 		o.BatchConfig.BufferSize, "The size of the buffer to store events before "+
 			"batching and writing. Only used in batch mode.")
