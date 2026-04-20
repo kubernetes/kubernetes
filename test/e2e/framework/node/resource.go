@@ -364,7 +364,7 @@ func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
-// TODO: need to discuss wether to return bool and error type
+// TODO: need to discuss whether to return bool and error type
 func isNodeUntainted(logger klog.Logger, node *v1.Node) bool {
 	return isNodeUntaintedWithNonblocking(logger, node, "")
 }

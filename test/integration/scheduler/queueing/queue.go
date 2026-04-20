@@ -111,12 +111,12 @@ type CoreResourceEnqueueTestCase struct {
 	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
 	// If empty, all plugins are enabled.
 	EnablePlugins []string
-	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
+	// EnabledRAExtendedResource indicates whether the test case should run with feature gate
 	// DRAExtendedResource enabled or not.
 	EnableDRAExtendedResource bool
 	// EnableNodeDeclaredFeatures indicates if the test case runs with the NodeDeclaredFeatures feature gate enabled.
 	EnableNodeDeclaredFeatures bool
-	// EnableGangScheduling indicates wether the test case should run with feature gates
+	// EnableGangScheduling indicates whether the test case should run with feature gates
 	// GenericWorkload and GangScheduling enabled or not.
 	EnableGangScheduling bool
 }
