@@ -295,6 +295,81 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 		})
 
+		ginkgo.It("must create resource claim when template is created later", func(ctx context.Context) {
+			ginkgo.By("creating a pod with a claim referencing a non-existent template")
+
+			pod := b.Pod()
+			pod.Spec.Containers[0].Name = "with-resource"
+
+			templateName := pod.Name + "-template"
+
+			pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "claim-a"}}
+			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
+				{Name: "claim-a", ResourceClaimTemplateName: &templateName},
+			}
+
+			b.Create(f.TContext(ctx), pod)
+
+			ginkgo.By("verifying that the pod stays Pending")
+			gomega.Consistently(ctx, func(ctx context.Context) (v1.PodPhase, error) {
+				testPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				return testPod.Status.Phase, nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Equal(v1.PodPending), "pod should stay pending while template is missing")
+
+			ginkgo.By("creating the resource claim template later")
+			template := &resourceapi.ResourceClaimTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      templateName,
+					Namespace: pod.Namespace,
+				},
+				Spec: resourceapi.ResourceClaimTemplateSpec{
+					Spec: b.ClaimSpec(),
+				},
+			}
+			b.Create(f.TContext(ctx), template)
+
+			ginkgo.By("verifying that the claim is NOT created immediately (due to missed event and back-off)")
+			gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
+				claims, err := f.ClientSet.ResourceV1().ResourceClaims(pod.Namespace).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return true, err // Treat error as failure to prove not created
+				}
+				for _, claim := range claims.Items {
+					if strings.HasPrefix(claim.Name, pod.Name+"-claim-a") {
+						return true, nil
+					}
+				}
+				return false, nil
+			}, 30*time.Second, 1*time.Second).Should(gomega.BeFalse(), "claim should not be created without external trigger")
+
+			ginkgo.By("updating the pod to force a sync")
+			testPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get pod")
+			if testPod.Labels == nil {
+				testPod.Labels = make(map[string]string)
+			}
+			testPod.Labels["trigger"] = "sync"
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Update(ctx, testPod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "update pod")
+
+			ginkgo.By("waiting for the resource claim to be created for the pod after update")
+			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+				claims, err := f.ClientSet.ResourceV1().ResourceClaims(pod.Namespace).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				for _, claim := range claims.Items {
+					if strings.HasPrefix(claim.Name, pod.Name+"-claim-a") {
+						return true, nil
+					}
+				}
+				return false, nil
+			}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("claim should be created eventually after update"))
+		})
+
 		ginkgo.It("must not run a pod if a claim is not ready", func(ctx context.Context) {
 			claim := b.ExternalClaim()
 			b.Create(f.TContext(ctx), claim)
