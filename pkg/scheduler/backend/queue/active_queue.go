@@ -37,7 +37,9 @@ type activeQueuer interface {
 	underLock(func(unlockedActiveQ unlockedActiveQueuer))
 	underRLock(func(unlockedActiveQ unlockedActiveQueueReader))
 
-	delete(pInfo *framework.QueuedPodInfo) error
+	// delete removes the pod from the activeQ.
+	// It returns the pod info if it was removed, nil otherwise.
+	delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	list() []*v1.Pod
 	len() int
@@ -255,8 +257,9 @@ func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueRea
 	fn(aq.unlockedQueue)
 }
 
-// delete deletes the pod info from activeQ.
-func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
+// delete removes the pod from the activeQ.
+// It returns the pod info if it was removed, nil otherwise.
+func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 

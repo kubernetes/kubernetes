@@ -768,17 +768,10 @@ func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 	var movesFromBackoffQ bool
 	// Verify if the pod is present in unschedulablePods or backoffQ.
 	if pInfo = p.unschedulablePods.get(pod); pInfo == nil {
-		// If the pod doesn't belong to unschedulablePods or backoffQ, don't activate it.
-		// The pod can be already in activeQ.
-		var exists bool
-		pInfo, exists = p.backoffQ.get(newQueuedPodInfoForLookup(pod))
-		if !exists {
-			return false
-		}
-		// Delete pod from the backoffQ now to make sure it won't be popped from the backoffQ
-		// just before moving it to the activeQ
-		if deleted := p.backoffQ.delete(pInfo); !deleted {
-			// Pod was popped from the backoffQ in the meantime. Don't activate it.
+		// Pod may be present in the backoffQ. Try to delete the pod from the backoffQ now
+		// to make sure it won't be popped from the backoffQ just before moving it to the activeQ.
+		if pInfo = p.backoffQ.delete(newQueuedPodInfoForLookup(pod)); pInfo == nil {
+			// Pod is not present in the backoffQ. Don't activate it.
 			return false
 		}
 		movesFromBackoffQ = true
@@ -967,16 +960,11 @@ func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framewo
 	// moved to the activeQ and popped from there.
 	_ = p.activate(logger, pod)
 
-	var pInfo *framework.QueuedPodInfo
-	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
-		pInfo, _ = unlockedActiveQ.get(pInfoLookup)
-	})
+	pInfo := p.activeQ.delete(pInfoLookup)
+
+	// nil value means that the pod disappeared from the activeQ in the meantime.
+	// Returning nil is fine.
 	if pInfo == nil {
-		return nil
-	}
-	if err := p.activeQ.delete(pInfo); err != nil {
-		// Error means that the pod disappeared from the activeQ in the meantime.
-		// Returning nil is fine.
 		return nil
 	}
 	err := p.activeQ.movePodToInFlight(pInfo)
@@ -1078,25 +1066,41 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	}
 }
 
+// decreaseUnschedulableReasonMetric decreases the metrics for the rejector plugins
+// which are both UnschedulablePlugins and PendingPlugins.
+func decreaseUnschedulableReasonMetric(pInfo *framework.QueuedPodInfo) {
+	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+	}
+}
+
 // Delete deletes the item from either of the two queues. It assumes the pod is
 // only in one queue.
 func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.DeleteNominatedPodIfExists(pod)
-	pInfo := newQueuedPodInfoForLookup(pod)
-	if err := p.activeQ.delete(pInfo); err == nil {
+	pInfoLookup := newQueuedPodInfoForLookup(pod)
+
+	// Check activeQ
+	if pInfo := p.activeQ.delete(pInfoLookup); pInfo != nil {
+		// Drop metric for deleted pod.
+		decreaseUnschedulableReasonMetric(pInfo)
 		return
 	}
-	if deleted := p.backoffQ.delete(pInfo); deleted {
+
+	// Check backoffQ
+	if pInfo := p.backoffQ.delete(pInfoLookup); pInfo != nil {
+		// Drop metric for deleted pod.
+		decreaseUnschedulableReasonMetric(pInfo)
 		return
 	}
-	if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
+
+	// Check unschedulablePods
+	if pInfo := p.unschedulablePods.get(pod); pInfo != nil {
 		p.unschedulablePods.delete(pod, pInfo.Gated())
 		// Drop metric for deleted pod.
-		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
-			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
-		}
+		decreaseUnschedulableReasonMetric(pInfo)
 	}
 }
 
