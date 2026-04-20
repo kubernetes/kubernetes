@@ -24,6 +24,25 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
+func TestRateLimiterDelayMetric(t *testing.T) {
+	mp := testMetricsProvider{}
+	limiter := NewTypedItemExponentialFailureRateLimiter[any](1*time.Millisecond, 1*time.Second)
+	q := NewTypedRateLimitingQueueWithConfig(limiter, TypedRateLimitingQueueConfig[any]{
+		Name:            "test",
+		MetricsProvider: &mp,
+	})
+	defer q.ShutDown()
+
+	q.AddRateLimited("foo")
+
+	if e, a := 0.001, mp.rateLimiterDelay.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1, mp.rateLimiterDelay.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
 type testMetrics struct {
 	added, gotten, finished int64
 
