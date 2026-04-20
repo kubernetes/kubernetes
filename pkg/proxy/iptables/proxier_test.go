@@ -82,6 +82,11 @@ const testExternalClientBlocked = "203.0.113.130"
 var testNodeIPs = []string{testNodeIP, testNodeIPAlt, testExternalIP, testNodeIPv6, testNodeIPv6Alt}
 
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
+	return NewFakeProxierWithSNATNodeInternalIP(ipt, false)
+}
+
+// NewFakeProxierWithSNATNodeInternalIP creates a test proxier with option to enable SNAT using node's internal IP
+func NewFakeProxierWithSNATNodeInternalIP(ipt utiliptables.Interface, snatNodeInternalIP bool) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	ipfamily := v1.IPv4Protocol
@@ -133,6 +138,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		localhostNodePorts:       true,
 		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
+		snatNodeInternalIP:       snatNodeInternalIP,
 		nfAcctCounters: map[string]bool{
 			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
 			metrics.LocalhostNodePortAcceptedNFAcctCounter:     true,
@@ -2593,6 +2599,41 @@ func TestDropInvalidRule(t *testing.T) {
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
 		})
 	}
+}
+
+// TestSNATNodeInternalIP tests that when the feature flag is enabled, SNAT rules use node's InternalIP
+func TestSNATNodeInternalIP(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxierWithSNATNodeInternalIP(ipt, true)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	expectedFmt := dedent.Dedent(`
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j SNAT --to-source %s --random-fully
+		`)
+	expected := fmt.Sprintf(expectedFmt, testNodeIP)
+	assertIPTablesChainEqual(t, getLine(), utiliptables.TableNAT, kubePostroutingChain, expected, fp.iptablesData.String())
+}
+
+// TestSNATNodeInternalIPWithLoopback tests that loopback nodeIPs fallback to MASQUERADE
+func TestSNATNodeInternalIPWithLoopback(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxierWithSNATNodeInternalIP(ipt, true)
+	// Override with loopback IP to test fallback behavior
+	fp.nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	expectedFmt := dedent.Dedent(`
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
+		`)
+	assertIPTablesChainEqual(t, getLine(), utiliptables.TableNAT, kubePostroutingChain, expectedFmt, fp.iptablesData.String())
 }
 
 // TestExternalTrafficPolicyLocal tests that traffic to externally-facing IPs does not get

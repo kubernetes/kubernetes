@@ -29,6 +29,7 @@ iptables:
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 1s
+  snatNodeInternalIP: null
   syncPeriod: 30s
 ipvs:
   excludeCIDRs: null
