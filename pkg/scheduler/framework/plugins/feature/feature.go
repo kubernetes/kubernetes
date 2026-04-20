@@ -26,6 +26,7 @@ import (
 // the internal k8s features pkg.
 type Features struct {
 	EnableDRAExtendedResource                     bool
+	EnableDRAPreemption                           bool
 	EnableDRAPrioritizedList                      bool
 	EnableDRAAdminAccess                          bool
 	EnableDRAConsumableCapacity                   bool
@@ -59,6 +60,7 @@ type Features struct {
 func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features {
 	return Features{
 		EnableDRAExtendedResource:                     featureGate.Enabled(features.DRAExtendedResource),
+		EnableDRAPreemption:                           featureGate.Enabled(features.DRAPreemption),
 		EnableDRAPrioritizedList:                      featureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                          featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRAConsumableCapacity:                   featureGate.Enabled(features.DRAConsumableCapacity),

@@ -165,6 +165,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
+				runSubTest(tCtx, "Preemption", func(tCtx ktesting.TContext) { testPreemption(tCtx, false) })
 			},
 		},
 		// This scenario verifies that features which have graduated to GA can
@@ -218,6 +219,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// in alphabetical order,
 				// as needed by tests for them.
 				features.DRAAdminAccess:               true,
+				features.DRAPreemption:                true,
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaintRules:          true,
@@ -259,6 +261,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, true) })
 				runSubTest(tCtx, "PodGroup", testPodGroup)
 				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true, true) })
+				runSubTest(tCtx, "Preemption", func(tCtx ktesting.TContext) { testPreemption(tCtx, true) })
 			},
 		},
 	} {
