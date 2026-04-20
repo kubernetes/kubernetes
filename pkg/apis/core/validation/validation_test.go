@@ -21181,13 +21181,13 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			{
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceCPU:                                      resource.MustParse("1"),
-						core.ResourceMemory:                                   resource.MustParse("200Mi"),
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
 						core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("1Gi"),
 					},
 					Limits: core.ResourceList{
-						core.ResourceCPU:                                      resource.MustParse("1"),
-						core.ResourceMemory:                                   resource.MustParse("200Mi"),
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
 						core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("1Gi"),
 					},
 				},
