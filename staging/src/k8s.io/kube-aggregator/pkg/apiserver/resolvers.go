@@ -54,12 +54,30 @@ func NewClusterIPServiceResolver(services listersv1.ServiceLister) ServiceResolv
 	}
 }
 
+// NewClusterIPServiceResolverWithReadiness returns a ServiceResolver that directly calls the
+// service's cluster IP but ensures endpoints are ready.
+func NewClusterIPServiceResolverWithReadiness(services listersv1.ServiceLister, endpointSliceGetter proxy.EndpointSliceGetter) ServiceResolver {
+	return &aggregatorClusterRoutingWithReadiness{
+		services:            services,
+		endpointSliceGetter: endpointSliceGetter,
+	}
+}
+
 type aggregatorClusterRouting struct {
 	services listersv1.ServiceLister
 }
 
 func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return proxy.ResolveCluster(r.services, namespace, name, port)
+}
+
+type aggregatorClusterRoutingWithReadiness struct {
+	services            listersv1.ServiceLister
+	endpointSliceGetter proxy.EndpointSliceGetter
+}
+
+func (r *aggregatorClusterRoutingWithReadiness) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return proxy.ResolveClusterWithReadiness(r.services, r.endpointSliceGetter, namespace, name, port)
 }
 
 // NewLoopbackServiceResolver returns a ServiceResolver that routes
