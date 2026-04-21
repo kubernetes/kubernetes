@@ -88,7 +88,12 @@ type metricInfo struct {
 }
 
 type replicaCalcTestCase struct {
-	currentReplicas  int32
+	currentReplicas int32
+	// specReplicas overrides the spec.replicas value passed to PerPod metric
+	// calculators. When zero, currentReplicas is used for both status and spec
+	// (the steady-state assumption). Set this to exercise rolling-update
+	// scenarios where status.replicas temporarily differs from spec.replicas.
+	specReplicas     int32
 	expectedReplicas int32
 	expectedError    error
 
@@ -375,6 +380,12 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		tolerances = *tc.tolerances
 	}
 
+	// Default specReplicas to currentReplicas (steady state) unless explicitly set.
+	specReplicas := tc.specReplicas
+	if specReplicas == 0 {
+		specReplicas = tc.currentReplicas
+	}
+
 	if tc.resource != nil {
 		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tCtx, tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
 
@@ -404,7 +415,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, specReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, nil)
 	case externalMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalMetric but metric.selector is nil.")
@@ -421,7 +432,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 			t.Fatalf("Metric specified as externalPerPodMetric but metric.perPodTargetUsage is %d which is <=0.", tc.metric.perPodTargetUsage)
 		}
 
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, specReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector)
 	case podMetric:
 		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil)
 	default:
@@ -619,6 +630,88 @@ func TestExternalPerPodMetricUsageOverflow(t *testing.T) {
 			metricType:        externalPerPodMetric,
 			expectedUsage:     math.MaxInt64,
 			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+// During a rolling update, status.replicas can exceed spec.replicas due to maxSurge.
+// With per-pod external metric usage within tolerance, the calculator must return
+// spec.replicas, not status.replicas, to avoid drifting spec upward.
+func TestReplicaCalcExternalPerPodMetricWithinToleranceSurgeReturnsSpec(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  23, // status.replicas during surge
+		specReplicas:     22, // spec.replicas
+		expectedReplicas: 22,
+		metric: &metricInfo{
+			name:              "qps",
+			levels:            []int64{5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500},
+			perPodTargetUsage: 5000,
+			metricType:        externalPerPodMetric,
+			expectedUsage:     5500,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+// Symmetric case: status.replicas < spec.replicas while pods are still starting.
+// Within tolerance should preserve spec, not drift it downward.
+func TestReplicaCalcExternalPerPodMetricWithinToleranceStartupReturnsSpec(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  9, // status.replicas while pods still starting
+		specReplicas:     10,
+		expectedReplicas: 10,
+		metric: &metricInfo{
+			name:              "qps",
+			levels:            []int64{4500, 4500, 4500, 4500, 4500, 4500, 4500, 4500, 4500},
+			perPodTargetUsage: 5000,
+			metricType:        externalPerPodMetric,
+			expectedUsage:     4500,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+// Same regression check for object per-pod metrics.
+func TestReplicaCalcObjectPerPodMetricWithinToleranceSurgeReturnsSpec(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  23,
+		specReplicas:     22,
+		expectedReplicas: 22,
+		metric: &metricInfo{
+			metricType:        objectPerPodMetric,
+			name:              "qps",
+			levels:            []int64{110000},
+			perPodTargetUsage: 5000,
+			expectedUsage:     4783,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcObjectPerPodMetricWithinToleranceStartupReturnsSpec(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  9,
+		specReplicas:     10,
+		expectedReplicas: 10,
+		metric: &metricInfo{
+			metricType:        objectPerPodMetric,
+			name:              "qps",
+			levels:            []int64{45000},
+			perPodTargetUsage: 5000,
+			expectedUsage:     5000,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
 		},
 	}
 	tc.runTest(t)
