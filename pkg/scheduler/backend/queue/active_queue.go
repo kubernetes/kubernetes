@@ -38,6 +38,10 @@ type activeQueuer interface {
 	underRLock(func(unlockedActiveQ unlockedActiveQueueReader))
 
 	delete(pInfo *framework.QueuedPodInfo) error
+	// deleteReturningStoredPodInfo removes the pod from activeQ if present and returns
+	// the stored *QueuedPodInfo (including UnschedulablePlugins). If the pod is not
+	// present, it returns an error.
+	deleteReturningStoredPodInfo(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, error)
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	list() []*v1.Pod
 	len() int
@@ -265,6 +269,22 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 	defer aq.lock.Unlock()
 
 	return aq.queue.Delete(pInfo)
+}
+
+// deleteReturningStoredPodInfo deletes the pod from activeQ if present and returns
+// the stored QueuedPodInfo (including UnschedulablePlugins metadata used by metrics).
+func (aq *activeQueue) deleteReturningStoredPodInfo(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, error) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+
+	stored, ok := aq.unlockedQueue.get(pInfoLookup)
+	if !ok {
+		return nil, fmt.Errorf("object not found")
+	}
+	if err := aq.queue.Delete(pInfoLookup); err != nil {
+		return nil, err
+	}
+	return stored, nil
 }
 
 // movePodToInFlight moves the pod to the in-flight state.

@@ -1202,19 +1202,27 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.DeleteNominatedPodIfExists(pod)
-	pInfo := newQueuedPodInfoForLookup(pod)
-	if err := p.activeQ.delete(pInfo); err == nil {
+	pInfoLookup := newQueuedPodInfoForLookup(pod)
+	if stored, err := p.activeQ.deleteReturningStoredPodInfo(pInfoLookup); err == nil {
+		decUnschedulablePluginMetrics(stored)
 		return
 	}
-	if deleted := p.backoffQ.delete(pInfo); deleted {
+	if stored, err := p.backoffQ.deleteReturningStoredPodInfo(pInfoLookup); err == nil {
+		decUnschedulablePluginMetrics(stored)
 		return
 	}
-	if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
+	if pInfo := p.unschedulablePods.get(pod); pInfo != nil {
 		p.unschedulablePods.delete(pod, pInfo.Gated())
-		// Drop metric for deleted pod.
-		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
-			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
-		}
+		decUnschedulablePluginMetrics(pInfo)
+	}
+}
+
+// decUnschedulablePluginMetrics drops unschedulable_pods (UnschedulableReason) gauge
+// labels for the given pod info. Caller must ensure this pairs with prior Inc calls
+// for the same pod scheduling state.
+func decUnschedulablePluginMetrics(pInfo *framework.QueuedPodInfo) {
+	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 	}
 }
 

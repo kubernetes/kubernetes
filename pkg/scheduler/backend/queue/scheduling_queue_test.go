@@ -1058,6 +1058,103 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	}
 }
 
+// TestPriorityQueue_Delete_DecUnschedulablePluginMetrics tests that deleting a pod
+// from activeQ or backoffQ after a failed scheduling attempt decrements
+// UnschedulableReason metrics (regression for #138444).
+func TestPriorityQueue_Delete_DecUnschedulablePluginMetrics(t *testing.T) {
+	pluginActive := "testUnschedulablePluginActive"
+	pluginBackoff := "testUnschedulablePluginBackoff"
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	t.Run("activeQ", func(t *testing.T) {
+		metrics.UnschedulableReason(pluginActive, "").Set(0)
+		c := testingclock.NewFakeClock(time.Now())
+		q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
+		unschedulablePod := st.MakePod().Name("test-pod-active").Namespace("ns1").UID("tp-active").Priority(highPriority).Obj()
+		podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+			Type: v1.PodScheduled, Status: v1.ConditionFalse, Reason: v1.PodReasonUnschedulable,
+		})
+		q.Add(ctx, unschedulablePod)
+		if _, err := q.Pop(logger); err != nil {
+			t.Fatalf("Pop: %v", err)
+		}
+		if err := q.AddUnschedulableIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, pluginActive), q.SchedulingCycle()); err != nil {
+			t.Fatalf("AddUnschedulableIfNotPresent: %v", err)
+		}
+		c.Step(DefaultPodInitialBackoffDuration + time.Second)
+		q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+		if !q.activeQ.has(newQueuedPodInfoForLookup(unschedulablePod)) {
+			t.Fatal("expected pod in activeQ")
+		}
+		val, err := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(pluginActive, ""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(val) != 1 {
+			t.Fatalf("expected UnschedulableReason metric 1 before Delete, got %v", val)
+		}
+		q.Delete(unschedulablePod)
+		val, err = testutil.GetGaugeMetricValue(metrics.UnschedulableReason(pluginActive, ""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(val) != 0 {
+			t.Fatalf("expected UnschedulableReason metric 0 after Delete, got %v", val)
+		}
+	})
+
+	t.Run("backoffQ", func(t *testing.T) {
+		metrics.UnschedulableReason(pluginBackoff, "").Set(0)
+		q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(time.Now())))
+		totalNum := 3
+		expectedPods := make([]v1.Pod, 0, totalNum)
+		for i := 0; i < totalNum; i++ {
+			p := st.MakePod().Name(fmt.Sprintf("pod%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("upns%d", i)).Priority(int32(i)).Obj()
+			expectedPods = append(expectedPods, *p)
+			q.Add(ctx, p)
+		}
+		for i := totalNum - 1; i > 0; i-- {
+			if _, err := q.Pop(logger); err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+		}
+		q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+		oldCycle := q.SchedulingCycle()
+		if _, err := q.Pop(logger); err != nil {
+			t.Fatalf("Pop: %v", err)
+		}
+		unschedPod := expectedPods[1].DeepCopy()
+		unschedPod.Status = v1.PodStatus{
+			Conditions: []v1.PodCondition{{
+				Type: v1.PodScheduled, Status: v1.ConditionFalse, Reason: v1.PodReasonUnschedulable,
+			}},
+		}
+		if err := q.AddUnschedulableIfNotPresent(logger, newQueuedPodInfoForLookup(unschedPod, pluginBackoff), oldCycle); err != nil {
+			t.Fatalf("AddUnschedulableIfNotPresent: %v", err)
+		}
+		if !q.backoffQ.has(newQueuedPodInfoForLookup(unschedPod)) {
+			t.Fatal("expected pod in backoffQ")
+		}
+		val, err := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(pluginBackoff, ""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(val) != 1 {
+			t.Fatalf("expected UnschedulableReason metric 1 before Delete, got %v", val)
+		}
+		q.Delete(unschedPod)
+		val, err = testutil.GetGaugeMetricValue(metrics.UnschedulableReason(pluginBackoff, ""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(val) != 0 {
+			t.Fatalf("expected UnschedulableReason metric 0 after Delete, got %v", val)
+		}
+	})
+}
+
 // tryPop tries to pop one pod from the queue and returns it.
 // It waits 5 seconds before timing out, assuming the queue is then empty.
 func tryPop(t *testing.T, logger klog.Logger, q *PriorityQueue) *framework.QueuedPodInfo {

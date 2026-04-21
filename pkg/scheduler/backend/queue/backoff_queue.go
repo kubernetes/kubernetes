@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -67,6 +68,9 @@ type backoffQueuer interface {
 	// delete deletes the pInfo from backoffQueue.
 	// It returns true if the pod was deleted.
 	delete(pInfo *framework.QueuedPodInfo) bool
+	// deleteReturningStoredPodInfo deletes the pInfo from backoffQueue if present and
+	// returns the stored *QueuedPodInfo. If the pod is not present, it returns an error.
+	deleteReturningStoredPodInfo(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, error)
 	// get returns the pInfo matching given pInfoLookup, if exists.
 	get(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
 	// has inform if pInfo exists in the queue.
@@ -352,6 +356,27 @@ func (bq *backoffQueue) delete(pInfo *framework.QueuedPodInfo) bool {
 		return true
 	}
 	return bq.podErrorBackoffQ.Delete(pInfo) == nil
+}
+
+// deleteReturningStoredPodInfo deletes the pInfo from backoffQueue if present and returns
+// the stored QueuedPodInfo (including UnschedulablePlugins metadata used by metrics).
+func (bq *backoffQueue) deleteReturningStoredPodInfo(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, error) {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
+	if stored, ok := bq.podBackoffQ.Get(pInfoLookup); ok {
+		if err := bq.podBackoffQ.Delete(pInfoLookup); err != nil {
+			return nil, err
+		}
+		return stored, nil
+	}
+	if stored, ok := bq.podErrorBackoffQ.Get(pInfoLookup); ok {
+		if err := bq.podErrorBackoffQ.Delete(pInfoLookup); err != nil {
+			return nil, err
+		}
+		return stored, nil
+	}
+	return nil, fmt.Errorf("object not found")
 }
 
 // popBackoff pops the pInfo from the podBackoffQ.
