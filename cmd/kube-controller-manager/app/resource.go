@@ -115,7 +115,7 @@ func newResourcePoolStatusRequestControllerDescriptor() *ControllerDescriptor {
 }
 
 func newResourcePoolStatusRequestController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("resourcepoolstatusrequest-controller")
+	client, err := controllerContext.NewClient(names.ResourcePoolStatusRequestController)
 	if err != nil {
 		return nil, err
 	}

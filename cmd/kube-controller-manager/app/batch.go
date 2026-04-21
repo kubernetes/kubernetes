@@ -41,7 +41,7 @@ func newJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func newJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("job-controller")
+	client, err := controllerContext.NewClient(names.JobController)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func newCronJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func newCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("cronjob-controller")
+	client, err := controllerContext.NewClient(names.CronJobController)
 	if err != nil {
 		return nil, err
 	}

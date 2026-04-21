@@ -36,12 +36,12 @@ func newDisruptionControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDisruptionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("disruption-controller")
+	client, err := controllerContext.NewClient(names.DisruptionController)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := controllerContext.NewClientConfig("disruption-controller")
+	config, err := controllerContext.NewClientConfig(names.DisruptionController)
 	if err != nil {
 		return nil, err
 	}

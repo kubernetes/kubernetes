@@ -73,7 +73,7 @@ func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func newStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("statefulset-controller")
+	client, err := controllerContext.NewClient(names.StatefulSetController)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func newReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("replicaset-controller")
+	client, err := controllerContext.NewClient(names.ReplicaSetController)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func newDeploymentControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("deployment-controller")
+	client, err := controllerContext.NewClient(names.DeploymentController)
 	if err != nil {
 		return nil, err
 	}
