@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -50,6 +51,32 @@ func TestPodGroupState_AssumeForget(t *testing.T) {
 	}
 	if !pgs.unscheduledPods.Has(pod.UID) {
 		t.Fatal("Pod should be in UnscheduledPods after ForgetPod")
+	}
+}
+
+// TestPodGroupState_ForgetPod_DeletionTimestamp verifies that forgetting an assumed pod which
+// is already terminating removes it from pod group tracking (regression for #138422).
+func TestPodGroupState_ForgetPod_DeletionTimestamp(t *testing.T) {
+	pgs := newPodGroupState()
+	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
+	podTerminating := pod.DeepCopy()
+	now := metav1.Now()
+	podTerminating.DeletionTimestamp = &now
+
+	pgs.addPod(pod)
+	pgs.assumePod(pod)
+	pgs.updatePod(pod, podTerminating)
+
+	pgs.forgetPod(pod.UID)
+
+	if pgs.AllPods().Has(pod.UID) {
+		t.Fatal("terminating pod should be removed from pod group on forget")
+	}
+	if pgs.unscheduledPods.Has(pod.UID) {
+		t.Fatal("terminating pod must not remain in unscheduledPods")
+	}
+	if pgs.AssignedPods().Has(pod.UID) {
+		t.Fatal("terminating pod must not be moved to assignedPods on forget")
 	}
 }
 

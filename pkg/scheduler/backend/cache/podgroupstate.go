@@ -143,12 +143,19 @@ func (d *podGroupStateData) assumePod(pod *v1.Pod) {
 }
 
 // forgetPod moves a pod back from the assumed state to unscheduled within the pod group state.
+// If the pod is terminating (deletion timestamp set), it is removed from the group entirely so it
+// cannot remain stuck in unscheduledPods after the scheduler cache drops the assumed pod.
 func (d *podGroupStateData) forgetPod(podUID types.UID) {
 
 	pod := d.allPods[podUID]
 	// A scheduling pod may be removed from the cluster.
 	// In that case, we just ignore it.
 	if pod == nil {
+		return
+	}
+
+	if pod.DeletionTimestamp != nil {
+		d.deletePod(podUID)
 		return
 	}
 
