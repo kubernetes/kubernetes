@@ -19,6 +19,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/cel-go/common/types/ref"
@@ -1277,6 +1278,93 @@ func TestTwoVariableComprehensionCost(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
 		})
+	}
+}
+
+func TestPodCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		spec                map[string]interface{}
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "empty map literal",
+			expr:                `allContainers({}).size()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 31, Max: 31},
+			expectRuntimeCost:   31,
+		},
+		{
+			name:                "literal with empty container lists",
+			expr:                `allContainers({'initContainers': [], 'containers': [], 'ephemeralContainers': []}).size()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 64, Max: 64},
+			expectRuntimeCost:   64,
+		},
+		{
+			name:                "literal with one container",
+			expr:                `allContainers({'containers': [{'name': 'main', 'image': 'nginx'}]}).size()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 72, Max: 72},
+			expectRuntimeCost:   72,
+		},
+		{
+			name: "variable spec with one container",
+			expr: `allContainers(spec).size()`,
+			spec: map[string]interface{}{
+				"containers": []interface{}{map[string]interface{}{"name": "main", "image": "nginx"}},
+			},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: math.MaxUint64},
+			expectRuntimeCost:   3,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPodCost(t, tc.expr, tc.spec, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
+func testPodCost(t *testing.T, expr string, spec map[string]interface{}, expectEstimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
+	env, err := cel.NewEnv(
+		Pod(),
+		cel.Variable("spec", cel.DynType),
+		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
+	)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	compiled, issues := env.Compile(expr)
+	if len(issues.Errors()) > 0 {
+		var errList []string
+		for _, issue := range issues.Errors() {
+			errList = append(errList, issue.ToDisplayString(common.NewTextSource(expr)))
+		}
+		t.Fatalf("%v", errList)
+	}
+	estCost, err := env.EstimateCost(compiled, est)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if estCost.Min != expectEstimatedCost.Min || estCost.Max != expectEstimatedCost.Max {
+		t.Errorf("Expected estimated cost of %d..%d but got %d..%d", expectEstimatedCost.Min, expectEstimatedCost.Max, estCost.Min, estCost.Max)
+	}
+	prog, err := env.Program(compiled, cel.CostTracking(est))
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	activation := map[string]interface{}{}
+	if spec != nil {
+		activation["spec"] = spec
+	}
+	_, details, err := prog.Eval(activation)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	cost := details.ActualCost()
+	if *cost != expectRuntimeCost {
+		t.Errorf("Expected cost of %d but got %d", expectRuntimeCost, *cost)
 	}
 }
 

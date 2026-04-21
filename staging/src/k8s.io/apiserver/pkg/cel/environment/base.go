@@ -190,7 +190,7 @@ var baseOpts = []VersionedOptions{
 	},
 	// Pod library
 	{
-		IntroducedVersion: version.MajorMinor(1, 36),
+		IntroducedVersion: version.MajorMinor(1, 37),
 		EnvOptions: []cel.EnvOption{
 			UnversionedLib(library.Pod),
 		},

@@ -310,6 +310,11 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
 		}
+	case "allContainers":
+		if len(args) == 1 {
+			sz := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: sz.Min, Max: sz.Max}}
+		}
 	case "url", "jsonpatch.escapeKey":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])

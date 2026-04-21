@@ -28,8 +28,8 @@ import (
 // allContainers
 //
 // Returns a single list containing all containers from a pod spec: initContainers,
-// containers, and ephemeralContainers (in that order). Container types that are
-// absent or empty are silently skipped.
+// containers, and ephemeralContainers (in that order). Absent and null fields are
+// treated as empty. A field that is present but not a list causes a runtime error.
 //
 //	allContainers(<podSpec>) <list>
 //
@@ -60,8 +60,6 @@ func (*pod) declarations() map[string][]cel.FunctionOpt {
 	return podLibraryDecls
 }
 
-// WARNING: All library additions or modifications must follow
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
 var podLibraryDecls = map[string][]cel.FunctionOpt{
 	"allContainers": {
 		cel.Overload("pod_spec_all_containers",
@@ -85,7 +83,8 @@ func (*pod) ProgramOptions() []cel.ProgramOption {
 }
 
 // allContainersImpl concatenates initContainers, containers, and ephemeralContainers
-// from a pod spec into a single list. Fields that are absent or not lists are skipped.
+// from a pod spec into a single list. Absent or null fields are treated as empty; a
+// field that is present but not a list returns a runtime error.
 func allContainersImpl(spec ref.Val) ref.Val {
 	indexer, ok := spec.(traits.Indexer)
 	if !ok {
@@ -99,9 +98,12 @@ func allContainersImpl(spec ref.Val) ref.Val {
 			// field absent; skip
 			continue
 		}
+		if val == types.NullValue {
+			continue
+		}
 		lister, ok := val.(traits.Lister)
 		if !ok {
-			continue
+			return types.NewErr("allContainers: %s is present but is not a list (got %s)", field, val.Type().TypeName())
 		}
 		for it := lister.Iterator(); it.HasNext() == types.True; {
 			items = append(items, it.Next())

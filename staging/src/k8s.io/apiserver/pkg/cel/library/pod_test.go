@@ -155,6 +155,24 @@ func TestAllContainers(t *testing.T) {
 			},
 			expectResult: types.Int(1),
 		},
+		{
+			name: "null fields are treated as empty",
+			expr: "allContainers(spec).size()",
+			spec: map[string]interface{}{
+				"initContainers":      nil,
+				"containers":          []interface{}{makeContainer("main", "nginx")},
+				"ephemeralContainers": nil,
+			},
+			expectResult: types.Int(1),
+		},
+		{
+			name: "field present but not a list errors",
+			expr: "allContainers(spec).size()",
+			spec: map[string]interface{}{
+				"containers": "not-a-list",
+			},
+			expectRuntimeErr: "allContainers: containers is present but is not a list (got string)",
+		},
 	}
 
 	for _, tc := range cases {
@@ -162,6 +180,91 @@ func TestAllContainers(t *testing.T) {
 			testPod(t, tc.expr,
 				map[string]interface{}{"spec": tc.spec},
 				tc.expectResult, tc.expectRuntimeErr, nil)
+		})
+	}
+}
+
+// TestAllContainersWorkloadTypes exercises allContainers against every built-in
+// workload type that embeds a PodSpec, walking the expected field path for each.
+func TestAllContainersWorkloadTypes(t *testing.T) {
+	podSpec := map[string]interface{}{
+		"initContainers":      []interface{}{makeContainer("init", "busybox")},
+		"containers":          []interface{}{makeContainer("main", "nginx"), makeContainer("sidecar", "envoy")},
+		"ephemeralContainers": []interface{}{makeContainer("debug", "alpine")},
+	}
+	podTemplateSpec := map[string]interface{}{"spec": podSpec}
+	jobSpec := map[string]interface{}{"template": podTemplateSpec}
+
+	cases := []struct {
+		name   string
+		expr   string
+		object map[string]interface{}
+	}{
+		{
+			name: "Pod",
+			expr: "allContainers(spec.spec).size()",
+			object: map[string]interface{}{
+				"spec": podSpec,
+			},
+		},
+		{
+			name: "PodTemplate",
+			expr: "allContainers(spec.template.spec).size()",
+			object: map[string]interface{}{
+				"template": podTemplateSpec,
+			},
+		},
+		{
+			name: "Deployment",
+			expr: "allContainers(spec.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{"template": podTemplateSpec},
+			},
+		},
+		{
+			name: "StatefulSet",
+			expr: "allContainers(spec.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{"template": podTemplateSpec},
+			},
+		},
+		{
+			name: "DaemonSet",
+			expr: "allContainers(spec.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{"template": podTemplateSpec},
+			},
+		},
+		{
+			name: "ReplicaSet",
+			expr: "allContainers(spec.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{"template": podTemplateSpec},
+			},
+		},
+		{
+			name: "Job",
+			expr: "allContainers(spec.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{"template": podTemplateSpec},
+			},
+		},
+		{
+			name: "CronJob",
+			expr: "allContainers(spec.spec.jobTemplate.spec.template.spec).size()",
+			object: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"jobTemplate": map[string]interface{}{"spec": jobSpec},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod(t, tc.expr,
+				map[string]interface{}{"spec": tc.object},
+				types.Int(4), "", nil)
 		})
 	}
 }
