@@ -32,21 +32,32 @@ func TestScaledValueInternal(t *testing.T) {
 	}{
 		// remain scale
 		{big.NewInt(1000), 0, 0, 1000},
+		{big.NewInt(-1000), 0, 0, -1000},
 
 		// scale down
 		{big.NewInt(1000), 0, -3, 1},
 		{big.NewInt(1000), 3, 0, 1},
+		{big.NewInt(-1000), 3, 0, -1},
 		{big.NewInt(0), 3, 0, 0},
 
-		// always round up
+		// scale down rounds away from zero
 		{big.NewInt(999), 3, 0, 1},
 		{big.NewInt(500), 3, 0, 1},
 		{big.NewInt(499), 3, 0, 1},
 		{big.NewInt(1), 3, 0, 1},
+		{big.NewInt(-1), 3, 0, -1},
+		{big.NewInt(-499), 3, 0, -1},
+		{big.NewInt(-500), 3, 0, -1},
+		{big.NewInt(-999), 3, 0, -1},
+		{big.NewInt(-1500), 3, 0, -2},
 		// large scaled value does not lose precision
 		{big.NewInt(0).Sub(maxInt64, bigOne), 1, 0, (math.MaxInt64-1)/10 + 1},
-		// large intermediate result.
+		// large intermediate result, positive and negative, forces the big.Int path
 		{big.NewInt(1).Exp(big.NewInt(10), big.NewInt(100), nil), 100, 0, 1},
+		{big.NewInt(0).Neg(big.NewInt(1).Exp(big.NewInt(10), big.NewInt(100), nil)), 100, 0, -1},
+		// negative unscaled values outside the int64 range force the big.Int path;
+		// result fits in int64 after scaling.
+		{big.NewInt(0).Mul(minInt64, bigThousand), 3, 0, math.MinInt64},
 
 		// scale up
 		{big.NewInt(0), 0, 3, 0},
