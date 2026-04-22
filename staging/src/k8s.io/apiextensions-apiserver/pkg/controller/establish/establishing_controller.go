@@ -169,9 +169,5 @@ func (ec *EstablishingController) sync(ctx context.Context, key string) error {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

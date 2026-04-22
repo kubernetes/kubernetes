@@ -96,11 +96,7 @@ func ToClientSet(config *clientcmdapi.Config) (clientset.Interface, error) {
 // WriteToDisk writes a KubeConfig object down to disk with mode 0600
 func WriteToDisk(filename string, kubeconfig *clientcmdapi.Config) error {
 	err := clientcmd.WriteToFile(*kubeconfig, filename)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // GetClusterFromKubeConfig returns the default Cluster of the specified KubeConfig

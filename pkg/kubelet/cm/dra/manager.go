@@ -457,12 +457,8 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 		return nil
 	})
-	if err != nil {
-		// No wrapping, this is the error above.
-		return err
-	}
-
-	return nil
+	// No wrapping, this is the error above.
+	return err
 }
 
 func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
@@ -712,12 +708,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 		}
 		return nil
 	})
-	if err != nil {
-		// No wrapping, this is the error above.
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // PodMightNeedToUnprepareResources returns true if the pod might need to

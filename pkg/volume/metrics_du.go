@@ -52,11 +52,7 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 	}
 
 	err = md.getFsInfo(metrics)
-	if err != nil {
-		return metrics, err
-	}
-
-	return metrics, nil
+	return metrics, err
 }
 
 // getDiskUsage writes metrics.Used and metric.InodesUsed from fs.DiskUsage
