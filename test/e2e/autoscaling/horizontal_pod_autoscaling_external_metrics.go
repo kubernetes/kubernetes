@@ -26,6 +26,7 @@ import (
 	v2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -83,6 +84,95 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 
 		ginkgo.By("Waiting for HPA to scale down to min replicas")
 		rc.WaitForReplicas(ctx, int(*hpa.Spec.MinReplicas), maxResourceConsumerDelay+waitBuffer)
+	})
+
+	// Regression coverage for the per-pod metric tolerance path. During a rolling
+	// update, status.replicas transiently exceeds spec.replicas by maxSurge. If the
+	// per-pod metric aggregate scales with pod count (so the usage ratio stays within
+	// tolerance at the surged replica count), the HPA must leave spec.replicas alone
+	// instead of latching it to status.replicas.
+	ginkgo.It("should not drift spec.replicas during a rolling update when a per-pod external metric stays within tolerance", func(ctx context.Context) {
+		initPods := 3
+		perPodTarget := int64(100)
+		steadyMetricValue := int64(initPods) * perPodTarget       // ratio 1.0 at initPods pods
+		surgedMetricValue := (int64(initPods) + 1) * perPodTarget // ratio 1.0 while status.replicas = initPods+1
+
+		ginkgo.By("Creating the resource consumer deployment")
+		rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
+			hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+			0, 0, 0,
+			int64(podCPURequest), 200,
+			f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+			nil)
+		ginkgo.DeferCleanup(rc.CleanUp)
+		rc.WaitForReplicas(ctx, initPods, maxResourceConsumerDelay+waitBuffer)
+
+		deployments := f.ClientSet.AppsV1().Deployments(f.Namespace.Name)
+
+		// minReadySeconds holds the surge pod "unavailable" long enough to span
+		// several HPA reconciles, so a buggy controller has multiple chances to
+		// latch spec.replicas to status.replicas.
+		ginkgo.By("Configuring the deployment for a prolonged surge (maxSurge=1, maxUnavailable=0, minReadySeconds=60s)")
+		_, err := deployments.Patch(ctx, hpaName, types.StrategicMergePatchType,
+			[]byte(`{"spec":{"minReadySeconds":60,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":1,"maxUnavailable":0}}}}`),
+			metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+
+		metricName := "per_pod_tolerance_drift"
+		ginkgo.By(fmt.Sprintf("Creating external metric %q at %d (= %d replicas * %d target)", metricName, steadyMetricValue, initPods, perPodTarget))
+		framework.ExpectNoError(metricsController.CreateMetric(ctx, metricName, steadyMetricValue, nil, false))
+
+		ginkgo.By(fmt.Sprintf("Creating a per-pod external-metric HPA (AverageValue target=%d, min=%d, max=10)", perPodTarget, initPods))
+		hpa := e2eautoscaling.CreateExternalHorizontalPodAutoscaler(ctx, rc, metricName, nil,
+			v2.AverageValueMetricType, perPodTarget, int32(initPods), 10)
+		ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+
+		expectSpecReplicasStable := func(duration time.Duration) {
+			stableErr := framework.Gomega().Consistently(ctx, func(ctx context.Context) (int32, error) {
+				d, err := deployments.Get(ctx, hpaName, metav1.GetOptions{})
+				if err != nil {
+					return 0, err
+				}
+				if d.Spec.Replicas == nil {
+					return 0, fmt.Errorf("deployment %s has nil spec.replicas", d.Name)
+				}
+				return *d.Spec.Replicas, nil
+			}).WithTimeout(duration).WithPolling(10 * time.Second).Should(gomega.Equal(int32(initPods)))
+			framework.ExpectNoErrorWithOffset(1, stableErr, "deployment spec.replicas drifted from %d within %v", initPods, duration)
+		}
+
+		ginkgo.By("Letting the HPA stabilize at the initial replicas with the within-tolerance metric")
+		expectSpecReplicasStable(maxHPAReactionTime + maxResourceConsumerDelay)
+
+		ginkgo.By("Triggering a rolling update by annotating the pod template")
+		_, err = deployments.Patch(ctx, hpaName, types.StrategicMergePatchType,
+			[]byte(`{"spec":{"template":{"metadata":{"annotations":{"e2e.hpa-drift/rollout":"1"}}}}}`),
+			metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for a surge pod to appear (deployment status.replicas > spec.replicas)")
+		surgeErr := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			d, err := deployments.Get(ctx, hpaName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if d.Spec.Replicas == nil {
+				return fmt.Errorf("deployment %s has nil spec.replicas", d.Name)
+			}
+			if d.Status.Replicas <= *d.Spec.Replicas {
+				return fmt.Errorf("no surge yet: status=%d spec=%d", d.Status.Replicas, *d.Spec.Replicas)
+			}
+			return nil
+		}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		framework.ExpectNoError(surgeErr)
+
+		ginkgo.By(fmt.Sprintf("Raising the external metric to %d so the HPA observes within-tolerance while status.replicas > spec.replicas", surgedMetricValue))
+		framework.ExpectNoError(metricsController.SetMetricValue(ctx, metricName, surgedMetricValue, nil))
+
+		// Cover at least four HPA reconciles (~15s each) while status.replicas > spec.replicas.
+		// Without the fix, the very first reconcile in this window latches spec.replicas to status.replicas.
+		ginkgo.By("Asserting spec.replicas does not drift upward across HPA reconciles during the surge")
+		expectSpecReplicasStable(hpaReconciliationInterval*4 + actuationDelay)
 	})
 })
 
