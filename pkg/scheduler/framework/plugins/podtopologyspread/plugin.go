@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -70,6 +71,8 @@ type PodTopologySpread struct {
 	enableMatchLabelKeysInPodTopologySpread      bool
 	enableSchedulingQueueHint                    bool
 	enableTaintTolerationComparisonOperators     bool
+
+	cache *PodTopologySpreadCacheProxy
 }
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
@@ -103,7 +106,7 @@ func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Si
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -132,6 +135,11 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 			return nil, fmt.Errorf("SharedInformerFactory is nil")
 		}
 		pl.setListers(h.SharedInformerFactory())
+	}
+	enablePodTopologySpreadCache := os.Getenv("EnablePodTopologySpreadCache") == "true"
+	if enablePodTopologySpreadCache {
+		klog.Info("Create interpodaffinity cache for plugin.")
+		pl.cache = NewPodTopologySpreadCacheProxy(ctx, pl, h.SharedInformerFactory().Core().V1().Pods().Lister(), h.SharedInformerFactory().Core().V1().Pods(), h.SharedInformerFactory().Core().V1().Nodes(), h.SnapshotSharedLister())
 	}
 	return pl, nil
 }
@@ -184,13 +192,8 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 
 // involvedInTopologySpreading returns true if the incomingPod is involved in the topology spreading of podWithSpreading.
 func involvedInTopologySpreading(incomingPod, podWithSpreading *v1.Pod) bool {
-	if incomingPod.UID == podWithSpreading.UID {
-		return true
-	}
-	if incomingPod.Spec.NodeName == "" && incomingPod.Status.NominatedNodeName == "" {
-		return false
-	}
-	return incomingPod.Namespace == podWithSpreading.Namespace
+	return incomingPod.UID == podWithSpreading.UID ||
+		(incomingPod.Spec.NodeName != "" && incomingPod.Namespace == podWithSpreading.Namespace)
 }
 
 // hasConstraintWithNodeTaintsPolicyHonor returns true if any constraint has `NodeTaintsPolicy: Honor`.
