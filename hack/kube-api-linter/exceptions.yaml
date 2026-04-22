@@ -23,7 +23,9 @@
 # Commentstart - Ignore commentstart issues for existing API group
 # TODO: For each existing API group, we aim to remove it over time.
 - text: "godoc for field .* should start with '.* ...'"
-  path: "staging/src/k8s.io/api/(apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+  path: "staging/src/k8s.io/api/(apps|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+- text: "godoc for field Lease.* should start with '.* ...'"
+  path: "staging/src/k8s.io/api/coordination"
 - text: "field .* is missing godoc comment"
   path: "staging/src/k8s.io/api/autoscaling/"
 
@@ -126,3 +128,8 @@
 # Validation makes this require at least one of the fields within to be set.
 - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
   path: "staging/src/k8s.io/api/scheduling/v1alpha2/types.go"
+
+# The EvictionRequest.Spec.Target field is a union type and nonpointerstructs does not understand unions today.
+# Validation makes this require at least one of the fields within to be set.
+- text: "nonpointerstructs: field EvictionRequestSpec.Target is a non-pointer struct with no required fields."
+  path: "staging/src/k8s.io/api/coordination/v1alpha1/types.go"

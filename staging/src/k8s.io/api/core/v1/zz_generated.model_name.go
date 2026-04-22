@@ -327,6 +327,11 @@ func (in EventSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionResponder) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.EvictionResponder"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ExecAction) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.ExecAction"
 }

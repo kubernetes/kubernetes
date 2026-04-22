@@ -60,6 +60,7 @@ import (
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -107,6 +108,7 @@ var args = []string{
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
+	"--concurrent-eviction-request-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
@@ -315,6 +317,11 @@ func TestAddFlags(t *testing.T) {
 		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
 			&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+		},
+		EvictionRequestController: &EvictionRequestControllerOptions{
+			&evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
@@ -538,6 +545,13 @@ func TestValidateFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "concurrent eviction request syncs set to 0",
+			flags: []string{
+				"--concurrent-eviction-request-syncs=0",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -661,6 +675,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+			EvictionRequestController: evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
@@ -1254,6 +1271,16 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must be greater than 0",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1288,6 +1315,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &DeviceTaintEvictionControllerOptions{
 				&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
 					ConcurrentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 10,
 				},
 			},
 		},
@@ -1427,6 +1463,30 @@ func TestValidateControllersOptions(t *testing.T) {
 					ConcurrentTTLSyncs: 8,
 				},
 			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions valid",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 5,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions zero syncs",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must be greater than 0",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions nil",
+			expectErrors: false,
+			options:      (*EvictionRequestControllerOptions)(nil),
 		},
 	}
 
