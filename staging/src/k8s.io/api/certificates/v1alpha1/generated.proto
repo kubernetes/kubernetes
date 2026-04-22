@@ -49,6 +49,7 @@ message ClusterTrustBundle {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the signer (if any) and trust anchors.
+  // +required
   optional ClusterTrustBundleSpec spec = 2;
 }
 
@@ -98,6 +99,7 @@ message ClusterTrustBundleSpec {
   // Users of ClusterTrustBundles, including Kubelet, are free to reorder and
   // deduplicate certificate blocks in this file according to their own logic,
   // as well as to drop PEM block headers and inter-block data.
+  // +required
   optional string trustBundle = 2;
 }
 
