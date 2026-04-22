@@ -72,9 +72,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
-
 	// Onwer: sig-node
 	// Enables configuring per-container restart policy and restart policy rules.
 	ContainerRestartRules = framework.WithFeature(framework.ValidFeatures.Add("ContainerRestartRules"))
