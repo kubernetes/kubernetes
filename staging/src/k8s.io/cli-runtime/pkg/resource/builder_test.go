@@ -46,6 +46,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/utils/dump"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -1361,6 +1362,21 @@ func TestNoSelectorUnknowResourceType(t *testing.T) {
 		}
 	}
 }
+
+func TestNoSelectorUnknownResourceTypeWithGroup(t *testing.T) {
+	b := newDefaultBuilder().
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(false, "foo.bar")
+
+	err := b.Do().Err()
+	if err == nil {
+		t.Fatalf("expected error, got none")
+	}
+	if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\" in group \"bar\"") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSingleResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
