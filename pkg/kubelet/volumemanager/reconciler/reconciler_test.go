@@ -2458,10 +2458,6 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	// fake Setup error
 	fakePlugin.SetUpHook = func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error {
-		if !mounterArgs.ReconstructedVolume {
-			// mock cleaned volume files while it's not a reconstructed volume
-			plugin.(*volumetesting.FakeVolumePlugin).NewUnmounterError = errors.New("unmounter failed to load volume data file")
-		}
 		return errors.New("csiRPCError")
 	}
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()

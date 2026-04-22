@@ -202,9 +202,6 @@ type FakeVolumePlugin struct {
 	UnmountDeviceHook func(globalMountPath string) error
 	SetUpHook         func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error
 
-	// Inject error to NewUnmounterError
-	NewUnmounterError error
-
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
 	Attachers            []*FakeVolume
@@ -328,9 +325,6 @@ func (plugin *FakeVolumePlugin) GetMounters() (Mounters []*FakeVolume) {
 func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
-	if plugin.NewUnmounterError != nil {
-		return nil, plugin.NewUnmounterError
-	}
 	fakeVolume := plugin.getFakeVolume(&plugin.Unmounters)
 	fakeVolume.Lock()
 	defer fakeVolume.Unlock()
