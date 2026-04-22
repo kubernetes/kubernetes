@@ -48,6 +48,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -2009,24 +2010,20 @@ func waitForMount(
 	}
 }
 
-func waitForUnmount(
+func waitForPedingOperationsCompletion(
 	t *testing.T,
 	volumeName v1.UniqueVolumeName,
 	podName types.UniquePodName,
-	asw cache.ActualStateOfWorld) {
+	oex operationexecutor.OperationExecutor) {
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			if asw.PodHasMountedVolumes(podName) {
-				return false, nil
-			}
-
-			return true, nil
+			return !oex.IsOperationPending(volumeName, podName, nestedpendingoperations.EmptyNodeName), nil
 		},
 	)
 
 	if err != nil {
-		t.Fatalf("Timed out waiting for pod %q to be unmount from volume %q.", podName, volumeName)
+		t.Fatalf("Timed out waiting for pod %q to complete pending operations for volume %q.", podName, volumeName)
 	}
 }
 
@@ -2586,13 +2583,11 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 
 	// Act first reconcile to trigger mount reconstructed volume
 	reconciler.reconcile(ctx)
-	waitForUncertainPodMount(t, generatedVolumeName, podName, asw)
+	waitForPedingOperationsCompletion(t, generatedVolumeName, podName, oex)
 
 	// mock remove pod
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	// Act second reconcile to trigger unmount reconstructed volume after removed pod from volume
 	reconciler.reconcile(ctx)
-
-	// assert volume unmount succeed
-	waitForUnmount(t, generatedVolumeName, podName, asw)
+	waitForPedingOperationsCompletion(t, generatedVolumeName, podName, oex)
 }
