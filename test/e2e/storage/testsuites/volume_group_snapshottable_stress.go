@@ -257,6 +257,27 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 		}
 		wg.Wait()
 
+		// Verify all volume group snapshots have actually been deleted. This
+		// guards against the CSI driver namespace being torn down while VGS
+		// objects are still Terminating (waiting for a finalizer that the
+		// sidecar can no longer remove).
+		framework.Logf("Verifying all volume group snapshots have been deleted from namespace %s", f.Namespace.Name)
+		dc := stressTest.config.Framework.DynamicClient
+		vgsList, listErr := dc.Resource(storageutils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		if listErr != nil {
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("failed to list volume group snapshots for verification: %w", listErr))
+			mu.Unlock()
+		} else if len(vgsList.Items) > 0 {
+			remaining := make([]string, 0, len(vgsList.Items))
+			for _, item := range vgsList.Items {
+				remaining = append(remaining, item.GetName())
+			}
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("%d volume group snapshot(s) still exist after cleanup: %v", len(remaining), remaining))
+			mu.Unlock()
+		}
+
 		// Clean up volumes
 		wg.Add(len(stressTest.volumeResources))
 		for _, volume := range stressTest.volumeResources {
