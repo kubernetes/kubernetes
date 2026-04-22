@@ -2924,3 +2924,83 @@ func TestEndpointSubsetsEqualIgnoreResourceVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestPodToEndpointAddressForServiceEmptyIPFamilies(t *testing.T) {
+	testCases := []struct {
+		name       string
+		clusterIP  string
+		podIPs     []v1.PodIP
+		podIP      string
+		wantErr    bool
+		wantFamily v1.IPFamily
+	}{
+		{
+			name:       "headful IPv4, IPv4 pod",
+			clusterIP:  "10.0.0.1",
+			podIPs:     []v1.PodIP{{IP: "10.244.0.1"}},
+			wantFamily: v1.IPv4Protocol,
+		},
+		{
+			name:       "headful IPv6, IPv6 pod",
+			clusterIP:  "fd00::1",
+			podIPs:     []v1.PodIP{{IP: "fd00::10"}},
+			wantFamily: v1.IPv6Protocol,
+		},
+		{
+			name:      "headful IPv4, no matching pod IP",
+			clusterIP: "10.0.0.1",
+			podIPs:    []v1.PodIP{{IP: "fd00::10"}},
+			wantErr:   true,
+		},
+		{
+			name:       "headless, IPv4 pod",
+			clusterIP:  v1.ClusterIPNone,
+			podIPs:     []v1.PodIP{{IP: "10.244.0.1"}},
+			podIP:      "10.244.0.1",
+			wantFamily: v1.IPv4Protocol,
+		},
+		{
+			name:       "headless, IPv6 pod",
+			clusterIP:  v1.ClusterIPNone,
+			podIPs:     []v1.PodIP{{IP: "fd00::10"}},
+			podIP:      "fd00::10",
+			wantFamily: v1.IPv6Protocol,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: v1.ServiceSpec{
+					// Intentionally leave IPFamilies empty.
+					ClusterIP: tc.clusterIP,
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo-pod", Namespace: "bar", UID: "uid-1"},
+				Spec:       v1.PodSpec{NodeName: "node-1"},
+				Status:     v1.PodStatus{PodIP: tc.podIP, PodIPs: tc.podIPs},
+			}
+
+			addr, err := podToEndpointAddressForService(svc, pod)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error but got addr=%v", addr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if addr == nil {
+				t.Fatal("expected an address but got nil")
+			}
+			isV6 := utilnet.IsIPv6String(addr.IP)
+			wantV6 := tc.wantFamily == v1.IPv6Protocol
+			if isV6 != wantV6 {
+				t.Errorf("got IP %q (IPv6=%v), want family %v", addr.IP, isV6, tc.wantFamily)
+			}
+		})
+	}
+}
