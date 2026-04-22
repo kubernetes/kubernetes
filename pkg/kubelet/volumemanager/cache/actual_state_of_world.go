@@ -123,6 +123,9 @@ type ActualStateOfWorld interface {
 	// PodHasMountedVolumes returns true if any volume is mounted on the given pod
 	PodHasMountedVolumes(podName volumetypes.UniquePodName) bool
 
+	// PodHasPossiblyMountedVolumes returns true if any volume is mounted or "uncertain" on the given pod
+	PodHasPossiblyMountedVolumes(podName volumetypes.UniquePodName) bool
+
 	// VolumeExistsWithSpecName returns true if the given volume specified with the
 	// volume spec name (a.k.a., InnerVolumeSpecName) exists in the list of
 	// volumes that should be attached to this node.
@@ -958,6 +961,21 @@ func (asw *actualStateOfWorld) PodHasMountedVolumes(podName volumetypes.UniquePo
 	for _, volumeObj := range asw.attachedVolumes {
 		if podObj, hasPod := volumeObj.mountedPods[podName]; hasPod {
 			if podObj.volumeMountStateForPod == operationexecutor.VolumeMounted {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (asw *actualStateOfWorld) PodHasPossiblyMountedVolumes(podName volumetypes.UniquePodName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	for _, volumeObj := range asw.attachedVolumes {
+		if podObj, hasPod := volumeObj.mountedPods[podName]; hasPod {
+			if podObj.volumeMountStateForPod == operationexecutor.VolumeMounted ||
+				podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain {
 				return true
 			}
 		}

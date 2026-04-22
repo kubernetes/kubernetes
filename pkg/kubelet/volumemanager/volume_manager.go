@@ -330,7 +330,7 @@ func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) co
 }
 
 func (vm *volumeManager) HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool {
-	return len(vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName)) > 0
+	return vm.actualStateOfWorld.PodHasPossiblyMountedVolumes(podName)
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
