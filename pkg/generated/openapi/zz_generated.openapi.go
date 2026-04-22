@@ -19800,7 +19800,6 @@ func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 				},
-				Required: []string{"target"},
 			},
 		},
 		Dependencies: []string{
@@ -23053,7 +23052,6 @@ func schema_k8sio_api_core_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 				},
-				Required: []string{"metadata", "involvedObject"},
 			},
 		},
 		Dependencies: []string{
@@ -24263,6 +24261,7 @@ func schema_k8sio_api_core_v1_LimitRange(ref common.ReferenceCallback) common.Op
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -26609,7 +26608,6 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimTemplate(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -27208,6 +27206,7 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -29273,6 +29272,7 @@ func schema_k8sio_api_core_v1_PodTemplate(ref common.ReferenceCallback) common.O
 						},
 					},
 				},
+				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
@@ -29353,6 +29353,7 @@ func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback) comm
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -29469,7 +29470,6 @@ func schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"podSignature"},
 			},
 		},
 		Dependencies: []string{
@@ -29500,7 +29500,7 @@ func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"weight", "preference"},
+				Required: []string{"weight"},
 			},
 		},
 		Dependencies: []string{
@@ -32686,7 +32686,6 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"kind", "name"},
 			},
 		},
 	}
