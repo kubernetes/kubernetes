@@ -5225,7 +5225,7 @@ func TestDefaultDescribers(t *testing.T) {
 		"Pod":                       {},
 		"PodDisruptionBudgetV1":     {},
 		"PriorityClass":             {},
-		"Quota":                     {},
+		"ResourceQuota":             {},
 		"ReplicaSet":                {},
 		"ReplicationController":     {},
 		"Role":                      {},
