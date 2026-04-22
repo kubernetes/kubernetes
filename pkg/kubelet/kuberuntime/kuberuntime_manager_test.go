@@ -1969,6 +1969,24 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToKill:  getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
+		"stale main container from a previous sandbox must not mark pod as initialized": {
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{ID: "id1"},
+						Name:  "foo1",
+						State: kubecontainer.ContainerStateCreated,
+					},
+				}
+				status.ActiveContainerStatuses = nil
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
 		"an init container is in the created state due to an unknown error when starting container; restart it": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
@@ -2495,6 +2513,28 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 				SandboxID:             baseStatus.SandboxStatuses[0].Id,
 				InitContainersToStart: []int{0, 1},
 				ContainersToStart:     []int{0, 1, 2},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"stale main container with mixed restartable and non-restartable init containers; start the first one": {
+			mutatePodFn: func(pod *v1.Pod) {
+				// Make the second init container non-restartable while keeping the others restartable.
+				pod.Spec.InitContainers[1].RestartPolicy = nil
+			},
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{ID: "id1"},
+						Name:  "foo1",
+						State: kubecontainer.ContainerStateCreated,
+					},
+				}
+				status.ActiveContainerStatuses = nil
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
