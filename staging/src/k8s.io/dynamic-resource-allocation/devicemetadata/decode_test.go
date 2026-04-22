@@ -69,8 +69,10 @@ func mustMarshal(obj interface{}) []byte {
 func TestDecodeMetadataFromStream(t *testing.T) {
 	unknownVersionJSON := `{"apiVersion":"metadata.k8s.io/v99","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
 	unknownV2JSON := `{"apiVersion":"metadata.k8s.io/v100","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+	unknownVersionMissingKindJSON := `{"apiVersion":"metadata.k8s.io/v99","metadata":{"name":"test"}}` + "\n"
 	missingKindJSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","metadata":{"name":"test"}}` + "\n"
 	missingApiversionJSON := `{"kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+	malformedV1Alpha1JSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","kind":"DeviceMetadata","metadata":{"name":"test"},"requests":"this-should-be-an-array"}` + "\n"
 
 	expectedV1Alpha1 := &v1alpha1.DeviceMetadata{
 		TypeMeta: metav1.TypeMeta{
@@ -150,55 +152,62 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 		"missing-kind": {
 			streamInput: []byte(missingKindJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 		"missing-apiversion": {
 			streamInput: []byte(missingApiversionJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "decode metadata object",
+		},
+		"malformed-registered-version": {
+			streamInput: []byte(malformedV1Alpha1JSON),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 		"only-unknown-versions": {
 			streamInput: []byte(unknownVersionJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "no compatible metadata version found in stream (unknown versions: metadata.k8s.io/v99)",
+		},
+		"unknown-version-missing-kind": {
+			streamInput: []byte(unknownVersionMissingKindJSON),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.k8s.io/v99",
 		},
 		"multiple-unknown-versions": {
 			streamInput: append([]byte(unknownVersionJSON), []byte(unknownV2JSON)...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
-		},
-		"unknown-version-then-broken": {
-			streamInput: append([]byte(unknownVersionJSON), []byte(missingKindJSON)...),
-			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "no compatible metadata version found in stream (unknown versions: metadata.k8s.io/v99, metadata.k8s.io/v100)",
 		},
 		"known-version-then-broken": {
 			streamInput: append(validV1Alpha1JSON, []byte("{broken")...),
 			dest:        &v1alpha1.DeviceMetadata{},
 			expected:    expectedV1Alpha1,
 		},
-
-		// Forward compatibility: object-level errors are skipped so
-		// that an older consumer can reach a version it understands.
 		"skips-unknown-version": {
 			streamInput: append([]byte(unknownVersionJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
 			expected:    expectedV1Alpha1,
 		},
-		"skips-missing-kind": {
+		"malformed-registered-then-valid-is-fatal": {
+			streamInput: append([]byte(malformedV1Alpha1JSON), validV1Alpha1JSON...),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
+		},
+		"missing-kind-then-valid-is-fatal": {
 			streamInput: append([]byte(missingKindJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
-		"skips-missing-apiversion": {
+		"missing-apiversion-then-valid-is-fatal": {
 			streamInput: append([]byte(missingApiversionJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata object",
 		},
-		"skips-multiple-errors": {
-			streamInput: append(append([]byte(unknownVersionJSON), []byte(missingKindJSON)...), validV1Alpha1JSON...),
+		"unknown-version-then-malformed-is-fatal": {
+			streamInput: append([]byte(unknownVersionJSON), []byte(missingKindJSON)...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 	}
 
