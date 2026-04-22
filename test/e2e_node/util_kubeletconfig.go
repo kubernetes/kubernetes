@@ -71,25 +71,57 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 }
 
 type updateKubeletOptions struct {
-	deleteStateFiles          bool
+	deleteStateFiles bool
+	// In addition to the standard ready node check, ensure that the node stays consistently ready.
 	ensureConsistentReadyNode bool
+	// extraAction performs any extra configuration actions that are needed while the Kubelet is stopped.
+	// the function returned by extraAction will be called during the cleanup step (if non-nil)
+	extraAction func(context.Context) (func(context.Context), error)
 	// TODO: add option to use systemctl stop, now we only use systemctl kill for historical reasons
 }
 
 func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
 	ginkgo.GinkgoHelper()
 
-	withStoppedKubelet(ctx, f, opts.ensureConsistentReadyNode, func() {
-		// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-		if opts.deleteStateFiles {
-			deleteStateFile(cpuManagerStateFile)
-			deleteStateFile(memoryManagerStateFile)
-			deleteStateFile(usernsStateFiles)
-		}
+	oldCfg, err := getCurrentKubeletConfig(ctx)
+	framework.ExpectNoError(err)
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+	var cleanupAction func(context.Context)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		ginkgo.By("Restoring original Kubelet Configuration")
+		// A failure to successfully restore the kubelet is a fatal error.
+		err := gomega.InterceptGomegaFailure(func() {
+			withStoppedKubelet(ctx, f, false, func() {
+				if opts.deleteStateFiles {
+					deleteStateFiles()
+				}
+				framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+				if cleanupAction != nil {
+					cleanupAction(ctx)
+				}
+			})
+		})
+		if err != nil {
+			ginkgo.AbortSuite(fmt.Sprintf("Fatal Error: Failed to restore kubelet: %v", err.Error()))
+		}
 	})
 
+	withStoppedKubelet(ctx, f, opts.ensureConsistentReadyNode, func() {
+		if opts.deleteStateFiles {
+			deleteStateFiles()
+		}
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+		if opts.extraAction != nil {
+			cleanupAction, err = opts.extraAction(ctx)
+			framework.ExpectNoError(err, "error performing extraAction during Kubelet configuration")
+		}
+	})
+}
+
+func deleteStateFiles() {
+	deleteStateFile(cpuManagerStateFile)
+	deleteStateFile(memoryManagerStateFile)
+	deleteStateFile(usernsStateFiles)
 }
 
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {

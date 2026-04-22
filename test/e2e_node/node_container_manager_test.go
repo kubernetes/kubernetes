@@ -38,13 +38,12 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, cgroupManager cm.CgroupManager) {
+func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -98,19 +97,6 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			oldCfg, err = getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)
 
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if oldCfg != nil {
-					// Update the Kubelet configuration.
-					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-
-					ginkgo.By("Restarting the kubelet")
-					restartKubelet(ctx, true)
-
-					waitForKubeletToStart(ctx, f)
-					ginkgo.By("Started the kubelet")
-				}
-			})
-
 			newCfg := oldCfg.DeepCopy()
 			// Change existing kubelet configuration
 			newCfg.CPUManagerPolicy = "none"
@@ -118,17 +104,10 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			newCfg.FailCgroupV1 = true // extra safety. We want to avoid false negatives though, so we added the skip check earlier
 
 			// Update the Kubelet configuration.
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-			ginkgo.By("Restarting the kubelet")
-			restartKubelet(ctx, true)
-
-			waitForKubeletToStart(ctx, f)
-			ginkgo.By("Started the kubelet")
-
-			gomega.Consistently(ctx, func(ctx context.Context) bool {
-				return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
-			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles:          true,
+				ensureConsistentReadyNode: true,
+			})
 		})
 	})
 })
@@ -234,67 +213,36 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 	// Create a cgroup manager object for manipulating cgroups.
 	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, oldCfg.CgroupDriver)
-
-	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
-	ginkgo.DeferCleanup(func(ctx context.Context) {
-		if oldCfg != nil {
-			// Update the Kubelet configuration.
-			ginkgo.By("Stopping the kubelet")
-			restartKubelet := mustStopKubelet(ctx, f)
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
-
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
-
-			ginkgo.By("Restarting the kubelet")
-			restartKubelet(ctx)
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
+	updateKubeletCgroups := func(ctx context.Context) (func(context.Context), error) {
+		cleanup := func(context.Context) {
+			destroyTemporaryCgroupsForReservation(cgroupManager)
 		}
-	})
-	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
-		return err
+		if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
+			return cleanup, err
+		}
+
+		// Cleanup from the previous kubelet, to verify the new one creates it correctly
+		if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
+			Name: cm.NewCgroupName(expectedNAPodCgroup),
+		}); err != nil {
+			return cleanup, err
+		}
+		if cgroupManager.Exists(expectedNAPodCgroup) {
+			return cleanup, fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
+		}
+		return cleanup, nil
 	}
 
 	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
-	setDesiredConfiguration(newCfg, cgroupManager)
+	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.
-	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet")
-	restartKubelet := mustStopKubelet(ctx, f)
+	updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+		deleteStateFiles: true,
+		extraAction:      updateKubeletCgroups,
+	})
 
-	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
-
-	// Cleanup from the previous kubelet, to verify the new one creates it correctly
-	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
-		Name: cm.NewCgroupName(expectedNAPodCgroup),
-	}); err != nil {
-		return err
-	}
-	if cgroupManager.Exists(expectedNAPodCgroup) {
-		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
-	}
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-	ginkgo.By("Starting the kubelet")
-	restartKubelet(ctx)
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
-
-	if err != nil {
-		return err
-	}
 	// Set new config and current config.
 	currentConfig := newCfg
 

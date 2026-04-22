@@ -1352,13 +1352,6 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 
 		runTMScopeResourceAlignmentTestSuite(ctx, f, configMap, reservedSystemCPUs, policy, numaNodes, coreCount)
 	})
-
-	ginkgo.AfterEach(func(ctx context.Context) {
-		if oldCfg != nil {
-			// restore kubelet config
-			updateKubeletConfig(ctx, f, oldCfg, true)
-		}
-	})
 }
 
 func runPreferClosestNUMATests(f *framework.Framework) {
@@ -1384,13 +1377,6 @@ func runPreferClosestNUMATests(f *framework.Framework) {
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		runPreferClosestNUMATestSuite(ctx, f, numaNodes, numaDistances)
-	})
-
-	ginkgo.AfterEach(func(ctx context.Context) {
-		if oldCfg != nil {
-			// restore kubelet config
-			updateKubeletConfig(ctx, f, oldCfg, true)
-		}
 	})
 }
 

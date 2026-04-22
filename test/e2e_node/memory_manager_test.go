@@ -827,7 +827,6 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 	var (
 		allNUMANodes         []int
 		isMultiNUMASupported *bool
-		oldCfg               *kubeletconfig.KubeletConfiguration
 		podMap               map[string]*v1.Pod
 		createPodSync        func(ctx context.Context, pod *v1.Pod) *v1.Pod
 	)
@@ -848,10 +847,6 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 	}
 
 	ginkgo.BeforeAll(func(ctx context.Context) {
-		var err error
-		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
-
 		if isMultiNUMASupported == nil {
 			isMultiNUMASupported = ptr.To(isMultiNUMA())
 		}
@@ -859,10 +854,6 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 		if len(allNUMANodes) == 0 {
 			allNUMANodes = getAllNUMANodes()
 		}
-	})
-
-	ginkgo.AfterAll(func(ctx context.Context) {
-		updateKubeletConfig(ctx, f, oldCfg, true)
 	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {

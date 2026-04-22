@@ -35,20 +35,16 @@ import (
 var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.KubeletConfigDropInDir, func() {
 	f := framework.NewDefaultFramework("kubelet-config-drop-in-dir-test")
 	ginkgo.Context("when merging drop-in configs", func() {
-		var oldcfg *kubeletconfig.KubeletConfiguration
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			var err error
-			oldcfg, err = getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
-		})
 		ginkgo.AfterEach(func(ctx context.Context) {
+			restartKubelet := mustStopKubelet(ctx, f)
+			defer restartKubelet(ctx)
+
 			files, err := filepath.Glob(filepath.Join(framework.TestContext.KubeletConfigDropinDir, "*"+".conf"))
 			framework.ExpectNoError(err)
 			for _, file := range files {
 				err := os.Remove(file)
 				framework.ExpectNoError(err)
 			}
-			updateKubeletConfig(ctx, f, oldcfg, true)
 		})
 		ginkgo.It("should merge kubelet configs correctly", func(ctx context.Context) {
 			// Get the initial kubelet configuration
