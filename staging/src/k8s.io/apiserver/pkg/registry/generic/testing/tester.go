@@ -76,6 +76,11 @@ func (t *Tester) GeneratesName() *Tester {
 	return t
 }
 
+func (t *Tester) NewObjectModifier(newObjectModifier func(object runtime.Object)) *Tester {
+	t.tester = t.tester.NewObjectModifier(newObjectModifier)
+	return t
+}
+
 func (t *Tester) ReturnDeletedObject() *Tester {
 	t.tester = t.tester.ReturnDeletedObject()
 	return t

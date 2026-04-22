@@ -256,6 +256,12 @@ func SetSchedulingGroup(schedulingGroup *api.PodSchedulingGroup) Tweak {
 	}
 }
 
+func SetEvictionResponders(evictionResponders ...api.EvictionResponder) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.EvictionResponders = evictionResponders
+	}
+}
+
 func MakeContainer(name string, tweaks ...TweakContainer) api.Container {
 	cnr := api.Container{
 		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent",
