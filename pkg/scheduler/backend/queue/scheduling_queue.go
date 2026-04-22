@@ -128,6 +128,7 @@ type SchedulingQueue interface {
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
+	MoveOneToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, podKey string)
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent)
 
@@ -1157,6 +1158,21 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
+}
+
+// MoveOneToActiveOrBackoffQueue moves a single pod identified by podKey from
+// the unschedulable pod pool to the active or backoff queue. This is an O(1)
+// alternative to MoveAllToActiveOrBackoffQueue for events that affect only a
+// single known pod, such as ResourceClaim events for per-pod claims created
+// from ResourceClaimTemplates.
+func (p *PriorityQueue) MoveOneToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, podKey string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	pInfo, exists := p.unschedulablePods.podInfoMap[podKey]
+	if !exists {
+		return
+	}
+	p.movePodsToActiveOrBackoffQueue(logger, []*framework.QueuedPodInfo{pInfo}, event, oldObj, newObj)
 }
 
 // requeuePodWithQueueingStrategy tries to requeue Pod to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
