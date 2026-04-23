@@ -40,6 +40,10 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			mf, scheme, scheme,
 			json.SerializerOptions{Yaml: false, Pretty: false, Strict: true, StreamingCollectionsEncoding: options.StreamingCollectionsEncodingToJSON},
 		),
+		ExcludeManagedFieldsSerializer: json.NewSerializerWithOptions(
+			mf, scheme, scheme,
+			json.SerializerOptions{Yaml: false, Pretty: false, Strict: options.Strict, StreamingCollectionsEncoding: options.StreamingCollectionsEncodingToJSON, ExcludeManagedFields: true},
+		),
 		StreamSerializer: &runtime.StreamSerializerInfo{
 			EncodesAsText: true,
 			Serializer:    jsonSerializer,

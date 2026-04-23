@@ -24,6 +24,7 @@ import (
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
@@ -36,7 +37,7 @@ import (
 // is not nil, the object has the group, version, and kind fields set.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{Pretty: pretty})
 }
 
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
@@ -44,7 +45,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{Yaml: true})
 }
 
 // NewSerializerWithOptions creates a JSON/YAML serializer that handles encoding versioned objects into the proper JSON/YAML
@@ -63,10 +64,11 @@ func NewSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, t
 // identifier computes Identifier of Encoder based on the given options.
 func identifier(options SerializerOptions) runtime.Identifier {
 	result := map[string]string{
-		"name":   "json",
-		"yaml":   strconv.FormatBool(options.Yaml),
-		"pretty": strconv.FormatBool(options.Pretty),
-		"strict": strconv.FormatBool(options.Strict),
+		"name":                 "json",
+		"yaml":                 strconv.FormatBool(options.Yaml),
+		"pretty":               strconv.FormatBool(options.Pretty),
+		"strict":               strconv.FormatBool(options.Strict),
+		"excludeManagedFields": strconv.FormatBool(options.ExcludeManagedFields),
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
@@ -96,6 +98,12 @@ type SerializerOptions struct {
 
 	// StreamingCollectionsEncoding enables encoding collection, one item at the time, drastically reducing memory needed.
 	StreamingCollectionsEncoding bool
+
+	// ExcludeManagedFields configures the serializer to omit metadata.managedFields
+	// from the encoded output. The serializer's Identifier reflects this option, so
+	// runtime.CacheableObject implementations cache the stripped form separately
+	// from the full form.
+	ExcludeManagedFields bool
 }
 
 // Serializer handles encoding versioned objects into the proper JSON form
@@ -218,12 +226,35 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if co, ok := obj.(runtime.CacheableObject); ok {
+		// CacheEncode invokes doEncode with cachingObject.GetObject(), which
+		// returns a deep copy each call. doEncode is free to mutate that copy
+		// to honor ExcludeManagedFields.
 		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+	}
+	if s.options.ExcludeManagedFields {
+		// Non-CacheableObject path: doEncode strips in place, so deep-copy here
+		// to avoid mutating an object the caller still holds.
+		obj = obj.DeepCopyObject()
 	}
 	return s.doEncode(obj, w)
 }
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
+	if s.options.ExcludeManagedFields {
+		// Caller (Encode or CacheEncode->GetObject) has guaranteed obj is a
+		// private copy; in-place mutation is safe.
+		stripManagedFields(obj)
+		// For list-shaped objects, also strip managedFields off each item.
+		// stripManagedFields(obj) above only touches the list envelope's own
+		// metadata, which doesn't carry managedFields — without this walk,
+		// LIST responses would still emit per-item managedFields and the
+		// bytes-on-wire savings story breaks.
+		_ = meta.EachListItem(obj, func(item runtime.Object) error {
+			stripManagedFields(item)
+			return nil
+		})
+	}
+
 	if s.options.Yaml {
 		json, err := json.Marshal(obj)
 		if err != nil {
@@ -256,6 +287,15 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+// stripManagedFields clears metadata.managedFields on obj. It is a no-op for
+// objects that don't expose ObjectMeta (e.g. *runtime.Unknown, raw lists).
+// List items are handled separately by the streaming path.
+func stripManagedFields(obj runtime.Object) {
+	if accessor, err := meta.Accessor(obj); err == nil {
+		accessor.SetManagedFields(nil)
+	}
 }
 
 // IsStrict indicates whether the serializer
