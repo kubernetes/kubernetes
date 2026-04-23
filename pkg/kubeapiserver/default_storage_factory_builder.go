@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
@@ -73,8 +72,6 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		// - alpha→beta: stores as beta immediately (alpha has no compat guarantee)
 		// - alpha→alpha: stores as latest alpha (alpha has no compat guarantee)
 		// - new resources: stores as the best version at the emulation version
-		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1beta1"),       // TODO: remove in 1.37.
-		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1beta1"), // TODO: remove in 1.37.
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
