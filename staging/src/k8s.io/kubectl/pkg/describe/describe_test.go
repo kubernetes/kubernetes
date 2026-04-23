@@ -5202,7 +5202,8 @@ var m = map[string]runtime.Object{
 }
 
 func TestDefaultDescribers(t *testing.T) {
-	defaultObjectDescriberObjectTypes := map[string]struct{}{
+	// sourced from https://github.com/jamescripter/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
+	defaultObjectDescriberTypes := map[string]struct{}{
 		"CertificateSigningRequest": {},
 		"ClusterRole":               {},
 		"ClusterRoleBinding":        {},
@@ -5239,7 +5240,7 @@ func TestDefaultDescribers(t *testing.T) {
 	}
 
 	for objType, obj := range m {
-		if _, ok := defaultObjectDescriberObjectTypes[objType]; ok {
+		if _, ok := defaultObjectDescriberTypes[objType]; ok {
 			t.Run(objType, func(t *testing.T) {
 				out, err := DefaultObjectDescriber.DescribeObject(obj)
 				if err != nil {
