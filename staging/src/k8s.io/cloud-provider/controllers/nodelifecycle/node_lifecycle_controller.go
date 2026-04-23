@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
@@ -66,13 +68,17 @@ type CloudNodeLifecycleController struct {
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod
 	// set in controller-manager
 	nodeMonitorPeriod time.Duration
+
+	// Value controlling NodeController monitoring loop worker number.
+	concurrentNodeLifecycleSyncs int
 }
 
 func NewCloudNodeLifecycleController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
+	nodeMonitorPeriod time.Duration,
+	concurrentNodeLifecycleSyncs int) (*CloudNodeLifecycleController, error) {
 
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
@@ -88,11 +94,16 @@ func NewCloudNodeLifecycleController(
 		return nil, errors.New("cloud provider does not support instances")
 	}
 
+	if concurrentNodeLifecycleSyncs < 1 {
+		return nil, fmt.Errorf("concurrentNodeLifecycleSyncs must be >= 1, got %d", concurrentNodeLifecycleSyncs)
+	}
+
 	c := &CloudNodeLifecycleController{
-		kubeClient:        kubeClient,
-		nodeLister:        nodeInformer.Lister(),
-		cloud:             cloud,
-		nodeMonitorPeriod: nodeMonitorPeriod,
+		kubeClient:                   kubeClient,
+		nodeLister:                   nodeInformer.Lister(),
+		cloud:                        cloud,
+		nodeMonitorPeriod:            nodeMonitorPeriod,
+		concurrentNodeLifecycleSyncs: concurrentNodeLifecycleSyncs,
 	}
 
 	return c, nil
@@ -133,7 +144,8 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 		return
 	}
 
-	for _, node := range nodes {
+	processNode := func(piece int) {
+		node := nodes[piece].DeepCopy()
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
 		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
@@ -142,11 +154,10 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 
 		if status == v1.ConditionTrue {
 			// if taint exist remove taint
-			err = cloudnodeutil.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint)
-			if err != nil {
+			if err := cloudnodeutil.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint); err != nil {
 				klog.Errorf("error patching node taints: %v", err)
 			}
-			continue
+			return
 		}
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
@@ -154,7 +165,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 		exists, err := c.ensureNodeExistsByProviderID(ctx, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
-			continue
+			return
 		}
 
 		if !exists {
@@ -185,17 +196,19 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 			shutdown, err := c.shutdownInCloudProvider(ctx, node)
 			if err != nil {
 				klog.Errorf("error checking if node %s is shutdown: %v", node.Name, err)
+				return
 			}
 
-			if shutdown && err == nil {
+			if shutdown {
 				// if node is shutdown add shutdown taint
-				err = cloudnodeutil.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint)
-				if err != nil {
+				if err := cloudnodeutil.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint); err != nil {
 					klog.Errorf("failed to apply shutdown taint to node %s, it may have been deleted.", node.Name)
 				}
 			}
 		}
 	}
+
+	workqueue.ParallelizeUntil(ctx, c.concurrentNodeLifecycleSyncs, len(nodes), processNode)
 }
 
 // getProviderID returns the provider ID for the node. If Node CR has no provider ID,

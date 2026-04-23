@@ -68,4 +68,7 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 	if obj.RouteReconciliationPeriod == zero {
 		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
 	}
+	if obj.ConcurrentNodeLifecycleSyncs == 0 {
+		obj.ConcurrentNodeLifecycleSyncs = 1
+	}
 }

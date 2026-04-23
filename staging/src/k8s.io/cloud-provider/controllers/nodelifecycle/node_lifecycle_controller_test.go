@@ -525,11 +525,12 @@ func Test_NodesDeleted(t *testing.T) {
 
 			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        clientset,
-				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
-				nodeMonitorPeriod: 1 * time.Second,
+				nodeLister:                   nodeInformer.Lister(),
+				kubeClient:                   clientset,
+				cloud:                        testcase.fakeCloud,
+				recorder:                     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				nodeMonitorPeriod:            1 * time.Second,
+				concurrentNodeLifecycleSyncs: 1,
 			}
 
 			w := eventBroadcaster.StartLogging(klog.Infof)
@@ -902,11 +903,12 @@ func Test_NodesShutdown(t *testing.T) {
 
 			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        clientset,
-				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
-				nodeMonitorPeriod: 1 * time.Second,
+				nodeLister:                   nodeInformer.Lister(),
+				kubeClient:                   clientset,
+				cloud:                        testcase.fakeCloud,
+				recorder:                     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				nodeMonitorPeriod:            1 * time.Second,
+				concurrentNodeLifecycleSyncs: 1,
 			}
 
 			e := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
@@ -1063,7 +1065,8 @@ func Test_GetProviderID(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				cloud: testcase.fakeCloud,
+				cloud:                        testcase.fakeCloud,
+				concurrentNodeLifecycleSyncs: 1,
 			}
 
 			providerID, err := cloudNodeLifecycleController.getProviderID(ctx, testcase.existingNode)
@@ -1095,4 +1098,60 @@ func syncNodeStore(ctx context.Context, nodeinformer coreinformers.NodeInformer,
 		newElems = append(newElems, &nodes.Items[i])
 	}
 	return nodeinformer.Informer().GetStore().Replace(newElems, "newRV")
+}
+
+func TestNewCloudNodeLifecycleController(t *testing.T) {
+	_, _ = ktesting.NewTestContext(t)
+	clientset := fake.NewSimpleClientset()
+	informer := informers.NewSharedInformerFactory(clientset, time.Second)
+	nodeInformer := informer.Core().V1().Nodes()
+	fakeCloud := &fakecloud.Cloud{}
+
+	testcases := []struct {
+		name            string
+		workers         int
+		expectedWorkers int
+		expectErr       bool
+	}{
+		{
+			name:            "valid workers count",
+			workers:         5,
+			expectedWorkers: 5,
+			expectErr:       false,
+		},
+		{
+			name:      "workers count is 0, expect error",
+			workers:   0,
+			expectErr: true,
+		},
+		{
+			name:      "workers count is negative, expect error",
+			workers:   -5,
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewCloudNodeLifecycleController(
+				nodeInformer,
+				clientset,
+				fakeCloud,
+				1*time.Second,
+				tc.workers,
+			)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error creating controller, but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating controller: %v", err)
+			}
+			if c.concurrentNodeLifecycleSyncs != tc.expectedWorkers {
+				t.Errorf("expected concurrentNodeLifecycleSyncs to be %d, but got %d", tc.expectedWorkers, c.concurrentNodeLifecycleSyncs)
+			}
+		})
+	}
 }
