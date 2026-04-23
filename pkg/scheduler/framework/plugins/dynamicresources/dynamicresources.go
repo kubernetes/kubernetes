@@ -661,6 +661,7 @@ func AllocatorFeatures(fts feature.Features) structured.Features {
 		DeviceTaints:           fts.EnableDRADeviceTaints,
 		DeviceBindingAndStatus: fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
 		ConsumableCapacity:     fts.EnableDRAConsumableCapacity,
+		ListTypeAttributes:     fts.EnableDRAListTypeAttributes,
 	}
 }
 
