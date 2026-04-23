@@ -271,6 +271,12 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
+
+	// owner: @yongruilin
+	//
+	// Allow clients to opt out of receiving metadata.managedFields in API
+	// responses via the Accept header parameter drop=metadata.managedFields.
+	ManagedFieldsOptOut featuregate.Feature = "ManagedFieldsOptOut"
 )
 
 func init() {
@@ -441,5 +447,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ManagedFieldsOptOut: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 }
