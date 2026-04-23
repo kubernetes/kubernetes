@@ -19,6 +19,7 @@ require (
 	golang.org/x/time v0.14.0
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/inf.v0 v0.9.1
+	k8s.io/constants v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	k8s.io/streaming v0.0.0
@@ -50,4 +51,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/streaming => ../streaming
+replace (
+	k8s.io/constants => ../constants
+	k8s.io/streaming => ../streaming
+)

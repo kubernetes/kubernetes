@@ -19,6 +19,8 @@ package content
 import (
 	"regexp"
 	"strings"
+
+	"k8s.io/constants/limits"
 )
 
 const labelKeyCharFmt string = "[A-Za-z0-9]"
@@ -75,7 +77,8 @@ const labelValueFmt string = "(" + labelKeyFmt + ")?"
 const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
 
 // LabelValueMaxLength is a label's max length
-const LabelValueMaxLength int = 63
+// Re-exported from k8s.io/constants/limits for backwards compatibility.
+const LabelValueMaxLength int = limits.LabelValueMaxLength
 
 var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
 

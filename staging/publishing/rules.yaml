@@ -1,7 +1,20 @@
 rules:
+# constants is published first as it has zero dependencies.
+# Other modules can depend on it for well-known Kubernetes constants.
+- destination: constants
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/constants
+  library: true
 - destination: streaming
   branches:
   - name: master
+    dependencies:
+    - repository: constants
+      branch: master
     source:
       branch: master
       dirs:
@@ -16,6 +29,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: streaming
       branch: master
     source:
@@ -55,6 +70,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -110,6 +127,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -201,6 +220,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -255,6 +276,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -334,6 +357,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -464,6 +489,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -567,6 +594,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -693,6 +722,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -849,6 +880,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -969,6 +1002,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -1107,6 +1142,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -1198,6 +1235,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -1277,6 +1316,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -1367,6 +1408,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -1491,6 +1534,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -1613,6 +1658,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -1728,6 +1775,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -1843,6 +1892,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -1982,6 +2033,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -2133,6 +2186,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -2200,6 +2255,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -2300,6 +2357,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -2439,6 +2498,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery
@@ -2554,6 +2615,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -2700,6 +2763,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: apimachinery
       branch: master
     - repository: streaming
@@ -2831,6 +2896,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: constants
+      branch: master
     - repository: api
       branch: master
     - repository: apimachinery

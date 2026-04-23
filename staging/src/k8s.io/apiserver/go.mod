@@ -122,6 +122,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/constants v0.0.0 // indirect
 )
 
 replace (
@@ -129,6 +130,7 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/constants => ../constants
 	k8s.io/kms => ../kms
 	k8s.io/streaming => ../streaming
 )

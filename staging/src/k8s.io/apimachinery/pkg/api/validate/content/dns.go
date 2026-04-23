@@ -18,6 +18,8 @@ package content
 
 import (
 	"regexp"
+
+	"k8s.io/constants/rfc"
 )
 
 const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
@@ -25,7 +27,8 @@ const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 const dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
 
 // DNS1123LabelMaxLength is a label's max length in DNS (RFC 1123)
-const DNS1123LabelMaxLength int = 63
+// Re-exported from k8s.io/constants/rfc for backwards compatibility.
+const DNS1123LabelMaxLength int = rfc.DNS1123LabelMaxLength
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 
@@ -54,7 +57,8 @@ const dns1123SubdomainErrorMsg string = "a lowercase RFC 1123 subdomain must con
 const dns1123SubdomainCaselessErrorMsg string = "an RFC 1123 subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
 
 // DNS1123SubdomainMaxLength is a subdomain's max length in DNS (RFC 1123)
-const DNS1123SubdomainMaxLength int = 253
+// Re-exported from k8s.io/constants/rfc for backwards compatibility.
+const DNS1123SubdomainMaxLength int = rfc.DNS1123SubdomainMaxLength
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
 var dns1123SubdomainCaselessRegexp = regexp.MustCompile("^" + dns1123SubdomainFmtCaseless + "$")
