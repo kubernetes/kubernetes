@@ -41,8 +41,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-
-
 func TestPodGroupScheduling(t *testing.T) {
 	node := st.MakeNode().Name("node").Label("topology.kubernetes.io/zone", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
@@ -668,7 +666,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					scheduler.WithPodMaxBackoffSeconds(0),
 					scheduler.WithPodInitialBackoffSeconds(0))
 
-				ns :=testCtx.NS.Name
+				ns := testCtx.NS.Name
 
 				commonSteps := []Step{
 					{
@@ -681,15 +679,13 @@ func TestPodGroupScheduling(t *testing.T) {
 					},
 				}
 
-				if err := RunSteps(testCtx, append(commonSteps, tt.steps... ), ns); err != nil {
+				if err := RunSteps(testCtx, append(commonSteps, tt.steps...), ns); err != nil {
 					t.Fatal(err)
 				}
 			})
 		}
 	}
 }
-
-
 
 func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -722,35 +718,35 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	testCtx := testutils.InitTestSchedulerWithNS(t, "wap-inv",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
-	ns :=testCtx.NS.Name
+	ns := testCtx.NS.Name
 
 	steps := []Step{
 		{
-			Name: "Create node",
+			Name:        "Create node",
 			CreateNodes: []*v1.Node{node},
 		},
 		{
-			Name: "Create low priority pods",
+			Name:       "Create low priority pods",
 			CreatePods: lowPods,
 		},
 		{
-			Name: "Wait for low priority pods to be scheduled",
+			Name:                 "Wait for low priority pods to be scheduled",
 			WaitForPodsScheduled: []string{"low-1", "low-2", "low-3", "low-4"},
 		},
 		{
-			Name: "Create workload",
+			Name:            "Create workload",
 			CreateWorkloads: []*schedulingapi.Workload{workload},
 		},
 		{
-			Name: "Create PodGroup",
+			Name:           "Create PodGroup",
 			CreatePodGroup: pg,
 		},
 		{
-			Name: "Create high priority pods",
+			Name:       "Create high priority pods",
 			CreatePods: highPods,
 		},
 		{
-			Name: "Verify WorkloadAwarePreemption was called",
+			Name:                          "Verify WorkloadAwarePreemption was called",
 			VerifyWorkloadAwarePreemption: lowPods,
 		},
 	}
@@ -759,8 +755,6 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-
 
 func TestPostFilterInvocationCount(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -819,29 +813,29 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	)
 	ns := testCtx.NS.Name
 
-	steps := []Step {
+	steps := []Step{
 		{
-			Name: "Create node",
+			Name:        "Create node",
 			CreateNodes: []*v1.Node{node},
 		},
 		{
-			Name: "Create low priority pods",
+			Name:       "Create low priority pods",
 			CreatePods: lowPods,
 		},
 		{
-			Name: "Wait for low priority pods to be scheduled",
+			Name:                 "Wait for low priority pods to be scheduled",
 			WaitForPodsScheduled: []string{"low-1", "low-2", "low-3", "low-4"},
 		},
 		{
-			Name: "Create workload",
+			Name:            "Create workload",
 			CreateWorkloads: []*schedulingapi.Workload{workload},
 		},
 		{
-			Name: "Create PodGroup",
+			Name:           "Create PodGroup",
 			CreatePodGroup: pg,
 		},
 		{
-			Name: "Create high priority pods",
+			Name:       "Create high priority pods",
 			CreatePods: highPods,
 		},
 		{
@@ -850,7 +844,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 			Name: "Verify MockPostFilter was called 3 times",
 			VerifyMockPostFilterPluginCalled: &VerifyMockPostFilterPluginCalled{
 				Called: 3,
-				Mock: mockPlugin,
+				Mock:   mockPlugin,
 			},
 		},
 	}
@@ -859,4 +853,3 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-

@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,28 +60,28 @@ type VerifyAssignedInOneDomain struct {
 
 type VerifyMockPostFilterPluginCalled struct {
 	Called int
-	Mock *MockPostFilterPlugin
+	Mock   *MockPostFilterPlugin
 }
 
 type Step struct {
-	Name                         string
-	CreateNodes                  []*v1.Node
-	CreatePodGroup               *schedulingapi.PodGroup
-	CreatePodGroupForbiddenError *schedulingapi.PodGroup
-	CreatePods                   []*v1.Pod
-	CreateWorkloads               []*schedulingapi.Workload
-	DeletePods                   []string
-	DeleteWorkloads              []*schedulingapi.Workload
-	WaitForPodsGatedOnPreEnqueue []string
-	WaitForPodsUnschedulable     []string
-	WaitForPodsScheduled         []string
-	WaitForPodsRemoved           []string
-	WaitForPodGroupCreated       string
-	WaitForAnyPodsScheduled      *WaitForAnyPodsScheduled
-	WaitForPodGroupCondition     *PodGroupConditionCheck
-	VerifyAssignments            *VerifyAssignments
-	VerifyAssignedInOneDomain    *VerifyAssignedInOneDomain
-	VerifyWorkloadAwarePreemption []*v1.Pod
+	Name                             string
+	CreateNodes                      []*v1.Node
+	CreatePodGroup                   *schedulingapi.PodGroup
+	CreatePodGroupForbiddenError     *schedulingapi.PodGroup
+	CreatePods                       []*v1.Pod
+	CreateWorkloads                  []*schedulingapi.Workload
+	DeletePods                       []string
+	DeleteWorkloads                  []*schedulingapi.Workload
+	WaitForPodsGatedOnPreEnqueue     []string
+	WaitForPodsUnschedulable         []string
+	WaitForPodsScheduled             []string
+	WaitForPodsRemoved               []string
+	WaitForPodGroupCreated           string
+	WaitForAnyPodsScheduled          *WaitForAnyPodsScheduled
+	WaitForPodGroupCondition         *PodGroupConditionCheck
+	VerifyAssignments                *VerifyAssignments
+	VerifyAssignedInOneDomain        *VerifyAssignedInOneDomain
+	VerifyWorkloadAwarePreemption    []*v1.Pod
 	VerifyMockPostFilterPluginCalled *VerifyMockPostFilterPluginCalled
 }
 
@@ -168,10 +168,10 @@ func createPodGroupForbiddenError(testCtx *testutils.TestContext, pg *scheduling
 	_, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{})
 
 	if err == nil {
-		return fmt.Errorf("Expected PodGroup creation to be rejected, but it succeeded")
+		return fmt.Errorf("expected PodGroup creation to be rejected, but it succeeded")
 	}
 	if !apierrors.IsForbidden(err) {
-		return fmt.Errorf("Expected Forbidden error, got: %v", err)
+		return fmt.Errorf("expected Forbidden error, got: %w", err)
 	}
 	return nil
 }

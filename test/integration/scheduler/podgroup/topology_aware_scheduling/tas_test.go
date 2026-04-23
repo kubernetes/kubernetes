@@ -65,8 +65,6 @@ func makeUnfittablePod(podName, podGroupName string) *v1.Pod {
 		PodGroupName(podGroupName).Priority(100).Obj()
 }
 
-
-
 type scenario struct {
 	Name  string
 	steps []podgroup.Step

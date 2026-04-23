@@ -46,8 +46,8 @@ func TestPodGroupAdmission(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name           string
-		steps          []podgroup.Step
+		name  string
+		steps []podgroup.Step
 	}{
 		{
 			name: "PodGroup referencing non-existent Workload is rejected",
@@ -58,7 +58,7 @@ func TestPodGroupAdmission(t *testing.T) {
 			},
 		},
 		{
-			name:     "PodGroup referencing non-existent template is rejected",
+			name: "PodGroup referencing non-existent template is rejected",
 			steps: []podgroup.Step{
 				{
 					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
@@ -69,7 +69,7 @@ func TestPodGroupAdmission(t *testing.T) {
 			},
 		},
 		{
-			name:     "PodGroup referencing valid Workload and template is accepted",
+			name: "PodGroup referencing valid Workload and template is accepted",
 			steps: []podgroup.Step{
 				{
 					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
@@ -95,7 +95,7 @@ func TestPodGroupAdmission(t *testing.T) {
 			},
 		},
 		{
-			name:           "PodGroup referencing terminating Workload is rejected",
+			name: "PodGroup referencing terminating Workload is rejected",
 			steps: []podgroup.Step{
 				{
 					CreateWorkloads: []*schedulingapi.Workload{terminatingWorkload},
