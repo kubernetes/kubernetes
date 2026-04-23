@@ -331,7 +331,7 @@ func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGu
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, func() {
+var _ = ginkgo.FDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
