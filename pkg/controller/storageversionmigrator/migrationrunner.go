@@ -35,13 +35,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	svmlisters "k8s.io/client-go/listers/storagemigration/v1beta1"
+	svmlisters "k8s.io/client-go/listers/storagemigration/v1"
 )
 
 const MigrationRunnerControllerName string = "migration-runner-controller"
@@ -99,27 +99,27 @@ func NewCustomResourceController(
 }
 
 func (crc *MigrationRunnerController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1beta1.StorageVersionMigration)
+	svm := obj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	crc.enqueue(svm)
 }
 
 func (crc *MigrationRunnerController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
+	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
+	newSVM := newObj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	crc.enqueue(newSVM)
 }
 
 func (crc *MigrationRunnerController) deleteSVM(logger klog.Logger, obj interface{}) {
-	svm, ok := obj.(*svmv1beta1.StorageVersionMigration)
+	svm, ok := obj.(*svmv1.StorageVersionMigration)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			logger.Info("could not cast obj to DeletedFinalStateUnknown", "object", obj)
 			return
 		}
-		svm, ok = tombstone.Obj.(*svmv1beta1.StorageVersionMigration)
+		svm, ok = tombstone.Obj.(*svmv1.StorageVersionMigration)
 		if !ok {
 			logger.Info("could not cast tombstone to SVM", "object", obj)
 			return
@@ -129,7 +129,7 @@ func (crc *MigrationRunnerController) deleteSVM(logger klog.Logger, obj interfac
 	crc.enqueue(svm)
 }
 
-func (crc *MigrationRunnerController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
+func (crc *MigrationRunnerController) enqueue(svm *svmv1.StorageVersionMigration) {
 	crc.queue.Add(svm.Spec.Resource)
 }
 
@@ -202,12 +202,12 @@ func (crc *MigrationRunnerController) sync(ctx context.Context, resource metav1.
 	return nil
 }
 
-func (crc *MigrationRunnerController) cleanupAdmission(ctx context.Context, svm *svmv1beta1.StorageVersionMigration) error {
+func (crc *MigrationRunnerController) cleanupAdmission(ctx context.Context, svm *svmv1.StorageVersionMigration) error {
 	needsUpdate := false
-	migratingCond := meta.FindStatusCondition(svm.Status.Conditions, string(svmv1beta1.MigrationRunning))
+	migratingCond := meta.FindStatusCondition(svm.Status.Conditions, string(svmv1.MigrationRunning))
 	if migratingCond != nil && migratingCond.Status == metav1.ConditionTrue {
 		newCond := &metav1.Condition{
-			Type:               string(svmv1beta1.MigrationRunning),
+			Type:               string(svmv1.MigrationRunning),
 			Status:             metav1.ConditionFalse,
 			Reason:             "MigrationCompleted",
 			Message:            "Migration completed",
@@ -223,7 +223,7 @@ func (crc *MigrationRunnerController) cleanupAdmission(ctx context.Context, svm 
 			return err
 		}
 
-		_, err := crc.kubeClient.StoragemigrationV1beta1().
+		_, err := crc.kubeClient.StoragemigrationV1().
 			StorageVersionMigrations().
 			UpdateStatus(
 				ctx,
@@ -238,7 +238,7 @@ func (crc *MigrationRunnerController) cleanupAdmission(ctx context.Context, svm 
 	return nil
 }
 
-func (crc *MigrationRunnerController) markAsActive(ctx context.Context, svm *svmv1beta1.StorageVersionMigration) error {
+func (crc *MigrationRunnerController) markAsActive(ctx context.Context, svm *svmv1.StorageVersionMigration) error {
 	// Mark CRD as undergoing migration.
 	crd, exists, err := crc.crdForGroupResource(ctx, svm.Spec.Resource)
 	if err != nil {
@@ -275,8 +275,8 @@ func (crc *MigrationRunnerController) markAsActive(ctx context.Context, svm *svm
 		}
 	}
 
-	svm = setStatusConditions(svm, svmv1beta1.MigrationRunning, migrationRunningReason, migrationRunningMessage(nil, nil, nil))
-	_, err = crc.kubeClient.StoragemigrationV1beta1().
+	svm = setStatusConditions(svm, svmv1.MigrationRunning, migrationRunningReason, migrationRunningMessage(nil, nil, nil))
+	_, err = crc.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
@@ -290,14 +290,14 @@ func (crc *MigrationRunnerController) markAsActive(ctx context.Context, svm *svm
 	return nil
 }
 
-func compareSVM(a, b *svmv1beta1.StorageVersionMigration) int {
+func compareSVM(a, b *svmv1.StorageVersionMigration) int {
 	if i := a.CreationTimestamp.Compare(b.CreationTimestamp.Time); i != 0 {
 		return i
 	}
 	return strings.Compare(a.Name, b.Name)
 }
 
-func (crc *MigrationRunnerController) getSVMsForResource(resource metav1.GroupResource) (svmsToCleanup []*svmv1beta1.StorageVersionMigration, svmToPromote *svmv1beta1.StorageVersionMigration, err error) {
+func (crc *MigrationRunnerController) getSVMsForResource(resource metav1.GroupResource) (svmsToCleanup []*svmv1.StorageVersionMigration, svmToPromote *svmv1.StorageVersionMigration, err error) {
 	svms, err := crc.svmListers.List(labels.Everything())
 	if err != nil {
 		return nil, nil, err
@@ -329,17 +329,17 @@ func (crc *MigrationRunnerController) getSVMsForResource(resource metav1.GroupRe
 	return svmsToCleanup, svmToPromote, nil
 }
 
-func isTerminal(svm *svmv1beta1.StorageVersionMigration) bool {
-	return meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
-		meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1beta1.MigrationFailed))
+func isTerminal(svm *svmv1.StorageVersionMigration) bool {
+	return meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1.MigrationFailed))
 }
 
-func isRunning(svm *svmv1beta1.StorageVersionMigration) bool {
-	return meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1beta1.MigrationRunning))
+func isRunning(svm *svmv1.StorageVersionMigration) bool {
+	return meta.IsStatusConditionTrue(svm.Status.Conditions, string(svmv1.MigrationRunning))
 }
 
-func (crc *MigrationRunnerController) cleanupCRD(ctx context.Context, toBeProcessedSVM *svmv1beta1.StorageVersionMigration) error {
-	migratingSuccessfulCond := meta.FindStatusCondition(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded))
+func (crc *MigrationRunnerController) cleanupCRD(ctx context.Context, toBeProcessedSVM *svmv1.StorageVersionMigration) error {
+	migratingSuccessfulCond := meta.FindStatusCondition(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationSucceeded))
 	success := migratingSuccessfulCond != nil && migratingSuccessfulCond.Status == metav1.ConditionTrue
 	crd, exists, err := crc.crdForGroupResource(ctx, toBeProcessedSVM.Spec.Resource)
 	if err != nil {

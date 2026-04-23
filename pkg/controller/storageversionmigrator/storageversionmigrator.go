@@ -38,12 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
-	svmlisters "k8s.io/client-go/listers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
+	svmlisters "k8s.io/client-go/listers/storagemigration/v1"
 )
 
 const (
@@ -113,19 +113,19 @@ func (svmc *SVMController) Name() string {
 }
 
 func (svmc *SVMController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1beta1.StorageVersionMigration)
+	svm := obj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	svmc.enqueue(svm)
 }
 
 func (svmc *SVMController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
+	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
+	newSVM := newObj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	svmc.enqueue(newSVM)
 }
 
-func (svmc *SVMController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
+func (svmc *SVMController) enqueue(svm *svmv1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
@@ -209,8 +209,8 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	// working with a copy to avoid race condition between this and resource version controller
 	toBeProcessedSVM := svm.DeepCopy()
 
-	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
-		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationFailed)) {
+	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationFailed)) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
 	}
@@ -274,7 +274,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	return nil
 }
 
-func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
+func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
 	gvk, err := svmc.restMapper.KindFor(gvr)
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
@@ -353,7 +353,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 	}
 
 	updatedRunningCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
-		Type:               string(svmv1beta1.MigrationRunning),
+		Type:               string(svmv1.MigrationRunning),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationRunningReason,
@@ -361,7 +361,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 	})
 
 	updatedSucceededCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
-		Type:               string(svmv1beta1.MigrationSucceeded),
+		Type:               string(svmv1.MigrationSucceeded),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationSuccessStatusReason,
@@ -369,7 +369,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 	})
 
 	if updatedRunningCondition || updatedSucceededCondition {
-		_, err = svmc.kubeClient.StoragemigrationV1beta1().
+		_, err = svmc.kubeClient.StoragemigrationV1().
 			StorageVersionMigrations().
 			UpdateStatus(
 				ctx,
@@ -384,9 +384,9 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 	return nil, false
 }
 
-func (svmc *SVMController) updateRunningCondition(ctx context.Context, svm *svmv1beta1.StorageVersionMigration, candidatesToPatch, totalObjects int, err error) error {
+func (svmc *SVMController) updateRunningCondition(ctx context.Context, svm *svmv1.StorageVersionMigration, candidatesToPatch, totalObjects int, err error) error {
 	cond := &metav1.Condition{
-		Type:               string(svmv1beta1.MigrationRunning),
+		Type:               string(svmv1.MigrationRunning),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationRunningReason,
@@ -397,7 +397,7 @@ func (svmc *SVMController) updateRunningCondition(ctx context.Context, svm *svmv
 		return nil
 	}
 
-	_, updateErr := svmc.kubeClient.StoragemigrationV1beta1().
+	_, updateErr := svmc.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
@@ -418,11 +418,11 @@ func isRetriableError(k8sError error) bool {
 		apierrors.IsTimeout(k8sError)
 }
 
-func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, err error) error {
+func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1.StorageVersionMigration, err error) error {
 	errMsg := fmt.Sprintf("migration encountered unhandled error: %s", err)
 
 	cond := &metav1.Condition{
-		Type:               string(svmv1beta1.MigrationFailed),
+		Type:               string(svmv1.MigrationFailed),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationFailedStatusReason,
@@ -432,7 +432,7 @@ func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *
 		return nil
 	}
 
-	_, errStatus := svmc.kubeClient.StoragemigrationV1beta1().
+	_, errStatus := svmc.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
@@ -442,11 +442,11 @@ func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *
 	return errStatus
 }
 
-func (svmc *SVMController) failMigrationWithObjectsMigrated(ctx context.Context, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, err error, candidatesToPatch, totalObjects int) error {
+func (svmc *SVMController) failMigrationWithObjectsMigrated(ctx context.Context, toBeProcessedSVM *svmv1.StorageVersionMigration, err error, candidatesToPatch, totalObjects int) error {
 	errMsg := fmt.Sprintf("%d/%d not yet migrated. migration encountered unhandled error: %s", candidatesToPatch, totalObjects, err)
 
 	updatedRunningCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
-		Type:               string(svmv1beta1.MigrationRunning),
+		Type:               string(svmv1.MigrationRunning),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationRunningReason,
@@ -454,7 +454,7 @@ func (svmc *SVMController) failMigrationWithObjectsMigrated(ctx context.Context,
 	})
 
 	failedCond := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
-		Type:               string(svmv1beta1.MigrationFailed),
+		Type:               string(svmv1.MigrationFailed),
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 		Reason:             migrationFailedStatusReason,
@@ -465,7 +465,7 @@ func (svmc *SVMController) failMigrationWithObjectsMigrated(ctx context.Context,
 		return nil
 	}
 
-	_, errStatus := svmc.kubeClient.StoragemigrationV1beta1().
+	_, errStatus := svmc.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,

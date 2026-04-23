@@ -38,7 +38,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	corev1 "k8s.io/api/core/v1"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
@@ -275,7 +275,7 @@ func svmSetup(ctx context.Context, t *testing.T, allowedCodes ...int32) *svmTest
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 		"--authorization-mode=RBAC",
-		fmt.Sprintf("--runtime-config=%s=true", svmv1beta1.SchemeGroupVersion),
+		fmt.Sprintf("--runtime-config=%s=true", svmv1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
@@ -478,15 +478,15 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 }
 
 func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr metav1.GroupResource) (
-	*svmv1beta1.StorageVersionMigration,
+	*svmv1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	svmResource := &svmv1beta1.StorageVersionMigration{
+	svmResource := &svmv1.StorageVersionMigration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: svmv1beta1.StorageVersionMigrationSpec{
+		Spec: svmv1.StorageVersionMigrationSpec{
 			Resource: metav1.GroupResource{
 				Group:    gr.Group,
 				Resource: gr.Resource,
@@ -494,17 +494,17 @@ func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name st
 		},
 	}
 
-	return svm.client.StoragemigrationV1beta1().
+	return svm.client.StoragemigrationV1().
 		StorageVersionMigrations().
 		Create(ctx, svmResource, metav1.CreateOptions{})
 }
 
 func (svm *svmTest) getSVM(ctx context.Context, t *testing.T, name string) (
-	*svmv1beta1.StorageVersionMigration,
+	*svmv1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	return svm.client.StoragemigrationV1beta1().
+	return svm.client.StoragemigrationV1().
 		StorageVersionMigrations().
 		Get(ctx, name, metav1.GetOptions{})
 }
@@ -607,7 +607,7 @@ func (svm *svmTest) waitForResourceMigration(
 			}
 			svmConditions := svmResource.Status.Conditions
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationFailed)) {
 				t.Logf("%q SVM has failed migration, %#v", svmName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
@@ -617,12 +617,12 @@ func (svm *svmTest) waitForResourceMigration(
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationSucceeded)) {
 				t.Logf("%q SVM has completed migration", svmName)
 				return true, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationRunning)) {
 				t.Logf("%q SVM migration is running, %#v", svmName, svmConditions)
 				return false, nil
 			}
@@ -1116,7 +1116,7 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 			}
 			svmConditions := svmResource.Status.Conditions
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationFailed)) {
 				t.Logf("%q SVM has failed migration, %#v", crdSVMName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
@@ -1126,12 +1126,12 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
 				t.Logf("%q SVM has completed migration for crd %s", crdSVMName, crdName)
 				return true, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationRunning)) {
 				t.Logf("%q SVM migration is running, %#v", crdSVMName, svmConditions)
 				return false, nil
 			}
