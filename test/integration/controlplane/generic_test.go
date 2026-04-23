@@ -97,6 +97,7 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		"selfsubjectreviews.authentication.k8s.io",
 		"selfsubjectrulesreviews.authorization.k8s.io",
 		"serviceaccounts",
+		"storageversionmigrations.storagemigration.k8s.io",
 		"storageversions.internal.apiserver.k8s.io",
 		"subjectaccessreviews.authorization.k8s.io",
 		"tokenreviews.authentication.k8s.io",
