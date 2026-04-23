@@ -5202,7 +5202,7 @@ var objectTypeToInstance = map[string]runtime.Object{
 }
 
 func TestDefaultDescribers(t *testing.T) {
-	// sourced from https://github.com/jamescripter/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
+	// sourced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
 	defaultObjectDescriberTypes := map[string]struct{}{
 		"CertificateSigningRequest": {},
 		"ClusterRole":               {},
