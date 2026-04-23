@@ -713,55 +713,75 @@ func TestPrintUnstructuredObject(t *testing.T) {
 // because tabwriter's RememberWidths can only grow widths on future flushes
 // and cannot retroactively re-pad already-flushed rows.
 func TestPrintTable_ConsistentAlignmentAcrossFlushes(t *testing.T) {
-	columns := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string"},
-		{Name: "Status", Type: "string"},
-		{Name: "Age", Type: "string"},
-	}
-	// Use > 2 flush intervals (flushInterval=100) so we exercise multiple
-	// flushes, and place the widest Name cell in the final group so that
-	// the first flush fixes a narrower width than the overall max.
-	const rowCount = 250
+	// Exercise > 2 flush intervals so we cross multiple flush boundaries,
+	// and place the widest Name cell in the final group so the first flush
+	// would otherwise fix a narrower width than the overall max.
+	const rowCount = flushInterval*2 + flushInterval/2
 	const shortName = "a"
 	const longName = "a-name-that-is-significantly-wider"
-	rows := make([]metav1.TableRow, rowCount)
-	for i := range rows {
-		name := shortName
-		if i == rowCount-1 {
-			name = longName
-		}
-		rows[i] = metav1.TableRow{Cells: []interface{}{name, "Running", "5d"}}
-	}
-	table := &metav1.Table{ColumnDefinitions: columns, Rows: rows}
 
-	out := &bytes.Buffer{}
-	printer := NewTablePrinter(PrintOptions{})
-	if err := printer.PrintObj(table, out); err != nil {
-		t.Fatalf("PrintObj error: %v", err)
+	buildTable := func() *metav1.Table {
+		columns := []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string"},
+			{Name: "Status", Type: "string"},
+			{Name: "Age", Type: "string"},
+		}
+		rows := make([]metav1.TableRow, rowCount)
+		for i := range rows {
+			name := shortName
+			if i == rowCount-1 {
+				name = longName
+			}
+			rows[i] = metav1.TableRow{Cells: []interface{}{name, "Running", "5d"}}
+		}
+		return &metav1.Table{ColumnDefinitions: columns, Rows: rows}
 	}
 
-	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
-	if len(lines) != rowCount+1 {
-		t.Fatalf("expected %d lines (header + %d rows), got %d", rowCount+1, rowCount, len(lines))
-	}
-	// Compare the byte offset at which each non-first column starts, across
-	// all lines. Trailing content of the final column is ignored (the header's
-	// "AGE" is legitimately wider than data rows' "5d"), but every earlier
-	// column boundary must align identically for every line.
-	wantStarts := columnStartOffsets(lines[0])
-	for i, line := range lines {
-		gotStarts := columnStartOffsets(line)
-		if len(gotStarts) != len(wantStarts) {
-			t.Errorf("line %d: found %d column boundaries, want %d\nline: %q\nhdr:  %q", i, len(gotStarts), len(wantStarts), line, lines[0])
-			continue
+	assertAligned := func(t *testing.T, output string, expectedLines int) {
+		t.Helper()
+		lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+		if len(lines) != expectedLines {
+			t.Fatalf("expected %d lines, got %d", expectedLines, len(lines))
 		}
-		for j := range gotStarts {
-			if gotStarts[j] != wantStarts[j] {
-				t.Errorf("line %d: column %d starts at offset %d, want %d (misaligned across flush boundary)\nline: %q\nhdr:  %q", i, j+2, gotStarts[j], wantStarts[j], line, lines[0])
-				break
+		// Compare the byte offset at which each non-first column starts,
+		// across all lines. Trailing content of the final column is
+		// ignored (the header's "AGE" is legitimately wider than data
+		// rows' "5d"), but every earlier column boundary must align
+		// identically for every line.
+		wantStarts := columnStartOffsets(lines[0])
+		for i, line := range lines {
+			gotStarts := columnStartOffsets(line)
+			if len(gotStarts) != len(wantStarts) {
+				t.Errorf("line %d: found %d column boundaries, want %d\nline: %q\nref:  %q", i, len(gotStarts), len(wantStarts), line, lines[0])
+				continue
+			}
+			for j := range gotStarts {
+				if gotStarts[j] != wantStarts[j] {
+					t.Errorf("line %d: column %d starts at offset %d, want %d (misaligned across flush boundary)\nline: %q\nref:  %q", i, j+2, gotStarts[j], wantStarts[j], line, lines[0])
+					break
+				}
 			}
 		}
 	}
+
+	t.Run("WithHeaders", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		printer := NewTablePrinter(PrintOptions{})
+		if err := printer.PrintObj(buildTable(), out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		// header + rowCount data rows
+		assertAligned(t, out.String(), rowCount+1)
+	})
+
+	t.Run("NoHeaders", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		printer := NewTablePrinter(PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(buildTable(), out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		assertAligned(t, out.String(), rowCount)
+	})
 }
 
 // columnStartOffsets returns the byte offsets of the start of each non-first

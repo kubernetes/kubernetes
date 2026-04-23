@@ -37,6 +37,11 @@ import (
 // Formfeed is included because tabwriter treats it as a newline.
 const cellBreakChars = "\f\n\r"
 
+// flushInterval is the number of rows between tabwriter flushes when
+// streaming a large table. Flushing bounds memory while preserving
+// alignment via tabwriter.RememberWidths after the first flush.
+const flushInterval = 100
+
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
 type printHandler struct {
@@ -180,12 +185,15 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 	// When writing to a tabwriter we flush periodically (see below) to bound
 	// memory. Because tabwriter's RememberWidths can only grow column widths
 	// on future flushes — not retroactively re-pad rows already written — we
-	// pre-scan all rows to learn the ultimate max cell width per column, then
-	// pad the header so the first flush sets widths matching the ultimate max.
-	// Without this, a wider cell appearing after row 100 causes misalignment.
+	// pre-scan all rows to learn the ultimate max cell width per column. We
+	// then pad either the header (with headers) or the first data row
+	// (NoHeaders) so the first flush sets widths matching the ultimate max.
+	// Without this, a wider cell appearing after row flushInterval causes
+	// misalignment. Width comparisons use byte length because tabwriter
+	// measures columns in bytes, not runes.
 	var maxCellWidths []int
-	_, writingToTabwriter := output.(*tabwriter.Writer)
-	if writingToTabwriter && !options.NoHeaders && len(table.Rows) > 0 {
+	tw, isTabwriter := output.(*tabwriter.Writer)
+	if isTabwriter && len(table.Rows) > 0 {
 		maxCellWidths = make([]int, numColDefs)
 		for _, row := range table.Rows {
 			for i, cell := range row.Cells {
@@ -211,21 +219,21 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 		}
 	}
 
+	// Find the last visible column so we can skip padding it — padding the
+	// final column would leave trailing whitespace without any alignment
+	// benefit (tabwriter doesn't right-pad the last column for data rows).
+	lastVisibleCol := -1
+	for i, column := range table.ColumnDefinitions {
+		if !options.Wide && column.Priority != 0 {
+			continue
+		}
+		lastVisibleCol = i
+	}
+
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {
 			return nil
-		}
-
-		// Find the last visible column so we skip padding it — padding the
-		// final column would leave trailing whitespace without any alignment
-		// benefit (tabwriter doesn't right-pad the last column for data rows).
-		lastVisibleCol := -1
-		for i, column := range table.ColumnDefinitions {
-			if !options.Wide && column.Priority != 0 {
-				continue
-			}
-			lastVisibleCol = i
 		}
 
 		first := true
@@ -257,11 +265,16 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 	rowBuf := make([]byte, 0, numColDefs*40)
 
 	// When writing to a tabwriter with RememberWidths, flush periodically
-	// to bound memory usage. After the first flush the tabwriter remembers
-	// column widths, so subsequent flushes produce consistently aligned output.
-	// For small tables (< 100 rows) or non-tabwriter outputs, we skip this.
-	tw, isTabwriter := output.(*tabwriter.Writer)
-	const flushInterval = 100
+	// (flushInterval) to bound memory usage. After the first flush the
+	// tabwriter remembers column widths, so subsequent flushes produce
+	// consistently aligned output. For small tables or non-tabwriter
+	// outputs, no flushing happens here.
+	//
+	// NoHeaders mode: the header path above primes column widths by
+	// padding header cells to maxCellWidths. Without a header to prime
+	// widths, we instead pad the first data row's non-final cells using
+	// the same pre-scanned widths.
+	padFirstRow := isTabwriter && options.NoHeaders && len(maxCellWidths) > 0
 
 	for ri, row := range table.Rows {
 		rowBuf = rowBuf[:0]
@@ -280,12 +293,25 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 			} else {
 				rowBuf = append(rowBuf, '\t')
 			}
+			// Track byte length of the cell string we're about to
+			// write so we can pad to maxCellWidths without measuring
+			// through rowBuf (appendCellValue's slow path flushes
+			// rowBuf directly, making post-write measurement unsafe).
+			cellLen := 0
 			if cell != nil {
+				var cellStr string
 				switch val := cell.(type) {
 				case string:
-					rowBuf = appendCellValue(output, rowBuf, val)
+					cellStr = val
 				default:
-					rowBuf = appendCellValue(output, rowBuf, fmt.Sprint(val))
+					cellStr = fmt.Sprint(val)
+				}
+				cellLen = len(cellStr)
+				rowBuf = appendCellValue(output, rowBuf, cellStr)
+			}
+			if padFirstRow && ri == 0 && i != lastVisibleCol && i < len(maxCellWidths) {
+				if pad := maxCellWidths[i] - cellLen; pad > 0 {
+					rowBuf = append(rowBuf, bytes.Repeat([]byte{' '}, pad)...)
 				}
 			}
 		}
