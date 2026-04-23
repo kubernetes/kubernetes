@@ -5202,7 +5202,7 @@ var objectTypeToInstance = map[string]runtime.Object{
 }
 
 func TestDefaultDescribers(t *testing.T) {
-	// sourced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
+	// source: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
 	defaultObjectDescriberTypes := map[string]struct{}{
 		"CertificateSigningRequest": {},
 		"ClusterRole":               {},
@@ -5213,9 +5213,8 @@ func TestDefaultDescribers(t *testing.T) {
 		"DaemonSet":                 {},
 		"Deployment":                {},
 		"Endpoints":                 {},
-		"EndpointSliceV1":           {},
-		"HorizontalPodAutoscalerV1": {},
-		"HorizontalPodAutoscalerV2": {},
+		"EndpointSlice":             {},
+		"HorizontalPodAutoscaler":   {},
 		"Job":                       {},
 		"LimitRange":                {},
 		"Namespace":                 {},
@@ -5224,7 +5223,7 @@ func TestDefaultDescribers(t *testing.T) {
 		"PersistentVolume":          {},
 		"PersistentVolumeClaim":     {},
 		"Pod":                       {},
-		"PodDisruptionBudgetV1":     {},
+		"PodDisruptionBudget":       {},
 		"PriorityClass":             {},
 		"ResourceQuota":             {},
 		"ReplicaSet":                {},
