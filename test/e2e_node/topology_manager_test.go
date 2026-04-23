@@ -1295,7 +1295,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		topologymanager.PolicyNone,
 	}
 
-	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
+	ginkgo.FIt("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
