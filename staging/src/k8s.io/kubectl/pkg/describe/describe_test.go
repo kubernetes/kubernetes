@@ -5158,7 +5158,7 @@ var objectMeta = metav1.ObjectMeta{
 var objectMetaName = metav1.ObjectMeta{
 	Name: "bar",
 }
-var m = map[string]runtime.Object{
+var objectTypeToInstance = map[string]runtime.Object{
 	"DaemonSet": &appsv1.DaemonSet{ObjectMeta: objectMeta},
 	"Deployment": &appsv1.Deployment{
 		ObjectMeta: objectMeta,
@@ -5239,7 +5239,7 @@ func TestDefaultDescribers(t *testing.T) {
 		"VolumeAttributesClass":     {},
 	}
 
-	for objType, obj := range m {
+	for objType, obj := range objectTypeToInstance {
 		if _, ok := defaultObjectDescriberTypes[objType]; ok {
 			t.Run(objType, func(t *testing.T) {
 				out, err := DefaultObjectDescriber.DescribeObject(obj)
@@ -5308,7 +5308,7 @@ func TestDescribeEvents(t *testing.T) {
 		return describer, ok
 	}
 
-	for name, obj := range m {
+	for name, obj := range objectTypeToInstance {
 		t.Run(name, func(t *testing.T) {
 			clientset := fake.NewClientset(obj, events)
 			if d, ok := describerFor(name, clientset); ok {
