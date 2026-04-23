@@ -5159,7 +5159,10 @@ var objectMetaName = metav1.ObjectMeta{
 	Name: "bar",
 }
 var objectTypeToInstance = map[string]runtime.Object{
-	"DaemonSet": &appsv1.DaemonSet{ObjectMeta: objectMeta},
+	"ClusterRole":        &rbacv1.ClusterRole{ObjectMeta: objectMeta},
+	"ClusterRoleBinding": &rbacv1.ClusterRoleBinding{ObjectMeta: objectMeta},
+	"ConfigMap":          &corev1.ConfigMap{ObjectMeta: objectMeta},
+	"DaemonSet":          &appsv1.DaemonSet{ObjectMeta: objectMeta},
 	"Deployment": &appsv1.Deployment{
 		ObjectMeta: objectMeta,
 		Spec: appsv1.DeploymentSpec{
@@ -5167,10 +5170,11 @@ var objectTypeToInstance = map[string]runtime.Object{
 			Selector: &metav1.LabelSelector{},
 		},
 	},
-	"Endpoints":     &corev1.Endpoints{ObjectMeta: objectMeta},
-	"EndpointSlice": &discoveryv1.EndpointSlice{ObjectMeta: objectMeta},
-	"Job":           &batchv1.Job{ObjectMeta: objectMeta},
-	"Ingress":       &networkingv1.Ingress{ObjectMeta: objectMeta},
+	"Endpoints":               &corev1.Endpoints{ObjectMeta: objectMeta},
+	"EndpointSlice":           &discoveryv1.EndpointSlice{ObjectMeta: objectMeta},
+	"HorizontalPodAutoscaler": &autoscalingv2.HorizontalPodAutoscaler{ObjectMeta: objectMeta},
+	"Job":                     &batchv1.Job{ObjectMeta: objectMeta},
+	"Ingress":                 &networkingv1.Ingress{ObjectMeta: objectMeta},
 	"Node": &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
@@ -5190,15 +5194,11 @@ var objectTypeToInstance = map[string]runtime.Object{
 			Replicas: ptr.To[int32](1),
 		},
 	},
-	"Service":                 &corev1.Service{ObjectMeta: objectMeta},
-	"StorageClass":            &storagev1.StorageClass{ObjectMeta: objectMetaName},
-	"HorizontalPodAutoscaler": &autoscalingv2.HorizontalPodAutoscaler{ObjectMeta: objectMeta},
-	"ConfigMap":               &corev1.ConfigMap{ObjectMeta: objectMeta},
-	"ResourceQuota":           &corev1.ResourceQuota{ObjectMeta: objectMeta},
-	"Role":                    &rbacv1.Role{ObjectMeta: objectMeta},
-	"ClusterRole":             &rbacv1.ClusterRole{ObjectMeta: objectMeta},
-	"RoleBinding":             &rbacv1.RoleBinding{ObjectMeta: objectMeta},
-	"ClusterRoleBinding":      &rbacv1.ClusterRoleBinding{ObjectMeta: objectMeta},
+	"ResourceQuota": &corev1.ResourceQuota{ObjectMeta: objectMeta},
+	"Role":          &rbacv1.Role{ObjectMeta: objectMeta},
+	"RoleBinding":   &rbacv1.RoleBinding{ObjectMeta: objectMeta},
+	"Service":       &corev1.Service{ObjectMeta: objectMeta},
+	"StorageClass":  &storagev1.StorageClass{ObjectMeta: objectMetaName},
 }
 
 func TestDefaultDescribers(t *testing.T) {
@@ -5287,10 +5287,12 @@ func TestDescribeEvents(t *testing.T) {
 
 	describerFor := func(name string, clientset *fake.Clientset) (ResourceDescriber, bool) {
 		m := map[string]ResourceDescriber{
+			"ConfigMap":               &ConfigMapDescriber{clientset},
 			"DaemonSet":               &DaemonSetDescriber{clientset},
 			"Deployment":              &DeploymentDescriber{clientset},
 			"Endpoints":               &EndpointsDescriber{clientset},
 			"EndpointSlice":           &EndpointSliceDescriber{clientset},
+			"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{clientset},
 			"Job":                     &JobDescriber{clientset},
 			"Ingress":                 &IngressDescriber{clientset},
 			"Node":                    &NodeDescriber{clientset},
@@ -5300,8 +5302,6 @@ func TestDescribeEvents(t *testing.T) {
 			"ReplicationController":   &ReplicationControllerDescriber{clientset},
 			"Service":                 &ServiceDescriber{clientset},
 			"StorageClass":            &StorageClassDescriber{clientset},
-			"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{clientset},
-			"ConfigMap":               &ConfigMapDescriber{clientset},
 		}
 		describer, ok := m[name]
 		return describer, ok
