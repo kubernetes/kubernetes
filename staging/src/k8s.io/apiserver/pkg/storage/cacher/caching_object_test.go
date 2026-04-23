@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
 type mockEncoder struct {
@@ -162,6 +163,57 @@ func TestCachingObjectRaces(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// BenchmarkCachingObject_DualIdentifier characterizes the server-side cost of
+// KEP-5958: when some watchers opt out of managedFields, each event must be
+// serialized under two Identifiers instead of one. Two modes are reported:
+//
+//   - single:  status quo (all watchers receive the full object).
+//   - dual:    transition steady state (mixed clients). Marek's
+//     "serialize twice each event" concern lives here.
+//
+// The accompanying b.Logf prints the per-object byte size of full vs. stripped
+// so the bytes-on-wire savings are visible alongside the cache-fill CPU cost.
+func BenchmarkCachingObject_DualIdentifier(b *testing.B) {
+	pod := loadExemplarPod(b)
+	full := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+	stripped := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{ExcludeManagedFields: true})
+	if full.Identifier() == stripped.Identifier() {
+		b.Fatalf("expected distinct identifiers, both were %q", full.Identifier())
+	}
+
+	var fullBuf, strippedBuf bytes.Buffer
+	if err := full.Encode(pod, &fullBuf); err != nil {
+		b.Fatal(err)
+	}
+	if err := stripped.Encode(pod, &strippedBuf); err != nil {
+		b.Fatal(err)
+	}
+	b.Logf("per-object payload: full=%d B, stripped=%d B, savings=%d B (%.0f%%) per opt-out watcher",
+		fullBuf.Len(), strippedBuf.Len(),
+		fullBuf.Len()-strippedBuf.Len(),
+		float64(fullBuf.Len()-strippedBuf.Len())/float64(fullBuf.Len())*100)
+
+	run := func(b *testing.B, encoders ...runtime.Encoder) {
+		b.ReportAllocs()
+		var buf bytes.Buffer
+		for i := 0; i < b.N; i++ {
+			obj, err := newCachingObject(pod)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for _, enc := range encoders {
+				buf.Reset()
+				if err := enc.Encode(obj, &buf); err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	}
+
+	b.Run("variant=single", func(b *testing.B) { run(b, full) })
+	b.Run("variant=dual", func(b *testing.B) { run(b, full, stripped) })
 }
 
 func TestCachingObjectLazyDeepCopy(t *testing.T) {
