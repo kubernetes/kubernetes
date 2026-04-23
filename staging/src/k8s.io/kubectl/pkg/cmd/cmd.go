@@ -322,7 +322,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
 				label.NewCmdLabel(f, o.IOStreams),
-				annotate.NewCmdAnnotate("kubectl", f, o.IOStreams),
+				annotate.NewCmdAnnotate("kubectl", f, f, o.IOStreams),
 				completion.NewCmdCompletion(o.IOStreams.Out, ""),
 			},
 		},

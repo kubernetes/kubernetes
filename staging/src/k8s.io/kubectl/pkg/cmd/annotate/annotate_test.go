@@ -437,13 +437,16 @@ func TestAnnotateErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
+			// tf satisfies both cmdutil.Factory (needed by NewCmdAnnotate for tab-completion via
+			// ValidArgsFunction) and genericclioptions.RESTClientGetter (needed by NewAnnotateFlags
+			// and NewCmdAnnotate for resource building), so it's passed in both parameter slots.
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			iostreams, _, bufOut, bufErr := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+			cmd := NewCmdAnnotate("kubectl", tf, tf, iostreams)
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 

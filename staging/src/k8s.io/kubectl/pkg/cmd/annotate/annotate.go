@@ -41,6 +41,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -145,6 +146,7 @@ var (
 // NewCmdAnnotate creates the `annotate` command
 func NewCmdAnnotate(
 	parent string,
+	f cmdutil.Factory,
 	restClientGetter genericclioptions.RESTClientGetter,
 	streams genericiooptions.IOStreams,
 ) *cobra.Command {
@@ -156,6 +158,7 @@ func NewCmdAnnotate(
 		Short:                 i18n.T("Update the annotations on a resource"),
 		Long:                  annotateLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               annotateExample,
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(cmd, args)
 			cmdutil.CheckErr(err)
