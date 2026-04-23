@@ -5851,20 +5851,45 @@ type CreateContainerRequest struct {
 	//
 	// This field is not guaranteed to match the PodSandboxConfig that was
 	// originally passed to RunPodSandboxRequest for pod_sandbox_id. The kubelet
-	// may surface an updated view of the pod (for example after in-place
-	// resource resize via UpdatePodSandboxResourcesRequest, or other pod spec
-	// changes that affect sandbox configuration).
+	// may pass an updated or different view for reasons other than a changed
+	// core pod spec alone: in-place sandbox or resource changes (for example
+	// pod-level resource limits coordinated with the kubelet as part of a resize
+	// or other actuation), a kubelet restart with different feature gates or
+	// other kubelet settings (which can change the effective pod sandbox
+	// configuration the kubelet sends in sandbox_config), and any other case
+	// where the live kubelet state does not match what RunPodSandbox was told
+	// for this pod_sandbox_id.
+	//
+	// The CRI does not specify a global ordering between CreateContainer and
+	// other sandbox RPCs (for example UpdatePodSandboxResources) or a
+	// success-guarantee that must hold before a new container is created: a
+	// runtime MUST NOT assume the last UpdatePodSandboxResources (or any other
+	// sandbox update) for this pod_sandbox_id has already succeeded, or that
+	// the in-runtime pod sandbox matches every value the runtime last
+	// acknowledged, at the time CreateContainer is invoked. The kubelet
+	// interleaves pod- and container-level actuation in implementation-defined
+	// order (for example in-place resource updates adjust pod- and
+	// container-level cgroups with UpdatePodSandboxResources and
+	// UpdateContainerResources, often one resource at a time); an
+	// unrecoverable error in that pipeline can leave the actuation partially
+	// done while the kubelet may still call CreateContainer with
+	// sandbox_config reflecting the kubelet's current intent. This field is
+	// that intended pod sandbox for this create even when the in-runtime state
+	// may not yet match it.
 	//
 	// The container runtime MUST select the running sandbox using pod_sandbox_id.
 	// For information that affects the newly created container (including pod
 	// annotations the kubelet expects the workload to see at container creation
 	// time), the runtime MUST treat sandbox_config from this request as the
-	// kubelet's authoritative input, rather than inferring it solely from
+	// kubelet's input for the create, rather than inferring it solely from
 	// internal sandbox state that may be stale or modified out-of-band (for
-	// example by host-level extensions). If a requested value cannot be
-	// honored because it conflicts with the live sandbox, the runtime SHOULD
-	// fail this RPC with an error instead of silently diverging from the
-	// kubelet's requested configuration.
+	// example by host-level extensions). If the runtime can determine a
+	// requested value is incompatible with applying the kubelet's request for
+	// the new container, the runtime should return an error; otherwise,
+	// runtimes and versions differ in which conflicts can be detected and
+	// reported, and the kubelet supplies this field so the runtime can align
+	// the new container with the kubelet's current desired sandbox state
+	// independent of the runtime's internal view.
 	//
 	// Runtimes MUST NOT assume that fields omitted or unchanged in
 	// sandbox_config relative to an earlier RunPodSandboxRequest imply that no
