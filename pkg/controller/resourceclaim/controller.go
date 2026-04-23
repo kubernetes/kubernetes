@@ -167,6 +167,7 @@ type controllerFeatures struct {
 	WorkloadResourceClaims bool
 }
 
+// String describes the features suitably for unit test names.
 func (f controllerFeatures) String() string {
 	enabled := func(b bool) string {
 		if b {
@@ -175,7 +176,7 @@ func (f controllerFeatures) String() string {
 		return "disabled"
 	}
 	return fmt.Sprintf(
-		"AdminAccess %s, GenericWorkload %s, PrioritizedList %s, WorkloadResourceClaims %s",
+		"adminaccess-%s-genericworkload-%s-prioritizedlist-%s-workloadresourceclaims-%s",
 		enabled(f.AdminAccess),
 		enabled(f.GenericWorkload),
 		enabled(f.PrioritizedList),

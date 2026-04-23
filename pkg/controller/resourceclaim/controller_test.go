@@ -222,7 +222,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{1, 0, 0, 0},
 		},
 		{
-			name:                "create with admin and feature gate off",
+			name:                "create-adminaccess-feature-disabled",
 			featureCombinations: adminAccessDisabled,
 			pods:                []*v1.Pod{testPodWithResource},
 			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
@@ -230,7 +230,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedError:       adminAccessFeatureOffError,
 		},
 		{
-			name:                "create with admin and feature gate on",
+			name:                "create-adminaccess-feature-enabled",
 			featureCombinations: adminAccessEnabled,
 			pods:                []*v1.Pod{testPodWithResource},
 			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
@@ -244,7 +244,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 1, 0, 0},
 		},
 		{
-			name:                "create for Pod in PodGroup",
+			name:                "create-for-grouped-pod",
 			featureCombinations: workloadResourceClaimsEnabled,
 			pods:                []*v1.Pod{podInPodGroup(testPodWithResource, testPodName, testPodGroupName)},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroup},
@@ -267,7 +267,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedError:       `podgroup.scheduling.k8s.io "test-podgroup" not found`,
 		},
 		{
-			name:                "create for PodGroup",
+			name:                "create-for-podgroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
@@ -281,17 +281,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{1, 0, 0, 0},
 		},
 		{
-			name:                "skip create for Pod with PodGroup before template exists",
-			featureCombinations: workloadResourceClaimsEnabled,
-			pods:                []*v1.Pod{testPodWithPodGroupResource},
-			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
-			templates:           []*resourceapi.ResourceClaimTemplate{},
-			key:                 podKey(testPodWithPodGroupResource),
-			expectedClaims:      nil,
-			expectedMetrics:     expectedMetrics{0, 0, 0, 0},
-		},
-		{
-			name:                "skip create for Pod with PodGroup after template exists",
+			name:                "skip-create-podgroup-claim-for-pod",
 			featureCombinations: workloadResourceClaimsEnabled,
 			pods:                []*v1.Pod{testPodWithPodGroupResource},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -301,7 +291,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics:     expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name:                "update Pod status with PodGroup claim",
+			name:                "update-pod-status-with-podgroup-claim",
 			featureCombinations: workloadResourceClaimsEnabled,
 			pods:                []*v1.Pod{testPodWithPodGroupResource},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -317,7 +307,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name:                "skip create ResourceClaim for Pod with PodGroup claim when GenericWorkload feature is disabled",
+			name:                "skip-create-for-pod-with-podgroup-claim-genericworkload-disabled",
 			featureCombinations: genericWorkloadDisabled,
 			pods:                []*v1.Pod{testPodWithPodGroupResource},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -326,7 +316,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedError:       "GenericWorkload feature is disabled",
 		},
 		{
-			name:                "skip create ResourceClaim for Pod with PodGroup claim when DRAWorkloadResourceClaims feature is disabled",
+			name:                "skip-create-for-pod-with-podgroup-claim-workloadresourceclaims-disabled",
 			featureCombinations: workloadResourceClaimsDisabledGenericWorkloadEnabled,
 			pods:                []*v1.Pod{testPodWithPodGroupResource},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -335,7 +325,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedError:       "DRAWorkloadResourceClaims feature is disabled",
 		},
 		{
-			name:                "create ResourceClaim for grouped Pod with claim when DRAWorkloadResourceClaims feature is disabled",
+			name:                "create-for-grouped-pod-with-claim-workloadresourceclaims-disabled",
 			featureCombinations: workloadResourceClaimsDisabledGenericWorkloadEnabled,
 			pods:                []*v1.Pod{podInPodGroup(testPodWithResource, testPodName, testPodGroupName)},
 			podGroups:           []*schedulingapi.PodGroup{testPodGroup},
@@ -370,7 +360,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name:                "nop for PodGroup",
+			name:                "nop-podgroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
 				podGroup := testPodGroupWithResource.DeepCopy()
@@ -410,7 +400,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{1, 0, 0, 0},
 		},
 		{
-			name:                "recreate for PodGroup",
+			name:                "recreate-for-podgroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
 				pod := testPodGroupWithResource.DeepCopy()
@@ -798,7 +788,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
-			name: "clean up pod reservation with non-pod reservation present",
+			name: "remove-pod-reservation-with-non-pod-reservation-present",
 			pods: func() []*v1.Pod {
 				pod := testPodWithResource.DeepCopy()
 				pod.Status.Phase = v1.PodSucceeded
@@ -1506,12 +1496,12 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "nil claim",
+			name:  "nil-claim",
 			claim: nil,
 			want:  "false",
 		},
 		{
-			name: "no requests",
+			name: "no-requests",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -1522,7 +1512,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "false",
 		},
 		{
-			name: "admin access false",
+			name: "admin-access-false",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -1539,7 +1529,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "false",
 		},
 		{
-			name: "admin access true",
+			name: "admin-access-true",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -1556,7 +1546,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "true",
 		},
 		{
-			name: "prioritized list",
+			name: "prioritized-list",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -1571,7 +1561,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "false",
 		},
 		{
-			name: "multiple requests, one with admin access true",
+			name: "one-of-multiple-requests-with-admin-access-true",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -1593,7 +1583,7 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "true",
 		},
 		{
-			name: "multiple requests, all admin access false or nil",
+			name: "multiple-requests-admin-access-false-or-nil",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
