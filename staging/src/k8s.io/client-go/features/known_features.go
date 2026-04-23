@@ -90,6 +90,17 @@ const (
 	// GA: v1.35
 	InformerResourceVersion Feature = "InformerResourceVersion"
 
+	// owner: @yongruilin
+	// kep: https://kep.k8s.io/5958
+	// alpha: v1.36
+	//
+	// If enabled, opt-in clients (informers, reflectors, KCM, scheduler) add
+	// drop=metadata.managedFields to their Accept header so the server omits
+	// managedFields from responses. Independent of the server-side
+	// ManagedFieldsOptOut gate so client and server rollouts can be staged
+	// separately.
+	ManagedFieldsOptOutClient Feature = "ManagedFieldsOptOutClient"
+
 	// owner: @michaelasp
 	// beta: v1.36
 	//
@@ -134,6 +145,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	InformerResourceVersion: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: GA},
+	},
+	ManagedFieldsOptOutClient: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: Alpha},
 	},
 	UnlockWhileProcessingFIFO: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
