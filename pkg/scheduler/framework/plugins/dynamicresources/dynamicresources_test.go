@@ -2232,7 +2232,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                      want{},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2302,7 +2302,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2324,7 +2324,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2347,7 +2347,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2370,7 +2370,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2395,7 +2395,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2418,7 +2418,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2440,7 +2440,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2462,7 +2462,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2479,7 +2479,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				unreserveBeforePreBind: &result{},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2510,7 +2510,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["failure"]))
 			},

@@ -1767,7 +1767,7 @@ func getNumMetric(lister resourcelisters.ResourceClaimLister, logger klog.Logger
 		return numMetrics{}, fmt.Errorf("failed to gather metrics: %w", err)
 	}
 
-	metricName := "resourceclaim_controller_resource_claims"
+	metricName := "dynamic_resource_allocation_resource_claims"
 
 	em = newNumMetrics(lister)
 

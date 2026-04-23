@@ -23,8 +23,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-// ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
-const ResourceClaimSubsystem = "resourceclaim_controller"
+// subsystem is intentionally generic because these metrics are not specific to the controller.
+// The entire package could be in a neutral place, except that it is not obvious where that should be.
+const subsystem = "dynamic_resource_allocation"
 
 type NumResourceClaimLabels struct {
 	Allocated   string
@@ -36,10 +37,12 @@ var (
 	// ResourceClaimCreate tracks the total number of
 	// ResourceClaims creation requests
 	// categorized by their creation status and admin access.
+	// Used by kube-controller-manager and kube-scheduler, so
+	// the component where this metric gets collected is another dimension.
 	ResourceClaimCreate = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "creates_total",
+			Subsystem:      subsystem,
+			Name:           "resourceclaim_creates_total",
 			Help:           "Number of ResourceClaims creation requests, categorized by creation status and admin access",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -51,7 +54,7 @@ var (
 	// Source can be 'resource_claim_template' (created from a template),
 	// 'extended_resource' (extended resources), or empty (manually created by a user).
 	NumResourceClaimsDesc = metrics.NewDesc(
-		metrics.BuildFQName("", ResourceClaimSubsystem, "resource_claims"),
+		metrics.BuildFQName("", subsystem, "resource_claims"),
 		"Number of ResourceClaims, categorized by allocation status, admin access, and source. "+
 			"Source can be 'resource_claim_template' (created from a template), "+
 			"'extended_resource' (extended resources), or empty (manually created by a user).",
@@ -59,7 +62,7 @@ var (
 		metrics.ALPHA, "")
 )
 
-var registerMetrics sync.Once
+var registerMetrics, registerResourceClaimCreate sync.Once
 
 // testMode indicates whether we're running in test mode
 // In test mode, we don't register the custom collector in the global registry
@@ -70,10 +73,17 @@ func SetTestMode(enabled bool) {
 	testMode = enabled
 }
 
+// RegisterMetrics registers just the ResourceClaimCreate metric.
+func RegisterResourceClaimCreate() {
+	registerResourceClaimCreate.Do(func() {
+		legacyregistry.MustRegister(ResourceClaimCreate)
+	})
+}
+
 // RegisterMetrics registers ResourceClaim metrics.
 func RegisterMetrics(collector metrics.StableCollector) {
+	RegisterResourceClaimCreate()
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ResourceClaimCreate)
 		if !testMode && collector != nil {
 			// Only register custom collector in non-test mode
 			legacyregistry.CustomMustRegister(collector)

@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	volumebindingmetrics "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
@@ -166,7 +167,8 @@ var (
 	AsyncAPIPendingCalls *metrics.GaugeVec
 
 	// The below is only available when the DRAExtendedResource feature gate is enabled.
-	ResourceClaimCreatesTotal *metrics.CounterVec
+	// This is the same metric that also gets recorded in the kube-controller-manager.
+	ResourceClaimCreatesTotal = controllermetrics.ResourceClaimCreate
 
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
@@ -200,7 +202,7 @@ func Register() {
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-			RegisterMetrics(ResourceClaimCreatesTotal)
+			controllermetrics.RegisterResourceClaimCreate()
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			RegisterMetrics(
@@ -458,15 +460,6 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"call_type"})
-
-	ResourceClaimCreatesTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "resourceclaim_creates_total",
-			Help:           "Number of ResourceClaims creation requests within scheduler",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"status"})
 
 	DRABindingConditionsAllocationsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{

@@ -548,10 +548,10 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 
 	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {
-		metrics.ResourceClaimCreatesTotal.WithLabelValues("failure").Inc()
+		metrics.ResourceClaimCreatesTotal.WithLabelValues("failure", "false").Inc()
 		return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 	}
-	metrics.ResourceClaimCreatesTotal.WithLabelValues("success").Inc()
+	metrics.ResourceClaimCreatesTotal.WithLabelValues("success", "false").Inc()
 	logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(createdClaim))
 
 	return createdClaim, nil
