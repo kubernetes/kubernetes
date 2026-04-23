@@ -331,6 +331,11 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
 				// we ignore errors and let eviction sort it out with the original pod.
 				if err == nil {
+					// Pod has been rescheduled to a different node (e.g., StatefulSet pod
+					// recreated elsewhere while PDB blocked eviction). No eviction needed.
+					if freshPod.Spec.NodeName != pod.Spec.NodeName {
+						break
+					}
 					activePod = *freshPod
 				}
 			}
