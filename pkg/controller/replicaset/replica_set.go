@@ -723,7 +723,12 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		for _, pod := range podsToDelete {
 			go func(targetPod *v1.Pod) {
 				defer wg.Done()
-				if err := rsc.podControl.DeletePod(ctx, rs.Namespace, targetPod.Name, rs); err != nil {
+				opts := metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{
+						ResourceVersion: &targetPod.ResourceVersion,
+					},
+				}
+				if err := rsc.podControl.DeletePod(ctx, rs.Namespace, targetPod.Name, rs, opts); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(targetPod)
 					rsc.expectations.DeletionObserved(logger, rsKey, podKey)

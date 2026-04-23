@@ -1250,7 +1250,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 	for i := range pods {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
-			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
+			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
 				utilruntime.HandleError(err)
@@ -1307,7 +1307,7 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 					return
 				}
 			}
-			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil {
+			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job, metav1.DeleteOptions{}); err != nil {
 				failDelete(pod, err)
 			}
 			if podutil.IsPodReady(pod) {
