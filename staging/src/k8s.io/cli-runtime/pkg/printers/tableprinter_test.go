@@ -705,6 +705,79 @@ func TestPrintUnstructuredObject(t *testing.T) {
 	}
 }
 
+// TestPrintTable_ConsistentAlignmentAcrossFlushes verifies that every row in
+// the output is padded to the same column widths, even when the widest cell
+// value appears after the first periodic tabwriter flush. This is a regression
+// test for a bug where printTable's periodic flush (every 100 rows) caused
+// earlier rows to be written with narrower column widths than later rows,
+// because tabwriter's RememberWidths can only grow widths on future flushes
+// and cannot retroactively re-pad already-flushed rows.
+func TestPrintTable_ConsistentAlignmentAcrossFlushes(t *testing.T) {
+	columns := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string"},
+		{Name: "Status", Type: "string"},
+		{Name: "Age", Type: "string"},
+	}
+	// Use > 2 flush intervals (flushInterval=100) so we exercise multiple
+	// flushes, and place the widest Name cell in the final group so that
+	// the first flush fixes a narrower width than the overall max.
+	const rowCount = 250
+	const shortName = "a"
+	const longName = "a-name-that-is-significantly-wider"
+	rows := make([]metav1.TableRow, rowCount)
+	for i := range rows {
+		name := shortName
+		if i == rowCount-1 {
+			name = longName
+		}
+		rows[i] = metav1.TableRow{Cells: []interface{}{name, "Running", "5d"}}
+	}
+	table := &metav1.Table{ColumnDefinitions: columns, Rows: rows}
+
+	out := &bytes.Buffer{}
+	printer := NewTablePrinter(PrintOptions{})
+	if err := printer.PrintObj(table, out); err != nil {
+		t.Fatalf("PrintObj error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != rowCount+1 {
+		t.Fatalf("expected %d lines (header + %d rows), got %d", rowCount+1, rowCount, len(lines))
+	}
+	// Compare the byte offset at which each non-first column starts, across
+	// all lines. Trailing content of the final column is ignored (the header's
+	// "AGE" is legitimately wider than data rows' "5d"), but every earlier
+	// column boundary must align identically for every line.
+	wantStarts := columnStartOffsets(lines[0])
+	for i, line := range lines {
+		gotStarts := columnStartOffsets(line)
+		if len(gotStarts) != len(wantStarts) {
+			t.Errorf("line %d: found %d column boundaries, want %d\nline: %q\nhdr:  %q", i, len(gotStarts), len(wantStarts), line, lines[0])
+			continue
+		}
+		for j := range gotStarts {
+			if gotStarts[j] != wantStarts[j] {
+				t.Errorf("line %d: column %d starts at offset %d, want %d (misaligned across flush boundary)\nline: %q\nhdr:  %q", i, j+2, gotStarts[j], wantStarts[j], line, lines[0])
+				break
+			}
+		}
+	}
+}
+
+// columnStartOffsets returns the byte offsets of the start of each non-first
+// column on a tabwriter-formatted line. A column starts at the first non-space
+// byte following a run of >=2 spaces. This matches tabwriter's inter-column
+// padding and ignores the natural variability of the final column's contents.
+func columnStartOffsets(line string) []int {
+	var offsets []int
+	for i := 2; i < len(line); i++ {
+		if line[i] != ' ' && line[i-1] == ' ' && line[i-2] == ' ' {
+			offsets = append(offsets, i)
+		}
+	}
+	return offsets
+}
+
 // TestPrintTable_LargeRowCount verifies that the optimized printTable
 // produces correct output for large tables (the primary optimization target).
 func TestPrintTable_LargeRowCount(t *testing.T) {

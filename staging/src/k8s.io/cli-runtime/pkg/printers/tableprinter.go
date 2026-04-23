@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -174,14 +175,61 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // decorateTable if you receive a table from a remote server before calling printTable.
 func printTable(table *metav1.Table, output io.Writer, options PrintOptions) error {
+	numColDefs := len(table.ColumnDefinitions)
+
+	// When writing to a tabwriter we flush periodically (see below) to bound
+	// memory. Because tabwriter's RememberWidths can only grow column widths
+	// on future flushes — not retroactively re-pad rows already written — we
+	// pre-scan all rows to learn the ultimate max cell width per column, then
+	// pad the header so the first flush sets widths matching the ultimate max.
+	// Without this, a wider cell appearing after row 100 causes misalignment.
+	var maxCellWidths []int
+	_, writingToTabwriter := output.(*tabwriter.Writer)
+	if writingToTabwriter && !options.NoHeaders && len(table.Rows) > 0 {
+		maxCellWidths = make([]int, numColDefs)
+		for _, row := range table.Rows {
+			for i, cell := range row.Cells {
+				if i >= numColDefs {
+					break
+				}
+				if !options.Wide && table.ColumnDefinitions[i].Priority != 0 {
+					continue
+				}
+				if cell == nil {
+					continue
+				}
+				var l int
+				if s, ok := cell.(string); ok {
+					l = len(s)
+				} else {
+					l = len(fmt.Sprint(cell))
+				}
+				if l > maxCellWidths[i] {
+					maxCellWidths[i] = l
+				}
+			}
+		}
+	}
+
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {
 			return nil
 		}
 
+		// Find the last visible column so we skip padding it — padding the
+		// final column would leave trailing whitespace without any alignment
+		// benefit (tabwriter doesn't right-pad the last column for data rows).
+		lastVisibleCol := -1
+		for i, column := range table.ColumnDefinitions {
+			if !options.Wide && column.Priority != 0 {
+				continue
+			}
+			lastVisibleCol = i
+		}
+
 		first := true
-		for _, column := range table.ColumnDefinitions {
+		for i, column := range table.ColumnDefinitions {
 			if !options.Wide && column.Priority != 0 {
 				continue
 			}
@@ -190,12 +238,17 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 			} else {
 				output.Write([]byte{'\t'}) //nolint:errcheck
 			}
-			io.WriteString(output, strings.ToUpper(column.Name)) //nolint:errcheck
+			name := strings.ToUpper(column.Name)
+			io.WriteString(output, name) //nolint:errcheck
+			if i != lastVisibleCol && i < len(maxCellWidths) {
+				if pad := maxCellWidths[i] - len(name); pad > 0 {
+					output.Write(bytes.Repeat([]byte{' '}, pad)) //nolint:errcheck
+				}
+			}
 		}
 		output.Write([]byte{'\n'}) //nolint:errcheck
 	}
 
-	numColDefs := len(table.ColumnDefinitions)
 	// rowBuf accumulates tab-separated cell values for each row,
 	// reducing per-cell Write calls from ~3 (tab + value + truncation)
 	// down to 1 per row in the common case (no special characters).
