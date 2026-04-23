@@ -59,6 +59,9 @@ func NegotiateOutputMediaType(req *http.Request, ns runtime.NegotiatedSerializer
 	if (mediaType.Pretty || isPrettyPrint(req)) && info.PrettySerializer != nil {
 		info.Serializer = info.PrettySerializer
 	}
+	if mediaType.ExcludeManagedFields && info.ExcludeManagedFieldsSerializer != nil {
+		info.Serializer = info.ExcludeManagedFieldsSerializer
+	}
 	return mediaType, info, nil
 }
 
@@ -69,7 +72,13 @@ func NegotiateOutputMediaTypeStream(req *http.Request, ns runtime.NegotiatedSeri
 		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, NewNotAcceptableError(supported)
 	}
-	return mediaType.Accepted, nil
+	info := mediaType.Accepted
+	if mediaType.ExcludeManagedFields && info.ExcludeManagedFieldsSerializer != nil {
+		// Swap the embedded-object serializer; the StreamSerializer (which
+		// encodes the WatchEvent envelope) is unchanged.
+		info.Serializer = info.ExcludeManagedFieldsSerializer
+	}
+	return info, nil
 }
 
 // NegotiateInputSerializer returns the input serializer for the provided request.
@@ -171,6 +180,10 @@ type MediaTypeOptions struct {
 	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
 	Profile string
 
+	// excludeManagedFields is true if the client requests that metadata.managedFields
+	// be excluded from the response representation via Accept: ...;drop=metadata.managedFields
+	ExcludeManagedFields bool
+
 	// unrecognized is a list of all unrecognized keys
 	Unrecognized []string
 
@@ -233,6 +246,23 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		// controls the discovery profile (eg local vs peer-aggregated)
 		case "profile":
 			options.Profile = v
+
+		// if specified, the server should exclude the named field(s) from the
+		// response. Value is a '+'-separated set of field paths; unknown
+		// targets are ignored so older servers degrade silently. Today only
+		// metadata.managedFields is recognized; the set shape lets future
+		// fields ride the same parameter without an API redesign.
+		// '+' rather than ',' because goautoneg.ParseAccept treats ',' as
+		// the media-type-clause separator, which would terminate the value.
+		case "drop":
+			for _, target := range strings.Split(v, "+") {
+				switch strings.TrimSpace(target) {
+				case "metadata.managedFields":
+					if utilfeature.DefaultFeatureGate.Enabled(features.ManagedFieldsOptOut) {
+						options.ExcludeManagedFields = true
+					}
+				}
+			}
 
 		default:
 			options.Unrecognized = append(options.Unrecognized, k)
