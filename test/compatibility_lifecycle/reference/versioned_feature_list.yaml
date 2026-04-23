@@ -1979,6 +1979,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.37"
 - name: StreamingCollectionEncodingToJSON
   versionedSpecs:
   - default: true

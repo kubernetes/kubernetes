@@ -329,10 +329,14 @@
     {
       "name": "storagemigration.k8s.io",
       "preferredVersion": {
-        "groupVersion": "storagemigration.k8s.io/v1beta1",
-        "version": "v1beta1"
+        "groupVersion": "storagemigration.k8s.io/v1",
+        "version": "v1"
       },
       "versions": [
+        {
+          "groupVersion": "storagemigration.k8s.io/v1",
+          "version": "v1"
+        },
         {
           "groupVersion": "storagemigration.k8s.io/v1beta1",
           "version": "v1beta1"

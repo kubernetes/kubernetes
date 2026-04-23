@@ -1663,6 +1663,41 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:storage-version-migrator-controller
+  rules:
+  - apiGroups:
+    - '*'
+    resources:
+    - '*'
+    verbs:
+    - create
+    - list
+    - patch
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions
+    verbs:
+    - get
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions/status
+    verbs:
+    - patch
+  - apiGroups:
+    - storagemigration.k8s.io
+    resources:
+    - storageversionmigrations/status
+    verbs:
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:ttl-after-finished-controller
   rules:
   - apiGroups:

@@ -397,6 +397,16 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/storageversionmigrations/test-migration",
 			IntroducedVersion: "1.35",
 			RemovedVersion:    "1.41",
+			StatusStub:        `{"status": {"resourceVersion": "", "conditions": [{"type": "Running", "status": "True", "reason": "MigrationRunning", "message": "Migration is running", "lastTransitionTime": "2020-01-01T00:00:00Z"}]}}`,
+			MutatedStatusStub: `{"status": {"resourceVersion": "1", "conditions": [{"type": "Succeeded", "status": "True", "reason": "MigrationSucceeded", "message": "Migration completed", "lastTransitionTime": "2020-01-01T00:00:00Z"}]}}`,
+		},
+		gvr("storagemigration.k8s.io", "v1", "storageversionmigrations"): {
+			Stub:              `{"metadata": {"name": "test-migration-v1"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource"}}}`,
+			ExpectedEtcdPath:  "/registry/storageversionmigrations/test-migration-v1",
+			ExpectedGVK:       gvkP("storagemigration.k8s.io", "v1beta1", "StorageVersionMigration"),
+			IntroducedVersion: "1.37",
+			StatusStub:        `{"status": {"resourceVersion": "", "conditions": [{"type": "Running", "status": "True", "reason": "MigrationRunning", "message": "Migration is running", "lastTransitionTime": "2020-01-01T00:00:00Z"}]}}`,
+			MutatedStatusStub: `{"status": {"resourceVersion": "1", "conditions": [{"type": "Succeeded", "status": "True", "reason": "MigrationSucceeded", "message": "Migration completed", "lastTransitionTime": "2020-01-01T00:00:00Z"}]}}`,
 		},
 		// --
 

@@ -836,6 +836,13 @@
     code of 406.
   release: v1.16
   file: test/e2e/apimachinery/table_conversion.go
+- testname: CRUD operations for storageversionmigrations
+  codename: '[sig-api-machinery] StorageVersionMigration CRUD Tests storagemigration.k8s.io/v1
+    StorageVersionMigration [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for storagemigration.k8s.io/v1 StorageVersionMigration.
+  release: v1.37
+  file: test/e2e/apimachinery/storage_version_migration.go
 - testname: ValidatingAdmissionPolicy
   codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
     should allow expressions to refer variables. [Conformance]'

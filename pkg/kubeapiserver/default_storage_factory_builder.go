@@ -85,7 +85,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1beta1"), // TODO: remove in 1.37.
 		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
 		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
-		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
+		storagemigration.Resource("storageversionmigrations").WithVersion("v1beta1"),
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
 		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
 		scheduling.Resource("workloads").WithVersion("v1alpha2"),
