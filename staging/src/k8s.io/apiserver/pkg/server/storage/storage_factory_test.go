@@ -436,6 +436,9 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 	codecs := serializer.NewCodecFactory(sch)
 
 	type Internal = struct{}
+	type V1alpha1 struct{}
+	type V1alpha2 struct{}
+	type V1alpha3 struct{}
 	type V1beta1 struct{}
 	type V1beta2 struct{}
 	type V1beta3 struct{}
@@ -445,6 +448,11 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 	type FlowSchema struct{}
 	type ValidatingAdmisisonPolicy struct{}
 	type CronJob struct{}
+	type LeaseCandidate struct{}
+	type DeviceTaintRule struct{}
+	type PodCertificateRequest struct{}
+	type StorageVersionMigration struct{}
+	type Workload struct{}
 
 	// Order dictates priority order
 	registerFakeLifecycle[FlowSchema, V1](sch, "flowcontrol.apiserver.k8s.io", "1.29.0", "")
@@ -457,6 +465,22 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 	registerFakeLifecycle[ValidatingAdmisisonPolicy, V1beta1](sch, "admissionregistration.k8s.io", "1.28.0", "1.34.0")
 	registerFakeLifecycle[Pod, V1](sch, "", "1.31.0", "")
 
+	// alpha->beta: LeaseCandidate has v1beta1 (1.33) and v1alpha2 (1.31)
+	registerFakeLifecycle[LeaseCandidate, V1beta1](sch, "coordination.k8s.io", "1.33.0", "")
+	registerFakeLifecycle[LeaseCandidate, V1alpha2](sch, "coordination.k8s.io", "1.31.0", "1.35.0")
+
+	// alpha-only: DeviceTaintRule has only v1alpha3 (1.31)
+	registerFakeLifecycle[DeviceTaintRule, V1alpha3](sch, "resource.k8s.io", "1.31.0", "")
+
+	// new beta, no predecessor: PodCertificateRequest has only v1beta1 (1.33)
+	registerFakeLifecycle[PodCertificateRequest, V1beta1](sch, "certificates.k8s.io", "1.33.0", "")
+
+	// beta-only: StorageVersionMigration has only v1beta1 (1.30)
+	registerFakeLifecycle[StorageVersionMigration, V1beta1](sch, "storagemigration.k8s.io", "1.30.0", "")
+
+	// alpha-only in multi-version group: Workload has only v1alpha1 (1.33) in scheduling group
+	registerFakeLifecycle[Workload, V1alpha1](sch, "scheduling.k8s.io", "1.33.0", "")
+
 	// FlowSchema
 	//   - v1beta1: 1.20.0 - 1.23.0
 	//   - v1beta2: 1.23.0 - 1.26.0
@@ -468,6 +492,17 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 	// ValidatingAdmissionPolicy
 	//	 - v1beta1: 1.28.0 - 1.31.0
 	//	 - v1: 1.30.0+
+	// LeaseCandidate (alpha->beta)
+	//	 - v1alpha2: 1.31.0 - 1.35.0
+	//	 - v1beta1: 1.33.0+
+	// DeviceTaintRule (alpha-only)
+	//	 - v1alpha3: 1.31.0+
+	// PodCertificateRequest (new beta, no predecessor)
+	//	 - v1beta1: 1.33.0+
+	// StorageVersionMigration (beta-only)
+	//	 - v1beta1: 1.30.0+
+	// Workload (alpha-only, newly introduced)
+	//	 - v1alpha1: 1.33.0+
 
 	testcases := []struct {
 		effectiveVersion string
@@ -558,6 +593,57 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 			effectiveVersion: "1.29.0",
 			example:          &fakeLifecycler[ValidatingAdmisisonPolicy, Internal]{},
 			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// alpha->beta: beta introduced this release, should use beta immediately
+			// (alpha has no compat guarantee, no need to store as alpha for n-1)
+			effectiveVersion: "1.33.0",
+			example:          &fakeLifecycler[LeaseCandidate, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "coordination.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// alpha->beta: beta not yet introduced at this emulation version,
+			// should use alpha since beta doesn't exist yet
+			effectiveVersion: "1.32.0",
+			example:          &fakeLifecycler[LeaseCandidate, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "coordination.k8s.io", Version: "v1alpha2"},
+		},
+		{
+			// alpha->beta: one release after beta introduction, should use beta
+			effectiveVersion: "1.34.0",
+			example:          &fakeLifecycler[LeaseCandidate, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "coordination.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// alpha-only: should use the alpha version
+			effectiveVersion: "1.33.0",
+			example:          &fakeLifecycler[DeviceTaintRule, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "resource.k8s.io", Version: "v1alpha3"},
+		},
+		{
+			// new beta with no alpha predecessor: should use beta immediately
+			effectiveVersion: "1.33.0",
+			example:          &fakeLifecycler[PodCertificateRequest, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// beta-only, well established: should use beta
+			effectiveVersion: "1.33.0",
+			example:          &fakeLifecycler[StorageVersionMigration, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "storagemigration.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// alpha-only, newly introduced at emulation version: should use alpha
+			effectiveVersion: "1.33.0",
+			example:          &fakeLifecycler[Workload, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
+		},
+		{
+			// kind not yet introduced at emulation version: should fall back to
+			// the kind's highest-priority version (not the group's priority version)
+			effectiveVersion: "1.30.0",
+			example:          &fakeLifecycler[LeaseCandidate, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "coordination.k8s.io", Version: "v1beta1"},
 		},
 	}
 
