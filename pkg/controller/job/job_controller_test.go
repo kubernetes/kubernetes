@@ -7829,7 +7829,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	makePodGroup := func(job *batch.Job, wl *schedulingv1alpha3.Workload) *schedulingv1alpha3.PodGroup {
 		return &schedulingv1alpha3.PodGroup{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "scheduling.k8s.io/v1alpha2",
+				APIVersion: "scheduling.k8s.io/v1alpha3",
 				Kind:       "PodGroup",
 			},
 			ObjectMeta: metav1.ObjectMeta{

@@ -78,7 +78,7 @@ func TestWorkloadStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha2",
+		APIVersion:        "v1alpha3",
 		Resource:          "workloads",
 		IsResourceRequest: true,
 	})

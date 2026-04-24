@@ -71,7 +71,7 @@ func validNewWorkload() *scheduling.Workload {
 func newTester(t *testing.T, storage *genericregistry.Store) *genericregistrytest.Tester {
 	return genericregistrytest.New(t, storage).SetRequestInfo(&genericapirequest.RequestInfo{
 		APIGroup:   "scheduling.k8s.io",
-		APIVersion: "v1alpha2",
+		APIVersion: "v1alpha3",
 		Resource:   "workloads",
 	})
 }

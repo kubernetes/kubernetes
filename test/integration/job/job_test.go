@@ -4658,7 +4658,7 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	flags := framework.DefaultTestServerFlags()
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1alpha2=true")
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1alpha3=true")
 	}
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 

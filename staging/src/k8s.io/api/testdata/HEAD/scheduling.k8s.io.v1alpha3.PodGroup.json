@@ -1,6 +1,6 @@
 {
-  "kind": "Workload",
-  "apiVersion": "scheduling.k8s.io/v1alpha2",
+  "kind": "PodGroup",
+  "apiVersion": "scheduling.k8s.io/v1alpha3",
   "metadata": {
     "name": "nameValue",
     "generateName": "generateNameValue",
@@ -44,37 +44,51 @@
     ]
   },
   "spec": {
-    "controllerRef": {
-      "apiGroup": "apiGroupValue",
-      "kind": "kindValue",
-      "name": "nameValue"
+    "podGroupTemplateRef": {
+      "workload": {
+        "workloadName": "workloadNameValue",
+        "podGroupTemplateName": "podGroupTemplateNameValue"
+      }
     },
-    "podGroupTemplates": [
+    "schedulingPolicy": {
+      "basic": {},
+      "gang": {
+        "minCount": 1
+      }
+    },
+    "schedulingConstraints": {
+      "topology": [
+        {
+          "key": "keyValue"
+        }
+      ]
+    },
+    "resourceClaims": [
       {
         "name": "nameValue",
-        "schedulingPolicy": {
-          "basic": {},
-          "gang": {
-            "minCount": 1
-          }
-        },
-        "schedulingConstraints": {
-          "topology": [
-            {
-              "key": "keyValue"
-            }
-          ]
-        },
-        "resourceClaims": [
-          {
-            "name": "nameValue",
-            "resourceClaimName": "resourceClaimNameValue",
-            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
-          }
-        ],
-        "disruptionMode": "disruptionModeValue",
-        "priorityClassName": "priorityClassNameValue",
-        "priority": 7
+        "resourceClaimName": "resourceClaimNameValue",
+        "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+      }
+    ],
+    "disruptionMode": "disruptionModeValue",
+    "priorityClassName": "priorityClassNameValue",
+    "priority": 7
+  },
+  "status": {
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "observedGeneration": 3,
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ],
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
       }
     ]
   }

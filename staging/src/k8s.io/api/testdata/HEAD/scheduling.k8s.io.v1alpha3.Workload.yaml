@@ -1,4 +1,4 @@
-apiVersion: scheduling.k8s.io/v1alpha2
+apiVersion: scheduling.k8s.io/v1alpha3
 kind: Workload
 metadata:
   annotations:

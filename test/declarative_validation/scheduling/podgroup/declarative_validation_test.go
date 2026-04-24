@@ -42,6 +42,7 @@ var allowedDisruptionModes = sets.New(
 )
 
 func TestDeclarativeValidate(t *testing.T) {
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -352,6 +353,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -576,6 +578,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateStatusUpdate(t, apiVersion)

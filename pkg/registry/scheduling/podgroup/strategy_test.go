@@ -97,7 +97,7 @@ func TestStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha2",
+		APIVersion:        "v1alpha3",
 		Resource:          "podgroups",
 		IsResourceRequest: true,
 	})
@@ -488,7 +488,7 @@ func TestStrategyUpdate(t *testing.T) {
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha2",
+		APIVersion:  "v1alpha3",
 		Resource:    "podgroups",
 		Subresource: "status",
 	})

@@ -70,7 +70,6 @@ import (
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 	resourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
-	schedulingv1alpha2 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha2"
 	schedulingv1alpha3 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
@@ -130,7 +129,6 @@ type Interface interface {
 	ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface
 	ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface
 	SchedulingV1alpha3() schedulingv1alpha3.SchedulingV1alpha3Interface
-	SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	SchedulingV1() schedulingv1.SchedulingV1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
@@ -189,7 +187,6 @@ type Clientset struct {
 	resourceV1beta1               *resourcev1beta1.ResourceV1beta1Client
 	resourceV1alpha3              *resourcev1alpha3.ResourceV1alpha3Client
 	schedulingV1alpha3            *schedulingv1alpha3.SchedulingV1alpha3Client
-	schedulingV1alpha2            *schedulingv1alpha2.SchedulingV1alpha2Client
 	schedulingV1beta1             *schedulingv1beta1.SchedulingV1beta1Client
 	schedulingV1                  *schedulingv1.SchedulingV1Client
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
@@ -431,11 +428,6 @@ func (c *Clientset) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interfac
 // SchedulingV1alpha3 retrieves the SchedulingV1alpha3Client
 func (c *Clientset) SchedulingV1alpha3() schedulingv1alpha3.SchedulingV1alpha3Interface {
 	return c.schedulingV1alpha3
-}
-
-// SchedulingV1alpha2 retrieves the SchedulingV1alpha2Client
-func (c *Clientset) SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface {
-	return c.schedulingV1alpha2
 }
 
 // SchedulingV1beta1 retrieves the SchedulingV1beta1Client
@@ -700,10 +692,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.schedulingV1alpha2, err = schedulingv1alpha2.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.schedulingV1beta1, err = schedulingv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -796,7 +784,6 @@ func New(c rest.Interface) *Clientset {
 	cs.resourceV1beta1 = resourcev1beta1.New(c)
 	cs.resourceV1alpha3 = resourcev1alpha3.New(c)
 	cs.schedulingV1alpha3 = schedulingv1alpha3.New(c)
-	cs.schedulingV1alpha2 = schedulingv1alpha2.New(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.schedulingV1 = schedulingv1.New(c)
 	cs.storageV1beta1 = storagev1beta1.New(c)

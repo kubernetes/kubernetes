@@ -30,7 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apiserver/pkg/util/feature"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"

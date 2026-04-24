@@ -246,7 +246,7 @@ linters:
       # The (PodGroupSpec|PodGroupTemplate).SchedulingPolicy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
-        path: "staging/src/k8s.io/api/scheduling/v1alpha2/types.go"
+        path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
 
       - linters:
         - forbidigo

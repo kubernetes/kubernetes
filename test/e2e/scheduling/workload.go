@@ -36,7 +36,7 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		/*
 			Testname: CRUD operations for Workloads
 			Description: kube-apiserver must support create/get/list/update/patch/delete
-			operations for scheduling.k8s.io/v1alpha2 Workload.
+			operations for scheduling.k8s.io/v1alpha3 Workload.
 		*/
 		framework.It("Workload API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
@@ -74,7 +74,7 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		/*
 			Testname: CRUD operations for PodGroups
 			Description: kube-apiserver must support create/get/list/update/patch/delete
-			operations for scheduling.k8s.io/v1alpha2 PodGroup.
+			operations for scheduling.k8s.io/v1alpha3 PodGroup.
 		*/
 		framework.It("PodGroup API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
