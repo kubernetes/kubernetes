@@ -173,7 +173,7 @@ func TestPostFilter(t *testing.T) {
 		pods                  []*v1.Pod
 		pdbs                  []*policy.PodDisruptionBudget
 		nodes                 []*v1.Node
-		podGroups             []*v1alpha2.PodGroup
+		podGroups             []*v1alpha3.PodGroup
 		filteredNodesStatuses *framework.NodeToStatus
 		features              feature.Features
 		extender              fwk.Extender
@@ -403,7 +403,7 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			podGroups: []*v1alpha2.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).TopologyKey("rack").Obj(),
 			},
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
@@ -422,7 +422,7 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			podGroups: []*v1alpha2.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).TopologyKey("rack").Obj(),
 			},
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
@@ -441,7 +441,7 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			podGroups: []*v1alpha2.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).Obj(),
 			},
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
@@ -460,7 +460,7 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			podGroups: []*v1alpha2.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).Obj(),
 			},
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
@@ -2478,7 +2478,7 @@ func TestPreEnqueue(t *testing.T) {
 		name                   string
 		podToTriggerPreemption *v1.Pod
 		podToCheck             *v1.Pod
-		pgs                    []*v1alpha2.PodGroup
+		pgs                    []*v1alpha3.PodGroup
 		features               feature.Features
 		expectPreemption       bool
 		wantStatus             *fwk.Status
@@ -2511,7 +2511,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "WAP enabled, pod in same PodGroup, returns UnschedulableAndUnresolvable",
 			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
 			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
-			pgs: []*v1alpha2.PodGroup{
+			pgs: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			},
 			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: true},
@@ -2522,7 +2522,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "WAP disabled, pod in same PodGroup, returns nil",
 			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
 			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
-			pgs: []*v1alpha2.PodGroup{
+			pgs: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Obj(),
 			},
 			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: false},
@@ -2533,7 +2533,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "WAP enabled, pod in different PodGroup, returns nil",
 			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
 			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg2").Priority(highPriority).Obj(),
-			pgs: []*v1alpha2.PodGroup{
+			pgs: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			},
@@ -2545,7 +2545,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "WAP enabled, pod group not found, returns nil",
 			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
 			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg_missing").Priority(highPriority).Obj(),
-			pgs: []*v1alpha2.PodGroup{
+			pgs: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			},
 			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: true},

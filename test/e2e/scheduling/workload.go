@@ -19,7 +19,7 @@ package scheduling
 import (
 	"context"
 
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -40,21 +40,21 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		*/
 		framework.It("Workload API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*schedulingv1alpha2.Workload]{
-					GVR:        schedulingv1alpha2.SchemeGroupVersion.WithResource("workloads"),
+				&e2econformance.ResourceTestcase[*schedulingv1alpha3.Workload]{
+					GVR:        schedulingv1alpha3.SchemeGroupVersion.WithResource("workloads"),
 					Namespaced: new(true),
-					InitialSpec: &schedulingv1alpha2.Workload{
-						Spec: schedulingv1alpha2.WorkloadSpec{
-							ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+					InitialSpec: &schedulingv1alpha3.Workload{
+						Spec: schedulingv1alpha3.WorkloadSpec{
+							ControllerRef: &schedulingv1alpha3.TypedLocalObjectReference{
 								APIGroup: "batch",
 								Kind:     "Job",
 								Name:     "foo",
 							},
-							PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+							PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
 								{
 									Name: "pg1",
-									SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-										Gang: &schedulingv1alpha2.GangSchedulingPolicy{
+									SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+										Gang: &schedulingv1alpha3.GangSchedulingPolicy{
 											MinCount: 5,
 										},
 									},
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 							},
 						},
 					},
-					UpdateSpec: func(obj *schedulingv1alpha2.Workload) *schedulingv1alpha2.Workload {
+					UpdateSpec: func(obj *schedulingv1alpha3.Workload) *schedulingv1alpha3.Workload {
 						obj.Labels["foo"] = "bar"
 						return obj
 					},
@@ -78,23 +78,23 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		*/
 		framework.It("PodGroup API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*schedulingv1alpha2.PodGroup]{
-					GVR:        schedulingv1alpha2.SchemeGroupVersion.WithResource("podgroups"),
+				&e2econformance.ResourceTestcase[*schedulingv1alpha3.PodGroup]{
+					GVR:        schedulingv1alpha3.SchemeGroupVersion.WithResource("podgroups"),
 					Namespaced: new(true),
-					InitialSpec: &schedulingv1alpha2.PodGroup{
-						Spec: schedulingv1alpha2.PodGroupSpec{
-							SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-								Gang: &schedulingv1alpha2.GangSchedulingPolicy{
+					InitialSpec: &schedulingv1alpha3.PodGroup{
+						Spec: schedulingv1alpha3.PodGroupSpec{
+							SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+								Gang: &schedulingv1alpha3.GangSchedulingPolicy{
 									MinCount: 5,
 								},
 							},
 						},
 					},
-					UpdateSpec: func(obj *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroup {
+					UpdateSpec: func(obj *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
 						obj.Labels["foo"] = "bar"
 						return obj
 					},
-					UpdateStatus: func(obj *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroup {
+					UpdateStatus: func(obj *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
 						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 							Type:               scheduling.PodGroupScheduled,
 							Status:             metav1.ConditionFalse,

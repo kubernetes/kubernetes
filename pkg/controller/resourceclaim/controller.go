@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1177,7 +1177,7 @@ func (ec *Controller) syncPodGroup(ctx context.Context, namespace, name string) 
 			statuses = append(statuses, schedulingapply.PodGroupResourceClaimStatus().WithName(podGroupClaimName).WithResourceClaimName(resourceClaimName))
 		}
 		podGroupApply := schedulingapply.PodGroup(name, namespace).WithStatus(schedulingapply.PodGroupStatus().WithResourceClaimStatuses(statuses...))
-		if _, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+		if _, err := ec.kubeClient.SchedulingV1alpha3().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update PodGroup %s/%s ResourceClaimStatuses: %w", namespace, name, err)
 		}
 	}
@@ -1447,7 +1447,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// scheduling its Pods would be bad. We have to be
 					// absolutely sure and thus have to check with
 					// the API server.
-					podGroup, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
+					podGroup, err := ec.kubeClient.SchedulingV1alpha3().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}

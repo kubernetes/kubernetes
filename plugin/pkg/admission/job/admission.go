@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
-	schedulingv1alpha3listers "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulingv1alpha3listers "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/features"

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -220,12 +220,12 @@ func (c *Controller) processPodGroup(ctx context.Context, pgKey string) error {
 	return nil
 }
 
-func (c *Controller) removeFinalizer(ctx context.Context, pg *schedulingv1alpha2.PodGroup) error {
+func (c *Controller) removeFinalizer(ctx context.Context, pg *schedulingv1alpha3.PodGroup) error {
 	logger := klog.FromContext(ctx)
 	pgClone := pg.DeepCopy()
 
 	pgClone.Finalizers = slice.RemoveString(pgClone.Finalizers, scheduling.PodGroupProtectionFinalizer, nil)
-	_, err := c.kubeClient.SchedulingV1alpha2().PodGroups(pgClone.Namespace).Update(ctx, pgClone, metav1.UpdateOptions{})
+	_, err := c.kubeClient.SchedulingV1alpha3().PodGroups(pgClone.Namespace).Update(ctx, pgClone, metav1.UpdateOptions{})
 	if err != nil {
 		logger.Error(err, "Error removing protection finalizer from PodGroup", "podGroup", klog.KObj(pg))
 		return err
@@ -238,7 +238,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, pg *schedulingv1alpha2
 // hasActivePods returns true if any active pods reference the PodGroup
 // via spec.schedulingGroup.podGroupName. The index only contains
 // non-terminated pods, so a non-empty result means the PodGroup is still in use.
-func (c *Controller) hasActivePods(ctx context.Context, pg *schedulingv1alpha2.PodGroup) (bool, error) {
+func (c *Controller) hasActivePods(ctx context.Context, pg *schedulingv1alpha3.PodGroup) (bool, error) {
 	logger := klog.FromContext(ctx)
 	indexKey := pg.Namespace + "/" + pg.Name
 
@@ -264,7 +264,7 @@ func isPodTerminated(pod *v1.Pod) bool {
 // handlePodGroupUpdate handles PodGroup add/update events.
 // Only deletion candidates which are being deleted and have the finalizer need processing.
 func (c *Controller) handlePodGroupUpdate(logger klog.Logger, obj interface{}) {
-	pg, ok := obj.(*schedulingv1alpha2.PodGroup)
+	pg, ok := obj.(*schedulingv1alpha3.PodGroup)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("PodGroup informer returned non-PodGroup object: %#v", obj))
 		return

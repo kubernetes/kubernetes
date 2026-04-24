@@ -42,7 +42,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"

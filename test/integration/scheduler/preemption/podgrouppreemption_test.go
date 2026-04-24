@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -725,7 +725,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			// 1. Create PodGroups
 			for _, pg := range tt.podGroups {
 				pg.Namespace = ns
-				if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 				}
 			}

@@ -35,7 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"

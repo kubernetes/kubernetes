@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -677,13 +677,13 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	}
 
 	// 2. Create workload
-	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create workload: %v", err)
 	}
 
 	// 3. Create PodGroup
 	pg.Namespace = ns
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup: %v", err)
 	}
 
@@ -812,13 +812,13 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	}
 
 	// 2. Create workload
-	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create workload: %v", err)
 	}
 
 	// 3. Create PodGroup
 	pg.Namespace = ns
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup: %v", err)
 	}
 

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1342,7 +1342,6 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 	workload := st.MakeWorkload().Name("workload").Namespace(ns).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
 		Obj()
-
 	workloadStep := []stepsframework.Step{
 		{
 			Name:            "Creating workload",

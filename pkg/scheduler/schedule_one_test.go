@@ -50,7 +50,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"

@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2557,7 +2557,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pg := st.MakePodGroup().Name("pg1").MinCount(1).TemplateRef("t", "w").Obj()
-			if _, err := testCtx.ClientSet.SchedulingV1alpha2().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			if _, err := testCtx.ClientSet.SchedulingV1alpha3().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PodGroup, ActionType: fwk.Add}: 1}, nil
@@ -2698,7 +2698,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 
 	for _, pg := range tt.InitialPodGroups {
 		pg.Namespace = ns
-		if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a PodGroup %q: %v", pg.Name, err)
 		}
 	}

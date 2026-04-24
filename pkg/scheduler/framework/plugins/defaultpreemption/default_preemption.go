@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/listers/scheduling/v1alpha2"
+	"k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -71,7 +71,7 @@ type DefaultPreemption struct {
 
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
-	pgLister          v1alpha2.PodGroupLister
+	pgLister          v1alpha3.PodGroupLister
 	podGroupEvaluator *preemption.PodGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.

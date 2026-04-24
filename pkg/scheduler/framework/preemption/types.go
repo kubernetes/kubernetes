@@ -25,7 +25,7 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
