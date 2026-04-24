@@ -87,6 +87,75 @@ function git_grep() {
         "${DIRS_TO_AVOID[@]}"
 }
 
+function glob_files() {
+    local f
+    for f in $1; do
+        [[ -f "${f}" ]] && echo "${f}"
+    done
+}
+
+# Check that every doc.go in the provided doc_files contains every required_tag.
+# In required_tag, <GROUP> and <VERSION> may be used variables that are
+# substituted for the actual group and version before the check is performed.
+#
+# <doc_files> is a whitespace-separated list of paths.
+# <exempt_paths> is a single-space-separated list of paths (no newlines or
+# tabs). Use "${array[*]}" to produce it from a bash array.
+#
+# Usage: codegen::check_tag_coverage [--name <generator_name>] [--exempt <exempt_paths>] <doc_files> [<required_tag>, ...]
+function codegen::check_tag_coverage() {
+    local name="generator"
+    local exempt=""
+    local files=""
+    local tags=()
+    while (( $# > 0 )); do
+        case "$1" in
+            --name)
+                name=$2
+                shift 2
+                ;;
+            --exempt)
+                exempt=" $2 "
+                shift 2
+                ;;
+            *)
+                if [[ -z "${files}" ]]; then
+                    files=$1
+                else
+                    tags+=("$1")
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    local missing=()
+    for doc in ${files}; do
+        local pkg=$(dirname "${doc}")
+        if [[ "${exempt}" == *" ${pkg} "* ]]; then
+            continue
+        fi
+        local version=$(basename "${pkg}")
+        local group=$(basename "$(dirname "${pkg}")")
+        for tag in "${tags[@]}"; do
+            local substituted
+            substituted=${tag//<GROUP>/${group}}
+            substituted=${substituted//<VERSION>/${version}}
+            if ! grep -qxF "// ${substituted}" "${doc}"; then
+                missing+=("${pkg}")
+                break
+            fi
+        done
+    done
+
+    if (( ${#missing[@]} > 0 )); then
+        kube::log::error "${name} is not enabled in the following API packages:"
+        printf '  %s\n' "${missing[@]}" >&2
+        printf 'Required tag: // %s\n' "${tags[@]}" >&2
+        return 1
+    fi
+}
+
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
 # used to derive lists of files/dirs for generation tools.
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -103,6 +172,9 @@ kube::util::read-array ALL_K8S_TAG_FILES < <(
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: found ${#ALL_K8S_TAG_FILES[@]} +k8s: tagged files"
 fi
+
+EXTERNAL_VERSIONED_API_TAG_FILES=$(glob_files 'staging/src/k8s.io/api/*/v[0-9]*/doc.go')
+INTERNAL_VERSIONED_API_TAG_FILES=$(glob_files 'pkg/apis/*/v[0-9]*/doc.go')
 
 #
 # Code generation logic.
@@ -129,6 +201,9 @@ function codegen::protobuf() {
             | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sed 's|^|k8s.io/kubernetes/|;s|k8s.io/kubernetes/staging/src/||' \
             | sort -u)
+
+    codegen::check_tag_coverage --name "protobuf-gen" "${EXTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:protobuf-gen=package"
 
     kube::log::status "Generating protobufs for ${#apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -182,6 +257,9 @@ function codegen::deepcopy() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
     fi
+
+    codegen::check_tag_coverage --name "deepcopy-gen" "${EXTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:deepcopy-gen=package"
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
@@ -306,6 +384,18 @@ function codegen::prerelease() {
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:prerelease-lifecycle-gen tagged dirs"
     fi
 
+    # DO NOT ADD NEW EXEMPTIONS.
+    local exemptions=(
+        # pre-date prerelease-lifecycle-gen
+        staging/src/k8s.io/api/apiserverinternal/v1alpha1
+        staging/src/k8s.io/api/imagepolicy/v1alpha1
+        staging/src/k8s.io/api/node/v1alpha1
+        staging/src/k8s.io/api/rbac/v1alpha1
+        staging/src/k8s.io/api/scheduling/v1alpha2
+    )
+    codegen::check_tag_coverage --name "prerelease-lifecycle-gen" --exempt "${exemptions[*]}" "${EXTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:prerelease-lifecycle-gen=true"
+
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
         tag_pkgs+=("./$dir")
@@ -370,6 +460,18 @@ function codegen::defaults() {
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:defaulter-gen tagged dirs"
     fi
 
+    # DO NOT ADD NEW EXEMPTIONS.
+    local exemptions=(
+        # ABAC policy documents are configuration files, not REST API types.
+        pkg/apis/abac/v0
+        pkg/apis/node/v1
+        # RuntimeClass (node.k8s.io) has no fields that require defaulting.
+        pkg/apis/node/v1alpha1
+        pkg/apis/node/v1beta1
+    )
+    codegen::check_tag_coverage --name "defaulter-gen" --exempt "${exemptions[*]}" "${INTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:defaulter-gen=TypeMeta"
+
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
         tag_pkgs+=("./$dir")
@@ -432,6 +534,15 @@ function codegen::validation() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
     fi
+
+    # DO NOT ADD NEW EXEMPTIONS.
+    local exemptions=(
+        # ABAC policy documents are configuration files, not REST API types.
+        pkg/apis/abac/v0
+        pkg/apis/abac/v1beta1
+    )
+    codegen::check_tag_coverage --name "validation-gen" --exempt "${exemptions[*]}" "${INTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:validation-gen=TypeMeta"
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
@@ -515,6 +626,14 @@ function codegen::conversions() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:conversion-gen tagged dirs"
     fi
+
+    # DO NOT ADD NEW EXEMPTIONS.
+    local exemptions=(
+        # ABAC policy documents are configuration files, not REST API types.
+        pkg/apis/abac/v0
+    )
+    codegen::check_tag_coverage --name "conversion-gen" --exempt "${exemptions[*]}" "${INTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/<GROUP>"
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
@@ -669,6 +788,15 @@ function codegen::openapi() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:openapi-gen tagged dirs"
     fi
+
+    # DO NOT ADD NEW EXEMPTIONS.
+    local exemptions=(
+        # Admission review types are not part of the main API. These types are used to communicate with webhooks.
+        staging/src/k8s.io/api/admission/v1
+        staging/src/k8s.io/api/admission/v1beta1
+    )
+    codegen::check_tag_coverage --name "openapi-gen" --exempt "${exemptions[*]}" "${EXTERNAL_VERSIONED_API_TAG_FILES}" \
+        "+k8s:openapi-gen=true"
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
