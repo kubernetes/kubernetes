@@ -19,7 +19,6 @@ package celtest
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	sigsyaml "sigs.k8s.io/yaml"
@@ -66,11 +65,6 @@ func parseAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 
 // parseFlatPolicy parses a YAML document that contains bare variables and
 // validations fields without a Kubernetes resource wrapper.
-// The params variable is always declared for flat policies (hasParams=true)
-// because there is no spec.paramKind field to indicate otherwise. This allows
-// flat-format CEL expressions to reference "params" unconditionally; callers
-// should provide AdmissionInput.Params at evaluation time, or call
-// SetHasParams(false) on the returned policy to disable params.
 func parseFlatPolicy(data []byte) (*AdmissionPolicy, error) {
 	var flat policyFile
 	if err := sigsyaml.Unmarshal(data, &flat); err != nil {
@@ -224,9 +218,7 @@ func appendValidations(policy *AdmissionPolicy, prefix string, validations []adm
 }
 
 // parseAdmissionPolicyFile reads a YAML file from disk and parses it.
-// The path is cleaned to remove relative traversal components.
 func parseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
-	path = filepath.Clean(path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading policy file %s: %w", path, err)
