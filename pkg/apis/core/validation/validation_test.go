@@ -10391,7 +10391,7 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
 	minUserID := int64(0)
-	maxUserID := int64(2147483647)
+	maxUserID := int64(math.MaxUint32)
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 	goodfsGroupChangePolicy := core.FSGroupChangeAlways
@@ -10425,7 +10425,7 @@ func TestValidatePodSpec(t *testing.T) {
 				FSGroup:            &minGroupID,
 			}),
 		),
-		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": podtest.MakePod("",
+		"populate RunAsUser with max UID and SupplementalGroups FSGroup with max GID": podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
@@ -10567,7 +10567,7 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = int64(-1)
-	maxUserID = int64(2147483648)
+	maxUserID = int64(math.MaxUint32) + 1
 	minGroupID = int64(-1)
 	maxGroupID = int64(2147483648)
 
@@ -10624,7 +10624,7 @@ func TestValidatePodSpec(t *testing.T) {
 				SupplementalGroups: []int64{minGroupID, 1234},
 			}),
 		)},
-		"bad runAsUser large than math.MaxInt32": {pod: *podtest.MakePod("",
+		"bad runAsUser larger than math.MaxUint32": {pod: *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &maxUserID,
 			}),
@@ -15907,7 +15907,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                int64(math.MaxInt32) + 1,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -15935,7 +15935,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.containerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.containerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
@@ -16014,7 +16014,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
@@ -16093,7 +16093,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",

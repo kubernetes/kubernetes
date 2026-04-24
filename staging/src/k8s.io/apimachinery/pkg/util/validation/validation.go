@@ -283,11 +283,12 @@ func IsInRange(value int, min int, max int) []string {
 	return []string{InclusiveRangeError(min, max)}
 }
 
-// Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
+// Linux UIDs are unsigned 32-bit values. GIDs remain limited by the
+// range historically accepted by Kubernetes.
 // TODO: once we have a type for UID/GID we should make these that type.
 const (
 	minUserID  = 0
-	maxUserID  = math.MaxInt32
+	maxUserID  = math.MaxUint32
 	minGroupID = 0
 	maxGroupID = math.MaxInt32
 )
