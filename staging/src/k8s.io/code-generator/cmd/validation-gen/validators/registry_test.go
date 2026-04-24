@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,42 +18,39 @@ package validators
 
 import (
 	"testing"
+
+	"k8s.io/gengo/v2/types"
 )
 
-func TestGetStability(t *testing.T) {
-	tests := []struct {
-		tagName     string
-		expected    TagStabilityLevel
-		expectError bool
-	}{
-		{
-			tagName:  "k8s:validateTrueAlpha",
-			expected: TagStabilityLevelAlpha,
-		},
-		{
-			tagName:  "k8s:validateTrueBeta",
-			expected: TagStabilityLevelBeta,
-		},
-		{
-			tagName:  "k8s:required",
-			expected: TagStabilityLevelStable,
-		},
-		{
-			tagName:     "k8s:unknownTag",
-			expected:    "",
-			expectError: true,
-		},
-	}
+func TestRequirednessTagsOnNonPointerStructsAreAccepted(t *testing.T) {
+	st := &types.Type{Kind: types.Struct, Name: types.Name{Name: "MyStruct"}}
+	member := &types.Member{Name: "field", Type: st, CommentLines: nil}
 
-	for _, tt := range tests {
-		t.Run(tt.tagName, func(t *testing.T) {
-			got, err := GetStability(tt.tagName)
-			if err != nil && !tt.expectError {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if got != tt.expected {
-				t.Errorf("GetStability(%q) = %v, want %v", tt.tagName, got, tt.expected)
-			}
-		})
-	}
+	t.Run("required", func(t *testing.T) {
+		rtv := requirednessTagValidator{requirednessRequired}
+		v, err := rtv.doRequired(Context{Scope: ScopeField, Type: st, Member: member})
+		if err != nil {
+			t.Fatalf("doRequired() unexpected error: %v", err)
+		}
+		if len(v.Functions) != 0 {
+			t.Fatalf("doRequired() expected no runtime validations for non-pointer struct, got %d", len(v.Functions))
+		}
+		if len(v.Comments) == 0 {
+			t.Fatalf("doRequired() expected documentation comment for non-pointer struct")
+		}
+	})
+
+	t.Run("optional", func(t *testing.T) {
+		rtv := requirednessTagValidator{requirednessOptional}
+		v, err := rtv.doOptional(Context{Scope: ScopeField, Type: st, Member: member})
+		if err != nil {
+			t.Fatalf("doOptional() unexpected error: %v", err)
+		}
+		if len(v.Functions) != 0 {
+			t.Fatalf("doOptional() expected no runtime validations for non-pointer struct, got %d", len(v.Functions))
+		}
+		if len(v.Comments) == 0 {
+			t.Fatalf("doOptional() expected documentation comment for non-pointer struct")
+		}
+	})
 }
