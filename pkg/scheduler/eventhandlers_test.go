@@ -182,13 +182,14 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 			// Put test pods into unschedulable queue
 			for _, pod := range unschedulablePods {
 				queue.Add(ctx, pod)
-				poppedPod, err := queue.Pop(logger)
+				entity, err := queue.Pop(logger)
 				if err != nil {
 					t.Fatalf("Pop failed: %v", err)
 				}
+				poppedPod := entity.(*framework.QueuedPodInfo)
 				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
-				if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+					t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
 			}
 
@@ -730,7 +731,7 @@ func TestAddPod(t *testing.T) {
 
 			sched.addPod(tt.pod)
 
-			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace)
+			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
 			if tt.expectInQueue && !ok {
 				t.Errorf("Expected pod to be in scheduling queue")
 			} else if !tt.expectInQueue && ok {
@@ -969,11 +970,11 @@ func TestUpdatePod(t *testing.T) {
 
 			sched.updatePod(tt.oldPod, tt.newPod)
 
-			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace)
+			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if tt.expectInQueue != nil {
 				if !ok {
 					t.Errorf("Expected pod to be in scheduling queue")
-				} else if diff := cmp.Diff(tt.expectInQueue, qPod.Pod); diff != "" {
+				} else if diff := cmp.Diff(tt.expectInQueue, qPod.GetPod()); diff != "" {
 					t.Errorf("Unexpected pod after update (-want,+got):\n%s", diff)
 				}
 			} else if ok {
@@ -1139,7 +1140,7 @@ func TestDeletePod(t *testing.T) {
 			if err == nil {
 				t.Errorf("Unexpected pod in cache after removal")
 			}
-			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace)
+			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
 			if ok {
 				t.Errorf("Unexpected pod in scheduling queue after removal")
 			}

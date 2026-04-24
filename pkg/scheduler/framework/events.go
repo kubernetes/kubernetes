@@ -36,10 +36,10 @@ const (
 	BackoffComplete = "BackoffComplete"
 	// PopFromBackoffQ is the event when a pod is popped from backoffQ when activeQ is empty.
 	PopFromBackoffQ = "PopFromBackoffQ"
-	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
+	// ForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
-	// UnschedulableTimeout is the event when a pod is moved from unschedulablePods
+	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
 )
@@ -61,7 +61,7 @@ var (
 	EventTargetPodUpdate = fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update}
 	// EventUnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
 	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
-	// EventForceActivate is the event when a pod is moved from unschedulablePods/backoffQ to activeQ.
+	// EventForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ to activeQ.
 	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
 )
 

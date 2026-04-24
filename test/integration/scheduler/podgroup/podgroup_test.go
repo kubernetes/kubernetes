@@ -151,8 +151,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no quorum)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2"},
+					Name:                               "Verify pods are gated at PreEnqueue (no quorum)",
+					WaitForPodsInUnschedulableEntities: []string{"p1", "p2"},
 				},
 				{
 					Name:       "Create the last pod belonging to the gang to unblock PreEnqueue",
@@ -180,8 +180,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2", "p3"},
+					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
 				},
 				{
 					Name:           "Create the PodGroup to unblock PreEnqueue",
@@ -382,8 +382,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2", "p3"},
+					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
 				},
 				{
 					Name:           "Create the PodGroup to unblock PreEnqueue",
@@ -783,8 +783,9 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	})
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "post-filter-count",
-		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithPodInitialBackoffSeconds(0),
+		// Set high backoff times so that the scheduler does not retry scheduling before checking the count.
+		scheduler.WithPodMaxBackoffSeconds(100),
+		scheduler.WithPodInitialBackoffSeconds(100),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
