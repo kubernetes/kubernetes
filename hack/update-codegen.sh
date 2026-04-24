@@ -131,12 +131,13 @@ function codegen::check_tag_coverage() {
 
     local missing=()
     for doc in ${files}; do
-        local pkg=$(dirname "${doc}")
+        local pkg version group
+        pkg=$(dirname "${doc}")
         if [[ "${exempt}" == *" ${pkg} "* ]]; then
             continue
         fi
-        local version=$(basename "${pkg}")
-        local group=$(basename "$(dirname "${pkg}")")
+        version=$(basename "${pkg}")
+        group=$(basename "$(dirname "${pkg}")")
         for tag in "${tags[@]}"; do
             local substituted
             substituted=${tag//<GROUP>/${group}}
@@ -540,6 +541,13 @@ function codegen::validation() {
         # ABAC policy documents are configuration files, not REST API types.
         pkg/apis/abac/v0
         pkg/apis/abac/v1beta1
+        # extensions/v1beta1 converts to five external groups (apps, policy,
+        # networking, extensions, autoscaling), so its conversion.go imports
+        # k8s.io/api/extensions/v1beta1. Enabling validation-gen on the
+        # internal package would cause the generated external validations
+        # file to delegate back to internal, creating an import cycle.
+        # Validation is generated in staging instead.
+        pkg/apis/extensions/v1beta1
     )
     codegen::check_tag_coverage --name "validation-gen" --exempt "${exemptions[*]}" "${INTERNAL_VERSIONED_API_TAG_FILES}" \
         "+k8s:validation-gen=TypeMeta"
