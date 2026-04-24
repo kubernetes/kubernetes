@@ -20,50 +20,28 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v3"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	sigsyaml "sigs.k8s.io/yaml"
 )
 
+// policyMeta extracts the Kind to dispatch parsing. Not a real K8s type
+// because flat-format policies have no TypeMeta.
 type policyMeta struct {
-	APIVersion string `yaml:"apiVersion"`
-	Kind       string `yaml:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
 }
 
+// policyFile represents the flat variables/validations format that is not
+// a real Kubernetes resource.
 type policyFile struct {
-	Variables   []variableEntry   `yaml:"variables"`
-	Validations []validationEntry `yaml:"validations"`
-}
-
-type variableEntry struct {
-	Name       string `yaml:"name"`
-	Expression string `yaml:"expression"`
-}
-
-type validationEntry struct {
-	Expression        string `yaml:"expression"`
-	Message           string `yaml:"message"`
-	MessageExpression string `yaml:"messageExpression"`
-}
-
-type validatingAdmissionPolicyFile struct {
-	Spec struct {
-		ParamKind   *struct{}         `yaml:"paramKind"`
-		Variables   []variableEntry   `yaml:"variables"`
-		Validations []validationEntry `yaml:"validations"`
-	} `yaml:"spec"`
-}
-
-type webhookConfigurationFile struct {
-	Webhooks []struct {
-		MatchConditions []struct {
-			Expression string `yaml:"expression"`
-		} `yaml:"matchConditions"`
-	} `yaml:"webhooks"`
+	Variables   []admissionregistrationv1.Variable   `json:"variables"`
+	Validations []admissionregistrationv1.Validation `json:"validations"`
 }
 
 // parseAdmissionPolicy dispatches YAML parsing based on the document's Kind field.
 func parseAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 	var meta policyMeta
-	if err := yaml.Unmarshal(data, &meta); err != nil {
+	if err := sigsyaml.Unmarshal(data, &meta); err != nil {
 		return nil, fmt.Errorf("parsing policy YAML: %w", err)
 	}
 
@@ -75,9 +53,11 @@ func parseAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 	case "ValidatingAdmissionPolicy":
 		return parseValidatingAdmissionPolicy(data)
 	case "MutatingAdmissionPolicy":
-		return nil, fmt.Errorf("MutatingAdmissionPolicy parsing is not yet implemented in this prototype")
-	case "ValidatingWebhookConfiguration", "MutatingWebhookConfiguration":
-		return parseWebhookConfiguration(data)
+		return parseMutatingAdmissionPolicy(data)
+	case "ValidatingWebhookConfiguration":
+		return parseValidatingWebhookConfiguration(data)
+	case "MutatingWebhookConfiguration":
+		return parseMutatingWebhookConfiguration(data)
 	}
 
 	return nil, fmt.Errorf("unsupported policy source kind %q", meta.Kind)
@@ -86,18 +66,18 @@ func parseAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 // parseFlatPolicy parses a YAML document that contains bare variables and
 // validations fields without a Kubernetes resource wrapper.
 func parseFlatPolicy(data []byte) (*AdmissionPolicy, error) {
-	var policyFile policyFile
-	if err := yaml.Unmarshal(data, &policyFile); err != nil {
-		return nil, fmt.Errorf("parsing fallback policy YAML: %w", err)
+	var flat policyFile
+	if err := sigsyaml.Unmarshal(data, &flat); err != nil {
+		return nil, fmt.Errorf("parsing flat policy YAML: %w", err)
 	}
 
 	policy := &AdmissionPolicy{}
 	policy.hasParams = true
 	policy.hasParamsSet = true
-	if err := appendVariables(policy, policyFile.Variables); err != nil {
+	if err := appendVariables(policy, flat.Variables); err != nil {
 		return nil, err
 	}
-	if err := appendValidations(policy, "validations", policyFile.Validations); err != nil {
+	if err := appendValidations(policy, "validations", flat.Validations); err != nil {
 		return nil, err
 	}
 	if len(policy.Variables) == 0 && len(policy.Validations) == 0 {
@@ -108,18 +88,18 @@ func parseFlatPolicy(data []byte) (*AdmissionPolicy, error) {
 
 // parseValidatingAdmissionPolicy parses a ValidatingAdmissionPolicy YAML document.
 func parseValidatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
-	var policyFile validatingAdmissionPolicyFile
-	if err := yaml.Unmarshal(data, &policyFile); err != nil {
+	var vap admissionregistrationv1.ValidatingAdmissionPolicy
+	if err := sigsyaml.Unmarshal(data, &vap); err != nil {
 		return nil, fmt.Errorf("parsing ValidatingAdmissionPolicy: %w", err)
 	}
 
 	policy := &AdmissionPolicy{}
-	policy.hasParams = policyFile.Spec.ParamKind != nil
+	policy.hasParams = vap.Spec.ParamKind != nil
 	policy.hasParamsSet = true
-	if err := appendVariables(policy, policyFile.Spec.Variables); err != nil {
+	if err := appendVariables(policy, vap.Spec.Variables); err != nil {
 		return nil, err
 	}
-	if err := appendValidations(policy, "spec.validations", policyFile.Spec.Validations); err != nil {
+	if err := appendValidations(policy, "spec.validations", vap.Spec.Validations); err != nil {
 		return nil, err
 	}
 	if len(policy.Variables) == 0 && len(policy.Validations) == 0 {
@@ -128,13 +108,34 @@ func parseValidatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 	return policy, nil
 }
 
-// parseWebhookConfiguration parses a ValidatingWebhookConfiguration or
-// MutatingWebhookConfiguration YAML document, extracting matchConditions
-// expressions as validations.
-func parseWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
-	var config webhookConfigurationFile
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parsing webhook configuration: %w", err)
+// parseMutatingAdmissionPolicy parses a MutatingAdmissionPolicy YAML document.
+func parseMutatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
+	var map_ admissionregistrationv1.MutatingAdmissionPolicy
+	if err := sigsyaml.Unmarshal(data, &map_); err != nil {
+		return nil, fmt.Errorf("parsing MutatingAdmissionPolicy: %w", err)
+	}
+
+	policy := &AdmissionPolicy{}
+	policy.hasParams = map_.Spec.ParamKind != nil
+	policy.hasParamsSet = true
+	if err := appendVariables(policy, map_.Spec.Variables); err != nil {
+		return nil, err
+	}
+	if err := appendMutations(policy, "spec.mutations", map_.Spec.Mutations); err != nil {
+		return nil, err
+	}
+	if len(policy.Variables) == 0 && len(policy.Mutations) == 0 {
+		return nil, fmt.Errorf("MutatingAdmissionPolicy does not contain variables or mutations")
+	}
+	return policy, nil
+}
+
+// parseValidatingWebhookConfiguration parses a ValidatingWebhookConfiguration
+// YAML document, extracting matchConditions expressions as validations.
+func parseValidatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
+	var config admissionregistrationv1.ValidatingWebhookConfiguration
+	if err := sigsyaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("parsing ValidatingWebhookConfiguration: %w", err)
 	}
 
 	policy := &AdmissionPolicy{}
@@ -157,7 +158,35 @@ func parseWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 	return policy, nil
 }
 
-func appendVariables(policy *AdmissionPolicy, variables []variableEntry) error {
+// parseMutatingWebhookConfiguration parses a MutatingWebhookConfiguration
+// YAML document, extracting matchConditions expressions as validations.
+func parseMutatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
+	var config admissionregistrationv1.MutatingWebhookConfiguration
+	if err := sigsyaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("parsing MutatingWebhookConfiguration: %w", err)
+	}
+
+	policy := &AdmissionPolicy{}
+	policy.hasParams = false
+	policy.hasParamsSet = true
+	for webhookIndex, webhook := range config.Webhooks {
+		for conditionIndex, condition := range webhook.MatchConditions {
+			if condition.Expression == "" {
+				return nil, fmt.Errorf("webhooks[%d].matchConditions[%d] missing expression", webhookIndex, conditionIndex)
+			}
+			policy.Validations = append(policy.Validations, Validation{
+				Path:       fmt.Sprintf("webhooks[%d].matchConditions[%d]", webhookIndex, conditionIndex),
+				Expression: condition.Expression,
+			})
+		}
+	}
+	if len(policy.Validations) == 0 {
+		return nil, fmt.Errorf("webhook configuration does not contain matchConditions")
+	}
+	return policy, nil
+}
+
+func appendVariables(policy *AdmissionPolicy, variables []admissionregistrationv1.Variable) error {
 	for _, variable := range variables {
 		if variable.Name == "" {
 			return fmt.Errorf("variable missing name")
@@ -173,7 +202,7 @@ func appendVariables(policy *AdmissionPolicy, variables []variableEntry) error {
 	return nil
 }
 
-func appendValidations(policy *AdmissionPolicy, prefix string, validations []validationEntry) error {
+func appendValidations(policy *AdmissionPolicy, prefix string, validations []admissionregistrationv1.Validation) error {
 	for index, validation := range validations {
 		if validation.Expression == "" {
 			return fmt.Errorf("validation %s[%d] missing expression", prefix, index)
@@ -195,4 +224,33 @@ func parseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 		return nil, fmt.Errorf("reading policy file %s: %w", path, err)
 	}
 	return parseAdmissionPolicy(data)
+}
+
+func appendMutations(policy *AdmissionPolicy, prefix string, mutations []admissionregistrationv1.Mutation) error {
+	for index, mutation := range mutations {
+		if mutation.PatchType == "" {
+			return fmt.Errorf("mutation %s[%d] missing patchType", prefix, index)
+		}
+		var expression string
+		switch mutation.PatchType {
+		case admissionregistrationv1.PatchTypeApplyConfiguration:
+			if mutation.ApplyConfiguration == nil || mutation.ApplyConfiguration.Expression == "" {
+				return fmt.Errorf("mutation %s[%d] missing applyConfiguration.expression", prefix, index)
+			}
+			expression = mutation.ApplyConfiguration.Expression
+		case admissionregistrationv1.PatchTypeJSONPatch:
+			if mutation.JSONPatch == nil || mutation.JSONPatch.Expression == "" {
+				return fmt.Errorf("mutation %s[%d] missing jsonPatch.expression", prefix, index)
+			}
+			expression = mutation.JSONPatch.Expression
+		default:
+			return fmt.Errorf("mutation %s[%d] unsupported patchType %q", prefix, index, mutation.PatchType)
+		}
+		policy.Mutations = append(policy.Mutations, Mutation{
+			Path:       fmt.Sprintf("%s[%d]", prefix, index),
+			PatchType:  string(mutation.PatchType),
+			Expression: expression,
+		})
+	}
+	return nil
 }

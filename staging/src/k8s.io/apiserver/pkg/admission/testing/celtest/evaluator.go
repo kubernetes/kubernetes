@@ -16,9 +16,10 @@ limitations under the License.
 
 // Package celtest provides a CEL expression evaluator for testing Kubernetes
 // admission CEL expressions in Go without a running API server. It supports
-// ValidatingAdmissionPolicy and webhook matchConditions. The evaluator uses
-// the same CEL environment and compiler that the API server uses at runtime,
-// ensuring compilation and evaluation parity.
+// ValidatingAdmissionPolicy, MutatingAdmissionPolicy, and webhook
+// matchConditions. The evaluator uses the same CEL environment and compiler
+// that the API server uses at runtime, ensuring compilation and evaluation
+// parity.
 package celtest
 
 import (
@@ -115,13 +116,41 @@ type ValidationSelector struct {
 	Part string
 }
 
-// AdmissionPolicy holds parsed variables and validations from a policy YAML.
+// AdmissionPolicy holds parsed variables, validations, and mutations from a policy YAML.
 type AdmissionPolicy struct {
 	Variables   []Variable
 	Validations []Validation
+	Mutations   []Mutation
 
 	hasParams    bool
 	hasParamsSet bool
+}
+
+// Mutation is a single mutation operation parsed from a MutatingAdmissionPolicy.
+// PatchType is "ApplyConfiguration" or "JSONPatch".
+type Mutation struct {
+	Path       string
+	PatchType  string
+	Expression string
+}
+
+// MutationSelector identifies a single mutation for EvalMutationByPath.
+type MutationSelector struct {
+	Path string
+}
+
+// MutationResult is the outcome of EvalMutation.
+type MutationResult struct {
+	Patches []PatchResult
+	Cost    int64
+}
+
+// PatchResult is the result of evaluating a single mutation expression.
+type PatchResult struct {
+	Path      string
+	PatchType string
+	Value     interface{}
+	Error     error
 }
 
 // AdmissionInput provides the runtime values for CEL evaluation.
@@ -263,6 +292,75 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 
 	result.Cost = budgetCost(budget, remaining)
 	return result, nil
+}
+
+// EvalMutation evaluates all mutations in the policy against the input and
+// returns a MutationResult containing the raw CEL result for each mutation expression.
+func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput) (*MutationResult, error) {
+	compiler, decls, err := e.newCompiler(policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
+		return nil, err
+	}
+
+	evalInputs, err := buildEvaluationInputs(input)
+	if err != nil {
+		return nil, err
+	}
+
+	budget := e.runtimeCELCostBudget()
+	result := &MutationResult{}
+	for _, mutation := range policy.Mutations {
+		value, remaining, err := e.evaluateMutatingWithInputs(compiler, decls, anyExpressionAccessor(mutation.Expression), evalInputs, budget)
+		if remaining >= 0 {
+			budget = remaining
+		}
+		patch := PatchResult{
+			Path:      mutation.Path,
+			PatchType: mutation.PatchType,
+		}
+		if err != nil {
+			patch.Error = err
+		} else {
+			patch.Value = value
+		}
+		result.Patches = append(result.Patches, patch)
+	}
+
+	result.Cost = budgetCost(e.runtimeCELCostBudget(), budget)
+	return result, nil
+}
+
+// EvalMutationByPath evaluates a single mutation selected by path, returning the
+// raw CEL result value.
+func (e *Evaluator) EvalMutationByPath(policy *AdmissionPolicy, selector MutationSelector, input *AdmissionInput) (interface{}, error) {
+	if selector.Path == "" {
+		return nil, fmt.Errorf("mutation selector path is required")
+	}
+
+	compiler, decls, err := e.newCompiler(policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
+		return nil, err
+	}
+
+	evalInputs, err := buildEvaluationInputs(input)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, mutation := range policy.Mutations {
+		if mutation.Path != selector.Path {
+			continue
+		}
+		return e.evaluateMutating(compiler, decls, anyExpressionAccessor(mutation.Expression), evalInputs)
+	}
+
+	return nil, fmt.Errorf("mutation %q not found in policy", selector.Path)
 }
 
 // EvalVariable compiles policy variables up to and including the named variable,
@@ -436,9 +534,9 @@ func budgetCost(start, remaining int64) int64 {
 }
 
 // ParseAdmissionPolicy parses a YAML string into an AdmissionPolicy.
-// Supported formats: ValidatingAdmissionPolicy, webhook configurations
-// (ValidatingWebhookConfiguration, MutatingWebhookConfiguration), and flat
-// variables/validations YAML.
+// Supported formats: ValidatingAdmissionPolicy, MutatingAdmissionPolicy,
+// webhook configurations (ValidatingWebhookConfiguration,
+// MutatingWebhookConfiguration), and flat variables/validations YAML.
 func ParseAdmissionPolicy(yamlContent string) (*AdmissionPolicy, error) {
 	return parseAdmissionPolicy([]byte(yamlContent))
 }
