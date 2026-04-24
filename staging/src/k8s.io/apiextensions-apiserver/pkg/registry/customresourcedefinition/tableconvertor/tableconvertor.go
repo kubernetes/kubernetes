@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -45,6 +46,7 @@ func (c *crdConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, t
 			{Name: "Scope", Type: "string", Description: "Cluster/Namespaced"},
 			{Name: "Versions", Type: "string", Description: "Served versions"},
 			{Name: "Created At", Type: "date", Description: metaDocs["creationTimestamp"]},
+			{Name: "Age", Type: "date", Priority: 1, Description: metaDocs["creationTimestamp"]},
 			{Name: "Group", Type: "string", Priority: 1, Description: "API group"},
 			{Name: "Kind", Type: "string", Priority: 1, Description: "CustomResource kind"},
 			{Name: "ShortNames", Type: "string", Priority: 1, Description: "Short names"},
@@ -75,6 +77,7 @@ func (c *crdConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, t
 				string(cr.Spec.Scope),
 				strings.Join(versions, ","),
 				cr.CreationTimestamp.Time.UTC().Format(time.RFC3339),
+				translateTimestampSince(cr.CreationTimestamp),
 				cr.Spec.Group,
 				cr.Spec.Names.Kind,
 				shortNames,
@@ -116,4 +119,14 @@ func isEstablished(crd *apiextensions.CustomResourceDefinition) bool {
 		}
 	}
 	return false
+}
+
+// translateTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestampSince(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }

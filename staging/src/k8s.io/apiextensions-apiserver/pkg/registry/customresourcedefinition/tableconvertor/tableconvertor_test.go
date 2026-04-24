@@ -60,6 +60,7 @@ func TestPrintCRD(t *testing.T) {
 				"Namespaced",
 				"v1(storage),v1beta1",
 				"2025-05-03T16:36:32Z",
+				"356d",
 				"sample.example.com",
 				"Foo",
 				"f",
