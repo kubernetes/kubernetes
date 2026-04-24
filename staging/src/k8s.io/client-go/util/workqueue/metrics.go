@@ -185,6 +185,8 @@ func (m *defaultRateLimiterMetrics) addRateLimiterDelay(delay time.Duration) {
 }
 
 // MetricsProvider generates various metrics used by the queue.
+//
+// Deprecated: Implement RateLimiterMetricsProvider instead.
 type MetricsProvider interface {
 	NewDepthMetric(name string) GaugeMetric
 	NewAddsMetric(name string) CounterMetric
@@ -193,36 +195,41 @@ type MetricsProvider interface {
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
+}
+
+// RateLimiterMetricsProvider extends MetricsProvider with rate limiter delay tracking.
+type RateLimiterMetricsProvider interface {
+	MetricsProvider
 	NewRateLimiterDelayMetric(name string) HistogramMetric
 }
 
 type noopMetricsProvider struct{}
 
-func (_ noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
+func (noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
@@ -276,8 +283,13 @@ func newRateLimiterMetrics(name string, provider MetricsProvider) rateLimiterMet
 		provider = globalMetricsProvider
 	}
 
+	var delay HistogramMetric = noopMetric{}
+	if rlp, ok := provider.(RateLimiterMetricsProvider); ok {
+		delay = rlp.NewRateLimiterDelayMetric(name)
+	}
+
 	return &defaultRateLimiterMetrics{
-		delay: provider.NewRateLimiterDelayMetric(name),
+		delay: delay,
 	}
 }
 
