@@ -315,12 +315,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: CPUCFSQuotaPeriod
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.12"
 - name: CPUManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false
@@ -403,6 +397,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.21"
+- name: CustomCPUCFSQuotaPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.12"
 - name: CustomResourceFieldSelectors
   versionedSpecs:
   - default: false
@@ -1537,7 +1537,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.12"
-- name: RuntimeClassInImageCriAPI
+- name: RuntimeClassInImageCriApi
   versionedSpecs:
   - default: false
     lockToDefault: false
