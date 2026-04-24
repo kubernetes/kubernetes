@@ -348,6 +348,8 @@ func NewServer(
 	}
 	if auth != nil {
 		server.InstallAuthFilter(ctx)
+		server.addMetricsBucketMatcher("stats")
+		server.restfulCont.Add(stats.CreateHandlers(statsPath, server.host, server.resourceAnalyzer))
 	}
 	server.InstallAuthNotRequiredHandlers(ctx)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
@@ -492,9 +494,6 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 		}).
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
-
-	s.addMetricsBucketMatcher("stats")
-	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
 
 	s.addMetricsBucketMatcher("metrics")
 	s.addMetricsBucketMatcher("metrics/cadvisor")
