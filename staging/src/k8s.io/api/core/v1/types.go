@@ -5705,6 +5705,7 @@ type ReplicationControllerCondition struct {
 // +k8s:supportsSubresource="/status"
 
 // ReplicationController represents the configuration of a replication controller.
+// +k8s:supportsSubresource="/status"
 type ReplicationController struct {
 	metav1.TypeMeta `json:",inline"`
 
