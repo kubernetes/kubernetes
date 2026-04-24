@@ -295,6 +295,7 @@ func newRateLimiterMetrics(name string, provider MetricsProvider) rateLimiterMet
 
 // SetProvider sets the metrics provider for all subsequently created work
 // queues. Only the first call has an effect.
+// metricsProvider should ideally implement RateLimiterMetricsProvider.
 func SetProvider(metricsProvider MetricsProvider) {
 	setGlobalMetricsProviderOnce.Do(func() {
 		globalMetricsProvider = metricsProvider
