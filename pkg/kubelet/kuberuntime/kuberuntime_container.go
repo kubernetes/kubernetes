@@ -1091,7 +1091,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	// find the restartable init containers to restart.
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
+		status := podStatus.FindActiveContainerStatusByName(container.Name)
 		logger.V(4).Info("Computing init container action", "pod", klog.KObj(pod), "container", container.Name, "status", status)
 		if status == nil {
 			// If the container is previously initialized but its status is not

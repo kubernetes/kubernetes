@@ -143,6 +143,50 @@ func TestPodStatusFindContainerStatusByName(t *testing.T) {
 	}
 }
 
+func TestPodStatusFindActiveContainerStatusByName(t *testing.T) {
+	podStatus := &PodStatus{
+		ActiveContainerStatuses: []*Status{
+			{Name: "container1", State: ContainerStateRunning},
+			{Name: "container2", State: ContainerStateExited},
+			{Name: "container1", State: ContainerStateCreated}, // duplicate name
+		},
+	}
+
+	tests := []struct {
+		name           string
+		containerName  string
+		expectedStatus *Status
+	}{
+		{
+			name:           "find existing container",
+			containerName:  "container1",
+			expectedStatus: podStatus.ActiveContainerStatuses[0], // should return first match
+		},
+		{
+			name:           "find another existing container",
+			containerName:  "container2",
+			expectedStatus: podStatus.ActiveContainerStatuses[1],
+		},
+		{
+			name:           "find non-existing container",
+			containerName:  "nonexistent",
+			expectedStatus: nil,
+		},
+		{
+			name:           "empty container name",
+			containerName:  "",
+			expectedStatus: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := podStatus.FindActiveContainerStatusByName(tt.containerName)
+			assert.Equal(t, tt.expectedStatus, result, "FindActiveContainerStatusByName(%q)", tt.containerName)
+		})
+	}
+}
+
 func TestPodStatusGetRunningContainerStatuses(t *testing.T) {
 	podStatus := &PodStatus{
 		ContainerStatuses: []*Status{
