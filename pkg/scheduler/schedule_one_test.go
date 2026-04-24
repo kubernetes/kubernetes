@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1046,7 +1046,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			testPG := &schedulingv1alpha2.PodGroup{
+			testPG := &schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
 			clientObjs = []runtime.Object{item.sendPod, testPG}
@@ -1073,7 +1073,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		internalCache := internalcache.New(ctx, apiDispatcher, scheduleAsPodGroup)
 
 		if scheduleAsPodGroup {
-			podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+			podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 			internalCache.AddPodGroupMember(item.sendPod)
 		}
 		cache := &fakecache.Cache{

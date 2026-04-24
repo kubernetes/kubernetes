@@ -34,7 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	"k8s.io/api/scheduling/v1alpha2"
+	"k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -529,7 +529,7 @@ func TestPostFilter(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				pgInformer := informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+				pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 				for i := range tt.podGroups {
 					if err := pgInformer.GetStore().Add(tt.podGroups[i]); err != nil {
 						t.Fatal(err)
@@ -2578,7 +2578,7 @@ func TestPreEnqueue(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			pgInformer := informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+			pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			for i := range tt.pgs {
 				if err := pgInformer.GetStore().Add(tt.pgs[i]); err != nil {
 					t.Fatal(err)
@@ -2632,7 +2632,7 @@ func TestPreEnqueue(t *testing.T) {
 			// Trigger preemption. Given custom PreemptPod implementation, the async preemption will not finish until
 			// finishPreemption is closed.
 			if tt.features.EnableWorkloadAwarePreemption && tt.podToTriggerPreemption.Spec.SchedulingGroup != nil {
-				pg, err := informerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(tt.podToTriggerPreemption.Namespace).Get(*tt.podToTriggerPreemption.Spec.SchedulingGroup.PodGroupName)
+				pg, err := informerFactory.Scheduling().V1alpha3().PodGroups().Lister().PodGroups(tt.podToTriggerPreemption.Namespace).Get(*tt.podToTriggerPreemption.Spec.SchedulingGroup.PodGroupName)
 				if err != nil {
 					t.Fatalf("could not find pg: %v", err)
 				}

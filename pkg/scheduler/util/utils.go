@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -155,26 +155,26 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 // PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submits a request to API server to patch the PodGroup status changes.
 func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name string,
-	namespace string, oldStatus *schedulingv1alpha2.PodGroupStatus,
-	newStatus *schedulingv1alpha2.PodGroupStatus) error {
+	namespace string, oldStatus *schedulingv1alpha3.PodGroupStatus,
+	newStatus *schedulingv1alpha3.PodGroupStatus) error {
 	if newStatus == nil {
 		return nil
 	}
 
 	if oldStatus == nil {
-		oldStatus = &schedulingv1alpha2.PodGroupStatus{}
+		oldStatus = &schedulingv1alpha3.PodGroupStatus{}
 	}
 
-	oldData, err := json.Marshal(schedulingv1alpha2.PodGroup{Status: *oldStatus})
+	oldData, err := json.Marshal(schedulingv1alpha3.PodGroup{Status: *oldStatus})
 	if err != nil {
 		return err
 	}
 
-	newData, err := json.Marshal(schedulingv1alpha2.PodGroup{Status: *newStatus})
+	newData, err := json.Marshal(schedulingv1alpha3.PodGroup{Status: *newStatus})
 	if err != nil {
 		return err
 	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha2.PodGroup{})
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.PodGroup{})
 	if err != nil {
 		return fmt.Errorf("failed to create merge patch for podgroup %q/%q: %w", namespace, name, err)
 	}
@@ -184,7 +184,7 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 	}
 
 	patchFn := func() error {
-		_, err := cs.SchedulingV1alpha2().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		_, err := cs.SchedulingV1alpha3().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		return err
 	}
 
@@ -273,7 +273,7 @@ func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
 }
 
 // PodGroupPriority returns priority of a given pod group.
-func PodGroupPriority(pg *schedulingv1alpha2.PodGroup) int32 {
+func PodGroupPriority(pg *schedulingv1alpha3.PodGroup) int32 {
 	if pg.Spec.Priority != nil {
 		return *pg.Spec.Priority
 	}

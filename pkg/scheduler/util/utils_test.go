@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -368,24 +368,24 @@ func TestPatchPodGroupStatus(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		podGroup schedulingv1alpha2.PodGroup
+		podGroup schedulingv1alpha3.PodGroup
 		client   *clientsetfake.Clientset
 		// validateErr checks if error returned from PatchPodGroupStatus is expected one or not.
 		// (true means error is expected one.)
 		validateErr    func(goterr error) bool
-		statusToUpdate *schedulingv1alpha2.PodGroupStatus
+		statusToUpdate *schedulingv1alpha3.PodGroupStatus
 		nilOldStatus   bool
 	}{
 		{
 			name:   "Should update podgroup conditions successfully",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -400,12 +400,12 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "no-op when status is unchanged",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
-				Status: schedulingv1alpha2.PodGroupStatus{
+				Status: schedulingv1alpha3.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupScheduled,
@@ -417,7 +417,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 					},
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -432,7 +432,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "nil newStatus returns nil",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
@@ -449,23 +449,23 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					defer func() { reqcount++ }()
 					if reqcount == 0 {
-						return true, &schedulingv1alpha2.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+						return true, &schedulingv1alpha3.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
 					}
 					if reqcount == 1 {
-						return false, &schedulingv1alpha2.PodGroup{}, nil
+						return false, &schedulingv1alpha3.PodGroup{}, nil
 					}
 					return true, nil, errors.New("requests comes in more than three times.")
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -488,19 +488,19 @@ func TestPatchPodGroupStatus(t *testing.T) {
 					if reqcount >= 4 {
 						return true, nil, errors.New("requests comes in more than four times.")
 					}
-					return true, &schedulingv1alpha2.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+					return true, &schedulingv1alpha3.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
 			validateErr: net.IsConnectionRefused,
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -521,26 +521,26 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					defer func() { reqcount++ }()
 					if reqcount == 0 {
-						return true, &schedulingv1alpha2.PodGroup{},
+						return true, &schedulingv1alpha3.PodGroup{},
 							apierrors.NewConflict(schema.GroupResource{
 								Resource: "podgroups"}, "pg1",
 								errors.New("the object has been modified"))
 					}
 					if reqcount == 1 {
-						return false, &schedulingv1alpha2.PodGroup{}, nil
+						return false, &schedulingv1alpha3.PodGroup{}, nil
 					}
 					return true, nil, errors.New("requests comes in more than three times.")
 				})
 
 				return client
 			}(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -555,13 +555,13 @@ func TestPatchPodGroupStatus(t *testing.T) {
 		{
 			name:   "nil oldStatus patches successfully",
 			client: clientsetfake.NewClientset(),
-			podGroup: schedulingv1alpha2.PodGroup{
+			podGroup: schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pg1",
 				},
 			},
-			statusToUpdate: &schedulingv1alpha2.PodGroupStatus{
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               schedulingapi.PodGroupScheduled,
@@ -583,7 +583,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			defer cancel()
 
 			client := tc.client
-			_, err := client.SchedulingV1alpha2().PodGroups(tc.podGroup.Namespace).Create(ctx, &tc.podGroup, metav1.CreateOptions{})
+			_, err := client.SchedulingV1alpha3().PodGroups(tc.podGroup.Namespace).Create(ctx, &tc.podGroup, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -603,7 +603,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				return
 			}
 
-			retrievedPG, err := client.SchedulingV1alpha2().PodGroups(tc.podGroup.Namespace).Get(ctx, tc.podGroup.Name, metav1.GetOptions{})
+			retrievedPG, err := client.SchedulingV1alpha3().PodGroups(tc.podGroup.Namespace).Get(ctx, tc.podGroup.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
