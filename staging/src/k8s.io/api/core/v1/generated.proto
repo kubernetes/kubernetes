@@ -5373,6 +5373,7 @@ message RangeAllocation {
 }
 
 // ReplicationController represents the configuration of a replication controller.
+// +k8s:supportsSubresource="/status"
 message ReplicationController {
   // If the Labels of a ReplicationController are empty, they are defaulted to
   // be the same as the Pod(s) that the replication controller manages.
