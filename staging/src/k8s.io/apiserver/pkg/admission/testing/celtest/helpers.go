@@ -171,7 +171,10 @@ func convertParamsObject(value map[string]interface{}) (*unstructured.Unstructur
 }
 
 func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
-	if input != nil && input.Request != nil {
+	if input == nil {
+		return defaultObjectGVK()
+	}
+	if input.Request != nil {
 		if gvk := schemaGVKFromMeta(input.Request.Kind); !gvk.Empty() {
 			return gvk
 		}
@@ -286,12 +289,12 @@ func resolveUserInfo(request *admissionv1.AdmissionRequest) user.Info {
 		return nil
 	}
 
+	if request.UserInfo.Username == "" && request.UserInfo.UID == "" && len(request.UserInfo.Groups) == 0 && len(request.UserInfo.Extra) == 0 {
+		return nil
+	}
 	extra := make(map[string][]string, len(request.UserInfo.Extra))
 	for key, value := range request.UserInfo.Extra {
 		extra[key] = []string(value)
-	}
-	if request.UserInfo.Username == "" && request.UserInfo.UID == "" && len(request.UserInfo.Groups) == 0 && len(extra) == 0 {
-		return nil
 	}
 	return &user.DefaultInfo{
 		Name:   request.UserInfo.Username,
@@ -317,6 +320,11 @@ func deepCopyMap(value map[string]interface{}) map[string]interface{} {
 	return copyValue
 }
 
+// deepCopyValue recursively copies maps and slices. Scalar types (string,
+// bool, int64, float64, nil) are returned as-is since they are immutable value
+// types in Go. Other reference types (e.g., []byte, structs) are not deep-copied
+// and will be shared with the original. This is sufficient for unstructured
+// JSON-decoded data which only contains the handled types.
 func deepCopyValue(value interface{}) interface{} {
 	switch typed := value.(type) {
 	case map[string]interface{}:
@@ -341,15 +349,34 @@ func defaultObjectGVK() schema.GroupVersionKind {
 }
 
 // defaultResourceForGVK derives a resource name from a GVK by lowercasing the
-// kind and appending "s". This is a simplified heuristic for test defaults.
+// kind and applying simple English pluralization rules. This covers common
+// Kubernetes kinds (Pod→pods, Ingress→ingresses, NetworkPolicy→networkpolicies)
+// but is not exhaustive. Supply an explicit Request.Resource for non-standard plurals.
 func defaultResourceForGVK(gvk schema.GroupVersionKind) schema.GroupVersionResource {
 	resource := strings.ToLower(gvk.Kind)
 	if resource == "" {
 		resource = "objects"
-	} else if !strings.HasSuffix(resource, "s") {
-		resource += "s"
+	} else {
+		resource = pluralizeResource(resource)
 	}
 	return schema.GroupVersionResource{Group: gvk.Group, Version: gvk.Version, Resource: resource}
+}
+
+// pluralizeResource applies simple English pluralization for Kubernetes resource
+// names. It handles sibilant endings (-s, -x, -z, -ch, -sh → +es) and
+// consonant+y → -ies, which covers the vast majority of built-in kinds.
+func pluralizeResource(s string) string {
+	if strings.HasSuffix(s, "s") || strings.HasSuffix(s, "x") || strings.HasSuffix(s, "z") ||
+		strings.HasSuffix(s, "ch") || strings.HasSuffix(s, "sh") {
+		return s + "es"
+	}
+	if strings.HasSuffix(s, "y") && len(s) > 1 {
+		c := s[len(s)-2]
+		if c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' {
+			return s[:len(s)-1] + "ies"
+		}
+	}
+	return s + "s"
 }
 
 func schemaGVKFromMeta(gvk metav1.GroupVersionKind) schema.GroupVersionKind {

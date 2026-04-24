@@ -74,6 +74,7 @@ func WithPreambleVariables(vars ...Variable) Option {
 }
 
 // WithCostLimit overrides the default runtime CEL cost budget.
+// Non-positive values are ignored and the default budget is used instead.
 func WithCostLimit(limit int64) Option {
 	return func(e *Evaluator) {
 		e.costLimit = limit
@@ -117,6 +118,11 @@ type ValidationSelector struct {
 }
 
 // AdmissionPolicy holds parsed variables, validations, and mutations from a policy YAML.
+//
+// When constructed manually (not via ParseAdmissionPolicy), the params variable
+// is declared by default. Call SetHasParams(false) to disable it, or
+// SetHasParams(true) to explicitly enable it, matching the behavior of
+// ParseAdmissionPolicy which sets it based on the presence of spec.paramKind.
 type AdmissionPolicy struct {
 	Variables   []Variable
 	Validations []Validation
@@ -124,6 +130,17 @@ type AdmissionPolicy struct {
 
 	hasParams    bool
 	hasParamsSet bool
+}
+
+// SetHasParams controls whether the "params" variable is declared in the CEL
+// environment. When set to true, CEL expressions can reference "params" which
+// will resolve to AdmissionInput.Params at evaluation time. When set to false,
+// the "params" variable is not declared and referencing it causes a compilation
+// error. If SetHasParams is never called on a manually-constructed policy, the
+// params variable is declared by default.
+func (p *AdmissionPolicy) SetHasParams(has bool) {
+	p.hasParams = has
+	p.hasParamsSet = true
 }
 
 // Mutation is a single mutation operation parsed from a MutatingAdmissionPolicy.
@@ -296,6 +313,8 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 
 // EvalMutation evaluates all mutations in the policy against the input and
 // returns a MutationResult containing the raw CEL result for each mutation expression.
+// Compilation errors cause an immediate error return (symmetric with EvalAdmission).
+// Runtime evaluation errors are recorded per-patch in PatchResult.Error.
 func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput) (*MutationResult, error) {
 	compiler, decls, err := e.newCompiler(policy)
 	if err != nil {
@@ -305,6 +324,16 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		return nil, err
 	}
 
+	// Pre-compile all mutations and fail fast on compilation errors.
+	compiled := make([]admissioncel.MutatingEvaluator, 0, len(policy.Mutations))
+	for _, mutation := range policy.Mutations {
+		evaluator := compiler.CompileMutatingEvaluator(anyExpressionAccessor(mutation.Expression), decls, e.compileMode())
+		if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
+			return nil, fmt.Errorf("mutation %q: %w", mutation.Path, err)
+		}
+		compiled = append(compiled, evaluator)
+	}
+
 	evalInputs, err := buildEvaluationInputs(input)
 	if err != nil {
 		return nil, err
@@ -312,19 +341,21 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 
 	budget := e.runtimeCELCostBudget()
 	result := &MutationResult{}
-	for _, mutation := range policy.Mutations {
-		value, remaining, err := e.evaluateMutatingWithInputs(compiler, decls, anyExpressionAccessor(mutation.Expression), evalInputs, budget)
-		if remaining >= 0 {
-			budget = remaining
-		}
+	for i, mutation := range policy.Mutations {
+		ctx := compiler.CreateContext(context.Background())
+		evalResult, remaining, err := compiled[i].ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
+		budget = remaining
+
 		patch := PatchResult{
 			Path:      mutation.Path,
 			PatchType: mutation.PatchType,
 		}
 		if err != nil {
 			patch.Error = err
+		} else if evalResult.Error != nil {
+			patch.Error = evalResult.Error
 		} else {
-			patch.Value = value
+			patch.Value = evaluationValue(evalResult)
 		}
 		result.Patches = append(result.Patches, patch)
 	}
@@ -512,11 +543,7 @@ func compilationErrors(errs []error) error {
 	if len(errs) == 1 {
 		return errs[0]
 	}
-	parts := make([]string, 0, len(errs))
-	for _, err := range errs {
-		parts = append(parts, err.Error())
-	}
-	return errors.New(strings.Join(parts, "; "))
+	return errors.Join(errs...)
 }
 
 func evaluationValue(result admissioncel.EvaluationResult) interface{} {
@@ -527,9 +554,6 @@ func evaluationValue(result admissioncel.EvaluationResult) interface{} {
 }
 
 func budgetCost(start, remaining int64) int64 {
-	if remaining < 0 {
-		return start
-	}
 	return start - remaining
 }
 
@@ -542,6 +566,8 @@ func ParseAdmissionPolicy(yamlContent string) (*AdmissionPolicy, error) {
 }
 
 // ParseAdmissionPolicyFile reads and parses a YAML file into an AdmissionPolicy.
+// The path is cleaned but not otherwise restricted. Callers are responsible for
+// ensuring the path points to a trusted file — do not pass unsanitised user input.
 func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 	return parseAdmissionPolicyFile(path)
 }
@@ -557,7 +583,11 @@ func (r *AdmissionResult) FormatViolations() string {
 			msgs = append(msgs, fmt.Sprintf("error evaluating %q: %v", violation.Expression, violation.Error))
 			continue
 		}
-		msgs = append(msgs, violation.Message)
+		if violation.Message != "" {
+			msgs = append(msgs, violation.Message)
+		} else {
+			msgs = append(msgs, fmt.Sprintf("expression %q evaluated to false", violation.Expression))
+		}
 	}
 	return strings.Join(msgs, ", ")
 }
