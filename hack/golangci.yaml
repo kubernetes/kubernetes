@@ -426,11 +426,6 @@ linters:
                 - ["k8s:optional", "optional", "kubebuilder:validation:Optional"]
                 - ["k8s:required", "required", "kubebuilder:validation:Required"]
                 description: "fields cannot be both optional and required"
-              - name: "required_vs_default"
-                sets:
-                - ["k8s:required", "required", "kubebuilder:validation:Required"]
-                - ["default"]
-                description: "fields with default values are always optional"
             dependenttags:
               rules:
                 - identifier: "k8s:unionMember"
