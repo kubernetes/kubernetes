@@ -61,6 +61,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -9172,6 +9174,147 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 			if domain != tc.expectedDomain {
 				t.Errorf("expected domain %q, but got %q", tc.expectedDomain, domain)
 			}
+		})
+	}
+}
+
+// trackingSubpath is a mock subpath.Interface that returns non-nil cleanup
+// functions from PrepareSafeSubpath and tracks which subpaths had cleanup
+// called. This is used to verify that makeMounts accumulates all
+// cleanup actions rather than overwriting them.
+type trackingSubpath struct {
+	cleanedSubPaths []string
+	errorOnSubPath  string // SubPath name to fail on; empty means no error
+	safeMakeDirErr  error
+}
+
+func (ts *trackingSubpath) PrepareSafeSubpath(sub subpath.Subpath) (string, func(), error) {
+	subPathName := filepath.Base(sub.Path)
+	if ts.errorOnSubPath != "" && subPathName == ts.errorOnSubPath {
+		return "", nil, fmt.Errorf("mock PrepareSafeSubpath error on subpath %s", subPathName)
+	}
+	cleanup := func() {
+		ts.cleanedSubPaths = append(ts.cleanedSubPaths, subPathName)
+	}
+	return sub.Path, cleanup, nil
+}
+
+func (ts *trackingSubpath) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+func (ts *trackingSubpath) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return ts.safeMakeDirErr
+}
+
+func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	podDir := t.TempDir()
+	volPath := filepath.Join(podDir, "volumes", "disk")
+	require.NoError(t, os.MkdirAll(volPath, 0755))
+
+	// Create the subpath directories on disk so PathExists returns true
+	sub1 := filepath.Join(volPath, "sub1")
+	sub2 := filepath.Join(volPath, "sub2")
+	sub3 := filepath.Join(volPath, "sub3")
+	require.NoError(t, os.MkdirAll(sub1, 0755))
+	require.NoError(t, os.MkdirAll(sub2, 0755))
+	require.NoError(t, os.MkdirAll(sub3, 0755))
+
+	tests := []struct {
+		name                    string
+		volumeMounts            []v1.VolumeMount
+		expectedCleanedSubPaths []string
+		expectError             bool
+		errorOnSubPath          string
+	}{
+		{
+			name: "multiple subpath mounts all get cleanup called",
+			volumeMounts: []v1.VolumeMount{
+				{MountPath: "/mnt/a", Name: "disk", SubPath: "sub1"},
+				{MountPath: "/mnt/b", Name: "disk", SubPath: "sub2"},
+				{MountPath: "/mnt/c", Name: "disk", SubPath: "sub3"},
+			},
+			expectedCleanedSubPaths: []string{"sub1", "sub2", "sub3"},
+		},
+		{
+			name: "single subpath mount cleanup called once",
+			volumeMounts: []v1.VolumeMount{
+				{MountPath: "/mnt/a", Name: "disk", SubPath: "sub1"},
+			},
+			expectedCleanedSubPaths: []string{"sub1"},
+		},
+		{
+			name: "no subpath mounts no cleanup needed",
+			volumeMounts: []v1.VolumeMount{
+				{MountPath: "/mnt/a", Name: "disk"},
+			},
+		},
+		{
+			name: "error on third mount still cleans up first two",
+			volumeMounts: []v1.VolumeMount{
+				{MountPath: "/mnt/a", Name: "disk", SubPath: "sub1"},
+				{MountPath: "/mnt/b", Name: "disk", SubPath: "sub2"},
+				{MountPath: "/mnt/c", Name: "disk", SubPath: "sub3"},
+			},
+			expectedCleanedSubPaths: []string{"sub1", "sub2"},
+			expectError:             true,
+			errorOnSubPath:          "sub3",
+		},
+		{
+			name: "error on first mount returns zero cleanups",
+			volumeMounts: []v1.VolumeMount{
+				{MountPath: "/mnt/a", Name: "disk", SubPath: "sub1"},
+				{MountPath: "/mnt/b", Name: "disk", SubPath: "sub2"},
+			},
+			expectError:    true,
+			errorOnSubPath: "sub1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tracker := &trackingSubpath{
+				errorOnSubPath: tc.errorOnSubPath,
+			}
+
+			container := v1.Container{
+				VolumeMounts: tc.volumeMounts,
+			}
+
+			// FakeHostUtil with the subpath directories registered so PathExists returns true
+			fhu := hostutil.NewFakeHostUtil(map[string]hostutil.FileType{
+				sub1: hostutil.FileTypeDirectory,
+				sub2: hostutil.FileTypeDirectory,
+				sub3: hostutil.FileTypeDirectory,
+			})
+
+			podVolumes := kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: volPath}},
+			}
+
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "test-pod-uid",
+				},
+				Spec: v1.PodSpec{},
+			}
+
+			_, cleanupAction, err := makeMounts(logger, &pod, podDir, &container, "fakepod", "", []string{""}, podVolumes, fhu, tracker, nil, false, nil)
+
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Call the cleanup action returned by makeMounts
+			require.NotNil(t, cleanupAction, "cleanupAction should never be nil")
+			cleanupAction()
+
+			require.ElementsMatch(t, tc.expectedCleanedSubPaths, tracker.cleanedSubPaths,
+				"expected cleaned subpaths %v but got %v", tc.expectedCleanedSubPaths, tracker.cleanedSubPaths)
 		})
 	}
 }
