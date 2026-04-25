@@ -139,17 +139,9 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
 	logger := klog.FromContext(ctx)
-	onlyCPUAndMemory := false
-	err := request.Request.ParseForm()
-	if err != nil {
-		handleError(logger, response, "/stats/summary", fmt.Errorf("parse form failed: %w", err))
-		return
-	}
-	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
-		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
-		onlyCPUAndMemory = true
-	}
+	onlyCPUAndMemory := request.Request.URL.Query().Get("only_cpu_and_memory") == "true"
 	var summary *statsapi.Summary
+	var err error
 	if onlyCPUAndMemory {
 		summary, err = h.summaryProvider.GetCPUAndMemoryStats(ctx)
 	} else {
