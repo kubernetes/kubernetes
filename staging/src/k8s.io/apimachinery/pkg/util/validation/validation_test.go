@@ -198,8 +198,13 @@ func TestIsValidUserID(t *testing.T) {
 
 	badValues := createUserIDs(-1, -1003, 4294967296)
 	for _, val := range badValues {
-		if msgs := IsValidUserID(val); len(msgs) == 0 {
+		msgs := IsValidUserID(val)
+		if len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
+			continue
+		}
+		if msgs[0] != "must be between 0 and 4294967295, inclusive" {
+			t.Errorf("expected user ID range error for '%d', got: %v", val, msgs)
 		}
 	}
 }
