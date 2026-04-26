@@ -933,20 +933,15 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 			return
 		}
 
-		for _, nodeID := range maskBits {
-			// the node already used for the memory allocation
-			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
-				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
-				if len(machineState[nodeID].Cells) == 1 {
-					return
-				}
-
-				// the node already used with different group of nodes, it can not be use with in the current hint
-				if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
-					return
-				}
-			}
-		}
+		// Cross-NUMA hints that conflict with existing single-NUMA allocations on
+		// one of the target nodes are no longer excluded outright. Excluding them
+		// leaves the TopologyManager unaware that Memory Manager has a preference
+		// against such topology, so in best-effort mode it may still choose a
+		// conflicting hint based on CPU/device affinity — and then Allocate() hard-
+		// fails. Instead, we include conflicting hints but force them non-preferred
+		// in the post-loop pass below, giving the TopologyManager a signal to avoid
+		// them when non-conflicting alternatives exist.
+		// See: https://github.com/kubernetes/kubernetes/issues/138495
 
 		// verify that for all memory types the node mask has enough free resources
 		for resourceName, requestedSize := range requestedResources {
@@ -972,7 +967,16 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 	// behaviour to prefer the minimal amount of NUMA nodes will be used
 	for resourceName := range requestedResources {
 		for i, hint := range hints[string(resourceName)] {
-			hints[string(resourceName)][i].Preferred = p.isHintPreferred(hint.NUMANodeAffinity.GetBits(), minAffinitySize)
+			preferred := p.isHintPreferred(hint.NUMANodeAffinity.GetBits(), minAffinitySize)
+			// Even if a hint has the minimum affinity size, downgrade it to
+			// non-preferred when it would violate the single-vs-cross NUMA
+			// allocation invariant for an already-allocated NUMA node. This
+			// steers the TopologyManager away from such hints in best-effort
+			// mode without removing them from the hint list entirely.
+			if preferred && isAffinityViolatingNUMAAllocations(machineState, hint.NUMANodeAffinity) {
+				preferred = false
+			}
+			hints[string(resourceName)][i].Preferred = preferred
 		}
 	}
 

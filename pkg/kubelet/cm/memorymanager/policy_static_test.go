@@ -3963,6 +3963,97 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
 		},
+		{
+			// When NUMA node 0 already has a single-NUMA allocation, a cross-NUMA
+			// hint {0,1} would violate the single-vs-cross allocation invariant.
+			// Previously such hints were excluded from the hint list entirely,
+			// leaving the TopologyManager blind to Memory Manager constraints
+			// and causing Allocate() to hard-fail in best-effort mode.
+			// The corrected behavior includes the conflicting hint as non-preferred
+			// so the TopologyManager can score it lower when better options exist.
+			description: "should include cross-NUMA hint as non-preferred when a target node already has a single-NUMA allocation",
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           gb,
+							Reserved:       gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{1},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			pod: getPod("pod2", "container1", requirementsGuaranteed),
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
