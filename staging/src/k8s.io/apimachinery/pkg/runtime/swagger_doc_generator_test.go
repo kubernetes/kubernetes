@@ -17,6 +17,9 @@ limitations under the License.
 package runtime
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 )
 
@@ -40,4 +43,53 @@ func TestFmtRawDoc(t *testing.T) {
 			t.Fatalf("Expected: %q, got %q", test.expected, o)
 		}
 	}
+}
+
+func TestFieldNameJSONInlineOption(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "embedded inline field is skipped",
+			src:  "TypeMeta `json:\",inline\"`",
+			want: "-",
+		},
+		{
+			name: "field name containing the substring inline is retained",
+			src:  "InlineVolumeSpec *PersistentVolumeSpec `json:\"inlineVolumeSpec,omitempty\"`",
+			want: "inlineVolumeSpec",
+		},
+		{
+			name: "field whose JSON name is exactly inline is retained",
+			src:  "Inline string `json:\"inline,omitempty\"`",
+			want: "inline",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field := mustParseStructField(t, tt.src)
+			if got := fieldName(field); got != tt.want {
+				t.Fatalf("fieldName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func mustParseStructField(t *testing.T, fieldSrc string) *ast.Field {
+	t.Helper()
+
+	src := "package p\n\ntype T struct {\n" + fieldSrc + "\n}\n"
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+
+	decl := f.Decls[0].(*ast.GenDecl)
+	spec := decl.Specs[0].(*ast.TypeSpec)
+	st := spec.Type.(*ast.StructType)
+	return st.Fields.List[0]
 }
