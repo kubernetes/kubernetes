@@ -435,6 +435,9 @@ const (
 	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
 	// ScaledToZero indicates that the HPA controller scaled the workload to zero.
 	ScaledToZero HorizontalPodAutoscalerConditionType = "ScaledToZero"
+	// SelectorMatchesExtraPods indicates that the HPA's selector matches more pods
+	// than the scale target reports as owned, which may skew metric averages.
+	SelectorMatchesExtraPods HorizontalPodAutoscalerConditionType = "SelectorMatchesExtraPods"
 )
 
 // HorizontalPodAutoscalerCondition describes the state of

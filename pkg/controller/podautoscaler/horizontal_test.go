@@ -3195,7 +3195,7 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestMoreReplicasThanSpecNoScale(t *testing.T) {
+func TestMoreReplicasThanStatusNoScale(t *testing.T) {
 	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skip flaking test on Windows.")
@@ -3207,8 +3207,9 @@ func TestMoreReplicasThanSpecNoScale(t *testing.T) {
 		statusReplicas:          5, // Deployment update with 25% surge.
 		expectedDesiredReplicas: 4,
 		CPUTarget:               50,
-		reportedLevels:          []uint64{500, 500, 500, 500, 500},
+		reportedLevels:          []uint64{500, 500, 500, 500, 500, 500},
 		reportedCPURequests: []resource.Quantity{
+			resource.MustParse("1"),
 			resource.MustParse("1"),
 			resource.MustParse("1"),
 			resource.MustParse("1"),
@@ -3216,11 +3217,12 @@ func TestMoreReplicasThanSpecNoScale(t *testing.T) {
 			resource.MustParse("1"),
 		},
 		useMetricsAPI: true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}),
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "ReadyForNewScale"},
+			{Type: autoscalingv2.SelectorMatchesExtraPods, Status: v1.ConditionTrue, Reason: "SelectorOverlap"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
+			{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
+		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -4090,6 +4092,13 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 								LastTransitionTime: *tc.lastScaleTime,
 								Reason:             "ReadyForNewScale",
 								Message:            "recommended size matches current size",
+							},
+							{
+								Type:               autoscalingv2.SelectorMatchesExtraPods,
+								Status:             v1.ConditionTrue,
+								LastTransitionTime: *tc.lastScaleTime,
+								Reason:             "SelectorOverlap",
+								Message:            fmt.Sprintf("selector name=%s matches 3 active pods, more than the 2 replicas on the scale target; selector may overlap with another workload", podNamePrefix),
 							},
 							{
 								Type:               autoscalingv2.ScalingActive,

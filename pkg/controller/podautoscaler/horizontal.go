@@ -326,6 +326,30 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 	var invalidMetricError error
 	var invalidMetricCondition autoscalingv2.HorizontalPodAutoscalerCondition
 
+	// Surface a condition when the selector matches more active pods than the
+	// scale target owns. This usually indicates two workloads share a label,
+	// which causes HPA to average metrics across pods it does not control and
+	// scale incorrectly. Terminating and failed pods are excluded to match the
+	// set of pods the replica calculator considers; the condition can still
+	// fire transiently during rolling updates - treat it as advisory.
+	podList, err := a.podLister.Pods(hpa.Namespace).List(selector)
+	if err != nil {
+		return -1, "", nil, time.Time{}, fmt.Errorf("unable to list pods for selector %v: %w", selector, err)
+	}
+	activePodsCount := 0
+	for _, pod := range podList {
+		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
+			continue
+		}
+		activePodsCount++
+	}
+	if activePodsCount > int(scale.Status.Replicas) {
+		msg := fmt.Sprintf("selector %v matches %d active pods, more than the %d replicas on the scale target; selector may overlap with another workload", selector, activePodsCount, scale.Spec.Replicas)
+		setCondition(hpa, autoscalingv2.SelectorMatchesExtraPods, v1.ConditionTrue, "SelectorOverlap", "%s", msg)
+	} else {
+		removeCondition(hpa, autoscalingv2.SelectorMatchesExtraPods)
+	}
+
 	for i, metricSpec := range metricSpecs {
 		replicaCountProposal, metricNameProposal, timestampProposal, condition, err := a.computeReplicasForMetric(ctx, hpa, metricSpec, specReplicas, statusReplicas, selector, &statuses[i])
 
