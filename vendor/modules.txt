@@ -1,7 +1,4 @@
 ## workspace
-# bitbucket.org/bertimus9/systemstat v0.5.0
-## explicit; go 1.17
-bitbucket.org/bertimus9/systemstat
 # cel.dev/expr v0.25.1
 ## explicit; go 1.23.0
 cel.dev/expr
@@ -101,9 +98,9 @@ github.com/coredns/caddy/caddyfile
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
-# github.com/coreos/go-oidc v2.5.0+incompatible
-## explicit
-github.com/coreos/go-oidc
+# github.com/coreos/go-oidc/v3 v3.11.0
+## explicit; go 1.19
+github.com/coreos/go-oidc/v3/oidc
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver

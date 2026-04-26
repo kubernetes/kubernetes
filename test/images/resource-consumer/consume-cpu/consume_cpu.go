@@ -20,10 +20,30 @@ package main
 
 import (
 	"flag"
+	"syscall"
 	"time"
-
-	"bitbucket.org/bertimus9/systemstat"
 )
+
+type procCPUSample struct {
+	total float64
+	t     time.Time
+}
+
+func getProcCPUSample() procCPUSample {
+	var ru syscall.Rusage
+	syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
+	user := float64(ru.Utime.Usec)/1e6 + float64(ru.Utime.Sec)
+	sys := float64(ru.Stime.Usec)/1e6 + float64(ru.Stime.Sec)
+	return procCPUSample{total: user + sys, t: time.Now()}
+}
+
+func getProcCPUTotalPct(first, second procCPUSample) float64 {
+	dT := second.t.Sub(first.t).Seconds()
+	if dT <= 0 {
+		return 0
+	}
+	return 100 * (second.total - first.total) / dT
+}
 
 func main() {
 	flag.Parse()
@@ -31,10 +51,9 @@ func main() {
 	millicoresPct := float64(*millicores) / float64(10)
 	duration := time.Duration(*durationSec) * time.Second
 	start := time.Now()
-	first := systemstat.GetProcCPUSample()
+	first := getProcCPUSample()
 	for time.Since(start) < duration {
-		cpu := systemstat.GetProcCPUAverage(first, systemstat.GetProcCPUSample(), systemstat.GetUptime().Uptime)
-		if cpu.TotalPct < millicoresPct {
+		if getProcCPUTotalPct(first, getProcCPUSample()) < millicoresPct {
 			doSomething()
 		} else {
 			time.Sleep(sleep)
