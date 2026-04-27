@@ -34,6 +34,14 @@ import (
 
 var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))
 
+type valuelessContext struct {
+	context.Context
+}
+
+func (v valuelessContext) Value(key any) any {
+	return nil
+}
+
 type REST struct {
 	tokenAuthenticator authenticator.Request
 	apiAudiences       []string
@@ -90,17 +98,17 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return tokenReview, nil
 	}
 
-	// create a header that contains nothing but the token
-	fakeReq := &http.Request{Header: http.Header{}}
-	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
-
 	auds := tokenReview.Spec.Audiences
 	if len(auds) == 0 {
 		auds = r.apiAudiences
 	}
+	var reqCtx context.Context = valuelessContext{Context: ctx}
 	if len(auds) > 0 {
-		fakeReq = fakeReq.WithContext(authenticator.WithAudiences(fakeReq.Context(), auds))
+		reqCtx = authenticator.WithAudiences(reqCtx, auds)
 	}
+
+	fakeReq := (&http.Request{Header: http.Header{}}).WithContext(reqCtx)
+	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
 
 	resp, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
 	tokenReview.Status.Authenticated = ok
