@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -388,7 +389,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				ginkgo.By("restart kubelet")
 				restartKubelet(ctx, true)
 				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
+					return e2enode.HealthCheck(kubeletHealthCheckURL)
 				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 				ginkgo.By("wait for the mirror pod to be updated")
@@ -711,7 +712,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithSerial(), func() {
 			restartKubelet(ctx, true)
 
 			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
+				return e2enode.HealthCheck(kubeletHealthCheckURL)
 			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			ginkgo.By("ensuring that pod is running")

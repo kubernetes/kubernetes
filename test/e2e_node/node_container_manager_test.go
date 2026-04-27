@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -127,7 +128,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			ginkgo.By("Started the kubelet")
 
 			gomega.Consistently(ctx, func(ctx context.Context) bool {
-				return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
+				return getNodeReadyStatus(ctx, f) && e2enode.HealthCheck(kubeletHealthCheckURL)
 			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
 		})
 	})
@@ -244,7 +245,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
+				return e2enode.HealthCheck(kubeletHealthCheckURL)
 			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
