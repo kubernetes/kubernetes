@@ -191,13 +191,16 @@ func (kvh *kubeletVolumeHost) NewWrapperMounter(
 	volName string,
 	spec volume.Spec,
 	pod *v1.Pod) (volume.Mounter, error) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	logger := klog.FromContext(context.TODO())
+
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	logger := klog.FromContext(context.TODO())
 	return kvh.kubelet.newVolumeMounterFromPlugins(logger, &spec, pod)
 }
 
