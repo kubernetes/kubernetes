@@ -1867,6 +1867,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			PodAffinityExists("foo", "", st.PodAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i)).Obj()
 		podsWithAffinity = append(podsWithAffinity, pod)
 	}
+	// Add a few pods with required anti-affinity.
+	var podsWithRequiredAntiAffinity []*v1.Pod
+	for i := range 20 {
+		pod := st.MakePod().Name(fmt.Sprintf("p-anti-affinity-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-anti-affinity-%v", i)).
+			PodAntiAffinityExists("foo", "kubernetes.io/hostname", st.PodAntiAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i)).Obj()
+		podsWithRequiredAntiAffinity = append(podsWithRequiredAntiAffinity, pod)
+	}
 
 	makePodWithPVC := func(podID int, node int, pvcID int) *v1.Pod {
 		return st.MakePod().Name(fmt.Sprintf("p-pvc-%v", podID)).Namespace("test-ns").UID(fmt.Sprintf("puid-pvc-%v", podID)).
@@ -1913,6 +1920,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	addPodWithAffinity := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.AddPod(logger, podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	addPodWithRequiredAntiAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AddPod(logger, podsWithRequiredAntiAffinity[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -2076,12 +2090,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                           string
-		operations                     []operation
-		expected                       []*v1.Node
-		expectedHavePodsWithAffinity   int
-		expectedPodGroupStatesSnapshot map[podGroupKey]*podGroupStateSnapshot
-		expectedUsedPVCSet             sets.Set[string]
+		name                                     string
+		operations                               []operation
+		expected                                 []*v1.Node
+		expectedHavePodsWithAffinity             int
+		expectedHavePodsWithRequiredAntiAffinity int
+		expectedPodGroupStatesSnapshot           map[podGroupKey]*podGroupStateSnapshot
+		expectedUsedPVCSet                       sets.Set[string]
 	}{
 		{
 			name:               "Empty cache",
@@ -2216,6 +2231,16 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 1,
 			expectedUsedPVCSet:           sets.New[string](),
+		},
+		{
+			name: "Add Pods with required anti-affinity",
+			operations: []operation{
+				addNode(0), addPodWithRequiredAntiAffinity(0), updateSnapshot(), addNode(1),
+			},
+			expected:                                 []*v1.Node{nodes[1], nodes[0]},
+			expectedHavePodsWithAffinity:             1,
+			expectedHavePodsWithRequiredAntiAffinity: 1,
+			expectedUsedPVCSet:                       sets.New[string](),
 		},
 		{
 			name: "Add Pods with PVC",
@@ -2384,6 +2409,9 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			if len(snapshot.havePodsWithAffinityNodeInfoList) != test.expectedHavePodsWithAffinity {
 				t.Errorf("unexpected number of HavePodsWithAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithAffinity, len(snapshot.havePodsWithAffinityNodeInfoList))
 			}
+			if len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList) != test.expectedHavePodsWithRequiredAntiAffinity {
+				t.Errorf("unexpected number of HavePodsWithRequiredAntiAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithRequiredAntiAffinity, len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList))
+			}
 
 			// Compare content of the used PVC set
 			if diff := cmp.Diff(test.expectedUsedPVCSet, snapshot.usedPVCSet); diff != "" {
@@ -2398,6 +2426,43 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				t.Error(err)
 			}
 		})
+	}
+}
+
+func TestSnapshotAssumePodUpdatesAffinityLists(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	node := st.MakeNode().Name("node1").Label("kubernetes.io/hostname", "node1").Obj()
+	pod := st.MakePod().Name("pod1").Namespace("ns").UID("pod1").
+		PodAntiAffinityExists("app", "kubernetes.io/hostname", st.PodAntiAffinityWithRequiredReq).
+		Node(node.Name).Obj()
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot := NewSnapshot(nil, []*v1.Node{node})
+	if err := snapshot.AssumePod(podInfo); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := len(snapshot.havePodsWithAffinityNodeInfoList); got != 1 {
+		t.Fatalf("expected one node with affinity pods after assuming pod, got %d", got)
+	}
+	if got := len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList); got != 1 {
+		t.Fatalf("expected one node with required anti-affinity pods after assuming pod, got %d", got)
+	}
+	if snapshot.havePodsWithRequiredAntiAffinityNodeInfoList[0].Node().Name != node.Name {
+		t.Fatalf("expected node %q in required anti-affinity list, got %q", node.Name, snapshot.havePodsWithRequiredAntiAffinityNodeInfoList[0].Node().Name)
+	}
+
+	if err := snapshot.ForgetPod(logger, pod); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(snapshot.havePodsWithAffinityNodeInfoList); got != 0 {
+		t.Fatalf("expected no nodes with affinity pods after forgetting pod, got %d", got)
+	}
+	if got := len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList); got != 0 {
+		t.Fatalf("expected no nodes with required anti-affinity pods after forgetting pod, got %d", got)
 	}
 }
 
@@ -2422,6 +2487,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 
 	expectedNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedHavePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedUsedPVCSet := sets.New[string]()
 	nodesList, err := cache.nodeTree.list()
 	if err != nil {
@@ -2432,6 +2498,9 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
 			if len(n.PodsWithAffinity) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
+			}
+			if len(n.PodsWithRequiredAntiAffinity) > 0 {
+				expectedHavePodsWithRequiredAntiAffinityNodeInfoList = append(expectedHavePodsWithRequiredAntiAffinityNodeInfoList, n)
 			}
 			for key := range n.PVCRefCounts {
 				expectedUsedPVCSet.Insert(key)
@@ -2452,6 +2521,16 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		got := snapshot.havePodsWithAffinityNodeInfoList[i]
 		if expected != got {
 			return fmt.Errorf("unexpected NodeInfo pointer in HavePodsWithAffinityNodeInfoList. Expected: %p, got: %p", expected, got)
+		}
+	}
+
+	if len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList) != len(expectedHavePodsWithRequiredAntiAffinityNodeInfoList) {
+		return fmt.Errorf("unexpected number of HavePodsWithRequiredAntiAffinity nodes. Expected: %v, got: %v", len(expectedHavePodsWithRequiredAntiAffinityNodeInfoList), len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList))
+	}
+	for i, expected := range expectedHavePodsWithRequiredAntiAffinityNodeInfoList {
+		got := snapshot.havePodsWithRequiredAntiAffinityNodeInfoList[i]
+		if expected != got {
+			return fmt.Errorf("unexpected NodeInfo pointer in HavePodsWithRequiredAntiAffinityNodeInfoList. Expected: %p, got: %p", expected, got)
 		}
 	}
 

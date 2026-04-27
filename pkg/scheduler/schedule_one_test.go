@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -2043,6 +2044,74 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				}
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
+			}
+		})
+	}
+}
+
+func TestSchedulerConsidersAssumedPodsForRequiredPodAntiAffinity(t *testing.T) {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
+			client := clientsetfake.NewClientset()
+			bindingChan := interruptOnBind(client)
+
+			var apiDispatcher *apidispatcher.APIDispatcher
+			if asyncAPICallsEnabled {
+				apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
+			}
+
+			scache := internalcache.New(ctx, apiDispatcher, false)
+			node := v1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "node1",
+				UID:  types.UID("node1"),
+				Labels: map[string]string{
+					v1.LabelHostname: "node1",
+				},
+			}}
+			scache.AddNode(logger, &node)
+			makeAntiAffinityPod := func(name string) *v1.Pod {
+				return st.MakePod().Name(name).UID(name).SchedulerName(testSchedulerName).Labels(map[string]string{"app": "demo"}).
+					PodAntiAffinityIn("app", v1.LabelHostname, []string{"demo"}, st.PodAntiAffinityWithRequiredReq).Obj()
+			}
+			firstPod := makeAntiAffinityPod("foo")
+			fns := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "PreFilter", "Filter"),
+			}
+			scheduler, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, client, queuedPodStore, scache, apiDispatcher, firstPod, &node, bindingChan, fns...)
+
+			secondPod := makeAntiAffinityPod("bar")
+			if err := queuedPodStore.Add(secondPod); err != nil {
+				t.Fatal(err)
+			}
+
+			scheduler.ScheduleOne(ctx)
+			select {
+			case err := <-errChan:
+				expectErr := &framework.FitError{
+					Pod:         secondPod,
+					NumAllNodes: 1,
+					Diagnosis: framework.Diagnosis{
+						NodeToStatus: framework.NewNodeToStatus(map[string]*fwk.Status{
+							node.Name: fwk.NewStatus(fwk.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch).WithPlugin(interpodaffinity.Name),
+						}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+						UnschedulablePlugins: sets.New(interpodaffinity.Name),
+					},
+				}
+				if diff := cmp.Diff(expectErr, err, schedulerCmpOpts...); diff != "" {
+					t.Errorf("unexpected error (-want,+got):\n%s", diff)
+				}
+			case b := <-bindingChan:
+				t.Fatalf("expected second pod to be unschedulable while first pod is assumed, got binding %#v", b)
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("timeout in fitting after %v", wait.ForeverTestTimeout)
 			}
 		})
 	}

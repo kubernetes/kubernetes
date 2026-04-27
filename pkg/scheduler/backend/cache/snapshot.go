@@ -351,8 +351,11 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	// Since this operation only affects the snapshot,
 	// we should keep the old number to remain consistent with the cached value.
 	oldGeneration := nodeInfo.Generation
+	hadPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+	hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
+	s.updateAffinityListsForNode(nodeInfo, hadPodsWithAffinity, hadPodsWithRequiredAntiAffinity)
 	s.assumedPods[key] = pod
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
@@ -383,11 +386,14 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		// Since this operation only affects the snapshot,
 		// we should keep the old number to remain consistent with the cached value.
 		oldGeneration := nodeInfo.Generation
+		hadPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+		hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 		err := nodeInfo.RemovePod(logger, pod)
 		if err != nil {
 			return err
 		}
 		nodeInfo.Generation = oldGeneration
+		s.updateAffinityListsForNode(nodeInfo, hadPodsWithAffinity, hadPodsWithRequiredAntiAffinity)
 		if len(nodeInfo.Pods) == 0 && nodeInfo.Node() == nil {
 			delete(s.nodeInfoMap, nodeName)
 		}
@@ -401,6 +407,70 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		pgs.forgetPod(assumedPod.UID)
 	}
 	return nil
+}
+
+func (s *Snapshot) updateAffinityListsForNode(nodeInfo *framework.NodeInfo, hadPodsWithAffinity, hadPodsWithRequiredAntiAffinity bool) {
+	nowHasPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+	if !hadPodsWithAffinity && nowHasPodsWithAffinity {
+		s.havePodsWithAffinityNodeInfoList = addNodeInfoInSnapshotOrder(s.havePodsWithAffinityNodeInfoList, nodeInfo, s.nodeInfoList)
+	} else if hadPodsWithAffinity && !nowHasPodsWithAffinity {
+		s.havePodsWithAffinityNodeInfoList = removeNodeInfo(s.havePodsWithAffinityNodeInfoList, nodeInfo)
+	}
+
+	nowHasPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
+	if !hadPodsWithRequiredAntiAffinity && nowHasPodsWithRequiredAntiAffinity {
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = addNodeInfoInSnapshotOrder(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo, s.nodeInfoList)
+	} else if hadPodsWithRequiredAntiAffinity && !nowHasPodsWithRequiredAntiAffinity {
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = removeNodeInfo(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+	}
+}
+
+func addNodeInfoInSnapshotOrder(nodeInfoList []fwk.NodeInfo, nodeInfo *framework.NodeInfo, snapshotNodeInfoList []fwk.NodeInfo) []fwk.NodeInfo {
+	for _, ni := range nodeInfoList {
+		if ni == nodeInfo {
+			return nodeInfoList
+		}
+	}
+
+	nodeInfoIndex := -1
+	for i, ni := range snapshotNodeInfoList {
+		if ni == nodeInfo {
+			nodeInfoIndex = i
+			break
+		}
+	}
+	if nodeInfoIndex == -1 {
+		return nodeInfoList
+	}
+
+	insertIndex := len(nodeInfoList)
+	for i, ni := range nodeInfoList {
+		for j, snapshotNodeInfo := range snapshotNodeInfoList {
+			if ni == snapshotNodeInfo {
+				if nodeInfoIndex < j {
+					insertIndex = i
+				}
+				break
+			}
+		}
+		if insertIndex != len(nodeInfoList) {
+			break
+		}
+	}
+
+	nodeInfoList = append(nodeInfoList, nil)
+	copy(nodeInfoList[insertIndex+1:], nodeInfoList[insertIndex:])
+	nodeInfoList[insertIndex] = nodeInfo
+	return nodeInfoList
+}
+
+func removeNodeInfo(nodeInfoList []fwk.NodeInfo, nodeInfo *framework.NodeInfo) []fwk.NodeInfo {
+	for i, ni := range nodeInfoList {
+		if ni == nodeInfo {
+			return append(nodeInfoList[:i], nodeInfoList[i+1:]...)
+		}
+	}
+	return nodeInfoList
 }
 
 // forgetAllAssumedPods forgets all assumed pods from the snapshot.
