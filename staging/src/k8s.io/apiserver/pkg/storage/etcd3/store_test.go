@@ -190,6 +190,21 @@ func TestKeySchema(t *testing.T) {
 	storagetesting.RunTestKeySchema(ctx, t, store)
 }
 
+func TestGetListWithErrorAggregation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+	ctx, s, _ := testSetup(t)
+	store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: store, store: s}, corruptErr)
+}
+
+func TestGetListWithoutErrorAggregation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, false)
+	ctx, s, _ := testSetup(t)
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithoutErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: s, store: s}, corruptErr)
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }
@@ -205,25 +220,19 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	}
 }
 
-type corruptedTransformer struct {
-	value.Transformer
+type storeWithTransformerOverride struct {
+	storage.Interface
+	// we need the original *store instance to mutate the transformer
+	store *store
 }
 
-func (f *corruptedTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	return nil, true, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
-}
-
-type storeWithCorruptedTransformer struct {
-	*store
-}
-
-func (s *storeWithCorruptedTransformer) CorruptTransformer() func() {
-	ct := &corruptedTransformer{Transformer: s.transformer}
-	s.transformer = ct
-	s.watcher.transformer = ct
+func (s *storeWithTransformerOverride) UpdateTransformer(modifier storagetesting.TransformerModifier) func() {
+	orig := s.store.transformer
+	s.store.transformer = modifier(orig)
+	s.store.watcher.transformer = modifier(orig)
 	return func() {
-		s.transformer = ct.Transformer
-		s.watcher.transformer = ct.Transformer
+		s.store.transformer = orig
+		s.store.watcher.transformer = orig
 	}
 }
 

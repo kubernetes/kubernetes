@@ -114,7 +114,8 @@ func TestProgressNotify(t *testing.T) {
 func TestWatchWithUnsafeDelete(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithTransformerOverride{Interface: store, store: store}, corruptErr)
 }
 
 // TestWatchDispatchBookmarkEvents makes sure that
