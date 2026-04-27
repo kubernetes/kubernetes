@@ -91,7 +91,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			old:    mkPriorityClass(tweakDescription("test description")),
 			update: mkPriorityClass(tweakValue(2000), tweakDescription("test description")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}

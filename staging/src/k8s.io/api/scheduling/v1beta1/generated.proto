@@ -42,6 +42,7 @@ message PriorityClass {
   // receive when they have the name of this class in their pod spec.
   // +optional
   // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   optional int32 value = 2;
 
   // globalDefault specifies whether this PriorityClass should be considered as
