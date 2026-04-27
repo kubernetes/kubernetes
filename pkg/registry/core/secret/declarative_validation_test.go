@@ -165,7 +165,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				}),
 			),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretTypeTLS, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("type"), api.SecretTypeTLS, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}

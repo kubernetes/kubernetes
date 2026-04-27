@@ -7965,6 +7965,7 @@ type Secret struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
