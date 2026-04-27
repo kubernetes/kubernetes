@@ -606,7 +606,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			ResourceClaimName: &claimName,
 		}}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("ResourceClaimStatuses: change should be ignored but was detected")
+			t.Error("ResourceClaimStatuses: change should be ignored but was detected")
 		}
 
 		// Test ExtendedResourceClaimStatus
@@ -615,7 +615,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			ResourceClaimName: "test-extended-claim",
 		}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("ExtendedResourceClaimStatus: change should be ignored but was detected")
+			t.Error("ExtendedResourceClaimStatus: change should be ignored but was detected")
 		}
 
 		// Test NodeAllocatableResourceClaimStatuses
@@ -625,7 +625,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			Containers:        []string{"ctr0"},
 		}}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
+			t.Error("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
 		}
 	})
 
@@ -638,7 +638,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		modified := base.DeepCopy()
 		modified.Phase = v1.PodSucceeded
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Phase: change should be detected but was ignored")
+			t.Error("Phase: change should be detected but was ignored")
 		}
 
 		// Test Conditions
@@ -648,64 +648,63 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			Status: v1.ConditionTrue,
 		})
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Conditions: change should be detected but was ignored")
+			t.Error("Conditions: change should be detected but was ignored")
 		}
 
 		// Test Message
 		modified = base.DeepCopy()
 		modified.Message = "test message"
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Message: change should be detected but was ignored")
+			t.Error("Message: change should be detected but was ignored")
 		}
 
 		// Test Reason
 		modified = base.DeepCopy()
 		modified.Reason = "TestReason"
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Reason: change should be detected but was ignored")
+			t.Error("Reason: change should be detected but was ignored")
 		}
 
 		// Test NominatedNodeName
 		modified = base.DeepCopy()
 		modified.NominatedNodeName = "test-node"
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("NominatedNodeName: change should be detected but was ignored")
+			t.Error("NominatedNodeName: change should be detected but was ignored")
 		}
 
 		// Test HostIP
 		modified = base.DeepCopy()
 		modified.HostIP = "192.168.1.1"
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("HostIP: change should be detected but was ignored")
+			t.Error("HostIP: change should be detected but was ignored")
 		}
 
 		// Test HostIPs — type is []v1.HostIP, not []v1.PodIP
 		modified = base.DeepCopy()
 		modified.HostIPs = []v1.HostIP{{IP: "192.168.1.1"}}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("HostIPs: change should be detected but was ignored")
+			t.Error("HostIPs: change should be detected but was ignored")
 		}
 
 		// Test PodIP
 		modified = base.DeepCopy()
 		modified.PodIP = "1.2.3.4"
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("PodIP: change should be detected but was ignored")
+			t.Error("PodIP: change should be detected but was ignored")
 		}
 
 		// Test PodIPs
 		modified = base.DeepCopy()
 		modified.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("PodIPs: change should be detected but was ignored")
+			t.Error("PodIPs: change should be detected but was ignored")
 		}
 
 		// Test StartTime
 		modified = base.DeepCopy()
-		now := metav1.Now()
-		modified.StartTime = &now
+		modified.StartTime = ptr.To(metav1.Now())
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("StartTime: change should be detected but was ignored")
+			t.Error("StartTime: change should be detected but was ignored")
 		}
 
 		// Test InitContainerStatuses
@@ -717,7 +716,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			},
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("InitContainerStatuses: change should be detected but was ignored")
+			t.Error("InitContainerStatuses: change should be detected but was ignored")
 		}
 
 		// Test ContainerStatuses
@@ -729,14 +728,14 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			},
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("ContainerStatuses: change should be detected but was ignored")
+			t.Error("ContainerStatuses: change should be detected but was ignored")
 		}
 
 		// Test QOSClass
 		modified = base.DeepCopy()
 		modified.QOSClass = v1.PodQOSGuaranteed
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("QOSClass: change should be detected but was ignored")
+			t.Error("QOSClass: change should be detected but was ignored")
 		}
 
 		// Test EphemeralContainerStatuses
@@ -748,14 +747,14 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			},
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("EphemeralContainerStatuses: change should be detected but was ignored")
+			t.Error("EphemeralContainerStatuses: change should be detected but was ignored")
 		}
 
 		// Test Resize — PodResizeStatus is a non-pointer string alias
 		modified = base.DeepCopy()
 		modified.Resize = v1.PodResizeStatus("InProgress")
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Resize: change should be detected but was ignored")
+			t.Error("Resize: change should be detected but was ignored")
 		}
 
 		// Test AllocatedResources
@@ -764,14 +763,14 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			v1.ResourceCPU: resource.MustParse("100m"),
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("AllocatedResources: change should be detected but was ignored")
+			t.Error("AllocatedResources: change should be detected but was ignored")
 		}
 
 		// Test ObservedGeneration
 		modified = base.DeepCopy()
 		modified.ObservedGeneration = 1
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("ObservedGeneration: change should be detected but was ignored")
+			t.Error("ObservedGeneration: change should be detected but was ignored")
 		}
 
 		// Test Resources
@@ -782,7 +781,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			},
 		}
 		if isPodStatusByKubeletEqual(base, modified) {
-			t.Errorf("Resources: change should be detected but was ignored")
+			t.Error("Resources: change should be detected but was ignored")
 		}
 	})
 }
